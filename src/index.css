@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #102a43;
+  --navy: #09243f;
+  --orange: #df6b16;
+  --gold: #efb24b;
+  --paper: #fbf8f2;
+  --muted: #607184;
+  --line: #e7ded1;
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.7;
+}
+
+h1, h2, h3, .serif-marathi {
+  font-family: 'Noto Serif Devanagari', serif;
+}
+
+/* Custom scrollbar for clean reading */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f0e9de;
+}
+::-webkit-scrollbar-thumb {
+  background: #c8b9a6;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #df6b16;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
