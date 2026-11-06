@@ -11,5 +11,17 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 3000,
-  }
+  },
+  build: {
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
+  },
 });

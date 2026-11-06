@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Health check / connection test document
+    match /test/{testId} {
+      allow get: if true;
+    }
+
+    // News collection - public read and list for educational circulars and federation updates
+    match /news/{newsId} {
+      allow get: if isValidId(newsId);
+      allow list: if true;
+      allow create, update: if isValidId(newsId);
+      allow delete: if isValidId(newsId);
+    }
+
+    // Applications collection - public can submit membership application, track status, admin manages
+    match /applications/{applicationId} {
+      allow get: if isValidId(applicationId);
+      allow list: if true;
+      allow create: if isValidId(applicationId) &&
+        request.resource.data.applicationNumber is string &&
+        request.resource.data.fullName is string &&
+        request.resource.data.phone is string;
+      allow update, delete: if isValidId(applicationId);
+    }
+
+    // Contact messages collection - public can submit contact inquiry
+    match /contacts/{contactId} {
+      allow get: if isValidId(contactId);
+      allow list: if true;
+      allow create: if isValidId(contactId) &&
+        request.resource.data.name is string &&
+        request.resource.data.phone is string &&
+        request.resource.data.message is string;
+      allow update, delete: if isValidId(contactId);
+    }
+
+    // Settings collection - admin authentication and system configuration
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId);
+      allow list: if true;
+      allow create, update: if isValidId(settingId);
+    }
+  }
+}

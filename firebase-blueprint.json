@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "MembershipApplication": {
+      "title": "MembershipApplication",
+      "description": "Membership registration application submitted by educational officers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "applicationNumber": { "type": "string", "maxLength": 32 },
+        "salutation": { "type": "string", "maxLength": 16 },
+        "fullName": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "maxLength": 128 },
+        "address": { "type": "string", "maxLength": 500 },
+        "district": { "type": "string", "maxLength": 64 },
+        "familyMembers": { "type": "string", "maxLength": 16 },
+        "hobby": { "type": "string", "maxLength": 128 },
+        "education": { "type": "string", "maxLength": 128 },
+        "professional": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "memberNumber": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "approvedAt": { "type": "string", "maxLength": 64 },
+        "paymentRef": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["applicationNumber", "salutation", "fullName", "phone", "email", "address", "education", "status", "createdAt"]
+    },
+    "NewsItem": {
+      "title": "NewsItem",
+      "description": "Official news announcements, circulars and articles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 256 },
+        "date": { "type": "string", "maxLength": 64 },
+        "category": { "type": "string", "maxLength": 64 },
+        "summary": { "type": "string", "maxLength": 1000 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "image": { "type": "string", "maxLength": 500 },
+        "featured": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["title", "date", "category", "summary", "content", "createdAt"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Message submitted via contact form",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "email": { "type": "string", "maxLength": 128 },
+        "district": { "type": "string", "maxLength": 64 },
+        "subject": { "type": "string", "maxLength": 256 },
+        "message": { "type": "string", "maxLength": 2000 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["name", "phone", "message", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/applications/{applicationId}": {
+      "schema": { "$ref": "MembershipApplication" },
+      "description": "Collection of membership applications submitted by officers across Maharashtra"
+    },
+    "/news/{newsId}": {
+      "schema": { "$ref": "NewsItem" },
+      "description": "Public educational announcements, notifications and letter pad circulars"
+    },
+    "/contacts/{contactId}": {
+      "schema": { "$ref": "ContactMessage" },
+      "description": "Inquiries, grievances and messages submitted by visitors and officers"
+    }
+  }
+}

@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
 import { Calendar, Tag, ArrowRight, X, Search, FileText } from 'lucide-react';
 import { NewsItem } from '../data/mahasanghData';
+import { toEnglishDigits } from '../utils/formatters';
 
 interface NewsTabProps {
   newsList: NewsItem[];
   selectedNews: NewsItem | null;
   setSelectedNews: (news: NewsItem | null) => void;
+  onRefreshNews?: () => Promise<void>;
+  isRefreshing?: boolean;
 }
 
 export const NewsTab: React.FC<NewsTabProps> = ({
   newsList,
   selectedNews,
   setSelectedNews,
+  onRefreshNews,
+  isRefreshing,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState('सर्व');
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,7 +50,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
 
         {/* Filter and Search Bar */}
         <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -59,6 +64,16 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                 {cat}
               </button>
             ))}
+            {onRefreshNews && (
+              <button
+                onClick={onRefreshNews}
+                disabled={isRefreshing}
+                className="text-xs text-[#df6b16] hover:bg-[#fff0df] border border-[#df6b16]/30 px-3 py-1.5 rounded-full transition-colors font-medium flex items-center gap-1 disabled:opacity-50"
+                title="ताज्या घडामोडी तपासा"
+              >
+                {isRefreshing ? 'तपासत आहे...' : '⟳ ताजे अपडेट्स'}
+              </button>
+            )}
           </div>
 
           <div className="relative w-full md:w-64">
@@ -90,6 +105,8 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                       <img
                         src={item.image}
                         alt={item.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <span className="absolute top-2.5 left-2.5 bg-[#09243f]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded">
@@ -104,7 +121,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                     <div className="flex items-center gap-3 text-xs text-[#607184] mb-2 font-medium">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
-                        {item.date}
+                        {toEnglishDigits(item.date)}
                       </span>
                       {!item.image && (
                         <span className="flex items-center gap-1 text-[#df6b16] font-semibold">
@@ -168,7 +185,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                 </span>
                 <span className="text-[#607184] flex items-center gap-1">
                   <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
-                  {selectedNews.date}
+                  {toEnglishDigits(selectedNews.date)}
                 </span>
               </div>
 

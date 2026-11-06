@@ -15,9 +15,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
     { id: 'about', label: 'आमच्याबद्दल' },
     { id: 'objectives', label: 'उद्दिष्टे' },
     { id: 'leadership', label: 'नेतृत्व' },
+    { id: 'appointments', label: 'पदाधिकारी व नियुक्ती पत्रे' },
     { id: 'news', label: 'बातम्या' },
     { id: 'membership', label: 'सदस्यत्व' },
-    { id: 'admin', label: 'प्रशासन' },
   ];
 
   const handleNavClick = (id: string) => {
@@ -59,6 +59,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
           <img
             src="/heding.jpg"
             alt="महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ चिन्ह"
+            width="56"
+            height="56"
+            decoding="async"
             className="w-12 h-12 md:w-14 md:h-14 object-cover object-left rounded-full border-2 border-[#efb24b] shadow-sm group-hover:scale-105 transition-transform"
           />
           <div className="flex flex-col leading-tight">

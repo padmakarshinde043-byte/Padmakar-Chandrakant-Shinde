@@ -74,6 +74,8 @@ export const AboutTab: React.FC<AboutTabProps> = ({ setCurrentTab }) => {
                 <img
                   src="/heding.jpg"
                   alt={ORG_DETAILS.founderPresident.name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-32 h-32 sm:w-40 sm:h-40 object-cover object-left rounded-full"
                 />
               </div>
@@ -211,7 +213,7 @@ export const AboutTab: React.FC<AboutTabProps> = ({ setCurrentTab }) => {
               कार्यक्षेत्र व विस्तार
             </span>
             <h2 className="font-serifDevanagari text-2xl font-bold text-[#09243f] mt-1">
-              महाराष्ट्रातील ३४ जिल्ह्यांमध्ये सक्रिय जाळे
+              महाराष्ट्रातील 34 जिल्ह्यांमध्ये सक्रिय जाळे
             </h2>
             <p className="text-xs sm:text-sm text-[#607184] mt-1">
               प्रत्येक जिल्हा व तालुक्यात महासंघाचे पदाधिकारी व प्रतिनिधी सदस्यांच्या मदतीसाठी सज्ज आहेत.

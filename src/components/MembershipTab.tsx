@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
 import { UserCheck, ShieldCheck, CheckCircle2, AlertCircle, Phone, Printer, Download, Search } from 'lucide-react';
 import { ORG_DETAILS, MAHARASHTRA_DISTRICTS, MembershipApplication } from '../data/mahasanghData';
+import { toEnglishDigits } from '../utils/formatters';
 
 interface MembershipTabProps {
   onAddApplication: (app: MembershipApplication) => void;
   applications: MembershipApplication[];
+  onTrackRemote?: (query: string) => Promise<MembershipApplication | null>;
 }
 
-export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, applications }) => {
+export const MembershipTab: React.FC<MembershipTabProps> = ({
+  onAddApplication,
+  applications,
+  onTrackRemote,
+}) => {
   const [salutation, setSalutation] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -41,11 +47,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
       applicationNumber: `MS-2026-${randomSuffix}`,
       salutation,
       fullName,
-      phone,
+      phone: toEnglishDigits(phone),
       email,
       address,
       district: district || 'नाशिक',
-      familyMembers,
+      familyMembers: toEnglishDigits(familyMembers),
       hobby,
       education,
       professional,
@@ -73,23 +79,34 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
     setPaymentScreenshot('');
   };
 
-  const handleTrackStatus = (e: React.FormEvent) => {
+  const handleTrackStatus = async (e: React.FormEvent) => {
     e.preventDefault();
-    const query = searchQuery.trim().toLowerCase();
+    const query = toEnglishDigits(searchQuery.trim().toLowerCase());
     if (!query) return;
 
-    const found = applications.find(
+    // 1. Check local cache first (0 network reads)
+    const foundLocally = applications.find(
       (a) =>
         a.applicationNumber.toLowerCase() === query ||
         a.phone.includes(query) ||
         (a.memberNumber && a.memberNumber.toLowerCase() === query)
     );
 
-    if (found) {
-      setSearchResult(found);
-    } else {
-      setSearchResult('not_found');
+    if (foundLocally) {
+      setSearchResult(foundLocally);
+      return;
     }
+
+    // 2. Query Firestore targeted (at most 1 read)
+    if (onTrackRemote) {
+      const foundRemote = await onTrackRemote(toEnglishDigits(searchQuery.trim()));
+      if (foundRemote) {
+        setSearchResult(foundRemote);
+        return;
+      }
+    }
+
+    setSearchResult('not_found');
   };
 
   return (
@@ -168,7 +185,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
 
           {searchResult === 'not_found' && (
             <div className="mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded">
-              कोणताही अर्ज आढळला नाही. कृपया अचूक अर्ज क्रमांक किंवा १० अंकी मोबाईल नंबर टाका.
+              कोणताही अर्ज आढळला नाही. कृपया अचूक अर्ज क्रमांक किंवा 10 अंकी मोबाईल नंबर टाका.
             </div>
           )}
         </div>
@@ -186,7 +203,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
                   आपला अर्ज क्रमांक: <strong className="text-base text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-300">{submittedApp.applicationNumber}</strong>
                 </p>
                 <p className="text-xs text-emerald-800">
-                  कृपया सदस्यत्व शुल्क ₹५०० चा पेमेंट स्क्रीनशॉट <strong>{ORG_DETAILS.phonePhonePe}</strong> या WhatsApp नंबरवर त्वरित पाठवा. पडताळणीनंतर आपल्या ई-मेल व मोबाईलवर अधिकृत सदस्य क्रमांक व प्रमाणपत्र पाठवले जाईल.
+                  कृपया सदस्यत्व शुल्क ₹500 चा पेमेंट स्क्रीनशॉट <strong>{ORG_DETAILS.phonePhonePe}</strong> या WhatsApp नंबरवर त्वरित पाठवा. पडताळणीनंतर आपल्या ई-मेल व मोबाईलवर अधिकृत सदस्य क्रमांक व प्रमाणपत्र पाठवले जाईल.
                 </p>
                 <div className="pt-2 flex gap-3">
                   <button
@@ -213,7 +230,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
           {/* Section 1: Personal Details */}
           <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
             <h2 className="font-serifDevanagari text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              १. वैयक्तिक माहिती (Personal Details)
+              1. वैयक्तिक माहिती (Personal Details)
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -259,7 +276,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
                   pattern="[0-9]{10}"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="१० अंकी मोबाईल नंबर"
+                  placeholder="10 अंकी मोबाईल नंबर"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
                 />
               </div>
@@ -306,7 +323,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
                   min="1"
                   value={familyMembers}
                   onChange={(e) => setFamilyMembers(e.target.value)}
-                  placeholder="उदा. ४"
+                  placeholder="उदा. 4"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
                 />
               </div>
@@ -343,7 +360,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
           {/* Section 2: Educational & Professional Qualifications */}
           <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
             <h2 className="font-serifDevanagari text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              २. शैक्षणिक व व्यावसायिक माहिती (Education & Profession)
+              2. शैक्षणिक व व्यावसायिक माहिती (Education & Profession)
             </h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -393,7 +410,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({ onAddApplication, 
           {/* Section 3: Fee & Documents Verification */}
           <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
             <h2 className="font-serifDevanagari text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              ३. कागदपत्रे व सदस्यत्व शुल्क
+              3. कागदपत्रे व सदस्यत्व शुल्क
             </h2>
 
             <div className="bg-[#fff7f0] border-l-4 border-[#df6b16] p-4 rounded-r-lg text-xs leading-relaxed text-[#102a43] space-y-1">

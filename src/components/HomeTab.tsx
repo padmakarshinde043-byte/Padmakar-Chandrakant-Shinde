@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, ExternalLink, ShieldCheck, Users, School, Award, ChevronRight } from 'lucide-react';
 import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem } from '../data/mahasanghData';
+import { toEnglishDigits } from '../utils/formatters';
 
 interface HomeTabProps {
   setCurrentTab: (tab: string) => void;
@@ -122,8 +123,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
         <div className="max-w-[1160px] mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serifDevanagari text-[#efb24b] mb-1">
-                ३४
+              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
+                34
               </div>
               <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#efb24b]" />
@@ -131,8 +132,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
               </div>
             </div>
             <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serifDevanagari text-[#efb24b] mb-1">
-                ३५०+
+              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
+                350+
               </div>
               <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
                 <School className="w-3.5 h-3.5 text-[#efb24b]" />
@@ -140,8 +141,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
               </div>
             </div>
             <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serifDevanagari text-[#efb24b] mb-1">
-                ५०,०००+
+              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
+                50,000+
               </div>
               <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
                 <Users className="w-3.5 h-3.5 text-[#efb24b]" />
@@ -149,8 +150,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
               </div>
             </div>
             <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serifDevanagari text-[#efb24b] mb-1">
-                १००%
+              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
+                100%
               </div>
               <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
                 <Award className="w-3.5 h-3.5 text-[#efb24b]" />
@@ -158,6 +159,37 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Featured Appointment Portal Banner */}
+      <section className="bg-gradient-to-r from-[#700f13] via-[#851216] to-[#09243f] text-white py-6 border-b border-[#d4af37]">
+        <div className="max-w-[1160px] mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shrink-0">
+              <Award className="w-6 h-6 text-[#efb24b]" />
+            </div>
+            <div>
+              <span className="text-[11px] uppercase tracking-widest text-[#f8d39b] font-bold block">
+                अधिकृत डिजिटल पोर्टल
+              </span>
+              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white">
+                जिल्हा पदाधिकारी यादी व अधिकृत नियुक्ती पत्रे
+              </h3>
+              <p className="text-xs text-[#dbe8f1] mt-0.5">
+                सर्व 36 जिल्ह्यांमधील पदाधिकाऱ्यांची यादी, थेट A4 नियुक्ती पत्र डाऊनलोड व WhatsApp प्रेषण.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setCurrentTab('appointments');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="shrink-0 bg-[#efb24b] hover:bg-[#df6b16] text-[#09243f] hover:text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-lg transition-all shadow-md flex items-center gap-2"
+          >
+            नियुक्ती पत्र पोर्टल उघडा <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </section>
 
@@ -232,7 +264,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
               >
                 <div>
                   <div className="flex items-center gap-2 text-xs font-bold text-[#df6b16] mb-4">
-                    <span>{INITIAL_NEWS[0].date}</span>
+                    <span>{toEnglishDigits(INITIAL_NEWS[0].date)}</span>
                     <span className="text-[#b9c9d3]">· {INITIAL_NEWS[0].category}</span>
                   </div>
                   <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white mb-3 hover:text-[#f8d39b] transition-colors">
@@ -246,6 +278,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
                       <img
                         src={INITIAL_NEWS[0].image}
                         alt="लेटर पॅड"
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-40 object-cover rounded"
                       />
                     </div>
@@ -267,7 +301,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
                 >
                   <div>
                     <div className="flex items-center gap-2 text-xs font-bold text-[#df6b16] mb-2">
-                      <span>{item.date}</span>
+                      <span>{toEnglishDigits(item.date)}</span>
                       <span className="text-[#607184]">· {item.category}</span>
                     </div>
                     <h3 className="font-serifDevanagari text-lg font-bold text-[#102a43] mb-2 hover:text-[#df6b16] transition-colors">

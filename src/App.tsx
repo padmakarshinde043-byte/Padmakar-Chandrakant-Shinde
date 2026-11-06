@@ -9,18 +9,38 @@ import { NewsTab } from './components/NewsTab';
 import { MembershipTab } from './components/MembershipTab';
 import { ContactTab } from './components/ContactTab';
 import { AdminTab } from './components/AdminTab';
+import { AppointmentsTab } from './components/AppointmentsTab';
 import {
   INITIAL_NEWS,
   INITIAL_APPLICATIONS,
   NewsItem,
   MembershipApplication,
 } from './data/mahasanghData';
+import {
+  testConnectionOncePerSession,
+  fetchNewsCached,
+  saveNewsToFirestore,
+  saveApplicationToFirestore,
+  trackSingleApplicationInFirestore,
+  fetchApplicationsForAdmin,
+  approveApplicationInFirestore,
+  saveContactToFirestore,
+} from './firebase';
+
+function isPathAdminRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  return path === '/admin' || hash === '#admin' || hash === '#/admin';
+}
 
 export function App() {
-  const [currentTab, setCurrentTab] = useState<string>('home');
+  const [currentTab, setCurrentTab] = useState<string>(() => (isPathAdminRoute() ? 'admin' : 'home'));
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const [isRefreshingNews, setIsRefreshingNews] = useState(false);
+  const [isLoadingAdminApps, setIsLoadingAdminApps] = useState(false);
 
-  // Initialize applications from localStorage or defaults
+  // Applications state (Starts from local storage to prevent unnecessary reads)
   const [applications, setApplications] = useState<MembershipApplication[]>(() => {
     try {
       const saved = localStorage.getItem('mahasangh_applications');
@@ -31,10 +51,10 @@ export function App() {
     return INITIAL_APPLICATIONS;
   });
 
-  // Initialize news from localStorage or defaults
+  // News state (Starts from local storage or cached data)
   const [newsList, setNewsList] = useState<NewsItem[]>(() => {
     try {
-      const saved = localStorage.getItem('mahasangh_news');
+      const saved = localStorage.getItem('mahasangh_news_cache_v2');
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
@@ -42,29 +62,115 @@ export function App() {
     return INITIAL_NEWS;
   });
 
-  // Save applications to localStorage
+  // Listen to browser URL changes (e.g. /admin or #admin)
   useEffect(() => {
-    try {
-      localStorage.setItem('mahasangh_applications', JSON.stringify(applications));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [applications]);
+    const handleLocationChange = () => {
+      if (isPathAdminRoute()) {
+        setCurrentTab('admin');
+      } else if (currentTab === 'admin') {
+        setCurrentTab('home');
+      }
+    };
 
-  // Save news to localStorage
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, [currentTab]);
+
+  // On initial mount: test connection once per session & load cached news (0 reads if cached!)
   useEffect(() => {
-    try {
-      localStorage.setItem('mahasangh_news', JSON.stringify(newsList));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [newsList]);
+    const initApp = async () => {
+      // 1. Session-level connection test (max 1 read per user session)
+      await testConnectionOncePerSession();
 
-  const handleAddApplication = (newApp: MembershipApplication) => {
-    setApplications((prev) => [newApp, ...prev]);
+      // 2. Load news with 30-minute cache (0 reads if valid cache exists)
+      try {
+        const news = await fetchNewsCached(false);
+        setNewsList(news);
+      } catch (err) {
+        console.warn('News cache init error:', err);
+      }
+    };
+
+    initApp();
+  }, []);
+
+  // Exit Admin to Main Public Website
+  const handleExitAdmin = () => {
+    setCurrentTab('home');
+    if (window.location.pathname.toLowerCase() === '/admin') {
+      window.history.pushState(null, '', '/');
+    } else if (window.location.hash.toLowerCase().includes('admin')) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleApproveApplication = (id: string, memberNumber: string) => {
+  // Manual News Refresh (Only reads Firestore when explicitly requested)
+  const handleRefreshNews = async () => {
+    setIsRefreshingNews(true);
+    try {
+      const freshNews = await fetchNewsCached(true);
+      setNewsList(freshNews);
+    } catch (err) {
+      console.warn('Failed to refresh news:', err);
+    } finally {
+      setIsRefreshingNews(false);
+    }
+  };
+
+  // Add application (Single write, 0 reads)
+  const handleAddApplication = async (newApp: MembershipApplication) => {
+    setApplications((prev) => [newApp, ...prev]);
+    localStorage.setItem(
+      'mahasangh_applications',
+      JSON.stringify([newApp, ...applications])
+    );
+
+    try {
+      await saveApplicationToFirestore(newApp);
+    } catch (err) {
+      console.warn('Saved application locally, Firestore sync error:', err);
+    }
+  };
+
+  // Single-document tracking (At most 1 read)
+  const handleTrackRemote = async (queryTerm: string): Promise<MembershipApplication | null> => {
+    try {
+      const found = await trackSingleApplicationInFirestore(queryTerm);
+      if (found) {
+        // Cache found app locally
+        setApplications((prev) => {
+          if (prev.some((a) => a.id === found.id)) return prev;
+          return [found, ...prev];
+        });
+      }
+      return found;
+    } catch (err) {
+      console.warn('Remote tracking error:', err);
+      return null;
+    }
+  };
+
+  // Admin: Fetch applications on demand (Only reads when admin logs in or clicks refresh)
+  const handleFetchAdminApplications = async () => {
+    setIsLoadingAdminApps(true);
+    try {
+      const list = await fetchApplicationsForAdmin();
+      setApplications(list);
+      localStorage.setItem('mahasangh_applications', JSON.stringify(list));
+    } catch (err) {
+      console.warn('Fetch admin applications error:', err);
+    } finally {
+      setIsLoadingAdminApps(false);
+    }
+  };
+
+  // Admin: Approve application (Single write)
+  const handleApproveApplication = async (id: string, memberNumber: string) => {
     setApplications((prev) =>
       prev.map((app) =>
         app.id === id
@@ -77,10 +183,41 @@ export function App() {
           : app
       )
     );
+
+    try {
+      await approveApplicationInFirestore(id, memberNumber);
+    } catch (err) {
+      console.warn('Approved locally, Firestore sync error:', err);
+    }
   };
 
-  const handleAddNews = (newNews: NewsItem) => {
+  // Admin: Add news (Single write)
+  const handleAddNews = async (newNews: NewsItem) => {
     setNewsList((prev) => [newNews, ...prev]);
+
+    try {
+      await saveNewsToFirestore(newNews);
+    } catch (err) {
+      console.warn('Saved news locally, Firestore sync error:', err);
+    }
+  };
+
+  // Public: Send contact message (Single write, 0 reads)
+  const handleSaveContact = async (contact: {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    district?: string;
+    subject?: string;
+    message: string;
+    createdAt: string;
+  }) => {
+    try {
+      await saveContactToFirestore(contact);
+    } catch (err) {
+      console.warn('Saved contact locally / log:', err);
+    }
   };
 
   const handleSelectNews = (news: NewsItem) => {
@@ -89,6 +226,26 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // =========================================================================
+  // Standalone Administration View (mahasangh.in/admin or #admin)
+  // Fully isolated from public navigation
+  // =========================================================================
+  if (currentTab === 'admin') {
+    return (
+      <AdminTab
+        applications={applications}
+        onApproveApplication={handleApproveApplication}
+        onAddNews={handleAddNews}
+        onFetchApplications={handleFetchAdminApplications}
+        isLoadingApps={isLoadingAdminApps}
+        onExitAdmin={handleExitAdmin}
+      />
+    );
+  }
+
+  // =========================================================================
+  // Public Website View (Header without Admin link, Footer without Admin link)
+  // =========================================================================
   return (
     <div className="min-h-screen flex flex-col bg-[#fbf8f2] text-[#102a43]">
       <Header currentTab={currentTab} setCurrentTab={setCurrentTab} />
@@ -107,27 +264,24 @@ export function App() {
         {currentTab === 'leadership' && (
           <LeadershipTab setCurrentTab={setCurrentTab} />
         )}
+        {currentTab === 'appointments' && <AppointmentsTab />}
         {currentTab === 'news' && (
           <NewsTab
             newsList={newsList}
             selectedNews={selectedNews}
             setSelectedNews={setSelectedNews}
+            onRefreshNews={handleRefreshNews}
+            isRefreshing={isRefreshingNews}
           />
         )}
         {currentTab === 'membership' && (
           <MembershipTab
             applications={applications}
             onAddApplication={handleAddApplication}
+            onTrackRemote={handleTrackRemote}
           />
         )}
-        {currentTab === 'contact' && <ContactTab />}
-        {currentTab === 'admin' && (
-          <AdminTab
-            applications={applications}
-            onApproveApplication={handleApproveApplication}
-            onAddNews={handleAddNews}
-          />
-        )}
+        {currentTab === 'contact' && <ContactTab onSaveContact={handleSaveContact} />}
       </main>
 
       <Footer setCurrentTab={setCurrentTab} />

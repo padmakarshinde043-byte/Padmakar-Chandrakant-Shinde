@@ -22,6 +22,10 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
               <img
                 src="/heding.jpg"
                 alt="महासंघ चिन्ह"
+                width="48"
+                height="48"
+                loading="lazy"
+                decoding="async"
                 className="w-12 h-12 object-cover object-left rounded-full border-2 border-[#efb24b]"
               />
               <div>
@@ -53,10 +57,10 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
                 { id: 'about', label: 'आमच्याबद्दल (About Us)' },
                 { id: 'objectives', label: 'उद्दिष्टे व मागण्या' },
                 { id: 'leadership', label: 'राज्य व जिल्हा नेतृत्व' },
+                { id: 'appointments', label: 'पदाधिकारी व नियुक्ती पत्रे' },
                 { id: 'news', label: 'ताज्या घडामोडी व परिपत्रके' },
                 { id: 'membership', label: 'नवीन सदस्यत्व अर्ज' },
                 { id: 'contact', label: 'जिल्हानिहाय संपर्क' },
-                { id: 'admin', label: 'प्रशासन कक्ष (Admin)' },
               ].map((link) => (
                 <li key={link.id}>
                   <button
@@ -106,7 +110,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
             </h4>
             <div className="bg-[#0e2c4c] p-3 rounded-lg border border-[#23425f] text-xs space-y-2">
               <p className="font-semibold text-white">
-                एकवेळ आजीवन शुल्क: <span className="text-[#f8d39b]">₹५००</span>
+                एकवेळ आजीवन शुल्क: <span className="text-[#f8d39b]">₹500</span>
               </p>
               <p className="text-[#a7bac4]">
                 फोन पे (PhonePe) नंबर: <br />
@@ -127,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
         {/* Bottom Copyright */}
         <div className="pt-5 flex flex-col sm:flex-row justify-between items-center text-xs text-[#849ba8] gap-2">
           <span>
-            © २०२६ {ORG_DETAILS.name}. सर्व हक्क राखीव.
+            © 2026 {ORG_DETAILS.name}. सर्व हक्क राखीव.
           </span>
           <span className="text-[11px]">
             नोंदणीकृत श्रमिक संघटना (Reg. Under Trade Unions Act)

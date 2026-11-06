@@ -84,6 +84,8 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
                 <img
                   src="/heding.jpg"
                   alt={ORG_DETAILS.founderPresident.name}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full object-cover object-left"
                 />
               </div>
@@ -159,7 +161,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
           </div>
         </section>
 
-        {/* Section 4: District Presidents with Live Search & Filter (महाराष्ट्रातील ३४ जिल्ह्यांचे अध्यक्ष) */}
+        {/* Section 4: District Presidents with Live Search & Filter (महाराष्ट्रातील 34 जिल्ह्यांचे अध्यक्ष) */}
         <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#e7ded1] shadow-xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-4 border-b border-[#e7ded1]">
             <div>
@@ -167,7 +169,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
                 जिल्हास्तरीय नेतृत्व
               </span>
               <h3 className="font-serifDevanagari text-2xl font-bold text-[#09243f]">
-                महाराष्ट्रातील ३४ जिल्ह्यांचे अध्यक्ष
+                महाराष्ट्रातील 34 जिल्ह्यांचे अध्यक्ष
               </h3>
               <p className="text-xs text-[#607184] mt-1">
                 आपल्या जिल्ह्याच्या अध्यक्षांशी थेट संपर्क साधून महासंघाशी जोडले जा.

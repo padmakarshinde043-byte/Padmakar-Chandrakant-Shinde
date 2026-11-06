@@ -41,7 +41,19 @@ h1, h2, h3, .serif-marathi {
 }
 
 @media print {
-  .no-print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  header, footer, nav, .no-print {
     display: none !important;
+  }
+  #appointment-letter-sheet {
+    box-shadow: none !important;
+    border: 2px solid #d4af37 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 25px !important;
   }
 }

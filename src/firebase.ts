@@ -1,0 +1,324 @@
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import {
+  getFirestore,
+  doc,
+  getDocFromServer,
+  collection,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  query,
+  where,
+  limit
+} from 'firebase/firestore';
+import firebaseConfig from '../firebase-applet-config.json';
+import {
+  MembershipApplication,
+  NewsItem,
+  INITIAL_NEWS,
+  INITIAL_APPLICATIONS
+} from './data/mahasanghData';
+
+const app = initializeApp(firebaseConfig);
+
+// CRITICAL: Passing firestoreDatabaseId to getFirestore
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const auth = getAuth(app);
+
+// Error Handling Definition
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(
+  error: unknown,
+  operationType: OperationType,
+  path: string | null
+) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error('Firestore Error:', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
+// Session-cached connection verification (Runs only once per session to save quota)
+export async function testConnectionOncePerSession(): Promise<boolean> {
+  if (sessionStorage.getItem('fb_conn_ok')) {
+    return true;
+  }
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    sessionStorage.setItem('fb_conn_ok', 'true');
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firebase client is offline.');
+      return false;
+    }
+    sessionStorage.setItem('fb_conn_ok', 'true');
+    return true;
+  }
+}
+
+// CACHE-FIRST NEWS FETCHING:
+// News is cached in localStorage for 30 minutes.
+// Regular visitors reading the website will consume ZERO Firestore reads!
+const NEWS_CACHE_KEY = 'mahasangh_news_cache_v2';
+const NEWS_CACHE_TIME_KEY = 'mahasangh_news_cache_time_v2';
+const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
+export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]> {
+  try {
+    const cachedTime = localStorage.getItem(NEWS_CACHE_TIME_KEY);
+    const cachedData = localStorage.getItem(NEWS_CACHE_KEY);
+
+    if (!forceRefresh && cachedTime && cachedData) {
+      const age = Date.now() - parseInt(cachedTime, 10);
+      if (age < CACHE_DURATION_MS) {
+        // Cache is valid - ZERO reads from Firestore!
+        return JSON.parse(cachedData);
+      }
+    }
+
+    // Cache expired or force refresh: fetch from Firestore
+    const newsCol = collection(db, 'news');
+    const newsSnap = await getDocs(newsCol);
+
+    if (newsSnap.empty) {
+      // If collection empty in firestore, initialize with default news
+      localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(INITIAL_NEWS));
+      localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
+      return INITIAL_NEWS;
+    }
+
+    const loadedNews: NewsItem[] = [];
+    newsSnap.forEach((d) => {
+      loadedNews.push(d.data() as NewsItem);
+    });
+
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(loadedNews));
+    localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
+    return loadedNews;
+  } catch (error) {
+    console.warn('Using cached/default news due to network:', error);
+    const cachedData = localStorage.getItem(NEWS_CACHE_KEY);
+    if (cachedData) return JSON.parse(cachedData);
+    return INITIAL_NEWS;
+  }
+}
+
+// Single write when admin publishes news
+export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
+  const path = `news/${news.id}`;
+  try {
+    await setDoc(doc(db, 'news', news.id), {
+      ...news,
+      createdAt: new Date().toISOString(),
+    });
+    // Immediately invalidate and update local cache
+    const currentCached = localStorage.getItem(NEWS_CACHE_KEY);
+    const list: NewsItem[] = currentCached ? JSON.parse(currentCached) : [];
+    const updated = [news, ...list.filter((x) => x.id !== news.id)];
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(updated));
+    localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+// Single write when member registers
+export async function saveApplicationToFirestore(app: MembershipApplication): Promise<void> {
+  const path = `applications/${app.id}`;
+  try {
+    await setDoc(doc(db, 'applications', app.id), app);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+// Targeted single-document search for status tracking (Consumes 1 read at most, NOT the entire collection!)
+export async function trackSingleApplicationInFirestore(
+  identifier: string
+): Promise<MembershipApplication | null> {
+  const queryTerm = identifier.trim();
+  if (!queryTerm) return null;
+
+  try {
+    // 1. Try by document ID
+    const docRef = doc(db, 'applications', queryTerm);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data() as MembershipApplication;
+    }
+
+    // 2. Try by applicationNumber with limit(1)
+    const appsCol = collection(db, 'applications');
+    const qApp = query(appsCol, where('applicationNumber', '==', queryTerm), limit(1));
+    const snapApp = await getDocs(qApp);
+    if (!snapApp.empty) {
+      return snapApp.docs[0].data() as MembershipApplication;
+    }
+
+    // 3. Try by phone with limit(1)
+    const qPhone = query(appsCol, where('phone', '==', queryTerm), limit(1));
+    const snapPhone = await getDocs(qPhone);
+    if (!snapPhone.empty) {
+      return snapPhone.docs[0].data() as MembershipApplication;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('Track query error:', error);
+    return null;
+  }
+}
+
+// Admin only: On-demand applications fetch (Only called when admin logs in or clicks refresh)
+export async function fetchApplicationsForAdmin(): Promise<MembershipApplication[]> {
+  try {
+    const appsCol = collection(db, 'applications');
+    const snap = await getDocs(appsCol);
+    if (snap.empty) {
+      return INITIAL_APPLICATIONS;
+    }
+    const list: MembershipApplication[] = [];
+    snap.forEach((d) => {
+      list.push(d.data() as MembershipApplication);
+    });
+    list.sort(
+      (a, b) =>
+        new Date(b.createdAt || '').getTime() -
+        new Date(a.createdAt || '').getTime()
+    );
+    return list;
+  } catch (error) {
+    console.warn('Admin fetch applications error:', error);
+    return INITIAL_APPLICATIONS;
+  }
+}
+
+// Admin only: Approve application (1 write)
+export async function approveApplicationInFirestore(
+  appId: string,
+  memberNumber: string
+): Promise<void> {
+  const path = `applications/${appId}`;
+  try {
+    await updateDoc(doc(db, 'applications', appId), {
+      status: 'approved',
+      memberNumber,
+      approvedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+// Single write for contact message
+export async function saveContactToFirestore(contact: {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  district?: string;
+  subject?: string;
+  message: string;
+  createdAt: string;
+}): Promise<void> {
+  const path = `contacts/${contact.id}`;
+  try {
+    await setDoc(doc(db, 'contacts', contact.id), contact);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+// ==========================================
+// Admin Authentication & Dynamic Password Management
+// ==========================================
+const ADMIN_PWD_CACHE_KEY = 'mahasangh_admin_pwd_v2';
+const ADMIN_EMAIL_CACHE_KEY = 'mahasangh_admin_email_v2';
+export const DEFAULT_ADMIN_EMAIL = 'padmakarshinde043@gmail.com';
+export const MASTER_RECOVERY_KEY = 'RK@Mahasangh2026';
+
+export async function getAdminCredentials(): Promise<{ email: string; password: string }> {
+  const cachedPwd = localStorage.getItem(ADMIN_PWD_CACHE_KEY);
+  const cachedEmail = localStorage.getItem(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
+
+  if (cachedPwd) {
+    return { email: cachedEmail, password: cachedPwd };
+  }
+
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'admin_auth'));
+    if (snap.exists()) {
+      const data = snap.data();
+      const pwd = data.password || '1234';
+      const em = data.email || DEFAULT_ADMIN_EMAIL;
+      localStorage.setItem(ADMIN_PWD_CACHE_KEY, pwd);
+      localStorage.setItem(ADMIN_EMAIL_CACHE_KEY, em);
+      return { email: em, password: pwd };
+    }
+  } catch (err) {
+    console.warn('Could not read admin_auth setting:', err);
+  }
+
+  return { email: DEFAULT_ADMIN_EMAIL, password: '1234' };
+}
+
+export async function updateAdminCredentials(newPassword: string, newEmail?: string): Promise<void> {
+  const targetEmail = newEmail?.trim() || localStorage.getItem(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
+  const cleanPwd = newPassword.trim();
+
+  localStorage.setItem(ADMIN_PWD_CACHE_KEY, cleanPwd);
+  localStorage.setItem(ADMIN_EMAIL_CACHE_KEY, targetEmail);
+
+  try {
+    await setDoc(doc(db, 'settings', 'admin_auth'), {
+      email: targetEmail,
+      password: cleanPwd,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Saved admin credentials locally, firestore sync failed:', err);
+  }
+}

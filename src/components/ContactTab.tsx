@@ -2,7 +2,20 @@ import React, { useState } from 'react';
 import { MapPin, Phone, Mail, Clock, ShieldCheck, Send, CheckCircle2, MessageCircle } from 'lucide-react';
 import { ORG_DETAILS, MAHARASHTRA_DISTRICTS, DISTRICT_PRESIDENTS } from '../data/mahasanghData';
 
-export const ContactTab: React.FC = () => {
+interface ContactTabProps {
+  onSaveContact?: (contact: {
+    id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    district?: string;
+    subject?: string;
+    message: string;
+    createdAt: string;
+  }) => void;
+}
+
+export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -17,6 +30,19 @@ export const ContactTab: React.FC = () => {
       alert('कृपया आवश्यक माहिती भरा.');
       return;
     }
+    if (onSaveContact) {
+      onSaveContact({
+        id: `contact-${Date.now()}`,
+        name,
+        phone,
+        email: email || undefined,
+        district: district || undefined,
+        subject: subject || undefined,
+        message,
+        createdAt: new Date().toISOString()
+      });
+    }
+
     setSubmitted(true);
     setName('');
     setPhone('');
@@ -192,7 +218,7 @@ export const ContactTab: React.FC = () => {
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="१० अंकी मोबाईल नंबर"
+                      placeholder="10 अंकी मोबाईल नंबर"
                       className="w-full p-2.5 border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
@@ -274,7 +300,7 @@ export const ContactTab: React.FC = () => {
         <div className="bg-white p-6 sm:p-8 rounded-xl border border-[#e7ded1] shadow-xs">
           <div className="mb-6 pb-2 border-b border-[#e7ded1]">
             <h3 className="font-serifDevanagari text-2xl font-bold text-[#09243f]">
-              जिल्हानिहाय थेट संपर्क निर्देशिका (३४ जिल्हे)
+              जिल्हानिहाय थेट संपर्क निर्देशिका (34 जिल्हे)
             </h3>
             <p className="text-xs text-[#607184] mt-1">
               आपल्या जिल्ह्यातील महासंघ अध्यक्षांशी थेट संपर्क साधा.
