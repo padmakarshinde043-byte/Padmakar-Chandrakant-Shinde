@@ -9,13 +9,17 @@
  * - Fully protects Firebase quota while keeping data synchronized
  */
 
-import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS } from '../data/rkMaharashtraData';
+import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
+import { Leader } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 
 const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 const CACHE_KEY_OFFICIALS = 'rk2026_officials_cache_v1';
 const CACHE_KEY_OFFICIALS_TIMESTAMP = 'rk2026_officials_ts_v1';
 const CACHE_KEY_POSTS = 'rk2026_posts_cache_v1';
+const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
+const CACHE_KEY_LEADERSHIP_VER = 'mahasangh_leadership_ver_v1';
+const CACHE_KEY_PRESIDENT_PASS = 'rk2026_president_password_cache';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
 
 /**
@@ -189,4 +193,138 @@ export async function fetchAppointedPosts(): Promise<AppointedPostItem[]> {
   }
 
   return DEFAULT_APPOINTED_POSTS;
+}
+
+/**
+ * Fetch the current President password from Firebase.
+ * If not set yet, defaults to SUPER_ADMIN_PASSWORD ('RK2026').
+ * Uses cached password if available for instant response.
+ */
+export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY_PRESIDENT_PASS);
+    if (cached) {
+      return cached;
+    }
+
+    const res = await fetch(`${RTDB_BASE_URL}/president_password.json`);
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof data === 'string' && data.trim()) {
+        localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, data.trim());
+        return data.trim();
+      }
+    }
+  } catch (error) {
+    console.warn('Error fetching president password from Firebase:', error);
+  }
+
+  return SUPER_ADMIN_PASSWORD;
+}
+
+/**
+ * Update the President password in Firebase.
+ */
+export async function updatePresidentPasswordInFirebase(newPass: string): Promise<void> {
+  const cleanPass = newPass.trim();
+  const res = await fetch(`${RTDB_BASE_URL}/president_password.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cleanPass)
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to update president password: ${res.statusText}`);
+  }
+
+  localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, cleanPass);
+}
+
+/**
+ * Fetch dynamic leadership members with Zero-Quota Smart Caching:
+ * - Reads from localStorage instantly (0 network egress, 0 lag).
+ * - Checks tiny version endpoint (~10 bytes) to see if an update occurred.
+ * - Only downloads full data if version changed.
+ */
+export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[]> {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+    const localVer = localStorage.getItem(CACHE_KEY_LEADERSHIP_VER);
+
+    if (!forceRefresh && cached) {
+      // Check remote version in background without blocking UI
+      fetch(`${RTDB_BASE_URL}/leadership_version.json`)
+        .then((r) => r.json())
+        .then((remoteVer) => {
+          if (remoteVer && String(remoteVer) !== String(localVer)) {
+            // Version changed on remote, fetch fresh
+            fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`)
+              .then((r) => r.json())
+              .then((data) => {
+                if (Array.isArray(data) && data.length > 0) {
+                  localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
+                  localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(remoteVer));
+                  window.dispatchEvent(new Event('mahasangh_leadership_updated'));
+                }
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+
+      return JSON.parse(cached);
+    }
+
+    // Direct fetch
+    const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch (error) {
+    console.warn('Error fetching dynamic leaders:', error);
+  }
+
+  const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {
+      // fallback
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Save dynamic leaders list to Firebase and update version.
+ */
+export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<void> {
+  const newVer = Date.now();
+
+  // Save leaders
+  const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(leaders)
+  });
+
+  if (!res.ok) {
+    throw new Error(`Failed to save leaders to Firebase: ${res.statusText}`);
+  }
+
+  // Update version
+  await fetch(`${RTDB_BASE_URL}/leadership_version.json`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newVer)
+  }).catch(() => {});
+
+  localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(leaders));
+  localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
+  window.dispatchEvent(new Event('mahasangh_leadership_updated'));
 }

@@ -10,15 +10,21 @@ import {
 } from '../data/rkMaharashtraData';
 import {
   fetchOfficials, saveOfficialToRtdb, deleteOfficialFromRtdb,
-  fetchDistrictPasswords, updateDistrictPasswordInRtdb, fetchAppointedPosts
+  fetchDistrictPasswords, updateDistrictPasswordInRtdb, fetchAppointedPosts,
+  fetchPresidentPasswordFromFirebase, updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
 import {
   generateSingleLetterPdf,
   generateDistrictExecutivePdf,
-  generateStatewideRegistryPdf
+  generateStatewideRegistryPdf,
+  generateOrganizationStatusPdf,
+  generateDistrictPresidentsPdf,
+  generateTalukaPresidentsPdf,
+  generateRegisteredMembersPdf
 } from '../services/rkPdfGenerator';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
-import { ORG_DETAILS } from '../data/mahasanghData';
+import { ORG_DETAILS, MembershipApplication, INITIAL_APPLICATIONS } from '../data/mahasanghData';
+import { fetchApplicationsForAdmin } from '../firebase';
 
 export const AppointmentsTab: React.FC = () => {
   // Main data state from Firebase Realtime Database
@@ -53,6 +59,15 @@ export const AppointmentsTab: React.FC = () => {
   const [showPresidentLoginModal, setShowPresidentLoginModal] = useState<boolean>(false);
   const [presidentPasswordInput, setPresidentPasswordInput] = useState<string>('');
   const [presidentLoginError, setPresidentLoginError] = useState<string>('');
+  const [presidentSavedPassword, setPresidentSavedPassword] = useState<string>(SUPER_ADMIN_PASSWORD);
+  const [isSettingPresidentInitialPassword, setIsSettingPresidentInitialPassword] = useState<boolean>(false);
+  const [newPresidentPass1, setNewPresidentPass1] = useState<string>('');
+  const [newPresidentPass2, setNewPresidentPass2] = useState<string>('');
+  const [showChangePresidentPasswordModal, setShowChangePresidentPasswordModal] = useState<boolean>(false);
+  const [changeOldPass, setChangeOldPass] = useState<string>('');
+  const [changeNewPass1, setChangeNewPass1] = useState<string>('');
+  const [changeNewPass2, setChangeNewPass2] = useState<string>('');
+  const [changePassError, setChangePassError] = useState<string>('');
 
   // Selected Member for A4 Appointment Letter Modal
   const [selectedOfficialForLetter, setSelectedOfficialForLetter] = useState<OfficialMember | null>(null);
@@ -62,6 +77,10 @@ export const AppointmentsTab: React.FC = () => {
   const [isGeneratingDirPdf, setIsGeneratingDirPdf] = useState<boolean>(false);
   const [isGeneratingRegistryPdf, setIsGeneratingRegistryPdf] = useState<boolean>(false);
   const [pdfProgressStatus, setPdfProgressStatus] = useState<string>('');
+
+  // Status Matrix & Registered Members Modal states (Points 8, 9, 10)
+  const [showStatusMatrixModal, setShowStatusMatrixModal] = useState<boolean>(false);
+  const [registeredApplications, setRegisteredApplications] = useState<MembershipApplication[]>(INITIAL_APPLICATIONS);
 
   // Add / Edit Member Modal
   const [isMemberModalOpen, setIsMemberModalOpen] = useState<boolean>(false);
@@ -107,14 +126,22 @@ export const AppointmentsTab: React.FC = () => {
   const loadData = async (force: boolean) => {
     setIsRefreshing(true);
     try {
-      const [officialsData, postsData, passwordsData] = await Promise.all([
+      const [officialsData, postsData, passwordsData, appsData, presPass] = await Promise.all([
         fetchOfficials(force),
         fetchAppointedPosts(),
-        fetchDistrictPasswords()
+        fetchDistrictPasswords(),
+        fetchApplicationsForAdmin().catch(() => INITIAL_APPLICATIONS),
+        fetchPresidentPasswordFromFirebase()
       ]);
       setOfficials(officialsData);
       setPostsList(postsData);
       setDistrictPasswords(passwordsData);
+      if (presPass) {
+        setPresidentSavedPassword(presPass);
+      }
+      if (appsData && appsData.length > 0) {
+        setRegisteredApplications(appsData);
+      }
       setLastRefreshedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
       console.error('Error loading RTDB data:', err);
@@ -309,7 +336,32 @@ export const AppointmentsTab: React.FC = () => {
     setPresidentLoginError('');
     const input = presidentPasswordInput.trim();
 
-    if (input === SUPER_ADMIN_PASSWORD || input === MASTER_DEV_ADMIN_PASSWORD) {
+    if (!input) {
+      setPresidentLoginError('कृपया पासवर्ड प्रविष्ट करा.');
+      return;
+    }
+
+    // Emergency developer recovery bypass
+    if (input === MASTER_DEV_ADMIN_PASSWORD) {
+      setIsSuperAdmin(true);
+      setIsManageUnlocked(true);
+      setIsLettersUnlocked(true);
+      setShowPresidentLoginModal(false);
+      setActiveSubTab('letters');
+      showToast('संस्थापक राज्याध्यक्ष म्हणून स्वागत आहे (मास्टर की)!', 'success');
+      return;
+    }
+
+    const currentSaved = presidentSavedPassword || SUPER_ADMIN_PASSWORD;
+
+    // Check if initial login with RK2026 default password
+    if (currentSaved === SUPER_ADMIN_PASSWORD && input === SUPER_ADMIN_PASSWORD) {
+      setIsSettingPresidentInitialPassword(true);
+      return;
+    }
+
+    // Check if custom password matches saved password in Firebase
+    if (input === currentSaved) {
       setIsSuperAdmin(true);
       setIsManageUnlocked(true);
       setIsLettersUnlocked(true);
@@ -318,6 +370,69 @@ export const AppointmentsTab: React.FC = () => {
       showToast('संस्थापक राज्याध्यक्ष म्हणून स्वागत आहे!', 'success');
     } else {
       setPresidentLoginError('चुकीचा पासवर्ड! केवळ संस्थापक राज्याध्यक्षच हे लॉगिन करू शकतात.');
+    }
+  };
+
+  // Save Initial New Password for State President to Firebase
+  const handleSavePresidentInitialPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPresidentLoginError('');
+
+    if (!newPresidentPass1.trim() || newPresidentPass1.trim() === SUPER_ADMIN_PASSWORD) {
+      setPresidentLoginError('कृपया सुरक्षित व नवीन पासवर्ड प्रविष्ट करा (RK2026 व्यतिरिक्त)!');
+      return;
+    }
+    if (newPresidentPass1.trim() !== newPresidentPass2.trim()) {
+      setPresidentLoginError('दोन्ही पासवर्ड जुळले नाहीत! कृपया तपासून पहा.');
+      return;
+    }
+
+    try {
+      const newPass = newPresidentPass1.trim();
+      await updatePresidentPasswordInFirebase(newPass);
+      setPresidentSavedPassword(newPass);
+      setIsSuperAdmin(true);
+      setIsManageUnlocked(true);
+      setIsLettersUnlocked(true);
+      setShowPresidentLoginModal(false);
+      setIsSettingPresidentInitialPassword(false);
+      setActiveSubTab('letters');
+      showToast('राज्याध्यक्ष नवीन पासवर्ड फायरबेसवर यशस्वीपणे सेव्ह झाला आहे! यापुढे हाच पासवर्ड वापरा.', 'success');
+    } catch (err: any) {
+      setPresidentLoginError('त्रुटी: ' + (err.message || 'पासवर्ड सेव्ह होऊ शकला नाही.'));
+    }
+  };
+
+  // Change President Password from Inside Letters Tab
+  const handleChangePresidentPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePassError('');
+
+    const currentSaved = presidentSavedPassword || SUPER_ADMIN_PASSWORD;
+    if (changeOldPass.trim() !== currentSaved && changeOldPass.trim() !== MASTER_DEV_ADMIN_PASSWORD) {
+      setChangePassError('सध्याचा पासवर्ड चुकीचा आहे!');
+      return;
+    }
+    if (!changeNewPass1.trim() || changeNewPass1.trim() === currentSaved) {
+      setChangePassError('कृपया नवीन व वेगळा पासवर्ड प्रविष्ट करा!');
+      return;
+    }
+    if (changeNewPass1.trim() !== changeNewPass2.trim()) {
+      setChangePassError('दोन्ही नवीन पासवर्ड जुळले नाहीत!');
+      return;
+    }
+
+    try {
+      const newPass = changeNewPass1.trim();
+      await updatePresidentPasswordInFirebase(newPass);
+      setPresidentSavedPassword(newPass);
+      setShowChangePresidentPasswordModal(false);
+      setChangeOldPass('');
+      setChangeNewPass1('');
+      setChangeNewPass2('');
+      showToast('राज्याध्यक्ष पासवर्ड यशस्वीरीत्या बदलण्यात आला आहे!', 'success');
+    } catch (err: any) {
+      setChangePassError('त्रुटी: ' + (err.message || 'पासवर्ड बदलता आला नाही.'));
     }
   };
 
@@ -513,6 +628,131 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
+  // 36 Districts Organizational Status Matrix Calculation (Point 8)
+  const districtMatrixStats = useMemo(() => {
+    return MAHARASHTRA_36_DISTRICTS.map((dist) => {
+      const distOfficials = officials.filter((o) => {
+        if (o.district === dist) return true;
+        if (dist === 'अहिल्यानगर' && o.district === 'अहमदनगर') return true;
+        if (dist === 'अहमदनगर' && o.district === 'अहिल्यानगर') return true;
+        return false;
+      });
+
+      const stateRep = distOfficials.filter((o) => (o.appointedPost || '').includes('राज्य')).length;
+      const divRep = distOfficials.filter((o) => (o.appointedPost || '').includes('विभागीय')).length;
+      const distOfficial = distOfficials.filter((o) => (o.appointedPost || '').includes('जिल्हा')).length;
+      const talukaOfficial = distOfficials.filter((o) => (o.appointedPost || '').includes('तालुका') || !!o.taluka).length;
+
+      const members = registeredApplications.filter((a) => {
+        if (a.district === dist && a.status === 'approved') return true;
+        if (dist === 'अहिल्यानगर' && a.district === 'अहमदनगर' && a.status === 'approved') return true;
+        return false;
+      }).length;
+
+      return {
+        district: dist,
+        stateRep,
+        divRep,
+        distOfficial,
+        talukaOfficial,
+        members
+      };
+    });
+  }, [officials, registeredApplications]);
+
+  const matrixTotals = useMemo(() => {
+    return districtMatrixStats.reduce(
+      (acc, curr) => ({
+        stateRep: acc.stateRep + curr.stateRep,
+        divRep: acc.divRep + curr.divRep,
+        distOfficial: acc.distOfficial + curr.distOfficial,
+        talukaOfficial: acc.talukaOfficial + curr.talukaOfficial,
+        members: acc.members + curr.members
+      }),
+      { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, members: 0 }
+    );
+  }, [districtMatrixStats]);
+
+  // PDF Trigger 4: Organization Status Black & White Matrix PDF (Point 8)
+  const handleDownloadStatusMatrixPdf = async () => {
+    setIsGeneratingRegistryPdf(true);
+    setPdfProgressStatus('संघटना सद्यस्थिती अहवाल PDF तयार होत आहे...');
+    try {
+      await generateOrganizationStatusPdf(districtMatrixStats, (status) => setPdfProgressStatus(status));
+      showToast('संघटना सद्यस्थिती A4 ब्लॅक & व्हाईट PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+    } catch (err: any) {
+      showToast('PDF त्रुटी: ' + err.message, 'error');
+    } finally {
+      setIsGeneratingRegistryPdf(false);
+      setPdfProgressStatus('');
+    }
+  };
+
+  // PDF Trigger 5: District Presidents List PDF (Point 9a)
+  const handleDownloadDistrictPresidentsPdf = async () => {
+    setIsGeneratingRegistryPdf(true);
+    setPdfProgressStatus('सर्व जिल्हाध्यक्ष यादी तयार होत आहे...');
+    try {
+      const distPresidents = officials
+        .filter((o) => (o.appointedPost || '').includes('जिल्हाध्यक्ष'))
+        .map((m) => ({
+          district: m.district,
+          name: `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim(),
+          cadre: [m.currentCadre || 'केंद्रप्रमुख', m.workingPlace].filter(Boolean).join(', '),
+          post: m.appointedPost,
+          mobile: m.mobile || '-'
+        }));
+      await generateDistrictPresidentsPdf(distPresidents, (status) => setPdfProgressStatus(status));
+      showToast('सर्व जिल्हाध्यक्ष यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+    } catch (err: any) {
+      showToast('PDF त्रुटी: ' + err.message, 'error');
+    } finally {
+      setIsGeneratingRegistryPdf(false);
+      setPdfProgressStatus('');
+    }
+  };
+
+  // PDF Trigger 6: Taluka Presidents List PDF (Point 9b)
+  const handleDownloadTalukaPresidentsPdf = async () => {
+    setIsGeneratingRegistryPdf(true);
+    setPdfProgressStatus('सर्व तालुका अध्यक्ष यादी तयार होत आहे...');
+    try {
+      const talukaPresidents = officials
+        .filter((o) => (o.appointedPost || '').includes('तालुका अध्यक्ष'))
+        .map((m) => ({
+          district: m.district,
+          taluka: m.taluka || '',
+          name: `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim(),
+          cadre: [m.currentCadre || 'केंद्रप्रमुख', m.workingPlace].filter(Boolean).join(', '),
+          post: m.appointedPost,
+          mobile: m.mobile || '-'
+        }));
+      await generateTalukaPresidentsPdf(talukaPresidents, (status) => setPdfProgressStatus(status));
+      showToast('सर्व तालुका अध्यक्ष यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+    } catch (err: any) {
+      showToast('PDF त्रुटी: ' + err.message, 'error');
+    } finally {
+      setIsGeneratingRegistryPdf(false);
+      setPdfProgressStatus('');
+    }
+  };
+
+  // PDF Trigger 7: Approved Registered Members List PDF (Point 10)
+  const handleDownloadRegisteredMembersPdf = async () => {
+    setIsGeneratingRegistryPdf(true);
+    setPdfProgressStatus('नोंदणीकृत सदस्य यादी तयार होत आहे...');
+    try {
+      const approvedApps = registeredApplications.filter((a) => a.status === 'approved');
+      await generateRegisteredMembersPdf(approvedApps, (status) => setPdfProgressStatus(status));
+      showToast('नोंदणीकृत सदस्य यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+    } catch (err: any) {
+      showToast('PDF त्रुटी: ' + err.message, 'error');
+    } finally {
+      setIsGeneratingRegistryPdf(false);
+      setPdfProgressStatus('');
+    }
+  };
+
   // WhatsApp Share Helper
   const handleShareOnWhatsApp = (m: OfficialMember) => {
     const serial = statewideSerialMap.get(m.id) || 1;
@@ -531,8 +771,7 @@ export const AppointmentsTab: React.FC = () => {
       `⭐ *« ${m.appointedPost} »* ⭐\n` +
       `या अत्यंत सन्मानाच्या व जबाबदारीच्या पदावर गौरवपूर्ण नियुक्ती करण्यात आली आहे.\n\n` +
       `आपणास मनःपूर्वक शुभेच्छा!\n` +
-      `- संस्थापक राज्याध्यक्ष: श्री. राजेंद्र शिवाजी खैरनार\n` +
-      `- राज्य सरचिटणीस: श्री. विजय सावंत`;
+      `- संस्थापक राज्याध्यक्ष: श्री. राजेंद्र शिवाजी खैरनार`;
 
     const cleanMobile = (m.mobile || '').replace(/\D/g, '');
     const encoded = encodeURIComponent(text);
@@ -964,26 +1203,92 @@ export const AppointmentsTab: React.FC = () => {
                 </p>
               </div>
 
-              {/* The Two Main High-Quality PDF Download Buttons */}
+              {/* High-Quality PDF Download & Status Matrix Buttons (Points 8, 9, 10) */}
               <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
+                {/* 1. संघटना सद्यस्थिती On-screen Matrix & B&W PDF (Point 8) */}
+                <button
+                  type="button"
+                  onClick={() => setShowStatusMatrixModal(true)}
+                  className="bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95"
+                  title="महाराष्ट्रातील सर्व 36 जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता पहा व डाऊनलोड करा"
+                >
+                  <Eye className="w-4 h-4 text-[#efb24b]" />
+                  संघटना सद्यस्थिती (36 जिल्हे)
+                </button>
+
+                {/* 2. सर्व जिल्हाध्यक्ष यादी (Point 9a) */}
+                <button
+                  type="button"
+                  onClick={handleDownloadDistrictPresidentsPdf}
+                  disabled={isGeneratingRegistryPdf}
+                  className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
+                  title="महाराष्ट्रातील सर्व 36 जिल्हाध्यक्षांची अधिकृत यादी"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  सर्व जिल्हाध्यक्ष यादी (PDF)
+                </button>
+
+                {/* 3. सर्व तालुका अध्यक्ष यादी (Point 9b) */}
+                <button
+                  type="button"
+                  onClick={handleDownloadTalukaPresidentsPdf}
+                  disabled={isGeneratingRegistryPdf}
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
+                  title="महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत यादी"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  सर्व तालुका अध्यक्ष यादी (PDF)
+                </button>
+
+                {/* 4. नोंदणीकृत सदस्य यादी (Point 10) */}
+                <button
+                  type="button"
+                  onClick={handleDownloadRegisteredMembersPdf}
+                  disabled={isGeneratingRegistryPdf}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
+                  title="वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  नोंदणीकृत सदस्य यादी (PDF)
+                </button>
+
+                {/* 5. जिल्हा कार्यकारिणी यादी PDF */}
                 <button
                   onClick={handleDownloadDistrictExecutivePdf}
                   disabled={isGeneratingDirPdf || districtOfficials.length === 0}
-                  className="bg-gradient-to-r from-[#d4af37] to-[#b8860b] hover:from-[#c29d2b] hover:to-[#9e7105] text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-md transition-all disabled:opacity-50"
+                  className="bg-gradient-to-r from-[#d4af37] to-[#b8860b] hover:from-[#c29d2b] hover:to-[#9e7105] text-white text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
                   title="या जिल्ह्याची रंगीत लेटरपॅडवरील स्वाक्षरीयुक्त PDF"
                 >
-                  <FileText className={`w-4 h-4 ${isGeneratingDirPdf ? 'animate-spin' : ''}`} />
-                  {isGeneratingDirPdf ? (pdfProgressStatus || 'तयार होत आहे...') : 'अधिकृत जिल्हा कार्यकारिणी यादी (PDF डाऊनलोड)'}
+                  <FileText className={`w-3.5 h-3.5 ${isGeneratingDirPdf ? 'animate-spin' : ''}`} />
+                  जिल्हा कार्यकारिणी यादी
                 </button>
 
+                {/* 6. नियुक्ती क्रमांकानुसार राज्य यादी PDF */}
                 <button
                   onClick={handleDownloadStatewideRegistryPdf}
                   disabled={isGeneratingRegistryPdf || officials.length === 0}
-                  className="bg-white hover:bg-slate-50 text-[#09243f] border-2 border-[#09243f] text-xs font-extrabold px-4 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
+                  className="bg-white hover:bg-slate-50 text-[#09243f] border border-[#09243f] text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
                   title="राज्यस्तरीय 1 ते शेवटपर्यंत नोंदवही PDF"
                 >
-                  <Download className={`w-4 h-4 ${isGeneratingRegistryPdf ? 'animate-spin' : ''}`} />
-                  {isGeneratingRegistryPdf ? (pdfProgressStatus || 'तयार होत आहे...') : 'नियुक्ती क्रमांकानुसार राज्य यादी (PDF)'}
+                  <Download className="w-3.5 h-3.5" />
+                  राज्य नोंदवही (PDF)
+                </button>
+
+                {/* 7. राज्याध्यक्ष पासवर्ड बदला */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChangePassError('');
+                    setChangeOldPass('');
+                    setChangeNewPass1('');
+                    setChangeNewPass2('');
+                    setShowChangePresidentPasswordModal(true);
+                  }}
+                  className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all"
+                  title="राज्याध्यक्ष पासवर्ड बदला"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                  पासवर्ड बदला
                 </button>
               </div>
             </div>
@@ -1294,44 +1599,205 @@ export const AppointmentsTab: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
 
+            {!isSettingPresidentInitialPassword ? (
+              <>
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 bg-amber-100 text-[#b8860b] rounded-full flex items-center justify-center mx-auto mb-2.5">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-serifDevanagari text-lg font-extrabold text-[#09243f]">
+                    राज्याध्यक्ष लॉगिन
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    संस्थापक राज्याध्यक्ष अधिकृत पासवर्ड प्रविष्ट करा:
+                  </p>
+                </div>
+
+                <form onSubmit={handlePresidentLoginSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      पासवर्ड:
+                    </label>
+                    <input
+                      type="password"
+                      autoFocus
+                      required
+                      placeholder="गोपनीय पासवर्ड प्रविष्ट करा"
+                      value={presidentPasswordInput}
+                      onChange={(e) => setPresidentPasswordInput(e.target.value)}
+                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+
+                  {presidentLoginError && (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-semibold">
+                      {presidentLoginError}
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPresidentLoginModal(false)}
+                      className="flex-1 py-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      रद्द करा
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-gradient-to-r from-[#d4af37] to-[#b8860b] text-white rounded-lg font-extrabold shadow-sm"
+                    >
+                      प्रवेश करा
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <div>
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-2.5">
+                    <KeyRound className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-serifDevanagari text-lg font-extrabold text-[#09243f]">
+                    राज्याध्यक्ष: नवीन पासवर्ड सेट करा
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    आपण प्रथमच लॉगिन करत आहात. सुरक्षिततेसाठी आपला स्वतःचा नवीन पासवर्ड तयार करा (हा पासवर्ड फायरबेसवर जतन होईल).
+                  </p>
+                </div>
+
+                <form onSubmit={handleSavePresidentInitialPassword} className="space-y-3.5">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">नवीन पासवर्ड (New Password):</label>
+                    <input
+                      type="password"
+                      required
+                      autoFocus
+                      placeholder="उदा. Rajendra@2026"
+                      value={newPresidentPass1}
+                      onChange={(e) => setNewPresidentPass1(e.target.value)}
+                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">नवीन पासवर्ड पुन्हा टाका (Confirm):</label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Confirm Password"
+                      value={newPresidentPass2}
+                      onChange={(e) => setNewPresidentPass2(e.target.value)}
+                      className="w-full p-2.5 border border-slate-300 rounded-lg text-sm"
+                    />
+                  </div>
+
+                  {presidentLoginError && (
+                    <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-semibold">
+                      {presidentLoginError}
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSettingPresidentInitialPassword(false)}
+                      className="flex-1 py-2.5 border border-slate-300 rounded-lg font-bold"
+                    >
+                      मागे जा
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 py-2.5 bg-emerald-600 text-white rounded-lg font-extrabold shadow-sm"
+                    >
+                      जतन करा व प्रवेश करा
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CHANGE PRESIDENT PASSWORD (राज्याध्यक्ष पासवर्ड बदला) */}
+      {/* ========================================================================= */}
+      {showChangePresidentPasswordModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-xs relative">
+            <button
+              onClick={() => setShowChangePresidentPasswordModal(false)}
+              className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
             <div className="text-center mb-4">
               <div className="w-12 h-12 bg-amber-100 text-[#b8860b] rounded-full flex items-center justify-center mx-auto mb-2.5">
-                <Award className="w-6 h-6" />
+                <KeyRound className="w-6 h-6" />
               </div>
               <h3 className="font-serifDevanagari text-lg font-extrabold text-[#09243f]">
-                राज्याध्यक्ष लॉगिन
+                राज्याध्यक्ष पासवर्ड बदला
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                संस्थापक राज्याध्यक्ष अधिकृत पासवर्ड प्रविष्ट करा:
+                नवीन पासवर्ड थेट फायरबेसवर सुरक्षित सेव्ह केला जाईल.
               </p>
             </div>
 
-            <form onSubmit={handlePresidentLoginSubmit} className="space-y-3.5">
+            <form onSubmit={handleChangePresidentPassword} className="space-y-3.5">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  पासवर्ड:
+                  सध्याचा पासवर्ड (Current Password):
                 </label>
                 <input
                   type="password"
-                  autoFocus
                   required
-                  placeholder="गोपनीय पासवर्ड प्रविष्ट करा"
-                  value={presidentPasswordInput}
-                  onChange={(e) => setPresidentPasswordInput(e.target.value)}
-                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-[#df6b16]"
+                  autoFocus
+                  placeholder="सध्याचा पासवर्ड टाका"
+                  value={changeOldPass}
+                  onChange={(e) => setChangeOldPass(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm"
                 />
               </div>
 
-              {presidentLoginError && (
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  नवीन पासवर्ड (New Password):
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="नवीन सुरक्षित पासवर्ड"
+                  value={changeNewPass1}
+                  onChange={(e) => setChangeNewPass1(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  नवीन पासवर्ड पुन्हा टाका (Confirm New Password):
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="नवीन पासवर्ड पुन्हा टाका"
+                  value={changeNewPass2}
+                  onChange={(e) => setChangeNewPass2(e.target.value)}
+                  className="w-full p-2.5 border border-slate-300 rounded-lg text-sm"
+                />
+              </div>
+
+              {changePassError && (
                 <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-semibold">
-                  {presidentLoginError}
+                  {changePassError}
                 </div>
               )}
 
               <div className="pt-2 flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowPresidentLoginModal(false)}
+                  onClick={() => setShowChangePresidentPasswordModal(false)}
                   className="flex-1 py-2.5 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
                 >
                   रद्द करा
@@ -1340,7 +1806,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="submit"
                   className="flex-1 py-2.5 bg-gradient-to-r from-[#d4af37] to-[#b8860b] text-white rounded-lg font-extrabold shadow-sm"
                 >
-                  प्रवेश करा
+                  पासवर्ड अपडेट करा
                 </button>
               </div>
             </form>
@@ -1819,6 +2285,129 @@ export const AppointmentsTab: React.FC = () => {
                 className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-extrabold shadow-sm disabled:opacity-50"
               >
                 {isDeleting ? 'हटवत आहे...' : 'होय, वगळा'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: संघटना सद्यस्थिती (36 जिल्हे मॅट्रिक्स तक्ता & A4 B&W PDF - Point 8) */}
+      {/* ========================================================================= */}
+      {showStatusMatrixModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-5 sm:p-6 text-xs relative max-h-[92vh] flex flex-col border-2 border-slate-300">
+            {/* Modal Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 shrink-0">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#df6b16]">
+                  महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+                </span>
+                <h3 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#09243f]">
+                  ॥ संघटना सद्यस्थिती अहवाल (36 जिल्हे) ॥
+                </h3>
+                <p className="text-slate-500 text-[11px] mt-0.5">
+                  सर्व 36 जिल्ह्यांतील राज्य, विभागीय, जिल्हा, तालुका पदाधिकारी व नोंदणीकृत सभासदांची आकडेवारी
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadStatusMatrixPdf}
+                  disabled={isGeneratingRegistryPdf}
+                  className="bg-[#0f172a] hover:bg-black text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm transition-all disabled:opacity-50"
+                  title="A4 साईज मध्ये ब्लॅक अँड व्हाईट अधिकृत PDF डाऊनलोड करा"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#efb24b]" />
+                  A4 PDF डाऊनलोड (Black & White)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowStatusMatrixModal(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Table View */}
+            <div className="overflow-y-auto flex-1 my-3 border border-slate-300 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-[#0f172a] text-white uppercase text-[11px] sticky top-0 z-10">
+                  <tr>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700 w-12">अनु.</th>
+                    <th className="py-2.5 px-3 border-r border-slate-700">जिल्ह्याचे नाव</th>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700">राज्य प्रतिनिधी</th>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700">विभागीय प्रतिनिधी</th>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700">जिल्हा पदाधिकारी</th>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700">तालुका पदाधिकारी</th>
+                    <th className="py-2.5 px-3 text-center">सदस्य (नोंदणी)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {districtMatrixStats.map((st, idx) => (
+                    <tr key={st.district} className="hover:bg-amber-50/50">
+                      <td className="py-2 px-3 text-center font-bold text-slate-600 border-r border-slate-200">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2 px-3 font-bold text-[#09243f] border-r border-slate-200">
+                        {st.district}
+                      </td>
+                      <td className="py-2 px-3 text-center font-semibold text-slate-700 border-r border-slate-200">
+                        {toEnglishDigits(st.stateRep)}
+                      </td>
+                      <td className="py-2 px-3 text-center font-semibold text-slate-700 border-r border-slate-200">
+                        {toEnglishDigits(st.divRep)}
+                      </td>
+                      <td className="py-2 px-3 text-center font-semibold text-slate-700 border-r border-slate-200">
+                        {toEnglishDigits(st.distOfficial)}
+                      </td>
+                      <td className="py-2 px-3 text-center font-semibold text-slate-700 border-r border-slate-200">
+                        {toEnglishDigits(st.talukaOfficial)}
+                      </td>
+                      <td className="py-2 px-3 text-center font-bold text-[#df6b16]">
+                        {toEnglishDigits(st.members)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {/* Total Row as per requirement */}
+                <tfoot className="bg-[#e2e8f0] text-slate-900 font-extrabold border-t-2 border-slate-400 sticky bottom-0 z-10">
+                  <tr>
+                    <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-300 text-sm">
+                      एकूण (Total)
+                    </td>
+                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                      {toEnglishDigits(matrixTotals.stateRep)}
+                    </td>
+                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                      {toEnglishDigits(matrixTotals.divRep)}
+                    </td>
+                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                      {toEnglishDigits(matrixTotals.distOfficial)}
+                    </td>
+                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                      {toEnglishDigits(matrixTotals.talukaOfficial)}
+                    </td>
+                    <td className="py-3 px-3 text-center text-sm text-[#df6b16]">
+                      {toEnglishDigits(matrixTotals.members)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 flex justify-between items-center text-[11px] text-slate-500 shrink-0">
+              <span>* आकडेवारी रिअल-टाईम डेटाबेसमधून स्वयंचलित एकत्रित केली आहे.</span>
+              <button
+                type="button"
+                onClick={() => setShowStatusMatrixModal(false)}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2 rounded-lg"
+              >
+                बंद करा
               </button>
             </div>
           </div>

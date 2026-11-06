@@ -40,6 +40,15 @@ h1, h2, h3, .serif-marathi {
   background: #df6b16;
 }
 
+/* Hide scrollbar for horizontal navigation strip on mobile */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @media print {
   body {
     background: white !important;

@@ -9,6 +9,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   limit
@@ -23,8 +24,9 @@ import {
 
 const app = initializeApp(firebaseConfig);
 
-// CRITICAL: Passing firestoreDatabaseId to getFirestore
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = (firebaseConfig.firestoreDatabaseId && !firebaseConfig.firestoreDatabaseId.startsWith('ai-studio-') && firebaseConfig.firestoreDatabaseId !== '(default)')
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
 export const auth = getAuth(app);
 
 // Error Handling Definition
@@ -322,3 +324,102 @@ export async function updateAdminCredentials(newPassword: string, newEmail?: str
     console.warn('Saved admin credentials locally, firestore sync failed:', err);
   }
 }
+
+// ==========================================
+// Multi-User Admin & RBAC Management (Manage Admins)
+// ==========================================
+export interface AdminPermissions {
+  approveMembers: boolean;     // सदस्य पडताळणी व मंजुरी (Approve Members)
+  manageNews: boolean;         // बातम्या व फोटो/परिपत्रके टाकणे (News & Circulars)
+  manageLeadership: boolean;   // नेतृत्व व वेबसाईट माहिती बदलणे (Leadership Management)
+  manageAdmins?: boolean;      // इतर ॲडमिन व्यवस्थापन (Manage Admins - Super Admin only)
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name?: string;
+  password?: string;
+  isFirstLogin?: boolean;
+  isSuperAdmin?: boolean;
+  permissions: AdminPermissions;
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
+const ADMIN_USERS_CACHE_KEY = 'mahasangh_sub_admins_v1';
+
+export async function fetchAdminUsers(): Promise<AdminUser[]> {
+  try {
+    const snap = await getDocs(collection(db, 'sub_admins'));
+    if (!snap.empty) {
+      const list: AdminUser[] = [];
+      snap.forEach((d) => list.push(d.data() as AdminUser));
+      localStorage.setItem(ADMIN_USERS_CACHE_KEY, JSON.stringify(list));
+      return list;
+    }
+  } catch (err) {
+    console.warn('Could not read sub_admins from firestore, using local cache:', err);
+  }
+
+  const cached = localStorage.getItem(ADMIN_USERS_CACHE_KEY);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+export async function saveAdminUser(admin: AdminUser): Promise<void> {
+  // Update local cache immediately
+  const existing = await fetchAdminUsers();
+  const index = existing.findIndex((a) => a.id === admin.id || a.email.toLowerCase() === admin.email.toLowerCase());
+  let updated: AdminUser[];
+  if (index >= 0) {
+    updated = [...existing];
+    updated[index] = { ...updated[index], ...admin };
+  } else {
+    updated = [admin, ...existing];
+  }
+  localStorage.setItem(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
+
+  try {
+    await setDoc(doc(db, 'sub_admins', admin.id), admin);
+  } catch (err) {
+    console.warn('Saved sub-admin locally, firestore sync failed:', err);
+  }
+}
+
+export async function deleteAdminUser(adminId: string): Promise<void> {
+  const existing = await fetchAdminUsers();
+  const updated = existing.filter((a) => a.id !== adminId);
+  localStorage.setItem(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
+
+  try {
+    await deleteDoc(doc(db, 'sub_admins', adminId));
+  } catch (err) {
+    console.warn('Deleted sub-admin locally, firestore delete failed:', err);
+  }
+}
+
+export async function setAdminUserPassword(email: string, newPassword: string): Promise<boolean> {
+  const cleanEmail = email.trim().toLowerCase();
+  const existing = await fetchAdminUsers();
+  const target = existing.find((a) => a.email.toLowerCase() === cleanEmail);
+
+  if (!target) return false;
+
+  const updatedAdmin: AdminUser = {
+    ...target,
+    password: newPassword.trim(),
+    isFirstLogin: false,
+    lastLoginAt: new Date().toISOString()
+  };
+
+  await saveAdminUser(updatedAdmin);
+  return true;
+}
+

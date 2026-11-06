@@ -80,6 +80,18 @@ export function App() {
     };
   }, [currentTab]);
 
+  // Global Right Click Protection across entire website (As requested)
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+    document.addEventListener('contextmenu', handleContextMenu, { capture: true });
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu, { capture: true } as any);
+    };
+  }, []);
+
   // On initial mount: test connection once per session & load cached news (0 reads if cached!)
   useEffect(() => {
     const initApp = async () => {

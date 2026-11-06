@@ -1,11 +1,14 @@
 export interface Leader {
+  id?: string;
   name: string;
   role: string;
   region: string;
   education: string;
   phone: string;
   email?: string;
+  photo?: string;
   isKey?: boolean;
+  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'सल्लागार';
 }
 
 export interface NewsItem {
@@ -37,6 +40,68 @@ export interface MembershipApplication {
   createdAt: string;
   approvedAt?: string;
   paymentRef?: string;
+  photo?: string; // Passport photo DataURL / Base64 under 200KB
+  isOfficial?: boolean; // आपण सध्या संघटनेचे पदाधिकारी आहात काय?
+  officialPost?: string; // संघटनेतील पद
+  officialDistrict?: string;
+  officialTaluka?: string;
+  paymentConfirmed?: boolean; // ₹500 payment verified by admin
+}
+
+export const DISTRICT_4_LETTER_CODES: Record<string, string> = {
+  "अहिल्यानगर": "AHIL", "अहमदनगर": "AHIL",
+  "अकोला": "AKOL",
+  "अमरावती": "AMRA",
+  "छत्रपती संभाजीनगर": "SAMB", "औरंगाबाद": "SAMB",
+  "भंडारा": "BHAN",
+  "बीड": "BEED",
+  "बुलढाणा": "BULD",
+  "चंद्रपूर": "CHAN",
+  "धुळे": "DHUL",
+  "गडचिरोली": "GADC",
+  "गोंदिया": "GOND",
+  "हिंगोली": "HING",
+  "जळगाव": "JALG",
+  "जालना": "JALN",
+  "कोल्हापूर": "KOLH",
+  "लातूर": "LATU",
+  "मुंबई शहर": "MUMC",
+  "मुंबई उपनगर": "MUMS",
+  "नागपूर": "NAGP",
+  "नांदेड": "NAND",
+  "नंदुरबार": "NDBR",
+  "नाशिक": "NASH",
+  "धाराशिव": "DHAR", "उस्मानाबाद": "DHAR",
+  "पालघर": "PALG",
+  "परभणी": "PARB",
+  "पुणे": "PUNE",
+  "रायगड": "RAIG",
+  "रत्नागिरी": "RATN",
+  "सांगली": "SANG",
+  "सातारा": "SATA",
+  "सिंधुदुर्ग": "SIND",
+  "सोलापूर": "SOLA",
+  "ठाणे": "THAN",
+  "वर्धा": "WARD",
+  "वाशीम": "WASH",
+  "यवतमाळ": "YAVA",
+};
+
+export function getDistrict4LetterCode(dist: string): string {
+  if (!dist) return "MAHA";
+  const trimmed = dist.trim();
+  if (DISTRICT_4_LETTER_CODES[trimmed]) return DISTRICT_4_LETTER_CODES[trimmed];
+  for (const [k, v] of Object.entries(DISTRICT_4_LETTER_CODES)) {
+    if (trimmed.includes(k) || k.includes(trimmed)) return v;
+  }
+  return "MAHA";
+}
+
+export function formatSequentialMemberNumber(district: string, sequentialIndex: number): string {
+  const year = new Date().getFullYear();
+  const code = getDistrict4LetterCode(district);
+  const padded = String(sequentialIndex).padStart(4, '0');
+  return `MS/${year}/${code}/${padded}`;
 }
 
 export const ORG_DETAILS = {
