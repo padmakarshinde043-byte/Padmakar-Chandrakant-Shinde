@@ -24,6 +24,16 @@ h1, h2, h3, .serif-marathi {
   font-family: 'Noto Serif Devanagari', serif;
 }
 
+.font-shree {
+  font-family: 'Rozha One', 'Yatra One', 'Noto Serif Devanagari', serif;
+  letter-spacing: -0.015em;
+}
+
+.font-yatra {
+  font-family: 'Yatra One', cursive, sans-serif;
+  letter-spacing: -0.01em;
+}
+
 /* Custom scrollbar for clean reading */
 ::-webkit-scrollbar {
   width: 8px;

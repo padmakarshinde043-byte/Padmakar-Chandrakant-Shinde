@@ -3,7 +3,8 @@ import {
   Lock, LogOut, Award, Printer, PlusCircle, Search,
   UserCheck, ShieldAlert, KeyRound, CheckCircle2, ArrowLeft, Eye, EyeOff,
   Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download,
-  UserPlus, Shield, CheckSquare, Square
+  UserPlus, Shield, CheckSquare, Square, MessageSquare, Mail, PhoneCall, RefreshCw,
+  Cloud, CloudUpload, ExternalLink, AlertCircle, Settings
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -14,7 +15,8 @@ import {
   DIVISIONAL_COORDINATORS,
   DISTRICT_PRESIDENTS,
   ADVISORY_BOARD,
-  formatSequentialMemberNumber
+  formatSequentialMemberNumber,
+  MAHARASHTRA_DISTRICTS
 } from '../data/mahasanghData';
 import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatters';
 import {
@@ -27,16 +29,28 @@ import {
   deleteAdminUser,
   setAdminUserPassword,
   AdminUser,
-  AdminPermissions
+  AdminPermissions,
+  ContactMessage,
+  fetchContactsForAdmin,
+  deleteContactMessageFromFirestore
 } from '../firebase';
 import { generateMembershipCertificatePdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
 import { saveDynamicLeadersToFirebase, fetchDynamicLeaders } from '../services/rkFirebaseService';
+import {
+  getCloudinaryConfig,
+  saveCloudinaryConfig,
+  uploadToCloudinary,
+  CloudinaryConfig
+} from '../utils/cloudinary';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
   onApproveApplication: (id: string, memberNumber: string) => void;
   onAddNews: (news: NewsItem) => void;
+  onUpdateNews?: (news: NewsItem) => void;
+  onDeleteNews?: (id: string) => void;
+  newsList?: NewsItem[];
   onFetchApplications?: () => Promise<void>;
   isLoadingApps?: boolean;
   onExitAdmin?: () => void;
@@ -48,6 +62,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   applications,
   onApproveApplication,
   onAddNews,
+  onUpdateNews,
+  onDeleteNews,
+  newsList = [],
   onFetchApplications,
   isLoadingApps,
   onExitAdmin,
@@ -80,7 +97,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [resetSuccess, setResetSuccess] = useState('');
 
   // Active view inside Admin Dashboard
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'leadership' | 'add_news' | 'manage_admins' | 'password'>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'leadership' | 'add_news' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary'>('applications');
+
+  // Contact Inquiries (प्राप्त संदेश / विचारणा)
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [contactSearchQuery, setContactSearchQuery] = useState('');
+  const [contactDistrictFilter, setContactDistrictFilter] = useState('');
 
   // Manage Admins tab state (Super Admin only)
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -112,14 +135,166 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Certificate Modal (Point 5)
   const [certModalApp, setCertModalApp] = useState<MembershipApplication | null>(null);
 
-  // News State
+  // Cloudinary State (Firebase Quota Protection - 100% Free CDN Hosting)
+  const [cloudinaryConfig, setCloudinaryConfig] = useState<CloudinaryConfig>(getCloudinaryConfig);
+  const [cloudinaryCloudName, setCloudinaryCloudName] = useState(cloudinaryConfig.cloudName);
+  const [cloudinaryPreset, setCloudinaryPreset] = useState(cloudinaryConfig.uploadPreset);
+  const [cloudinaryEnabled, setCloudinaryEnabled] = useState(cloudinaryConfig.enabled);
+  const [cloudinaryStatusMsg, setCloudinaryStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isTestingCloudinary, setIsTestingCloudinary] = useState(false);
+  const [isUploadingNewsCloudinary, setIsUploadingNewsCloudinary] = useState(false);
+  const [isUploadingLeaderCloudinary, setIsUploadingLeaderCloudinary] = useState(false);
+
+  const handleSaveCloudinarySettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    const updated: CloudinaryConfig = {
+      cloudName: cloudinaryCloudName.trim(),
+      uploadPreset: cloudinaryPreset.trim(),
+      enabled: cloudinaryEnabled && Boolean(cloudinaryCloudName.trim()) && Boolean(cloudinaryPreset.trim())
+    };
+    saveCloudinaryConfig(updated);
+    setCloudinaryConfig(updated);
+    setCloudinaryStatusMsg({
+      text: updated.enabled
+        ? '✓ Cloudinary सेटिंग्ज यशस्वीरीत्या सेव्ह झाली! आता सर्व फोटो मोफत Cloudinary CDN वर सेव्ह होतील.'
+        : 'Cloudinary सेटिंग्ज जतन करण्यात आली (सध्या पर्याय निष्क्रिय आहे).',
+      type: 'success'
+    });
+  };
+
+  const handleTestCloudinaryUpload = async () => {
+    if (!cloudinaryCloudName.trim() || !cloudinaryPreset.trim()) {
+      setCloudinaryStatusMsg({ text: 'कृपया आधी Cloud Name आणि Unsigned Upload Preset प्रविष्ट करा.', type: 'error' });
+      return;
+    }
+    setIsTestingCloudinary(true);
+    setCloudinaryStatusMsg(null);
+    try {
+      // Create a 10x10 tiny test pixel image blob
+      const canvas = document.createElement('canvas');
+      canvas.width = 10;
+      canvas.height = 10;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#09243f';
+        ctx.fillRect(0, 0, 10, 10);
+      }
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('चाचणी इमेज तयार करता आली नाही.');
+      const testFile = new File([blob], 'test_ping.png', { type: 'image/png' });
+
+      const result = await uploadToCloudinary(testFile, {
+        cloudName: cloudinaryCloudName.trim(),
+        uploadPreset: cloudinaryPreset.trim(),
+        enabled: true
+      });
+
+      setCloudinaryStatusMsg({
+        text: `✓ Cloudinary कनेक्शन यशस्वी झाले! चाचणी फोटो अपलोड झाला: ${result.url}`,
+        type: 'success'
+      });
+    } catch (err: any) {
+      setCloudinaryStatusMsg({
+        text: 'Cloudinary चाचणी अयशस्वी: ' + (err.message || 'कृपया नाव व Preset तपासा'),
+        type: 'error'
+      });
+    } finally {
+      setIsTestingCloudinary(false);
+    }
+  };
+
+  // News State & Management (Full News, Quick Photo Only, Edit, Live Preview)
   const [newsTitle, setNewsTitle] = useState('');
   const [newsCategory, setNewsCategory] = useState('अधिकृत घोषणा');
   const [newsSummary, setNewsSummary] = useState('');
   const [newsContent, setNewsContent] = useState('');
   const [newsImageUrl, setNewsImageUrl] = useState('');
+  const [isCompressingNewsImg, setIsCompressingNewsImg] = useState(false);
   const [newsCreatedSuccess, setNewsCreatedSuccess] = useState(false);
   const [newsError, setNewsError] = useState('');
+
+  // Editing existing news / GR / Photo
+  const [editingNewsItem, setEditingNewsItem] = useState<NewsItem | null>(null);
+  const [newsManageMode, setNewsManageMode] = useState<'form' | 'photo_only' | 'list'>('form');
+  const [previewNewsItem, setPreviewNewsItem] = useState<NewsItem | null>(null);
+
+  // Quick Photo Only state
+  const [photoOnlyTitle, setPhotoOnlyTitle] = useState('');
+  const [photoOnlyImageUrl, setPhotoOnlyImageUrl] = useState('');
+  const [isUploadingPhotoOnly, setIsUploadingPhotoOnly] = useState(false);
+
+  // News search query in admin
+  const [newsSearchQuery, setNewsSearchQuery] = useState('');
+
+  const handleNewsImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
+      setIsUploadingNewsCloudinary(true);
+      setNewsError('');
+      try {
+        const result = await uploadToCloudinary(file, cloudinaryConfig);
+        setNewsImageUrl(result.url);
+      } catch (err: any) {
+        console.warn('Cloudinary upload error, falling back to local compression:', err);
+        setIsCompressingNewsImg(true);
+        try {
+          const { base64 } = await compressImageFile(file, 800, 600, 0.7);
+          setNewsImageUrl(base64);
+          setNewsError('Cloudinary त्रुटी (' + (err.message || '') + '), म्हणून स्थानिक कॉम्प्रेस केलेली इमेज वापरली.');
+        } catch {
+          setNewsError('फोटो कॉम्प्रेस करताना अडचण आली.');
+        } finally {
+          setIsCompressingNewsImg(false);
+        }
+      } finally {
+        setIsUploadingNewsCloudinary(false);
+      }
+    } else {
+      setIsCompressingNewsImg(true);
+      try {
+        const { base64 } = await compressImageFile(file, 800, 600, 0.7);
+        setNewsImageUrl(base64);
+      } catch (err) {
+        console.warn('News image compression failed:', err);
+      } finally {
+        setIsCompressingNewsImg(false);
+      }
+    }
+  };
+
+  const handlePhotoOnlySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
+      setIsUploadingPhotoOnly(true);
+      setNewsError('');
+      try {
+        const result = await uploadToCloudinary(file, cloudinaryConfig);
+        setPhotoOnlyImageUrl(result.url);
+      } catch (err: any) {
+        console.warn('Cloudinary upload error for photo-only:', err);
+        try {
+          const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
+          setPhotoOnlyImageUrl(base64);
+          setNewsError('Cloudinary त्रुटी (' + (err.message || '') + '), स्थानिक इमेज निवडली.');
+        } catch {
+          setNewsError('फोटो कॉम्प्रेस करताना अडचण आली.');
+        }
+      } finally {
+        setIsUploadingPhotoOnly(false);
+      }
+    } else {
+      try {
+        const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
+        setPhotoOnlyImageUrl(base64);
+      } catch (err) {
+        console.warn('Photo compression failed:', err);
+      }
+    }
+  };
 
   // ==========================================
   // Leadership Management State (Point 7)
@@ -521,6 +696,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  // Fetch contact messages
+  const loadContactMessages = async () => {
+    setIsLoadingContacts(true);
+    try {
+      const msgs = await fetchContactsForAdmin();
+      setContactMessages(msgs);
+    } catch (e) {
+      console.warn('Failed to fetch contact messages:', e);
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
+
+  const handleDeleteContactMessage = async (id: string) => {
+    try {
+      await deleteContactMessageFromFirestore(id);
+      setContactMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch (e) {
+      console.warn('Delete contact message failed:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn && (activeAdminSubTab === 'contact_messages' || contactMessages.length === 0)) {
+      loadContactMessages();
+    }
+  }, [isLoggedIn, activeAdminSubTab]);
+
   // Open Verification Modal for an Application
   const handleOpenVerification = (app: MembershipApplication) => {
     setSelectedAppForVerification(app);
@@ -570,14 +773,38 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    try {
-      // Automatically compress down to ~20KB to protect Firebase quota 100%
-      const { base64, sizeKb } = await compressImageFile(file, 240, 240, 0.72);
-      setLeaderPhoto(base64);
-      setLeaderPhotoSizeKb(sizeKb);
-      setLeaderPhotoUrl('');
-    } catch (err: any) {
-      setLeaderFormMsg({ text: 'फोटो कॉम्प्रेस करताना अडचण आली: ' + (err.message || ''), type: 'error' });
+    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
+      setIsUploadingLeaderCloudinary(true);
+      try {
+        const result = await uploadToCloudinary(file, cloudinaryConfig);
+        setLeaderPhoto(result.url);
+        setLeaderPhotoUrl(result.url);
+        setLeaderPhotoSizeKb(0);
+        setLeaderFormMsg({ text: '✓ फोटो Cloudinary वर थेट सेव्ह झाला (0% Firebase कोटा खर्च)!', type: 'success' });
+      } catch (err: any) {
+        console.warn('Cloudinary leader upload error, falling back to local compression:', err);
+        try {
+          const { base64, sizeKb } = await compressImageFile(file, 240, 240, 0.72);
+          setLeaderPhoto(base64);
+          setLeaderPhotoSizeKb(sizeKb);
+          setLeaderPhotoUrl('');
+          setLeaderFormMsg({ text: 'Cloudinary त्रुटी, स्थानिक कॉम्प्रेस केलेला फोटो वापरला (' + sizeKb + ' KB).', type: 'error' });
+        } catch {
+          setLeaderFormMsg({ text: 'फोटो अपलोड करताना अडचण आली.', type: 'error' });
+        }
+      } finally {
+        setIsUploadingLeaderCloudinary(false);
+      }
+    } else {
+      try {
+        // Automatically compress down to ~20KB to protect Firebase quota 100%
+        const { base64, sizeKb } = await compressImageFile(file, 240, 240, 0.72);
+        setLeaderPhoto(base64);
+        setLeaderPhotoSizeKb(sizeKb);
+        setLeaderPhotoUrl('');
+      } catch (err: any) {
+        setLeaderFormMsg({ text: 'फोटो कॉम्प्रेस करताना अडचण आली: ' + (err.message || ''), type: 'error' });
+      }
     }
   };
 
@@ -662,24 +889,53 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setTimeout(() => setLeaderFormMsg(null), 3000);
   };
 
-  // Create News
+  // Create or Update News / GR
   const handleCreateNews = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newsTitle || !newsSummary || !newsContent) {
+    if (!newsTitle.trim() || !newsSummary.trim() || !newsContent.trim()) {
       setNewsError('कृपया बातमीचे शीर्षक, सारांश आणि सविस्तर मजकूर भरा.');
       return;
     }
     setNewsError('');
 
     const todayStr = formatDateWithEnglishDigits(new Date());
+
+    if (editingNewsItem) {
+      const updatedPost: NewsItem = {
+        ...editingNewsItem,
+        title: toEnglishDigits(newsTitle.trim()),
+        category: newsCategory,
+        summary: toEnglishDigits(newsSummary.trim()),
+        content: toEnglishDigits(newsContent.trim()),
+        image: newsImageUrl || undefined,
+        imageUrl: newsImageUrl || undefined,
+      };
+
+      if (onUpdateNews) {
+        onUpdateNews(updatedPost);
+      } else {
+        onAddNews(updatedPost);
+      }
+
+      setNewsCreatedSuccess(true);
+      setEditingNewsItem(null);
+      setNewsTitle('');
+      setNewsSummary('');
+      setNewsContent('');
+      setNewsImageUrl('');
+      setTimeout(() => setNewsCreatedSuccess(false), 4000);
+      return;
+    }
+
     const newPost: NewsItem = {
       id: `post-${Date.now()}`,
-      title: toEnglishDigits(newsTitle),
+      title: toEnglishDigits(newsTitle.trim()),
       date: todayStr,
       category: newsCategory,
-      summary: toEnglishDigits(newsSummary),
-      content: toEnglishDigits(newsContent),
+      summary: toEnglishDigits(newsSummary.trim()),
+      content: toEnglishDigits(newsContent.trim()),
       image: newsImageUrl || undefined,
+      imageUrl: newsImageUrl || undefined,
       featured: false
     };
 
@@ -692,13 +948,115 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setTimeout(() => setNewsCreatedSuccess(false), 4000);
   };
 
-  const filteredApps = applications.filter((app) => {
+  // Quick Photo Only Publish
+  const handleCreatePhotoOnly = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!photoOnlyTitle.trim() || !photoOnlyImageUrl) {
+      setNewsError('कृपया फोटोचे शीर्षक प्रविष्ट करा आणि फोटो निवडा.');
+      return;
+    }
+    setNewsError('');
+
+    const todayStr = formatDateWithEnglishDigits(new Date());
+    const photoPost: NewsItem = {
+      id: `photo-${Date.now()}`,
+      title: toEnglishDigits(photoOnlyTitle.trim()),
+      date: todayStr,
+      category: 'अधिकृत छायाचित्र / परिपत्रक',
+      summary: 'अधिकृत छायाचित्र / परिपत्रक',
+      content: '', // Empty content indicates photo-only mode
+      image: photoOnlyImageUrl,
+      imageUrl: photoOnlyImageUrl,
+      featured: false
+    };
+
+    onAddNews(photoPost);
+    setNewsCreatedSuccess(true);
+    setPhotoOnlyTitle('');
+    setPhotoOnlyImageUrl('');
+    setTimeout(() => setNewsCreatedSuccess(false), 4000);
+  };
+
+  // Start Editing News
+  const handleStartEditNews = (item: NewsItem) => {
+    setEditingNewsItem(item);
+    setNewsTitle(item.title || '');
+    setNewsCategory(item.category || 'अधिकृत घोषणा');
+    setNewsSummary(item.summary || '');
+    setNewsContent(item.content || '');
+    setNewsImageUrl(item.imageUrl || item.image || '');
+    setNewsManageMode('form');
+    setNewsError('');
+    window.scrollTo({ top: 320, behavior: 'smooth' });
+  };
+
+  // Cancel Editing
+  const handleCancelEditNews = () => {
+    setEditingNewsItem(null);
+    setNewsTitle('');
+    setNewsSummary('');
+    setNewsContent('');
+    setNewsImageUrl('');
+    setNewsError('');
+  };
+
+  // Delete News
+  const handleDeleteNewsItem = (item: NewsItem) => {
+    if (window.confirm(`आपण खात्रीने '${item.title}' ही बातमी / परिपत्रक हटवू इच्छिता?`)) {
+      if (onDeleteNews) {
+        onDeleteNews(item.id);
+      }
+    }
+  };
+
+  // Live Preview Handlers
+  const handleOpenLivePreview = () => {
+    if (!newsTitle.trim()) {
+      setNewsError('प्रिव्ह्यू पाहण्यासाठी किमान बातमीचे शीर्षक भरा.');
+      return;
+    }
+    setNewsError('');
+    setPreviewNewsItem({
+      id: editingNewsItem ? editingNewsItem.id : 'preview-temp',
+      title: newsTitle.trim(),
+      category: newsCategory,
+      date: formatDateWithEnglishDigits(new Date()),
+      summary: newsSummary.trim(),
+      content: newsContent.trim(),
+      image: newsImageUrl || undefined,
+      imageUrl: newsImageUrl || undefined,
+    });
+  };
+
+  const handleOpenPhotoOnlyPreview = () => {
+    if (!photoOnlyTitle.trim()) {
+      setNewsError('प्रिव्ह्यू पाहण्यासाठी कृपया फोटोचे शीर्षक प्रविष्ट करा.');
+      return;
+    }
+    setNewsError('');
+    setPreviewNewsItem({
+      id: 'preview-photo-temp',
+      title: photoOnlyTitle.trim(),
+      category: 'अधिकृत छायाचित्र / परिपत्रक',
+      date: formatDateWithEnglishDigits(new Date()),
+      summary: 'अधिकृत छायाचित्र / परिपत्रक',
+      content: '',
+      image: photoOnlyImageUrl || undefined,
+      imageUrl: photoOnlyImageUrl || undefined,
+    });
+  };
+
+  const filteredApps = (applications || []).filter((app) => {
+    if (!app) return false;
     const matchesFilter = filterStatus === 'all' || app.status === filterStatus;
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (!q) return matchesFilter;
+
     const matchesSearch =
-      app.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.applicationNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.phone.includes(searchQuery) ||
-      (app.district && app.district.toLowerCase().includes(searchQuery.toLowerCase()));
+      (app.fullName || '').toLowerCase().includes(q) ||
+      (app.applicationNumber || '').toLowerCase().includes(q) ||
+      (app.phone || '').includes(q) ||
+      (app.district && app.district.toLowerCase().includes(q));
     return matchesFilter && matchesSearch;
   });
 
@@ -734,7 +1092,28 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {/* Clean Green Dot Indicator for Active Cloudinary CDN */}
+            {cloudinaryConfig.enabled && (
+              <div
+                className="inline-flex items-center gap-2 bg-white/95 border border-slate-200/90 px-3 py-1.5 rounded-full text-xs shadow-2xs select-none"
+                title={currentUser?.isSuperAdmin ? "क्लाउड स्टोरेज सक्रिय आहे (सेटिंग्जसाठी क्लिक करा)" : "क्लाउड स्टोरेज सक्रिय आहे"}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-400 shrink-0" />
+                <span className="font-semibold text-emerald-800 text-[11px] sm:text-xs">क्लाउड स्टोरेज सक्रिय</span>
+                {currentUser?.isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab(activeAdminSubTab === 'cloudinary' ? 'applications' : 'cloudinary')}
+                    className="text-slate-400 hover:text-[#df6b16] ml-0.5 p-0.5 rounded transition-colors"
+                    title="क्लाउड स्टोरेज सेटिंग्ज (फक्त मुख्य प्रशासक)"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
             {isLoggedIn && (
               <div className="flex items-center gap-3">
                 <div className="text-right hidden sm:block">
@@ -1046,19 +1425,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </strong>
               </div>
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">मंजूर सदस्य (Approved)</span>
+                <span className="text-slate-500 block">मंजूर सदस्य</span>
                 <strong className="text-2xl font-serifDevanagari text-emerald-600">
                   {toEnglishDigits(approvedCount)}
                 </strong>
               </div>
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">प्रलंबित अर्ज (Pending)</span>
+                <span className="text-slate-500 block">प्रलंबित अर्ज</span>
                 <strong className="text-2xl font-serifDevanagari text-amber-600">
                   {toEnglishDigits(pendingCount)}
                 </strong>
               </div>
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">नाकारलेले (Rejected)</span>
+                <span className="text-slate-500 block">नाकारलेले</span>
                 <strong className="text-2xl font-serifDevanagari text-rose-600">
                   {toEnglishDigits(rejectedCount)}
                 </strong>
@@ -1126,6 +1505,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   व्यवस्थापक प्रशासन (Manage Admins)
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setActiveAdminSubTab('contact_messages')}
+                className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
+                  activeAdminSubTab === 'contact_messages'
+                    ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
+                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+                प्राप्त संदेश / विचारणा ({toEnglishDigits(contactMessages.length)})
+              </button>
 
               <button
                 type="button"
@@ -1312,17 +1704,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {/* Dropdown with 4 Categories (As Requested) */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <label className="font-bold text-xs text-[#09243f] shrink-0">
-                    श्रेणी निवडा (Category):
+                    श्रेणी निवडा:
                   </label>
                   <select
                     value={leaderCategory}
                     onChange={(e) => setLeaderCategory(e.target.value as any)}
                     className="p-2.5 bg-white border border-[#c8d2e2] text-xs font-bold text-[#193568] rounded-lg focus:outline-none focus:border-[#df6b16] w-full sm:w-64"
                   >
-                    <option value="राज्य कार्यकारिणी">1. राज्य कार्यकारिणी (State Executive)</option>
-                    <option value="विभागीय समन्वयक">2. विभागीय समन्वयक (Divisional Coordinators)</option>
-                    <option value="जिल्हा अध्यक्ष">3. जिल्हा अध्यक्ष (District Presidents)</option>
-                    <option value="सल्लागार">4. सल्लागार (Advisory Board)</option>
+                    <option value="राज्य कार्यकारिणी">1. राज्य कार्यकारिणी</option>
+                    <option value="विभागीय समन्वयक">2. विभागीय समन्वयक</option>
+                    <option value="जिल्हा अध्यक्ष">3. जिल्हा अध्यक्ष</option>
+                    <option value="सल्लागार">4. सल्लागार</option>
                   </select>
                   <span className="text-xs text-slate-500 font-medium">
                     या श्रेणीत एकूण: <strong>{categoryLeaders.length}</strong> पदाधिकारी
@@ -1472,26 +1864,59 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         />
                       </div>
 
-                      {/* Photo Upload < 200KB */}
+                      {/* Photo Upload */}
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1">
-                          पासपोर्ट फोटो (ऑटो-कॉम्प्रेस कमाल 25KB — कोटा रक्षण)
-                        </label>
-                        <input
-                          ref={leaderPhotoInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLeaderPhotoSelect}
-                          className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px]"
-                        />
-                        {leaderPhotoSizeKb > 0 && (
-                          <span className="text-[10px] text-emerald-700 font-bold block mt-1">
-                            ✓ फोटो सुपर-कॉम्प्रेस झाला (आकार: {leaderPhotoSizeKb} KB — 95% डेटा बचत!)
-                          </span>
-                        )}
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-slate-700 text-xs">
+                            पासपोर्ट फोटो
+                          </label>
+                          {cloudinaryConfig.enabled && (
+                            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              क्लाउड स्टोरेज सक्रिय
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <input
+                            ref={leaderPhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLeaderPhotoSelect}
+                            disabled={isUploadingLeaderCloudinary}
+                            className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px]"
+                          />
+                          {isUploadingLeaderCloudinary && (
+                            <div className="text-[11px] text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                              <span>फोटो अपलोड होत आहे...</span>
+                            </div>
+                          )}
+                          {leaderPhoto && !isUploadingLeaderCloudinary && (
+                            <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded">
+                              <img src={leaderPhoto} alt="प्रीव्ह्यू" className="w-8 h-8 rounded object-cover" />
+                              <span className="text-[10px] text-slate-600 truncate flex-1 font-mono">
+                                {leaderPhoto.startsWith('http') ? 'फोटो यशस्वीरीत्या अपलोड झाला' : 'फोटो निवडला आहे'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLeaderPhoto('');
+                                  setLeaderPhotoUrl('');
+                                  setLeaderPhotoSizeKb(0);
+                                }}
+                                className="text-[10px] text-rose-600 font-bold"
+                              >
+                                काढा
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="mt-2">
                           <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
-                            किंवा थेट फोटो लिंक टाका (URL — 0% फायरबेस कोटा खर्च):
+                            किंवा थेट फोटो लिंक टाका (URL):
                           </label>
                           <input
                             type="url"
@@ -1504,7 +1929,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 setLeaderPhotoSizeKb(0);
                               }
                             }}
-                            placeholder="https://... (गुगल ड्राईव्ह किंवा मोफत इमेज URL)"
+                            placeholder="https://... (गुगल ड्राईव्ह, Cloudinary किंवा मोफत इमेज URL)"
                             className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] focus:outline-none focus:border-[#df6b16]"
                           />
                         </div>
@@ -1541,102 +1966,606 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab 3: Add News / Circular */}
+            {/* Sub-tab 3: News / Circular / Photo Management */}
             {activeAdminSubTab === 'add_news' && (
-              <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-2xl">
-                <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d] mb-4 pb-2 border-b border-slate-100">
-                  नवीन बातमी किंवा अधिकृत परिपत्रक प्रसिद्ध करा
-                </h3>
+              <div className="space-y-6">
+                {/* Mode Selector Tabs */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap gap-2 items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsManageMode('form');
+                        setNewsError('');
+                      }}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                        newsManageMode === 'form'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span>{editingNewsItem ? '✏️ बातमी संपादन करा' : '📰 सविस्तर बातमी / शासन निर्णय'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsManageMode('photo_only');
+                        setNewsError('');
+                      }}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                        newsManageMode === 'photo_only'
+                          ? 'bg-[#df6b16] text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      <span>📷 केवळ फोटो अपलोड करा</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewsManageMode('list');
+                        setNewsError('');
+                      }}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                        newsManageMode === 'list'
+                          ? 'bg-slate-800 text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>📋 सर्व बातम्या व परिपत्रके ({newsList.length})</span>
+                    </button>
+                  </div>
+
+                  {editingNewsItem && newsManageMode !== 'form' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingNewsItem(null);
+                        setNewsTitle('');
+                        setNewsSummary('');
+                        setNewsContent('');
+                        setNewsImageUrl('');
+                      }}
+                      className="text-xs text-rose-600 font-semibold hover:underline"
+                    >
+                      संपादन रद्द करा
+                    </button>
+                  )}
+                </div>
 
                 {newsCreatedSuccess && (
-                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>बातमी यशस्वीपणे वेबसाईटवर प्रसिद्ध करण्यात आली आहे!</span>
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 shadow-xs">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span className="font-semibold">
+                      {editingNewsItem
+                        ? 'बातमीमधील बदल यशस्वीपणे सेव्ह झाले असून वेबसाईटवर अद्ययावत झाले आहेत!'
+                        : 'बातमी / परिपत्रक / फोटो यशस्वीपणे वेबसाईटवर प्रसिद्ध करण्यात आला आहे!'}
+                    </span>
                   </div>
                 )}
 
-                <form onSubmit={handleCreateNews} className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      बातमी / परिपत्रकाचे शीर्षक
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="उदा. केंद्रप्रमुख पदोन्नती बाबत राज्यस्तरीय बैठक संपन्न..."
-                      value={newsTitle}
-                      onChange={(e) => setNewsTitle(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
+                {newsError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{newsError}</span>
                   </div>
+                )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">
-                        श्रेणी (Category)
-                      </label>
-                      <select
-                        value={newsCategory}
-                        onChange={(e) => setNewsCategory(e.target.value)}
-                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                      >
-                        <option value="अधिकृत घोषणा">अधिकृत घोषणा</option>
-                        <option value="शासन निर्णय (GR)">शासन निर्णय (GR)</option>
-                        <option value="बैठक अहवाल">बैठक अहवाल</option>
-                        <option value="जिल्हा वृत्त">जिल्हा वृत्त</option>
-                        <option value="अभिनंदन">अभिनंदन</option>
-                      </select>
+                {/* MODE 1: Full News & GR Form */}
+                {newsManageMode === 'form' && (
+                  <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-5 border-b border-slate-100 gap-2">
+                      <div>
+                        <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                          <PlusCircle className="w-5 h-5 text-[#df6b16]" />
+                          {editingNewsItem ? 'बातमी / परिपत्रक संपादित करा (Edit News/GR)' : 'नवीन बातमी किंवा अधिकृत परिपत्रक प्रसिद्ध करा'}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          बातमीचा तपशील, संबंधित छायाचित्र व मजकूर भरा. हे मुख्य वेबसाईटवर लगेच प्रसिद्ध होईल.
+                        </p>
+                      </div>
+
+                      {editingNewsItem && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditNews}
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors self-start"
+                        >
+                          ✕ संपादन रद्द करा
+                        </button>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">
-                        फोटो लिंक (Image URL - पर्यायी)
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://example.com/photo.jpg"
-                        value={newsImageUrl}
-                        onChange={(e) => setNewsImageUrl(e.target.value)}
-                        className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                      />
+                    {editingNewsItem && (
+                      <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center justify-between">
+                        <div>
+                          <strong>संपादित करत आहात:</strong> {editingNewsItem.title}
+                          <span className="ml-2 text-[11px] text-amber-700">({editingNewsItem.date})</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleCreateNews} className="space-y-4 text-xs">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          बातमी / परिपत्रकाचे शीर्षक <span className="text-rose-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="उदा. केंद्रप्रमुख पदोन्नती बाबत राज्यस्तरीय बैठक संपन्न..."
+                          value={newsTitle}
+                          onChange={(e) => setNewsTitle(e.target.value)}
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-sm"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            श्रेणी (Category) <span className="text-rose-600">*</span>
+                          </label>
+                          <select
+                            value={newsCategory}
+                            onChange={(e) => setNewsCategory(e.target.value)}
+                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                          >
+                            <option value="अधिकृत घोषणा">अधिकृत घोषणा</option>
+                            <option value="शासन निर्णय (GR)">शासन निर्णय (GR)</option>
+                            <option value="बैठक अहवाल">बैठक अहवाल</option>
+                            <option value="जिल्हा वृत्त">जिल्हा वृत्त</option>
+                            <option value="अभिनंदन">अभिनंदन</option>
+                            <option value="अधिकृत छायाचित्र / परिपत्रक">अधिकृत छायाचित्र / परिपत्रक</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            फोटो अपलोड (Direct Cloudinary Upload)
+                          </label>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#09243f] hover:bg-[#17366d] text-white text-xs font-semibold rounded-lg shadow-xs transition-colors">
+                                <Upload className="w-3.5 h-3.5 text-[#df6b16]" />
+                                <span>
+                                  {isUploadingNewsCloudinary
+                                    ? 'Cloudinary वर अपलोड होत आहे...'
+                                    : isCompressingNewsImg
+                                    ? 'प्रक्रिया सुरू आहे...'
+                                    : 'फोटो निवडा (Upload Photo)'}
+                                </span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleNewsImageUpload}
+                                  className="hidden"
+                                  disabled={isCompressingNewsImg || isUploadingNewsCloudinary}
+                                />
+                              </label>
+
+                              {newsImageUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => setNewsImageUrl('')}
+                                  className="text-xs text-rose-600 hover:underline font-semibold"
+                                >
+                                  फोटो हटवा
+                                </button>
+                              )}
+                            </div>
+
+                            <p className="text-[11px] text-slate-500">
+                              ☁️ निवडलेला फोटो थेट मोफत Cloudinary CDN वर सेव्ह होतो (Firebase चा ०% कोटा वापरला जातो).
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Photo Thumbnail Preview */}
+                      {newsImageUrl && (
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                          <img
+                            src={newsImageUrl}
+                            alt="News Preview"
+                            className="w-16 h-16 object-cover rounded-lg border border-slate-300 shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              फोटो यशस्वीरीत्या जोडला गेला आहे
+                            </span>
+                            <p className="text-[10px] text-slate-500 truncate mt-0.5 font-mono">
+                              {newsImageUrl}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          थोडक्यात सारांश <span className="text-rose-600">*</span>
+                        </label>
+                        <textarea
+                          required
+                          rows={2}
+                          placeholder="बातमीचा 2-3 ओळींत महत्त्वाचा सारांश..."
+                          value={newsSummary}
+                          onChange={(e) => setNewsSummary(e.target.value)}
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          सविस्तर मजकूर <span className="text-rose-600">*</span>
+                        </label>
+                        <textarea
+                          required
+                          rows={6}
+                          placeholder="बातमीची संपूर्ण माहिती किंवा परिपत्रकाचा संपूर्ण तपशील..."
+                          value={newsContent}
+                          onChange={(e) => setNewsContent(e.target.value)}
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={handleOpenLivePreview}
+                          className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                        >
+                          <Eye className="w-4 h-4 text-emerald-400" />
+                          <span>प्रिव्ह्यू पहा (Live Preview)</span>
+                        </button>
+
+                        <button
+                          type="submit"
+                          className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 px-6 rounded-lg text-xs transition-colors shadow-xs flex items-center gap-1.5"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>{editingNewsItem ? 'बदल सेव्ह करा (Update)' : 'वेबसाईटवर प्रसिद्ध करा (Publish)'}</span>
+                        </button>
+
+                        {editingNewsItem && (
+                          <button
+                            type="button"
+                            onClick={handleCancelEditNews}
+                            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 px-4 rounded-lg text-xs"
+                          >
+                            रद्द करा
+                          </button>
+                        )}
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* MODE 2: Quick Photo-Only Upload ("केवळ फोटो अपलोड करा") */}
+                {newsManageMode === 'photo_only' && (
+                  <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-2xl">
+                    <div className="pb-4 mb-5 border-b border-slate-100">
+                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                        <ImageIcon className="w-5 h-5 text-[#df6b16]" />
+                        केवळ फोटो किंवा परिपत्रक अपलोड करा (Quick Photo Upload)
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        फक्त फोटोचे शीर्षक आणि फोटो निवडा. वेबसाईटवर बातमी ऐवजी <strong>'📷 फोटो पहा'</strong> असे बटण दिसेल.
+                      </p>
+                    </div>
+
+                    <div className="mb-5 p-3.5 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 space-y-1">
+                      <p className="font-bold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-sky-600" />
+                        थेट क्लाऊडनरी मोफत इमेज होस्टिंग (०% Firebase डेटा खर्च)
+                      </p>
+                      <p className="text-[11px] text-sky-800">
+                        येथे अपलोड केलेला फोटो आपोआप Cloudinary वर जाईल आणि मुख्य वेबसाईटवर संबंधित विभागात 100% स्पष्ट दिसेल.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleCreatePhotoOnly} className="space-y-4 text-xs">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          १. फोटोचे किंवा परिपत्रकाचे शीर्षक <span className="text-rose-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="उदा. राज्यस्तरीय शैक्षणिक परिषद २०२६ छायाचित्र / शासन निर्णय पत्र..."
+                          value={photoOnlyTitle}
+                          onChange={(e) => setPhotoOnlyTitle(e.target.value)}
+                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          २. फोटो निवडा (Upload Photo to Cloudinary) <span className="text-rose-600">*</span>
+                        </label>
+                        <div className="space-y-3">
+                          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold rounded-lg shadow-xs transition-colors">
+                            <Upload className="w-4 h-4" />
+                            <span>
+                              {isUploadingPhotoOnly
+                                ? 'Cloudinary वर अपलोड होत आहे...'
+                                : 'मोबाईल किंवा संगणकावरून फोटो निवडा'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handlePhotoOnlySelect}
+                              className="hidden"
+                              disabled={isUploadingPhotoOnly}
+                            />
+                          </label>
+
+                          {photoOnlyImageUrl && (
+                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={photoOnlyImageUrl}
+                                  alt="Preview"
+                                  className="w-16 h-16 object-cover rounded-lg border border-slate-300"
+                                />
+                                <div>
+                                  <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> फोटो सज्ज आहे
+                                  </span>
+                                  <p className="text-[10px] text-slate-500 font-mono truncate max-w-xs">
+                                    {photoOnlyImageUrl}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setPhotoOnlyImageUrl('')}
+                                className="text-xs text-rose-600 hover:underline font-semibold"
+                              >
+                                फोटो बदला
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 pt-3">
+                        <button
+                          type="button"
+                          onClick={handleOpenPhotoOnlyPreview}
+                          className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+                        >
+                          <Eye className="w-4 h-4 text-emerald-400" />
+                          <span>प्रिव्ह्यू पहा (Live Preview)</span>
+                        </button>
+
+                        <button
+                          type="submit"
+                          disabled={!photoOnlyTitle.trim() || !photoOnlyImageUrl || isUploadingPhotoOnly}
+                          className="bg-[#df6b16] hover:bg-[#c85c0e] disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-lg text-xs transition-colors shadow-xs flex items-center gap-1.5"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>फोटो वेबसाईटवर प्रसिद्ध करा</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* MODE 3: Published News & GR List with Edit & Delete */}
+                {newsManageMode === 'list' && (
+                  <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-3">
+                      <div>
+                        <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                          <FileText className="w-5 h-5 text-[#df6b16]" />
+                          सर्व प्रसिद्ध बातम्या, शासन निर्णय व फोटो ({newsList.length})
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          वेबसाईटवर प्रसिद्ध असलेल्या सर्व नोंदी पाहण्यासाठी, संपादित करण्यासाठी किंवा हटवण्यासाठी ही यादी वापरा.
+                        </p>
+                      </div>
+
+                      {/* Search */}
+                      <div className="relative w-full sm:w-64">
+                        <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="शीर्षक किंवा श्रेणी शोधा..."
+                          value={newsSearchQuery}
+                          onChange={(e) => setNewsSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+                    </div>
+
+                    {newsList.length === 0 ? (
+                      <div className="text-center py-12 text-slate-500 text-xs">
+                        वेबसाईटवर अद्याप कोणतीही बातमी उपलब्ध नाही.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {newsList
+                          .filter((item) => {
+                            if (!newsSearchQuery.trim()) return true;
+                            const q = newsSearchQuery.toLowerCase();
+                            return (
+                              item.title.toLowerCase().includes(q) ||
+                              item.category.toLowerCase().includes(q) ||
+                              (item.summary && item.summary.toLowerCase().includes(q))
+                            );
+                          })
+                          .map((item) => {
+                            const img = item.imageUrl || item.image;
+                            const isPhotoOnly = !item.content || item.content.trim() === '';
+                            return (
+                              <div
+                                key={item.id}
+                                className="bg-slate-50/70 hover:bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col justify-between transition-all"
+                              >
+                                <div className="flex gap-3">
+                                  {img ? (
+                                    <img
+                                      src={img}
+                                      alt={item.title}
+                                      className="w-16 h-16 object-cover rounded-lg border border-slate-200 shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="w-16 h-16 rounded-lg bg-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                      <FileText className="w-6 h-6" />
+                                    </div>
+                                  )}
+
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                                        {item.category}
+                                      </span>
+                                      <span className="text-[10px] text-slate-500">
+                                        {item.date}
+                                      </span>
+                                      {isPhotoOnly && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                                          📷 केवळ फोटो
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <h4 className="font-bold text-slate-900 text-xs line-clamp-2">
+                                      {item.title}
+                                    </h4>
+
+                                    {item.summary && (
+                                      <p className="text-[11px] text-slate-600 line-clamp-2 mt-1">
+                                        {item.summary}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-slate-200 text-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => setPreviewNewsItem(item)}
+                                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded border border-slate-300 flex items-center gap-1 transition-colors"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>प्रिव्ह्यू</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditNews(item)}
+                                    className="px-2.5 py-1 bg-white hover:bg-amber-50 text-amber-800 font-semibold rounded border border-amber-300 flex items-center gap-1 transition-colors"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>संपादित करा</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteNewsItem(item)}
+                                    className="px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-700 font-semibold rounded border border-rose-300 flex items-center gap-1 transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>हटवा</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Live Preview Modal */}
+                {previewNewsItem && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in">
+                    <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+                      {/* Header */}
+                      <div className="sticky top-0 bg-white/95 backdrop-blur-md px-5 py-3 border-b border-slate-200 flex items-center justify-between z-10">
+                        <div className="flex items-center gap-2">
+                          <Eye className="w-4 h-4 text-[#df6b16]" />
+                          <span className="font-bold text-xs sm:text-sm text-[#09243f]">
+                            थेट प्रिव्ह्यू (Live Preview) — मुख्य वेबसाईटवर असे दिसेल
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewNewsItem(null)}
+                          className="p-1 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Content Preview */}
+                      <div className="p-5 sm:p-6 space-y-4">
+                        {/* Big Photo Prominently on Top */}
+                        {(previewNewsItem.imageUrl || previewNewsItem.image) && (
+                          <div className="bg-slate-900 rounded-xl overflow-hidden shadow-md">
+                            <img
+                              src={previewNewsItem.imageUrl || previewNewsItem.image}
+                              alt={previewNewsItem.title}
+                              className="w-full max-h-96 object-contain mx-auto"
+                            />
+                            <div className="p-2 bg-slate-900/90 text-center">
+                              <span className="text-[11px] text-slate-300">
+                                📷 मुख्य वेबसाईटवर फोटो असा वर दिसेल
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#e8eef7] text-[#17366d]">
+                            {previewNewsItem.category}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            दिनांक: {previewNewsItem.date}
+                          </span>
+                        </div>
+
+                        <h2 className="font-serifDevanagari text-lg sm:text-2xl font-bold text-[#09243f] leading-snug">
+                          {previewNewsItem.title}
+                        </h2>
+
+                        {previewNewsItem.summary && (
+                          <div className="p-3 bg-amber-50/70 border-l-4 border-[#df6b16] rounded-r-lg text-xs sm:text-sm text-slate-700 italic">
+                            {previewNewsItem.summary}
+                          </div>
+                        )}
+
+                        {previewNewsItem.content ? (
+                          <div className="text-xs sm:text-sm text-slate-800 leading-relaxed space-y-2 whitespace-pre-line border-t border-slate-100 pt-3">
+                            {previewNewsItem.content}
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-600">
+                            💡 ही केवळ फोटो पोस्ट आहे. वेबसाईटवर युझरला <strong>'📷 फोटो पहा'</strong> हे बटण दिसेल व त्यावर क्लिक केल्यावर हा फोटो संपूर्ण मोठा दिसेल.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Modal Footer */}
+                      <div className="sticky bottom-0 bg-slate-50 px-5 py-3 border-t border-slate-200 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewNewsItem(null)}
+                          className="bg-[#17366d] hover:bg-[#09243f] text-white font-bold px-5 py-2 rounded-lg text-xs transition-colors"
+                        >
+                          प्रिव्ह्यू बंद करा
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      थोडक्यात सारांश (Summary)
-                    </label>
-                    <textarea
-                      required
-                      rows={2}
-                      placeholder="बातमीचा 2-3 ओळींत महत्त्वाचा सारांश..."
-                      value={newsSummary}
-                      onChange={(e) => setNewsSummary(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      सविस्तर मजकूर (Full Details)
-                    </label>
-                    <textarea
-                      required
-                      rows={5}
-                      placeholder="बातमीची संपूर्ण माहिती किंवा परिपत्रकाचा संपूर्ण तपशील..."
-                      value={newsContent}
-                      onChange={(e) => setNewsContent(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-colors shadow-xs"
-                  >
-                    प्रसिद्ध करा (Publish News)
-                  </button>
-                </form>
+                )}
               </div>
             )}
 
@@ -1995,6 +2924,288 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </form>
               </div>
             )}
+
+            {/* Sub-tab 5: Contact Inquiries & Messages */}
+            {activeAdminSubTab === 'contact_messages' && (
+              <div className="space-y-4">
+                {/* Header & Filter Bar */}
+                <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-[#df6b16]" />
+                      प्राप्त संदेश व विचारणा (Contact Inquiries)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      वेबसाईटवरील संपर्क फॉर्मद्वारे प्राथमिक शिक्षण विभागातील केंद्रप्रमुख व अधिकाऱ्यांनी पाठवलेले प्रश्न व संदेश.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={loadContactMessages}
+                      disabled={isLoadingContacts}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors"
+                      title="नवीन संदेश रिफ्रेश करा"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingContacts ? 'animate-spin text-[#df6b16]' : ''}`} />
+                      रिफ्रेश करा
+                    </button>
+                    <span className="bg-amber-100 text-[#df6b16] font-bold text-xs px-3 py-1.5 rounded-lg border border-amber-300 font-mono">
+                      एकूण: {toEnglishDigits(contactMessages.length)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Search & Filter Toolbar */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={contactSearchQuery}
+                      onChange={(e) => setContactSearchQuery(e.target.value)}
+                      placeholder="नाव, मोबाईल, विषय किंवा संदेशात शोधा..."
+                      className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+
+                  <select
+                    value={contactDistrictFilter}
+                    onChange={(e) => setContactDistrictFilter(e.target.value)}
+                    className="p-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] bg-white min-w-[160px]"
+                  >
+                    <option value="">सर्व 34 जिल्हे</option>
+                    {MAHARASHTRA_DISTRICTS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Messages List */}
+                {(() => {
+                  const filtered = contactMessages.filter((m) => {
+                    const matchesSearch =
+                      !contactSearchQuery.trim() ||
+                      (m.name || '').toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
+                      (m.phone || '').includes(contactSearchQuery) ||
+                      (m.subject || '').toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
+                      (m.message || '').toLowerCase().includes(contactSearchQuery.toLowerCase());
+                    const matchesDist = !contactDistrictFilter || m.district === contactDistrictFilter;
+                    return matchesSearch && matchesDist;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="bg-white p-12 text-center rounded-xl border border-dashed border-slate-300 text-slate-400 space-y-2">
+                        <MessageSquare className="w-12 h-12 mx-auto text-slate-300" />
+                        <p className="text-sm font-semibold text-slate-600">कोणतेही संदेश आढळले नाहीत.</p>
+                        <p className="text-xs text-slate-400">
+                          वेबसाईटच्या संपर्क पानावरील फॉर्मवरून कोणी संदेश पाठवल्यास तो येथे तात्काळ दिसेल.
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 gap-4">
+                      {filtered.map((msg) => {
+                        const cleanPhone = (msg.phone || '').replace(/\D/g, '');
+                        return (
+                          <div
+                            key={msg.id}
+                            className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:border-amber-400 transition-all space-y-3"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-full bg-amber-500/10 text-amber-800 font-bold flex items-center justify-center shrink-0 border border-amber-300">
+                                  {msg.name?.charAt(0) || '👤'}
+                                </div>
+                                <div>
+                                  <h4 className="font-bold text-sm text-[#09243f] leading-snug">
+                                    {msg.name}
+                                  </h4>
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                                    {msg.district && (
+                                      <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-slate-200">
+                                        📍 {msg.district}
+                                      </span>
+                                    )}
+                                    <span>
+                                      दिनांक: {formatDateWithEnglishDigits(msg.createdAt)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteContactMessage(msg.id)}
+                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-rose-200"
+                                  title="हा संदेश काढून टाका"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>हटवा</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Subject & Message Content */}
+                            <div className="space-y-1.5 text-xs">
+                              {msg.subject && (
+                                <p className="font-bold text-[#17366d]">
+                                  विषय: <span className="font-semibold text-slate-800">{msg.subject}</span>
+                                </p>
+                              )}
+                              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
+                                {msg.message}
+                              </div>
+                            </div>
+
+                            {/* Action Links: Phone Call, WhatsApp & Email */}
+                            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                              <a
+                                href={`tel:${cleanPhone}`}
+                                className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors"
+                              >
+                                <PhoneCall className="w-3.5 h-3.5" />
+                                <span>कॉल करा ({msg.phone})</span>
+                              </a>
+
+                              {cleanPhone && (
+                                <a
+                                  href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(`नमस्कार ${msg.name} जी, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ कार्यालयाकडून आपल्या संदेशाबाबत संपर्क करत आहोत.`)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>WhatsApp संदेश पाठवा</span>
+                                </a>
+                              )}
+
+                              {msg.email && (
+                                <a
+                                  href={`mailto:${msg.email}`}
+                                  className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 font-medium px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
+                                >
+                                  <Mail className="w-3.5 h-3.5" />
+                                  <span>{msg.email}</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* Super Admin Only: Minimal Cloud Storage Config (Hidden from all other sub-admins) */}
+            {activeAdminSubTab === 'cloudinary' && currentUser?.isSuperAdmin && (
+              <div className="bg-white p-6 rounded-xl border border-slate-300 shadow-md space-y-4 max-w-lg mx-auto">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <h3 className="font-serifDevanagari text-base font-bold text-[#17366d]">
+                      क्लाउड स्टोरेज व्यवस्थापन (फक्त मुख्य प्रशासक)
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('applications')}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    title="बंद करा"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Status Message */}
+                {cloudinaryStatusMsg && (
+                  <div
+                    className={`p-3 rounded-lg text-xs font-semibold flex items-center justify-between gap-2 ${
+                      cloudinaryStatusMsg.type === 'success'
+                        ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                        : 'bg-rose-50 border border-rose-300 text-rose-900'
+                    }`}
+                  >
+                    <span className="truncate">{cloudinaryStatusMsg.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCloudinaryStatusMsg(null)}
+                      className="text-slate-400 hover:text-slate-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveCloudinarySettings} className="space-y-3.5 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Cloud Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={cloudinaryCloudName}
+                      onChange={(e) => setCloudinaryCloudName(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono focus:bg-white focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Unsigned Upload Preset
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={cloudinaryPreset}
+                      onChange={(e) => setCloudinaryPreset(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono focus:bg-white focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="cldEnabled"
+                      checked={cloudinaryEnabled}
+                      onChange={(e) => setCloudinaryEnabled(e.target.checked)}
+                      className="w-4 h-4 text-[#df6b16] rounded border-slate-300"
+                    />
+                    <label htmlFor="cldEnabled" className="font-medium text-slate-700 cursor-pointer">
+                      क्लाउड अपलोड सक्रिय ठेवा
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2 rounded-lg transition-colors shadow-2xs"
+                    >
+                      जतन करा
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestCloudinaryUpload}
+                      disabled={isTestingCloudinary}
+                      className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isTestingCloudinary ? 'animate-spin' : ''}`} />
+                      <span>{isTestingCloudinary ? 'चाचणी...' : 'चाचणी'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -2075,6 +3286,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <span>{selectedAppForVerification.education || '-'}</span>
                 </div>
                 <div>
+                  <span className="text-slate-400 block text-[10px]">व्यावसायिक पात्रता:</span>
+                  <span className="font-semibold text-slate-800">{selectedAppForVerification.professionalQualification || '-'}</span>
+                </div>
+                <div className="col-span-2">
                   <span className="text-slate-400 block text-[10px]">कुटुंब सदस्य / छंद:</span>
                   <span>{selectedAppForVerification.familyMembers || '-'} / {selectedAppForVerification.hobby || '-'}</span>
                 </div>

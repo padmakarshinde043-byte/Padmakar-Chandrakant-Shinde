@@ -56,5 +56,24 @@ service cloud.firestore {
       allow list: if true;
       allow create, update: if isValidId(settingId);
     }
+
+    // Site statistics collection - visit counts
+    match /site_stats/{statId} {
+      allow get: if isValidId(statId);
+      allow list: if true;
+      allow create, update: if isValidId(statId);
+    }
+
+    // Dynamic leadership updates
+    match /leadership/{leaderId} {
+      allow get: if isValidId(leaderId);
+      allow list: if true;
+      allow create, update, delete: if isValidId(leaderId);
+    }
+
+    // Sub admins management
+    match /sub_admins/{adminId} {
+      allow get, list, create, update, delete: if isValidId(adminId);
+    }
   }
 }

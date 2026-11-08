@@ -162,8 +162,25 @@ export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
     const updated = [news, ...list.filter((x) => x.id !== news.id)];
     localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(updated));
     localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
+    window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
+  }
+}
+
+// Delete news from Firestore and update local cache
+export async function deleteNewsFromFirestore(newsId: string): Promise<void> {
+  const path = `news/${newsId}`;
+  try {
+    await deleteDoc(doc(db, 'news', newsId));
+    const currentCached = localStorage.getItem(NEWS_CACHE_KEY);
+    const list: NewsItem[] = currentCached ? JSON.parse(currentCached) : [];
+    const updated = list.filter((x) => x.id !== newsId);
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(updated));
+    localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
+    window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
@@ -255,8 +272,118 @@ export async function approveApplicationInFirestore(
   }
 }
 
-// Single write for contact message
-export async function saveContactToFirestore(contact: {
+// ==========================================
+// Zero-Quota Visitor Counter (Runs ONLY once per browser session)
+// ==========================================
+export interface VisitorStats {
+  today: number;
+  total: number;
+}
+
+const VISITOR_LOCAL_KEY = 'mhs_real_visit_count_v5';
+const VISITOR_SESSION_FLAG = 'mhs_visit_recorded_session_v5';
+
+// Proactively clear corrupted/legacy keys with dummy numbers (284, 18450)
+try {
+  localStorage.removeItem('mhs_visitor_stats_v1');
+  localStorage.removeItem('mhs_visitor_stats');
+  localStorage.removeItem('mhs_site_visits');
+  sessionStorage.removeItem('mhs_visit_recorded_session');
+} catch {
+  // ignore
+}
+
+export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
+  const todayDateStr = new Date().toISOString().split('T')[0];
+
+  // 1. Read existing local stats (default real baseline: today: 1, total: 1 if first ever)
+  let currentStats: VisitorStats = { today: 1, total: 1 };
+  try {
+    const raw = localStorage.getItem(VISITOR_LOCAL_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed.total === 'number' && parsed.total < 5000) {
+        currentStats = {
+          total: parsed.total,
+          today: parsed.date === todayDateStr && typeof parsed.today === 'number' && parsed.today < 1000 ? parsed.today : 1
+        };
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  // 2. Check if this session already counted
+  if (sessionStorage.getItem(VISITOR_SESSION_FLAG)) {
+    return currentStats;
+  }
+
+  // 3. Mark session counted immediately so subsequent actions in this session NEVER re-query or re-write
+  sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
+
+  // 4. Update Firestore once to persist genuine visitor count across all devices
+  try {
+    const statsDocRef = doc(db, 'site_stats', 'visits');
+    const snap = await getDoc(statsDocRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      let rawTotal = typeof data.total === 'number' ? data.total : 0;
+      // Sanitize legacy dummy baseline (18450) if present
+      if (rawTotal >= 5000) {
+        rawTotal = 0;
+      }
+      let rawToday = (data.lastDate === todayDateStr && typeof data.today === 'number' && data.today < 1000) ? data.today : 0;
+
+      const firestoreTotal = rawTotal + 1;
+      const firestoreToday = rawToday + 1;
+
+      await setDoc(statsDocRef, {
+        total: firestoreTotal,
+        today: firestoreToday,
+        lastDate: todayDateStr,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true });
+
+      const realStats: VisitorStats = { today: firestoreToday, total: firestoreTotal };
+      localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
+        ...realStats,
+        date: todayDateStr
+      }));
+      return realStats;
+    } else {
+      // First initialization in Firestore
+      const initStats: VisitorStats = { today: 1, total: 1 };
+      await setDoc(statsDocRef, {
+        total: 1,
+        today: 1,
+        lastDate: todayDateStr,
+        lastUpdated: new Date().toISOString()
+      });
+      localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
+        ...initStats,
+        date: todayDateStr
+      }));
+      return initStats;
+    }
+  } catch (err) {
+    // Zero disruption if offline / network hiccup - increment local count gracefully
+    console.warn('Visitor counter Firestore sync notice:', err);
+    const fallbackStats: VisitorStats = {
+      today: currentStats.today + 1,
+      total: currentStats.total + 1
+    };
+    localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
+      ...fallbackStats,
+      date: todayDateStr
+    }));
+    return fallbackStats;
+  }
+}
+
+// ==========================================
+// Contact Messages Management
+// ==========================================
+export interface ContactMessage {
   id: string;
   name: string;
   phone: string;
@@ -265,12 +392,69 @@ export async function saveContactToFirestore(contact: {
   subject?: string;
   message: string;
   createdAt: string;
-}): Promise<void> {
+}
+
+const CONTACTS_CACHE_KEY = 'mahasangh_contacts_cache_v1';
+
+export async function saveContactToFirestore(contact: ContactMessage): Promise<void> {
+  try {
+    const raw = localStorage.getItem(CONTACTS_CACHE_KEY);
+    const list: ContactMessage[] = raw ? JSON.parse(raw) : [];
+    const updated = [contact, ...list.filter(c => c.id !== contact.id)];
+    localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error(e);
+  }
+
   const path = `contacts/${contact.id}`;
   try {
     await setDoc(doc(db, 'contacts', contact.id), contact);
   } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.warn('Saved contact locally, Firestore sync error:', error);
+  }
+}
+
+export async function fetchContactsForAdmin(): Promise<ContactMessage[]> {
+  let list: ContactMessage[] = [];
+  try {
+    const raw = localStorage.getItem(CONTACTS_CACHE_KEY);
+    if (raw) list = JSON.parse(raw);
+  } catch (e) {
+    console.error(e);
+  }
+
+  try {
+    const snap = await getDocs(collection(db, 'contacts'));
+    if (!snap.empty) {
+      const firestoreList: ContactMessage[] = [];
+      snap.forEach((d) => firestoreList.push(d.data() as ContactMessage));
+      firestoreList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(firestoreList));
+      return firestoreList;
+    }
+  } catch (err) {
+    console.warn('Could not read contacts from firestore, using local cache:', err);
+  }
+
+  return list;
+}
+
+export async function deleteContactMessageFromFirestore(id: string): Promise<void> {
+  try {
+    const raw = localStorage.getItem(CONTACTS_CACHE_KEY);
+    if (raw) {
+      const list: ContactMessage[] = JSON.parse(raw);
+      const filtered = list.filter((c) => c.id !== id);
+      localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(filtered));
+    }
+  } catch (e) {
+    console.error(e);
+  }
+
+  try {
+    await deleteDoc(doc(db, 'contacts', id));
+  } catch (err) {
+    console.warn('Deleted contact locally, Firestore delete error:', err);
   }
 }
 

@@ -55,8 +55,6 @@ export const DISTRICT_TALUKAS_MAP: Record<string, string[]> = {
   "लातूर": [
     "लातूर", "औसा", "रेणापूर", "उदगीर", "अहमदपूर", "चाकूर", "शिरूर (अनंतपाळ)", "निलंगा", "देवणी", "जळकोट"
   ],
-  "मुंबई शहर": ["मुंबई शहर"],
-  "मुंबई उपनगर": ["कुर्ला", "अंधेरी", "बोरीवली"],
   "नागपूर": [
     "नागपूर शहर", "नागपूर ग्रामीण", "कामठी", "हिंगणा", "काटोल", "नरखेड", "सावनेर", "कळमेश्वर", "रामटेक", "पारशिवनी", "मौदा", "उमरेड", "भिवापूर", "कुही"
   ],
@@ -113,7 +111,8 @@ export const DISTRICT_TALUKAS_MAP: Record<string, string[]> = {
   ]
 };
 
-export const MAHARASHTRA_36_DISTRICTS = Object.keys(DISTRICT_TALUKAS_MAP);
+export const MAHARASHTRA_34_DISTRICTS = Object.keys(DISTRICT_TALUKAS_MAP);
+export const MAHARASHTRA_36_DISTRICTS = MAHARASHTRA_34_DISTRICTS;
 
 export interface AppointedPostItem {
   name: string;

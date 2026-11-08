@@ -25,6 +25,7 @@ import {
   fetchApplicationsForAdmin,
   approveApplicationInFirestore,
   saveContactToFirestore,
+  deleteNewsFromFirestore,
 } from './firebase';
 
 function isPathAdminRoute(): boolean {
@@ -108,6 +109,18 @@ export function App() {
     };
 
     initApp();
+
+    // Instant local synchronization when admin publishes news or circulars
+    const handleNewsSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setNewsList(customEvent.detail);
+      }
+    };
+    window.addEventListener('mahasangh_news_updated', handleNewsSync);
+    return () => {
+      window.removeEventListener('mahasangh_news_updated', handleNewsSync);
+    };
   }, []);
 
   // Exit Admin to Main Public Website
@@ -205,12 +218,36 @@ export function App() {
 
   // Admin: Add news (Single write)
   const handleAddNews = async (newNews: NewsItem) => {
-    setNewsList((prev) => [newNews, ...prev]);
+    setNewsList((prev) => [newNews, ...prev.filter((x) => x.id !== newNews.id)]);
 
     try {
       await saveNewsToFirestore(newNews);
     } catch (err) {
       console.warn('Saved news locally, Firestore sync error:', err);
+    }
+  };
+
+  // Admin: Update existing news / circular
+  const handleUpdateNews = async (updatedNews: NewsItem) => {
+    setNewsList((prev) =>
+      prev.map((item) => (item.id === updatedNews.id ? updatedNews : item))
+    );
+
+    try {
+      await saveNewsToFirestore(updatedNews);
+    } catch (err) {
+      console.warn('Updated news locally, Firestore sync error:', err);
+    }
+  };
+
+  // Admin: Delete news / circular
+  const handleDeleteNews = async (newsId: string) => {
+    setNewsList((prev) => prev.filter((item) => item.id !== newsId));
+
+    try {
+      await deleteNewsFromFirestore(newsId);
+    } catch (err) {
+      console.warn('Deleted news locally, Firestore sync error:', err);
     }
   };
 
@@ -248,6 +285,9 @@ export function App() {
         applications={applications}
         onApproveApplication={handleApproveApplication}
         onAddNews={handleAddNews}
+        onUpdateNews={handleUpdateNews}
+        onDeleteNews={handleDeleteNews}
+        newsList={newsList}
         onFetchApplications={handleFetchAdminApplications}
         isLoadingApps={isLoadingAdminApps}
         onExitAdmin={handleExitAdmin}
@@ -267,6 +307,7 @@ export function App() {
           <HomeTab
             setCurrentTab={setCurrentTab}
             onSelectNews={handleSelectNews}
+            newsList={newsList}
           />
         )}
         {currentTab === 'about' && <AboutTab setCurrentTab={setCurrentTab} />}

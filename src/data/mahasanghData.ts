@@ -8,7 +8,7 @@ export interface Leader {
   email?: string;
   photo?: string;
   isKey?: boolean;
-  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'सल्लागार';
+  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'विभागीय कार्यकारिणी' | 'जिल्हा अध्यक्ष' | 'सल्लागार';
 }
 
 export interface NewsItem {
@@ -17,6 +17,7 @@ export interface NewsItem {
   date: string;
   category: string;
   image?: string;
+  imageUrl?: string;
   summary: string;
   content: string;
   featured?: boolean;
@@ -34,6 +35,7 @@ export interface MembershipApplication {
   familyMembers?: string;
   hobby?: string;
   education: string;
+  professionalQualification?: string;
   professional: string;
   status: 'pending' | 'approved' | 'rejected';
   memberNumber?: string;
@@ -47,6 +49,33 @@ export interface MembershipApplication {
   officialTaluka?: string;
   paymentConfirmed?: boolean; // ₹500 payment verified by admin
 }
+
+// अधिकृत पद / संवर्ग (केवळ विचारलेले ५ पर्याय)
+export const OFFICIAL_CADRES = [
+  "केंद्रप्रमुख",
+  "ज्येष्ठ शिक्षण विस्तार अधिकारी",
+  "कनिष्ठ शिक्षण विस्तार अधिकारी",
+  "गटशिक्षणाधिकारी",
+  "इतर शिक्षण विभागातील अधिकारी"
+] as const;
+
+// शिक्षक पदाला लागू असणाऱ्या सर्व व्यावसायिक पात्रता (Professional Qualifications)
+export const TEACHER_PROFESSIONAL_QUALIFICATIONS = [
+  "डी.टी.एड. / डी.एड. (D.T.Ed. / D.Ed.)",
+  "बी.एड. (B.Ed.)",
+  "बी.एड. (विशेष शिक्षण / Special Education)",
+  "एम.एड. (M.Ed.)",
+  "डी.एल.एड. (D.El.Ed.)",
+  "बी.एल.एड. (B.El.Ed.)",
+  "बी.ए. बी.एड. / बी.एस्सी. बी.एड. (B.A. B.Ed. / B.Sc. B.Ed. एकात्मिक)",
+  "डी.एस.एम. (D.S.M. - शालेय व्यवस्थापन पदविका)",
+  "सी.पी.एड. (C.P.Ed. - शारीरिक शिक्षण पदविका)",
+  "बी.पी.एड. (B.P.Ed. - शारीरिक शिक्षण पदवी)",
+  "एम.पी.एड. (M.P.Ed. - शारीरिक शिक्षण पदव्युत्तर)",
+  "नेट / सेट (NET / SET - शिक्षणशास्त्र / संबंधित विषय)",
+  "टीईटी / सीटीईटी (TET / CTET पात्र)",
+  "इतर व्यावसायिक शिक्षक पात्रता"
+] as const;
 
 export const DISTRICT_4_LETTER_CODES: Record<string, string> = {
   "अहिल्यानगर": "AHIL", "अहमदनगर": "AHIL",
@@ -65,8 +94,6 @@ export const DISTRICT_4_LETTER_CODES: Record<string, string> = {
   "जालना": "JALN",
   "कोल्हापूर": "KOLH",
   "लातूर": "LATU",
-  "मुंबई शहर": "MUMC",
-  "मुंबई उपनगर": "MUMS",
   "नागपूर": "NAGP",
   "नांदेड": "NAND",
   "नंदुरबार": "NDBR",
@@ -115,6 +142,11 @@ export const ORG_DETAILS = {
   phonePhonePe: "9527254652",
   email: "mahasangh2026@gmail.com",
   officeHours: "सोमवार ते शनिवार: सकाळी 10 ते सायंकाळी 5",
+  directContacts: [
+    { name: "श्री. राजेंद्र खैरनार", phone: "9860704098", designation: "संस्थापक राज्याध्यक्ष" },
+    { name: "श्री. निलेश पाटील", phone: "9421385165", designation: "राज्य पदाधिकारी" },
+    { name: "श्री. नितीन शिंदे", phone: "9763099698", designation: "राज्य पदाधिकारी" },
+  ],
   membershipFee: "₹500 (एकवेळ आजीवन सदस्यत्व शुल्क)",
   founderPresident: {
     name: "श्री. राजेंद्र शिवाजी खैरनार",
@@ -176,7 +208,7 @@ export const ACTION_PLAN = [
     step: "1",
     phase: "पहिला टप्पा: संघटन बळकटीकरण",
     desc: "राज्यातील सर्व 34 जिल्ह्यांमध्ये सक्षम कार्यकारिणीची स्थापना, प्रत्येक तालुक्यात प्रतिनिधी नियुक्ती आणि राज्यव्यापी सदस्य नोंदणी मोहीम.",
-    badges: ["34 जिल्हा कार्यकारिणी", "350+ तालुका प्रतिनिधी", "50,000+ सभासद उद्दिष्ट"]
+    badges: ["34 जिल्हा कार्यकारिणी", "350+ तालुका प्रतिनिधी", "5000 सभासद उद्दिष्ट"]
   },
   {
     step: "2",
@@ -206,7 +238,7 @@ export const MEMBER_BENEFITS = [
   {
     icon: "Users",
     title: "राज्यस्तरीय नेटवर्क",
-    desc: "महाराष्ट्रातील 50,000+ सहकाऱ्यांशी थेट संवाद, ज्ञान व अनुभवांची देवाणघेवाण."
+    desc: "महाराष्ट्रातील 5000 सहकाऱ्यांशी थेट संवाद, ज्ञान व अनुभवांची देवाणघेवाण."
   },
   {
     icon: "Megaphone",
@@ -230,7 +262,7 @@ export const STATE_EXECUTIVE: Leader[] = [
   { name: "श्री. संजय देशमुख", role: "कार्याध्यक्ष", region: "औरंगाबाद — औरंगाबाद विभाग", education: "एम.एस.सी., बी.एड.", phone: "9800000002", isKey: true },
   { name: "श्री. विजय शिंदे", role: "महासचिव", region: "नागपूर — नागपूर विभाग", education: "बी.ए., बी.एड.", phone: "9800000003", isKey: true },
   { name: "श्रीमती. सुनीता जाधव", role: "सहसचिव", region: "नाशिक — नाशिक विभाग", education: "एम.ए., बी.एड.", phone: "9800000004", isKey: true },
-  { name: "श्री. रमेश कदम", role: "कोषाध्यक्ष", region: "मुंबई — कोकण विभाग", education: "बी.कॉम., बी.एड.", phone: "9800000005", isKey: true },
+  { name: "श्री. रमेश कदम", role: "कोषाध्यक्ष", region: "ठाणे — कोकण विभाग", education: "बी.कॉम., बी.एड.", phone: "9800000005", isKey: true },
   { name: "श्री. प्रकाश सोनवणे", role: "उपाध्यक्ष", region: "अमरावती — अमरावती विभाग", education: "एम.ए., बी.एड.", phone: "9800000006" },
   { name: "श्री. दिलीप मोरे", role: "उपाध्यक्ष", region: "कोल्हापूर — पुणे विभाग", education: "एम.एस.सी., बी.एड.", phone: "9800000007" },
   { name: "श्रीमती. मंगल भोसले", role: "सदस्य", region: "सातारा — पुणे विभाग", education: "बी.ए., बी.एड.", phone: "9800000008" }
@@ -251,8 +283,6 @@ export const DISTRICT_PRESIDENTS: Leader[] = [
   { name: "श्री. दत्तात्रय जगताप", role: "जिल्हा अध्यक्ष", region: "सांगली", education: "एम.ए., बी.एड.", phone: "9800000023" },
   { name: "श्री. हरिभाऊ कांबळे", role: "जिल्हा अध्यक्ष", region: "कोल्हापूर", education: "बी.एस.सी., बी.एड.", phone: "9800000024" },
   { name: "श्री. मनोज सूर्यवंशी", role: "जिल्हा अध्यक्ष", region: "सोलापूर", education: "एम.ए., बी.एड.", phone: "9800000025" },
-  { name: "श्री. प्रदीप गायकवाड", role: "जिल्हा अध्यक्ष", region: "मुंबई शहर", education: "बी.ए., बी.एड.", phone: "9800000026" },
-  { name: "श्री. विनायक सावंत", role: "जिल्हा अध्यक्ष", region: "मुंबई उपनगर", education: "एम.ए., बी.एड.", phone: "9800000027" },
   { name: "श्री. संदीप पाटकर", role: "जिल्हा अध्यक्ष", region: "ठाणे", education: "बी.कॉम., बी.एड.", phone: "9800000028" },
   { name: "श्री. अनंत परब", role: "जिल्हा अध्यक्ष", region: "रायगड", education: "बी.ए., बी.एड.", phone: "9800000029" },
   { name: "श्री. दिनेश राणे", role: "जिल्हा अध्यक्ष", region: "रत्नागिरी", education: "एम.ए., बी.एड.", phone: "9800000030" },
@@ -321,9 +351,25 @@ export const INITIAL_NEWS: NewsItem[] = [
     id: "paperless-portal-pattern",
     title: "डिजिटल पोर्टल आणि पेपरलेस प्रशासनाचे बारामती व बीड पॅटर्न कौतुकास्पद",
     date: "15 ऑक्टोबर 2026",
-    category: "शैक्षणिक गुणवत्ता",
+    category: "संघटना घडामोडी",
     summary: "शाळांच्या कागदपत्रांचे डिजिटायझेशन करण्यासाठी महासंघातर्फे राबविण्यात येत असलेल्या उपक्रमाचे राज्यभरात स्वागत.",
     content: "शाळांच्या कागदपत्रांचे डिजिटायझेशन करण्यासाठी महासंघातर्फे राबविण्यात येत असलेल्या उपक्रमाचे राज्यभरात स्वागत होत असून शिक्षक वर्गातून समाधान व्यक्त केले जात आहे. सुलभीकरण, पारदर्शकता आणि आधुनिक कामकाजासाठी तंत्रज्ञानाचा योग्य वापर महासंघाचा अजेंडा आहे."
+  },
+  {
+    id: "gr-cadre-restructure",
+    title: "प्राथमिक शिक्षण संवर्ग पुनर्रचना व केंद्रप्रमुख पदे सक्षमीकरण शासन निर्णय",
+    date: "18 ऑक्टोबर 2026",
+    category: "शासन निर्णय",
+    summary: "शासकीय आदेशानुसार राज्यातील केंद्रप्रमुख पदांचे कार्यक्षेत्र व प्रशासकीय अधिकारांचे सुसूत्रीकरण.",
+    content: "महाराष्ट्र शासन शालेय शिक्षण व क्रीडा विभागाद्वारे केंद्रप्रमुख संवर्गाच्या सक्षमीकरणासाठी नवीन मार्गदर्शक सूचना निर्गमित करण्यात आल्या आहेत. यानुसार केंद्रांतर्गत शाळांची गुणवत्ता तपासणी व शैक्षणिक संनियंत्रण अधिक प्रभावी होणार आहे."
+  },
+  {
+    id: "gr-allowance-facility",
+    title: "केंद्रप्रमुख प्रवास भत्ता व साधनसामग्री तरतूद मंजुरी परिपत्रक",
+    date: "05 ऑक्टोबर 2026",
+    category: "शासन निर्णय",
+    summary: "विस्तार अधिकारी व केंद्रप्रमुखांच्या क्षेत्रीय भेटींसाठी प्रवास भत्ता व तांत्रिक सुविधा निधी मंजुरी.",
+    content: "शालेय तपासणी व गुणवत्ता आढावा घेण्यासाठी केंद्रप्रमुखांच्या नियमित क्षेत्रीय भेटींसाठी आवश्यक प्रवास भत्ता आणि इंटरनेट/डिजिटल साधनसामग्री तरतुदीबाबतचे अधिकृत परिपत्रक शिक्षण आयुक्तालयाकडून जारी करण्यात आले आहे."
   }
 ];
 
@@ -340,7 +386,8 @@ export const INITIAL_APPLICATIONS: MembershipApplication[] = [
     familyMembers: "4",
     hobby: "वाचन, शैक्षणिक संशोधन",
     education: "पदव्युत्तर पदवी (M.A.)",
-    professional: "एम.एड. (M.Ed.)",
+    professionalQualification: "एम.एड. (M.Ed.)",
+    professional: "केंद्रप्रमुख",
     status: "approved",
     memberNumber: "MS-2026-0842",
     createdAt: "2026-10-28T10:30:00Z",
@@ -359,7 +406,8 @@ export const INITIAL_APPLICATIONS: MembershipApplication[] = [
     familyMembers: "3",
     hobby: "विद्यार्थी समुपदेशन",
     education: "पदवी (B.Sc.)",
-    professional: "बी.एड. (B.Ed.)",
+    professionalQualification: "बी.एड. (B.Ed.)",
+    professional: "ज्येष्ठ शिक्षण विस्तार अधिकारी",
     status: "approved",
     memberNumber: "MS-2026-0843",
     createdAt: "2026-11-01T09:15:00Z",
@@ -378,7 +426,8 @@ export const INITIAL_APPLICATIONS: MembershipApplication[] = [
     familyMembers: "5",
     hobby: "वृक्षारोपण, क्रीडा",
     education: "पदव्युत्तर पदवी (M.Sc.)",
-    professional: "नेट / सेट (NET/SET)",
+    professionalQualification: "नेट / सेट (NET/SET)",
+    professional: "गटशिक्षणाधिकारी",
     status: "pending",
     createdAt: "2026-11-03T16:45:00Z",
     paymentRef: "UPI-9527254652-654321"
@@ -387,7 +436,7 @@ export const INITIAL_APPLICATIONS: MembershipApplication[] = [
 
 export const MAHARASHTRA_DISTRICTS = [
   "पुणे", "सातारा", "सांगली", "कोल्हापूर", "सोलापूर",
-  "मुंबई शहर", "मुंबई उपनगर", "ठाणे", "रायगड", "रत्नागिरी", "सिंधुदुर्ग",
+  "ठाणे", "पालघर", "रायगड", "रत्नागिरी", "सिंधुदुर्ग",
   "नाशिक", "धुळे", "नंदुरबार", "जळगाव", "अहमदनगर",
   "औरंगाबाद (छत्रपती संभाजीनगर)", "जालना", "बीड", "लातूर", "उस्मानाबाद (धाराशिव)", "नांदेड", "परभणी", "हिंगोली",
   "नागपूर", "वर्धा", "भंडारा", "गोंदिया", "गडचिरोली", "चंद्रपूर",

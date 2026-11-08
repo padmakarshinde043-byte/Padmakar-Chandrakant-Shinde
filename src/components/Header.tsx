@@ -1,5 +1,4 @@
 import React, { useRef, useEffect } from 'react';
-import { Phone, ShieldCheck, Sparkles } from 'lucide-react';
 import { ORG_DETAILS } from '../data/mahasanghData';
 
 interface HeaderProps {
@@ -13,11 +12,11 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
   const navItems = [
     { id: 'home', label: 'मुख्यपृष्ठ' },
     { id: 'about', label: 'आमच्याबद्दल' },
-    { id: 'objectives', label: 'उद्दिष्टे' },
-    { id: 'leadership', label: 'नेतृत्व' },
-    { id: 'appointments', label: 'पदाधिकारी व नियुक्ती पत्रे', shortLabel: 'पदाधिकारी व नियुक्ती' },
-    { id: 'news', label: 'बातम्या' },
-    { id: 'membership', label: 'सदस्यत्व' },
+    { id: 'objectives', label: 'उद्दिष्टे व कार्य' },
+    { id: 'leadership', label: 'राज्य व जिल्हा नेतृत्व' },
+    { id: 'appointments', label: 'पदाधिकारी' },
+    { id: 'news', label: 'बातम्या आणि परिपत्रके' },
+    { id: 'membership', label: 'सदस्यत्व नोंदणी' },
     { id: 'contact', label: 'संपर्क' },
   ];
 
@@ -26,7 +25,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Keep active mobile pill in view when tab changes
+  // Keep active mobile item in view when tab changes
   useEffect(() => {
     if (scrollNavRef.current) {
       const activeEl = scrollNavRef.current.querySelector<HTMLButtonElement>('[data-active="true"]');
@@ -37,104 +36,116 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
   }, [currentTab]);
 
   return (
-    <header className="sticky top-0 z-50 bg-[#fbf8f2]/95 backdrop-blur border-b border-[#e7ded1] shadow-xs">
-      {/* Top Info Banner Bar */}
-      <div className="bg-[#09243f] text-[#dbe8f1] text-[10px] sm:text-[11px] md:text-xs tracking-wider py-1.5 px-3 sm:px-4">
-        <div className="max-w-[1160px] mx-auto flex flex-wrap justify-between items-center gap-1.5 sm:gap-2">
-          <span className="font-medium flex items-center gap-1.5 truncate">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#efb24b] shrink-0"></span>
-            {ORG_DETAILS.tagline}
-          </span>
-          <div className="flex items-center gap-3 sm:gap-4 text-[10px] md:text-[11px] shrink-0">
-            <span className="hidden sm:inline-flex items-center gap-1 text-[#f8d39b]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#efb24b]" />
-              नोंदणी क्र: {ORG_DETAILS.registrationNo}
-            </span>
-            <span className="flex items-center gap-1 text-slate-300">
-              <Phone className="w-3 h-3 text-[#efb24b]" />
-              मो. {ORG_DETAILS.phonePrimary}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Header Row */}
-      <div className="max-w-[1160px] mx-auto px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between gap-4">
-        {/* Brand Logo & Name */}
+    <header className="sticky top-0 z-50 bg-white/98 backdrop-blur-md border-b border-slate-200/90 shadow-sm">
+      {/* 1. Main Header Strip (सब मेनूच्या वरील मुख्य पट्टी) */}
+      <div className="max-w-[1240px] mx-auto px-2 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-1.5 sm:gap-4">
+        {/* Left: Official Organization Emblem Logo */}
         <button
           onClick={() => handleNavClick('home')}
-          className="flex items-center gap-2.5 sm:gap-3 text-left group focus:outline-none shrink-0"
+          className="flex items-center group focus:outline-none shrink-0"
           aria-label="महासंघ मुख्यपृष्ठ"
         >
-          <img
-            src="/heding.jpg"
-            alt="चिन्ह"
-            width="52"
-            height="52"
-            decoding="async"
-            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 object-cover object-left rounded-full border-2 border-[#efb24b] shadow-xs group-hover:scale-105 transition-transform"
-          />
-          <div className="flex flex-col leading-tight">
-            <strong className="font-serifDevanagari text-[11px] sm:text-xs md:text-sm text-[#df6b16] font-bold tracking-wide">
-              महाराष्ट्र राज्य
-            </strong>
-            <b className="text-[#09243f] text-xs sm:text-base md:text-lg font-extrabold font-serifDevanagari">
-              केंद्रप्रमुख व अधिकारी महासंघ
-            </b>
-            <small className="hidden md:block text-[#607184] text-[10px] font-medium mt-0.5">
-              {ORG_DETAILS.subTagline}
-            </small>
+          <div className="relative">
+            <img
+              src="/logo.png"
+              alt="महासंघ अधिकृत मानचिन्ह"
+              width="72"
+              height="72"
+              decoding="async"
+              className="w-12 h-12 min-[380px]:w-14 min-[380px]:h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 object-contain rounded-full ring-2 ring-amber-500 shadow-md group-hover:scale-105 transition-transform bg-white"
+            />
+            <span
+              className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-600 border-2 border-white rounded-full"
+              title="अधिकृत नोंदणीकृत"
+            />
           </div>
         </button>
 
-        {/* Desktop Side-by-Side Nav (lg:flex) */}
-        <nav className="hidden lg:flex items-center gap-1 shrink-0" aria-label="मुख्य नेव्हिगेशन">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.id)}
-              className={`text-xs xl:text-[13px] font-semibold px-2.5 xl:px-3 py-1.5 rounded-lg transition-all ${
-                currentTab === item.id
-                  ? 'text-[#df6b16] bg-[#fff0df] font-bold shadow-xs'
-                  : 'text-[#102a43] hover:text-[#df6b16] hover:bg-[#fff0df]/60'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+        {/* Center: 3 ओळी (पहिली ओळ: महाराष्ट्र राज्य, दुसरी ओळ: केंद्रप्रमुख व अधिकारी महासंघ मोठ्या आकारात, तिसरी ओळ: नोंदणी क्रमांक) */}
+        <button
+          onClick={() => handleNavClick('home')}
+          className="flex-1 flex flex-col items-center justify-center text-center px-1 focus:outline-none group"
+        >
+          {/* पहिली ओळ: महाराष्ट्र राज्य (सध्या आहे त्या आकारात) */}
+          <span className="text-xs min-[360px]:text-sm sm:text-base md:text-lg font-bold text-amber-700 tracking-wide leading-tight">
+            महाराष्ट्र राज्य
+          </span>
+
+          {/* दुसरी ओळ: केंद्रप्रमुख व अधिकारी महासंघ (मोठ्या आकारात) */}
+          <h1 className="font-serifDevanagari font-black text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl lg:text-[32px] text-[#0b1e36] group-hover:text-amber-800 transition-colors tracking-tight leading-tight my-0.5 drop-shadow-xs">
+            केंद्रप्रमुख व अधिकारी महासंघ
+          </h1>
+
+          {/* तिसरी ओळ: नोंदणी क्रमांक (आहे त्या आकारात) */}
+          <span className="text-[10px] min-[360px]:text-[11px] sm:text-xs text-slate-500 font-semibold tracking-wide leading-tight">
+            नोंदणी क्र. {ORG_DETAILS.registrationNo}
+          </span>
+        </button>
+
+        {/* Right Optical Balancer (Enables perfect center alignment) */}
+        <div className="w-12 min-[380px]:w-14 sm:w-16 md:w-20 shrink-0 pointer-events-none" aria-hidden="true" />
       </div>
 
-      {/* Smart Side-by-Side Horizontal Nav Strip on Mobile & Tablets (lg:hidden) */}
-      {/* Replaces the hamburger menu with an elegant, non-cluttered one-line scrollable bar */}
-      <div className="lg:hidden border-t border-[#e7ded1] bg-gradient-to-r from-[#fbf8f2] via-white to-[#fbf8f2] relative">
-        <div
-          ref={scrollNavRef}
-          className="no-scrollbar overflow-x-auto scroll-smooth flex items-center gap-1.5 px-3 py-2"
-          role="navigation"
-          aria-label="मोबाईल नेव्हिगेशन"
-        >
-          {navItems.map((item) => {
-            const isActive = currentTab === item.id;
-            return (
-              <button
-                key={item.id}
-                data-active={isActive ? 'true' : 'false'}
-                onClick={() => handleNavClick(item.id)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all shrink-0 flex items-center gap-1 ${
-                  isActive
-                    ? 'bg-[#df6b16] text-white shadow-xs border border-[#df6b16]'
-                    : 'bg-white/95 text-[#09243f] hover:text-[#df6b16] hover:bg-amber-50/60 border border-slate-200'
-                }`}
-              >
-                {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0"></span>}
-                {item.shortLabel || item.label}
-              </button>
-            );
-          })}
+      {/* 2. Submenu Bar (सब मेनू पट्टी - आकर्षक, ठळक अक्षरे व सुंदर रंगसंगती) */}
+      <div className="bg-[#0b1e36] border-y border-amber-500/60 shadow-inner">
+        <div className="max-w-[1240px] mx-auto px-2 sm:px-6">
+          {/* Desktop Nav Items */}
+          <nav className="hidden lg:flex items-center justify-between py-1.5" aria-label="मुख्य नेव्हिगेशन">
+            <div className="flex items-center gap-1 xl:gap-2">
+              {navItems.map((item) => {
+                const isActive = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item.id)}
+                    className={`text-xs xl:text-sm px-3.5 py-1.5 rounded-lg font-bold transition-all ${
+                      isActive
+                        ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
+                        : 'text-slate-200 hover:text-amber-300 hover:bg-white/10'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="text-[11px] text-amber-300/80 font-semibold tracking-wider font-mono">
+              नोंदणी क्र. {ORG_DETAILS.registrationNo}
+            </div>
+          </nav>
+
+          {/* Mobile Submenu Scrolling Ribbon: Large, Bold, Attractive Colorful Capsules */}
+          <div className="lg:hidden py-2">
+            <div
+              ref={scrollNavRef}
+              className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth px-1"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {navItems.map((item) => {
+                const isActive = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    data-active={isActive ? 'true' : 'false'}
+                    onClick={() => handleNavClick(item.id)}
+                    className={`shrink-0 text-xs sm:text-sm font-extrabold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full transition-all whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
+                      isActive
+                        ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-[#0b1e36] font-black border-2 border-white shadow-md shadow-amber-950/40 ring-2 ring-amber-400'
+                        : 'bg-white text-[#0b1e36] border-2 border-amber-300/90 hover:border-amber-400 hover:bg-amber-50/80 shadow-xs'
+                    }`}
+                  >
+                    {isActive && (
+                      <span className="w-2 h-2 rounded-full bg-[#0b1e36] shrink-0" />
+                    )}
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </header>
   );
 };
-

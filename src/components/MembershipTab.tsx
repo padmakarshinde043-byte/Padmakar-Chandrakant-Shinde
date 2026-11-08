@@ -6,7 +6,9 @@ import {
 import {
   ORG_DETAILS,
   MAHARASHTRA_DISTRICTS,
-  MembershipApplication
+  MembershipApplication,
+  OFFICIAL_CADRES,
+  TEACHER_PROFESSIONAL_QUALIFICATIONS
 } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { fetchOfficials } from '../services/rkFirebaseService';
@@ -35,6 +37,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [familyMembers, setFamilyMembers] = useState('');
   const [hobby, setHobby] = useState('');
   const [education, setEducation] = useState('');
+  const [professionalQualification, setProfessionalQualification] = useState('');
   const [professional, setProfessional] = useState('');
   
   // Passport photo (<200KB base64) with live preview
@@ -197,7 +200,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     e.preventDefault();
     setFormAlert('');
 
-    if (!salutation || !fullName.trim() || !phone.trim() || !email.trim() || !address.trim() || !education.trim() || !district) {
+    if (!salutation || !fullName.trim() || !phone.trim() || !email.trim() || !address.trim() || !education.trim() || !professionalQualification.trim() || !professional.trim() || !district) {
       setFormAlert('कृपया सर्व आवश्यक (*) माहिती अचूकपणे भरा.');
       return;
     }
@@ -240,6 +243,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       familyMembers: toEnglishDigits(familyMembers.trim()),
       hobby: hobby.trim(),
       education,
+      professionalQualification,
       professional,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -264,6 +268,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     setFamilyMembers('');
     setHobby('');
     setEducation('');
+    setProfessionalQualification('');
     setProfessional('');
     setPhotoDataUrl('');
     setPhotoSizeKb(0);
@@ -283,8 +288,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     // 1. Check local cache first
     const foundLocally = applications.find(
       (a) =>
-        a.applicationNumber.toLowerCase() === query ||
-        a.phone.replace(/\D/g, '').includes(query.replace(/\D/g, '')) ||
+        (a.applicationNumber && a.applicationNumber.toLowerCase() === query) ||
+        (a.phone && a.phone.replace(/\D/g, '').includes(query.replace(/\D/g, ''))) ||
         (a.memberNumber && a.memberNumber.toLowerCase() === query)
     );
 
@@ -496,125 +501,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
           )}
 
-          {/* Section 1: Question - आपण सध्या संघटनेचे पदाधिकारी आहात काय? */}
-          <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#dbe3ef]">
-              <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-[#df6b16]" />
-                1. संघटना पदाधिकारी माहिती (Organizational Designation)
-              </h2>
-            </div>
-
-            <div className="bg-[#f0f7ff] p-4 rounded-lg border border-blue-200 text-xs space-y-3">
-              <label className="font-bold text-[#193568] block text-sm">
-                आपण सध्या संघटनेचे पदाधिकारी आहात काय? <span className="text-[#df6b16]">*</span>
-              </label>
-
-              <div className="flex items-center gap-6 text-sm font-semibold text-slate-800">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="isOfficial"
-                    checked={!isOfficial}
-                    onChange={() => {
-                      setIsOfficial(false);
-                      setOfficialDistrict('');
-                      setOfficialPost('');
-                      setOfficialTaluka('');
-                      setSelectedOfficialId('');
-                    }}
-                    className="w-4 h-4 text-[#df6b16] focus:ring-[#df6b16]"
-                  />
-                  नाही (केवळ सामान्य सदस्य)
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="isOfficial"
-                    checked={isOfficial}
-                    onChange={() => setIsOfficial(true)}
-                    className="w-4 h-4 text-[#df6b16] focus:ring-[#df6b16]"
-                  />
-                  होय (होय, मी संघटनेचा पदाधिकारी आहे)
-                </label>
-              </div>
-
-              {/* If YES: Show District -> Post -> Official Name auto-fill Dropdown */}
-              {isOfficial && (
-                <div className="pt-3 border-t border-blue-200 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fadeIn">
-                  {/* Dropdown 1: District */}
-                  <div>
-                    <label className="font-bold text-[#172033] block mb-1">
-                      जिल्ह्याचे नाव निवडा <span className="text-[#df6b16]">*</span>
-                    </label>
-                    <select
-                      value={officialDistrict}
-                      onChange={(e) => {
-                        setOfficialDistrict(e.target.value);
-                        setSelectedOfficialId('');
-                      }}
-                      required={isOfficial}
-                      className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-medium"
-                    >
-                      <option value="">जिल्हा निवडा</option>
-                      {MAHARASHTRA_DISTRICTS.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Dropdown 2: Post */}
-                  <div>
-                    <label className="font-bold text-[#172033] block mb-1">
-                      पदाधिकारी प्रकार / पद <span className="text-[#df6b16]">*</span>
-                    </label>
-                    <select
-                      value={officialPost}
-                      onChange={(e) => setOfficialPost(e.target.value)}
-                      required={isOfficial}
-                      className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-medium"
-                    >
-                      <option value="">पद निवडा</option>
-                      {OFFICIAL_POST_OPTIONS.map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Dropdown 3: If related to District, choose self name from officials */}
-                  <div>
-                    <label className="font-bold text-[#172033] block mb-1">
-                      आपले स्वतःचे नाव निवडा (उपलब्ध असल्यास)
-                    </label>
-                    <select
-                      value={selectedOfficialId}
-                      onChange={(e) => handleSelectOfficialFromList(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-medium"
-                    >
-                      <option value="">-- यादीतून नाव निवडा --</option>
-                      {matchingDistrictOfficials.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.salutation} {m.firstName} {m.lastName} - {m.appointedPost} {m.taluka ? `(${m.taluka})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-[10px] text-slate-500 block mt-1">
-                      जिल्हाध्यक्षांनी आपले नाव ॲड केलेले असल्यास निवडा, माहिती आपोआप भरेल.
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Section 2: Personal Details & Passport Photo Upload with Live Preview */}
+          {/* Section 1: Personal Details & Passport Photo Upload with Live Preview */}
           <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
             <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              2. वैयक्तिक माहिती व पासपोर्ट फोटो
+              1. वैयक्तिक माहिती व पासपोर्ट फोटो
             </h2>
 
             {/* Marathi Language Notice */}
@@ -875,37 +765,61 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Educational & Professional Qualifications */}
+          {/* Section 2: Educational & Professional Qualifications */}
           <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
             <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              3. शैक्षणिक व व्यावसायिक माहिती (Education & Profession)
+              2. शैक्षणिक व व्यावसायिक माहिती
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="font-bold text-[#172033] block mb-1">
-                  शैक्षणिक पात्रता <span className="text-[#df6b16]">*</span>
-                </label>
-                <select
-                  value={education}
-                  onChange={(e) => setEducation(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
-                >
-                  <option value="">निवडा</option>
-                  <option value="बारावी (12th)">बारावी (12th)</option>
-                  <option value="पदविका (Diploma)">पदविका (Diploma)</option>
-                  <option value="पदवी (B.A. / B.Sc. / B.Com.)">पदवी (B.A. / B.Sc. / B.Com.)</option>
-                  <option value="पदव्युत्तर पदवी (M.A. / M.Sc. / M.Com.)">पदव्युत्तर पदवी (M.A. / M.Sc. / M.Com.)</option>
-                  <option value="एम.फिल. (M.Phil.)">एम.फिल. (M.Phil.)</option>
-                  <option value="पीएच.डी. (Ph.D.)">पीएच.डी. (Ph.D.)</option>
-                  <option value="इतर शिक्षण क्षेत्रातील पात्रता">इतर शिक्षण क्षेत्रातील पात्रता</option>
-                </select>
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* 1. शैक्षणिक पात्रता */}
+                <div>
+                  <label className="font-bold text-[#172033] block mb-1">
+                    शैक्षणिक पात्रता <span className="text-[#df6b16]">*</span>
+                  </label>
+                  <select
+                    value={education}
+                    onChange={(e) => setEducation(e.target.value)}
+                    required
+                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  >
+                    <option value="">शैक्षणिक पात्रता निवडा</option>
+                    <option value="बारावी (12th)">बारावी (12th)</option>
+                    <option value="पदविका (Diploma)">पदविका (Diploma)</option>
+                    <option value="पदवी (B.A. / B.Sc. / B.Com.)">पदवी (B.A. / B.Sc. / B.Com.)</option>
+                    <option value="पदव्युत्तर पदवी (M.A. / M.Sc. / M.Com.)">पदव्युत्तर पदवी (M.A. / M.Sc. / M.Com.)</option>
+                    <option value="एम.फिल. (M.Phil.)">एम.फिल. (M.Phil.)</option>
+                    <option value="पीएच.डी. (Ph.D.)">पीएच.डी. (Ph.D.)</option>
+                    <option value="इतर शिक्षण क्षेत्रातील पात्रता">इतर शिक्षण क्षेत्रातील पात्रता</option>
+                  </select>
+                </div>
+
+                {/* 2. व्यावसायिक पात्रता (शैक्षणिक पात्रतेच्या खाली शिक्षक पदाला लागू असणाऱ्या सर्व पात्रता) */}
+                <div>
+                  <label className="font-bold text-[#172033] block mb-1">
+                    व्यावसायिक पात्रता (शिक्षक संवर्ग) <span className="text-[#df6b16]">*</span>
+                  </label>
+                  <select
+                    value={professionalQualification}
+                    onChange={(e) => setProfessionalQualification(e.target.value)}
+                    required
+                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  >
+                    <option value="">व्यावसायिक पात्रता निवडा</option>
+                    {TEACHER_PROFESSIONAL_QUALIFICATIONS.map((qual) => (
+                      <option key={qual} value={qual}>
+                        {qual}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
+              {/* 3. सध्याचे पद / संवर्ग (केवळ विचारलेले ५ पर्याय) */}
               <div>
                 <label className="font-bold text-[#172033] block mb-1">
-                  सध्याचे पद / संवर्ग (Current Cadre) <span className="text-[#df6b16]">*</span>
+                  सध्याचे पद / संवर्ग <span className="text-[#df6b16]">*</span>
                 </label>
                 <select
                   value={professional}
@@ -913,22 +827,21 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   required
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
                 >
-                  <option value="">निवडा</option>
-                  <option value="केंद्रप्रमुख">केंद्रप्रमुख</option>
-                  <option value="विस्तार अधिकारी">विस्तार अधिकारी</option>
-                  <option value="मुख्याध्यापक">मुख्याध्यापक</option>
-                  <option value="शिक्षण विस्तार अधिकारी">शिक्षण विस्तार अधिकारी</option>
-                  <option value="उपशिक्षक / पदवीधर शिक्षक">उपशिक्षक / पदवीधर शिक्षक</option>
-                  <option value="इतर शिक्षण विभागातील अधिकारी">इतर शिक्षण विभागातील अधिकारी</option>
+                  <option value="">सध्याचे पद / संवर्ग निवडा</option>
+                  {OFFICIAL_CADRES.map((cadre) => (
+                    <option key={cadre} value={cadre}>
+                      {cadre}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Section 4: Membership Fee & Bank Account Details */}
+          {/* Section 3: Membership Fee & Bank Account Details */}
           <div className="bg-white rounded-xl border-2 border-[#df6b16]/40 p-6 shadow-xs space-y-4">
             <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              4. सदस्यत्व आणि वर्गणी फी तपशील
+              3. सदस्यत्व आणि वर्गणी फी तपशील
             </h2>
 
             <div className="bg-[#fff7f0] border-l-4 border-[#df6b16] p-4 sm:p-5 rounded-r-xl text-xs leading-relaxed text-[#102a43] space-y-3">
@@ -941,15 +854,15 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   💰 सदस्यत्व आणि वर्गणी फी तपशील:
                 </div>
                 <ul className="space-y-1.5 text-xs text-slate-800 font-semibold pl-1">
-                  <li>• <strong>आजीवन सदस्यत्व (Lifetime Membership):</strong> 100 रुपये (एकदाच भरायची फी).</li>
-                  <li>• <strong>वार्षिक वर्गणी (Annual Subscription):</strong> 120 रुपये (दरवर्षी भरायची वर्गणी).</li>
+                  <li>• <strong>आजीवन सदस्यत्व:</strong> 100 रुपये (एकदाच भरायची फी).</li>
+                  <li>• <strong>वार्षिक वर्गणी:</strong> 120 रुपये (दरवर्षी भरायची वर्गणी).</li>
                 </ul>
               </div>
 
               {/* Official Bank Account Details */}
               <div className="bg-gradient-to-r from-[#0f172a] via-[#1e293b] to-[#0f172a] text-white p-4 sm:p-5 rounded-xl shadow-sm space-y-2 border border-slate-700">
                 <div className="text-[11px] font-bold tracking-widest text-[#efb24b] uppercase">
-                  अधिकृत बँक खाते तपशील (Bank Account Details)
+                  अधिकृत बँक खाते तपशील
                 </div>
                 <div className="font-mono text-base font-extrabold text-[#f8fafc]">
                   KENDRAPRAMUKH V ADHIKARI MAHASNAGH
@@ -963,7 +876,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   </div>
                 </div>
                 <div className="text-[11px] text-slate-300 pt-1 border-t border-slate-700">
-                  बँक: बँक ऑफ महाराष्ट्र (Bank of Maharashtra)
+                  बँक: बँक ऑफ महाराष्ट्र
                 </div>
               </div>
 
@@ -973,7 +886,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
           </div>
 
-          {/* Section 5: Mandatory Applicant Declaration */}
+          {/* Section 4: Mandatory Applicant Declaration */}
           <div className="bg-white rounded-xl border-2 border-blue-200 p-5 shadow-xs">
             <label className="flex items-start gap-3 cursor-pointer">
               <input
@@ -985,7 +898,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               />
               <div className="text-xs text-slate-800 leading-relaxed">
                 <strong className="block text-sm text-[#09243f] font-serifDevanagari mb-1">
-                  सदस्यत्व स्वयंघोषणापत्र (Declaration) <span className="text-rose-600">*</span>
+                  सदस्यत्व स्वयंघोषणापत्र <span className="text-rose-600">*</span>
                 </strong>
                 "मी याद्वारे घोषित करतो/करते की, मी शिक्षण विभागातील कार्यरत अधिकारी / केंद्रप्रमुख असून महासंघाच्या सदस्यत्वासाठी पात्र आहे. माझ्याद्वारे अर्जात भरलेली सर्व वैयक्तिक व कार्यालयीन माहिती पूर्णपणे सत्य आणि अचूक आहे. मी संघटनेचे नियम व उद्दिष्टे वाचली असून मला महासंघाच्या सर्व अटी व शर्ती पूर्णपणे मान्य आहेत."
               </div>

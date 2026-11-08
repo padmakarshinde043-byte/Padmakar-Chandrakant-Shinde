@@ -776,7 +776,7 @@ export async function generateMembershipCertificatePdf(app: MembershipApplicatio
 
 /**
  * 5. Organization Status Matrix A4 Black & White PDF (संघटना सद्यस्थिती अहवाल)
- * - All 36 districts with counts for State Rep, Division Rep, District Officials, Taluka Officials, Members
+ * - All 34 districts with counts for State Rep, Division Rep, District Officials, Taluka Officials, Members
  * - Total row at the bottom
  */
 export async function generateOrganizationStatusPdf(
@@ -824,7 +824,7 @@ export async function generateOrganizationStatusPdf(
         </div>
 
         <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
-          <div>विषय: सर्व 36 जिल्ह्यांतील पदाधिकारी व सभासद संख्यात्मक स्थिती</div>
+          <div>विषय: सर्व 34 जिल्ह्यांतील पदाधिकारी व सभासद संख्यात्मक स्थिती</div>
           <div>दिनांक: ${todayFormatted}</div>
         </div>
 

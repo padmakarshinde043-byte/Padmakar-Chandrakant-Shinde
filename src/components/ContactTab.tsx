@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Clock, ShieldCheck, Send, CheckCircle2, MessageCircle } from 'lucide-react';
-import { ORG_DETAILS, MAHARASHTRA_DISTRICTS, DISTRICT_PRESIDENTS } from '../data/mahasanghData';
+import { MapPin, Phone, Mail, Clock, ShieldCheck, Send, CheckCircle2, MessageCircle, Globe } from 'lucide-react';
+import { ORG_DETAILS, MAHARASHTRA_DISTRICTS } from '../data/mahasanghData';
 
 interface ContactTabProps {
   onSaveContact?: (contact: {
@@ -23,22 +23,26 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !phone || !message) {
-      alert('कृपया आवश्यक माहिती भरा.');
+    setFormError('');
+
+    if (!name.trim() || !phone.trim() || !message.trim()) {
+      setFormError('कृपया नाव, मोबाईल नंबर आणि आपला संदेश आवश्यक भरा.');
       return;
     }
+
     if (onSaveContact) {
       onSaveContact({
         id: `contact-${Date.now()}`,
-        name,
-        phone,
-        email: email || undefined,
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
         district: district || undefined,
-        subject: subject || undefined,
-        message,
+        subject: subject.trim() || undefined,
+        message: message.trim(),
         createdAt: new Date().toISOString()
       });
     }
@@ -53,281 +57,343 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
   };
 
   return (
-    <div className="bg-[#fbf8f2] py-10 md:py-16">
+    <div className="bg-slate-50 py-10 md:py-16 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1160px] mx-auto px-4 mb-12">
-        <div className="border-b border-[#e7ded1] pb-6">
-          <p className="text-xs uppercase tracking-widest font-bold text-[#df6b16] mb-1">
-            संपर्क माहिती
-          </p>
-          <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-bold text-[#09243f]">
-            महासंघाशी थेट संपर्क साधा
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-10">
+        <div className="border-b border-slate-200 pb-6">
+          <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+            थेट संवाद व मार्गदर्शन
+          </span>
+          <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-extrabold text-[#0b1e36] mt-1">
+            महासंघ संपर्क व तक्रार निवारण दालन
           </h1>
-          <p className="text-base text-[#607184] mt-2 max-w-2xl">
-            आपले प्रश्न, सूचना किंवा सदस्यत्वासाठी मुख्य कार्यालय अथवा आपल्या जिल्हा अध्यक्षांशी संपर्क साधा.
+          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-2xl leading-relaxed">
+            राज्यातील प्राथमिक शिक्षण विभागातील केंद्रप्रमुख व अधिकाऱ्यांच्या अडीअडचणी व मार्गदर्शनासाठी मुख्य कार्यालयाशी थेट संपर्क साधा.
           </p>
         </div>
       </div>
 
-      <div className="max-w-[1160px] mx-auto px-4 space-y-12">
-        {/* Contact Info & Message Form Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Column: Office Details */}
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Official Administrative Headquarters Information */}
           <div className="lg:col-span-5 space-y-6">
-            <div className="bg-[#09243f] text-white p-6 sm:p-8 rounded-xl shadow-md border-t-4 border-[#df6b16] space-y-6">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-widest text-[#f8d39b]">
-                  मुख्यालय
-                </span>
-                <h3 className="font-serifDevanagari text-2xl font-bold text-white mt-1">
-                  कार्यालयाचा पत्ता
-                </h3>
-              </div>
+            <div className="bg-[#0b1e36] text-white p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-lg space-y-5">
+              <span className="text-xs uppercase tracking-widest font-bold text-amber-400">
+                मध्यवर्ती प्रशासकीय कार्यालय
+              </span>
+              <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white leading-tight">
+                महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+              </h2>
 
-              <div className="space-y-4 text-xs sm:text-sm text-[#dbe8f1]">
+              <div className="space-y-4 text-xs sm:text-sm text-slate-300 pt-2 border-t border-slate-700">
                 <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-[#efb24b] shrink-0 mt-0.5" />
+                  <MapPin className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <strong className="block text-white mb-0.5 font-serifDevanagari">
-                      पत्ता:
-                    </strong>
-                    <p className="leading-relaxed">{ORG_DETAILS.officeAddress}</p>
+                    <strong className="text-white block text-sm mb-0.5">मुख्य कार्यालय पत्ता:</strong>
+                    <span>{ORG_DETAILS.officeAddress}</span>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-[#efb24b] shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-white mb-0.5 font-serifDevanagari">
-                      फोन / WhatsApp:
+                  <Phone className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="w-full min-w-0">
+                    <strong className="text-white block text-sm mb-2.5 font-bold tracking-wide">
+                      Grievance Redressal Committee :
                     </strong>
-                    <a
-                      href={`tel:${ORG_DETAILS.phonePrimary}`}
-                      className="hover:text-[#f8d39b] font-mono text-sm block"
-                    >
-                      {ORG_DETAILS.phonePrimary}
-                    </a>
+                    {/* तीन सदस्यांची एकाखाली एक रचना (मोबाईलवर सुटसुटीत, डेस्कटॉपवर ३ कॉलम) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* 1. श्री. राजेंद्र खैरनार */}
+                      <div className="p-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
+                        <div>
+                          <span className="text-white text-xs sm:text-sm font-bold block" title="श्री. राजेंद्र खैरनार">
+                            श्री. राजेंद्र खैरनार
+                          </span>
+                          <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
+                            संस्थापक राज्याध्यक्ष
+                          </span>
+                        </div>
+                        <a
+                          href="tel:9860704098"
+                          className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
+                          title="कॉल करा"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>9860704098</span>
+                        </a>
+                      </div>
+
+                      {/* 2. श्री. निलेश पाटील */}
+                      <div className="p-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
+                        <div>
+                          <span className="text-white text-xs sm:text-sm font-bold block" title="श्री. निलेश पाटील">
+                            श्री. निलेश पाटील
+                          </span>
+                          <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
+                            राज्य पदाधिकारी
+                          </span>
+                        </div>
+                        <a
+                          href="tel:9421385165"
+                          className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
+                          title="कॉल करा"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>9421385165</span>
+                        </a>
+                      </div>
+
+                      {/* 3. श्री. नितीन शिंदे */}
+                      <div className="p-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
+                        <div>
+                          <span className="text-white text-xs sm:text-sm font-bold block" title="श्री. नितीन शिंदे">
+                            श्री. नितीन शिंदे
+                          </span>
+                          <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
+                            राज्य पदाधिकारी
+                          </span>
+                        </div>
+                        <a
+                          href="tel:9763099698"
+                          className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
+                          title="कॉल करा"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span>9763099698</span>
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-[#efb24b] shrink-0 mt-0.5" />
+                  <Mail className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <strong className="block text-white mb-0.5 font-serifDevanagari">
-                      ई-मेल:
-                    </strong>
-                    <a
-                      href={`mailto:${ORG_DETAILS.email}`}
-                      className="hover:text-[#f8d39b] font-mono text-xs block"
-                    >
+                    <strong className="text-white block text-sm mb-0.5">अधिकृत ई-मेल:</strong>
+                    <a href={`mailto:${ORG_DETAILS.email}`} className="text-slate-200 hover:underline font-mono">
                       {ORG_DETAILS.email}
                     </a>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-[#efb24b] shrink-0 mt-0.5" />
+                  <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <strong className="block text-white mb-0.5 font-serifDevanagari">
-                      कार्यालयीन वेळ:
-                    </strong>
-                    <p>{ORG_DETAILS.officeHours}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 pt-2 border-t border-[#29435a]">
-                  <ShieldCheck className="w-5 h-5 text-[#efb24b] shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="block text-white mb-0.5 font-serifDevanagari">
-                      अधिकृत नोंदणी:
-                    </strong>
-                    <p className="text-[#f8d39b]">{ORG_DETAILS.registrationNo}</p>
+                    <strong className="text-white block text-sm mb-0.5">कार्यालयीन वेळ:</strong>
+                    <span>सोमवार ते शनिवार (सकाळी 10:00 ते सायंकाळी 06:00)</span>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                <a
-                  href={`tel:${ORG_DETAILS.phonePrimary}`}
-                  className="bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold py-2.5 px-4 rounded text-center transition-colors shadow-sm"
-                >
-                  आत्ता फोन करा
-                </a>
-                <a
-                  href={`https://wa.me/91${ORG_DETAILS.phonePrimary}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#25D366] hover:bg-[#1eb956] text-white text-xs font-bold py-2.5 px-4 rounded text-center transition-colors shadow-sm flex items-center justify-center gap-1.5"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp वर संपर्क
-                </a>
+              <div className="pt-4 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400">
+                <span>नोंदणी क्र: <strong className="text-amber-300 font-mono">{ORG_DETAILS.registrationNo}</strong></span>
+                <span className="text-emerald-400 font-semibold">● अधिकृत संघटना</span>
+              </div>
+            </div>
+
+            {/* Quick District Leadership Info */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
+              <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] mb-2">
+                जिल्हास्तरीय संपर्क हवा आहे का?
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                महाराष्ट्रातील सर्व 34 जिल्ह्यांचे अध्यक्ष व प्रतिनिधींचे अधिकृत संपर्क क्रमांक 'नेतृत्व' या टॅबवर उपलब्ध आहेत.
+              </p>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 flex items-center gap-2">
+                <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>व्हॉट्सॲप समन्वय: {ORG_DETAILS.phonePrimary}</span>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Contact Message Form */}
-          <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-xl border border-[#e7ded1] shadow-xs">
-            <h3 className="font-serifDevanagari text-2xl font-bold text-[#09243f] mb-2">
-              आपला संदेश पाठवा
-            </h3>
-            <p className="text-xs text-[#607184] mb-6">
-              आपला संदेश, प्रश्न अथवा मागणी खालील फॉर्मद्वारे नोंदवा. आमचे प्रतिनिधी लवकरच आपल्याशी संपर्क करतील.
+          {/* Right Column: Direct Message / Suggestion Form */}
+          <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs">
+            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36] mb-2">
+              आपला संदेश किंवा प्रश्न पाठवा
+            </h2>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              महासंघाच्या कामकाजाबाबत सूचना, सेवाविषयक अडचण किंवा विचारणा असल्यास खालील फॉर्म भरा. मुख्य कार्यालयाकडून लवकरच संपर्क केला जाईल.
             </p>
 
             {submitted ? (
-              <div className="p-6 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-center space-y-3">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                <h4 className="font-serifDevanagari font-bold text-lg">
-                  आपला संदेश यशस्वीपणे प्राप्त झाला आहे!
-                </h4>
-                <p className="text-xs text-emerald-700">
-                  महासंघाच्या कार्यालयातून लवकरच आपल्या दिलेल्या फोन किंवा ई-मेलवर संपर्क साधला जाईल.
+              <div className="p-6 bg-emerald-50 border border-emerald-300 rounded-xl text-center space-y-3">
+                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
+                <h3 className="font-serifDevanagari text-lg font-bold text-emerald-900">
+                  आपला संदेश यशस्वीपणे पाठवण्यात आला आहे!
+                </h3>
+                <p className="text-xs text-emerald-700 leading-relaxed max-w-md mx-auto">
+                  आपल्या संदेशाची नोंद घेण्यात आली असून महासंघ कार्यालयाकडून लवकरच आपल्याशी संपर्क साधला जाईल. धन्यवाद!
                 </p>
                 <button
+                  type="button"
                   onClick={() => setSubmitted(false)}
-                  className="mt-2 text-xs font-bold bg-emerald-700 text-white px-4 py-2 rounded hover:bg-emerald-800"
+                  className="bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-lg mt-2 hover:bg-emerald-800 transition-colors"
                 >
-                  दुसरा संदेश पाठवा
+                  आणखी एक संदेश पाठवा
                 </button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+                {formError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg font-medium">
+                    {formError}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="font-bold text-[#102a43] block mb-1">
-                      नाव <span className="text-[#df6b16]">*</span>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      आपले पूर्ण नाव <span className="text-rose-600">*</span>
                     </label>
                     <input
                       type="text"
                       required
+                      placeholder="उदा. श्री. संतोष पाटील"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="आपले संपूर्ण नाव"
-                      className="w-full p-2.5 border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
                     />
                   </div>
 
                   <div>
-                    <label className="font-bold text-[#102a43] block mb-1">
-                      फोन नंबर <span className="text-[#df6b16]">*</span>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      मोबाईल नंबर <span className="text-rose-600">*</span>
                     </label>
                     <input
                       type="tel"
                       required
+                      maxLength={10}
+                      placeholder="10 अंकी मोबाईल"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="10 अंकी मोबाईल नंबर"
-                      className="w-full p-2.5 border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="font-bold text-[#102a43] block mb-1">
-                      ई-मेल पत्ता
+                    <label className="font-bold text-slate-700 block mb-1">
+                      ई-मेल पत्ता (पर्यायी)
                     </label>
                     <input
                       type="email"
+                      placeholder="example@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="उदा. name@example.com"
-                      className="w-full p-2.5 border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="font-bold text-[#102a43] block mb-1">
+                    <label className="font-bold text-slate-700 block mb-1">
                       आपला जिल्हा
                     </label>
                     <select
                       value={district}
                       onChange={(e) => setDistrict(e.target.value)}
-                      className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-medium text-slate-700"
                     >
-                      <option value="">आपला जिल्हा निवडा</option>
+                      <option value="">जिल्हा निवडा (ऐच्छिक)</option>
                       {MAHARASHTRA_DISTRICTS.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
-                        </option>
+                        <option key={d} value={d}>{d}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#102a43] block mb-1">
+                  <label className="font-bold text-slate-700 block mb-1">
                     विषय
                   </label>
                   <input
                     type="text"
+                    placeholder="उदा. सदस्यत्व, पदोन्नती, किंवा तक्रार"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    placeholder="उदा. सदस्यत्व माहिती / वेतन विसंगती / तक्रार निवारण"
-                    className="w-full p-2.5 border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
                   />
                 </div>
 
                 <div>
-                  <label className="font-bold text-[#102a43] block mb-1">
-                    संदेश <span className="text-[#df6b16]">*</span>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    आपला संदेश किंवा अडचण <span className="text-rose-600">*</span>
                   </label>
                   <textarea
                     required
                     rows={4}
+                    placeholder="आपला सविस्तर संदेश येथे टाईप करा..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    placeholder="आपला सविस्तर संदेश येथे लिहा..."
-                    className="w-full p-2.5 border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 resize-none"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-3 rounded-lg text-xs sm:text-sm transition-colors shadow-sm flex items-center justify-center gap-2"
+                  className="bg-[#0b1e36] hover:bg-[#132f52] text-amber-300 font-bold px-6 py-3 rounded-lg text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
                 >
-                  <Send className="w-4 h-4" />
-                  संदेश पाठवा
+                  <Send className="w-4 h-4 text-amber-400" />
+                  <span>संदेश पाठवा</span>
                 </button>
               </form>
             )}
           </div>
         </div>
 
-        {/* District-wise Direct Contact Directory */}
-        <div className="bg-white p-6 sm:p-8 rounded-xl border border-[#e7ded1] shadow-xs">
-          <div className="mb-6 pb-2 border-b border-[#e7ded1]">
-            <h3 className="font-serifDevanagari text-2xl font-bold text-[#09243f]">
-              जिल्हानिहाय थेट संपर्क निर्देशिका (34 जिल्हे)
-            </h3>
-            <p className="text-xs text-[#607184] mt-1">
-              आपल्या जिल्ह्यातील महासंघ अध्यक्षांशी थेट संपर्क साधा.
-            </p>
-          </div>
+        {/* Website Information Manager (संकेतस्थळ माहिती व्यवस्थापक - संपर्क फॉर्म नंतर व फुटर च्या वर) */}
+        <div className="mt-12 pt-8 border-t border-slate-200">
+          <div className="bg-gradient-to-br from-[#07182c] via-[#0b1e36] to-[#0f2a4a] text-white rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-xs">
-            {DISTRICT_PRESIDENTS.map((item) => (
-              <div
-                key={item.region}
-                className="p-3 rounded-lg border border-slate-200 bg-[#fbf8f2] hover:border-[#df6b16] transition-colors"
-              >
-                <strong className="block text-[#09243f] font-serifDevanagari text-sm">
-                  {item.region}
-                </strong>
-                <span className="block text-[#607184] text-[11px] mt-0.5">
-                  {item.name}
-                </span>
-                <a
-                  href={`tel:${item.phone}`}
-                  className="mt-2 inline-flex items-center gap-1 font-semibold text-[#df6b16] hover:underline"
-                >
-                  <Phone className="w-3 h-3" />
-                  {item.phone}
-                </a>
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              {/* Left Column: Context & Official Notice */}
+              <div className="lg:col-span-7 space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 border border-amber-400/40 rounded-full text-amber-300 text-xs font-semibold">
+                  <Globe className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Website Information Manager · संकेतस्थळ कक्ष</span>
+                </div>
+
+                <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  संकेतस्थळ माहिती व्यवस्थापक
+                </h3>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+                  संकेतस्थळावरील सामग्री, दुवे किंवा माहिती अद्ययावत किंवा अचूकतेबाबत काही सूचना अथवा तक्रारी असल्यास खालील तपशीलावर संपर्क साधावा.
+                </p>
               </div>
-            ))}
+
+              {/* Right Column: Manager Details Official Card */}
+              <div className="lg:col-span-5">
+                <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-xl p-5 space-y-3.5 shadow-inner">
+                  <div className="space-y-2 text-xs sm:text-sm">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-slate-400 font-semibold min-w-[70px]">नाव :</span>
+                      <strong className="text-white font-bold text-sm sm:text-base">श्री. पदमाकर चंद्रकांत शिंदे</strong>
+                    </div>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-slate-400 font-semibold min-w-[70px]">पद :</span>
+                      <span className="text-amber-300 font-bold">संकेतस्थळ माहिती व्यवस्थापक</span>
+                    </div>
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-slate-400 font-semibold min-w-[70px]">विभाग :</span>
+                      <span className="text-slate-200 font-medium">माहिती तंत्रज्ञान विभाग</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/10 flex items-center gap-2">
+                    <span className="text-slate-400 text-xs sm:text-sm font-semibold">संपर्क क्रमांक :</span>
+                    <a
+                      href="tel:7219123699"
+                      className="text-amber-300 hover:text-white font-mono font-bold text-sm sm:text-base tracking-wide"
+                    >
+                      7219123699
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

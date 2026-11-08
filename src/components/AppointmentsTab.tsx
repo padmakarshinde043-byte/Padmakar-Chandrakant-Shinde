@@ -1027,7 +1027,7 @@ export const AppointmentsTab: React.FC = () => {
                   जिल्हा पदाधिकारी व्यवस्थापन: <span className="text-[#df6b16]">{currentDistrict}</span>
                 </h3>
                 <small className="text-emerald-700 font-bold block mt-0.5">
-                  {isSuperAdmin ? '(राज्याध्यक्ष - सर्व 36 जिल्हे संपादन अधिकार)' : `(फक्त '${currentDistrict}' जिल्हा संपादन अधिकार लॉक)`}
+                  {isSuperAdmin ? '(राज्याध्यक्ष - सर्व 34 जिल्हे संपादन अधिकार)' : `(फक्त '${currentDistrict}' जिल्हा संपादन अधिकार लॉक)`}
                 </small>
               </div>
 
@@ -1210,10 +1210,10 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={() => setShowStatusMatrixModal(true)}
                   className="bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-md transition-all active:scale-95"
-                  title="महाराष्ट्रातील सर्व 36 जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता पहा व डाऊनलोड करा"
+                  title="महाराष्ट्रातील सर्व 34 जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता पहा व डाऊनलोड करा"
                 >
                   <Eye className="w-4 h-4 text-[#efb24b]" />
-                  संघटना सद्यस्थिती (36 जिल्हे)
+                  संघटना सद्यस्थिती (34 जिल्हे)
                 </button>
 
                 {/* 2. सर्व जिल्हाध्यक्ष यादी (Point 9a) */}
@@ -1222,10 +1222,10 @@ export const AppointmentsTab: React.FC = () => {
                   onClick={handleDownloadDistrictPresidentsPdf}
                   disabled={isGeneratingRegistryPdf}
                   className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3.5 py-2.5 rounded-full flex items-center justify-center gap-1.5 shadow-xs transition-all disabled:opacity-50"
-                  title="महाराष्ट्रातील सर्व 36 जिल्हाध्यक्षांची अधिकृत यादी"
+                  title="महाराष्ट्रातील सर्व 34 जिल्हाध्यक्षांची अधिकृत यादी"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  सर्व जिल्हाध्यक्ष यादी (PDF)
+                  सर्व जिल्हाध्यक्ष यादी
                 </button>
 
                 {/* 3. सर्व तालुका अध्यक्ष यादी (Point 9b) */}
@@ -1237,7 +1237,7 @@ export const AppointmentsTab: React.FC = () => {
                   title="महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत यादी"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  सर्व तालुका अध्यक्ष यादी (PDF)
+                  सर्व तालुका अध्यक्ष यादी
                 </button>
 
                 {/* 4. नोंदणीकृत सदस्य यादी (Point 10) */}
@@ -1249,7 +1249,7 @@ export const AppointmentsTab: React.FC = () => {
                   title="वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  नोंदणीकृत सदस्य यादी (PDF)
+                  नोंदणीकृत सदस्य यादी
                 </button>
 
                 {/* 5. जिल्हा कार्यकारिणी यादी PDF */}
@@ -1271,7 +1271,7 @@ export const AppointmentsTab: React.FC = () => {
                   title="राज्यस्तरीय 1 ते शेवटपर्यंत नोंदवही PDF"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  राज्य नोंदवही (PDF)
+                  राज्य नोंदवही
                 </button>
 
                 {/* 7. राज्याध्यक्ष पासवर्ड बदला */}
@@ -1547,7 +1547,7 @@ export const AppointmentsTab: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">पासवर्ड पुन्हा टाका (Confirm):</label>
+                    <label className="font-bold text-slate-700 block mb-1">पासवर्ड पुन्हा टाका:</label>
                     <input
                       type="password"
                       required
@@ -1668,7 +1668,7 @@ export const AppointmentsTab: React.FC = () => {
 
                 <form onSubmit={handleSavePresidentInitialPassword} className="space-y-3.5">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">नवीन पासवर्ड (New Password):</label>
+                    <label className="font-bold text-slate-700 block mb-1">नवीन पासवर्ड:</label>
                     <input
                       type="password"
                       required
@@ -1680,7 +1680,7 @@ export const AppointmentsTab: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">नवीन पासवर्ड पुन्हा टाका (Confirm):</label>
+                    <label className="font-bold text-slate-700 block mb-1">नवीन पासवर्ड पुन्हा टाका:</label>
                     <input
                       type="password"
                       required
@@ -1747,7 +1747,7 @@ export const AppointmentsTab: React.FC = () => {
             <form onSubmit={handleChangePresidentPassword} className="space-y-3.5">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  सध्याचा पासवर्ड (Current Password):
+                  सध्याचा पासवर्ड:
                 </label>
                 <input
                   type="password"
@@ -1762,7 +1762,7 @@ export const AppointmentsTab: React.FC = () => {
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  नवीन पासवर्ड (New Password):
+                  नवीन पासवर्ड:
                 </label>
                 <input
                   type="password"
@@ -1776,7 +1776,7 @@ export const AppointmentsTab: React.FC = () => {
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  नवीन पासवर्ड पुन्हा टाका (Confirm New Password):
+                  नवीन पासवर्ड पुन्हा टाका:
                 </label>
                 <input
                   type="password"
@@ -2292,7 +2292,7 @@ export const AppointmentsTab: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: संघटना सद्यस्थिती (36 जिल्हे मॅट्रिक्स तक्ता & A4 B&W PDF - Point 8) */}
+      {/* MODAL: संघटना सद्यस्थिती (34 जिल्हे मॅट्रिक्स तक्ता & A4 B&W PDF - Point 8) */}
       {/* ========================================================================= */}
       {showStatusMatrixModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
@@ -2304,10 +2304,10 @@ export const AppointmentsTab: React.FC = () => {
                   महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
                 </span>
                 <h3 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#09243f]">
-                  ॥ संघटना सद्यस्थिती अहवाल (36 जिल्हे) ॥
+                  ॥ संघटना सद्यस्थिती अहवाल (34 जिल्हे) ॥
                 </h3>
                 <p className="text-slate-500 text-[11px] mt-0.5">
-                  सर्व 36 जिल्ह्यांतील राज्य, विभागीय, जिल्हा, तालुका पदाधिकारी व नोंदणीकृत सभासदांची आकडेवारी
+                  सर्व 34 जिल्ह्यांतील राज्य, विभागीय, जिल्हा, तालुका पदाधिकारी व नोंदणीकृत सभासदांची आकडेवारी
                 </p>
               </div>
 
@@ -2377,7 +2377,7 @@ export const AppointmentsTab: React.FC = () => {
                 <tfoot className="bg-[#e2e8f0] text-slate-900 font-extrabold border-t-2 border-slate-400 sticky bottom-0 z-10">
                   <tr>
                     <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-300 text-sm">
-                      एकूण (Total)
+                      एकूण
                     </td>
                     <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
                       {toEnglishDigits(matrixTotals.stateRep)}

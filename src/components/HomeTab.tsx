@@ -1,105 +1,283 @@
 import React from 'react';
-import { ArrowRight, ExternalLink, ShieldCheck, Users, School, Award, ChevronRight } from 'lucide-react';
+import {
+  ArrowRight, ShieldCheck, Users, School, Award, ChevronRight,
+  FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle
+} from 'lucide-react';
 import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 
 interface HomeTabProps {
   setCurrentTab: (tab: string) => void;
   onSelectNews: (news: NewsItem) => void;
+  newsList?: NewsItem[];
 }
 
-export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews }) => {
+export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList }) => {
+  const recentNews = (newsList && newsList.length > 0 ? newsList : INITIAL_NEWS).slice(0, 3);
+
   return (
-    <div>
-      {/* Hero Section */}
-      <section className="relative min-h-[580px] flex items-center bg-[#072038] text-white overflow-hidden">
-        {/* Background image with authentic gradient overlay */}
+    <div className="bg-slate-50 text-slate-800">
+      {/* Hero Section: Modern Executive Asymmetric Portal */}
+      <section className="relative bg-gradient-to-b from-[#0b1e36] via-[#0d2545] to-[#0b1e36] text-white py-12 md:py-20 px-4 sm:px-6 overflow-hidden border-b border-slate-800">
+        {/* Subtle architectural background texture */}
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-40 mix-blend-luminosity"
+          className="absolute inset-0 opacity-10 bg-cover bg-center pointer-events-none mix-blend-overlay"
           style={{ backgroundImage: `url('/heding.jpg')` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#072038]/95 via-[#09243f]/85 to-[#0c2f4a]/70" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="relative max-w-[1160px] mx-auto px-4 py-20 w-full z-10">
-          <div className="max-w-2xl">
-            <p className="uppercase tracking-[0.14em] text-xs font-bold text-[#f8d39b] mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#efb24b]"></span>
-              महाराष्ट्रातील शैक्षणिक नेतृत्वाचा विश्वासू आवाज
-            </p>
-            <h1 className="font-serifDevanagari text-3xl sm:text-4xl md:text-5xl lg:text-[52px] leading-[1.2] font-bold mb-5 tracking-tight">
-              शिक्षणाच्या गुणवत्तेसाठी <br />
-              <em className="text-[#f8c47b] not-italic">एकजूट, सजग आणि समर्पित.</em>
+        <div className="relative max-w-[1240px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* Left Column: Authoritative Mission Statement & Core CTAs */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-xs rounded-full border border-amber-400/30 text-amber-300 text-xs font-semibold">
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>शासन नोंदणीकृत श्रमिक संघटना · नोंदणी क्र. {ORG_DETAILS.registrationNo}</span>
+            </div>
+
+            <h1 className="font-serifDevanagari text-3xl sm:text-4xl md:text-5xl font-extrabold leading-[1.2] tracking-tight text-slate-100">
+              प्राथमिक शिक्षणाची धुरा सांभाळणाऱ्या <br className="hidden sm:block" />
+              <span className="text-amber-400 font-bold not-italic leading-[47px]">केंद्रप्रमुख व अधिकाऱ्यांचे</span> महासंघटन.
             </h1>
-            <p className="text-base sm:text-lg text-[#e5edf1] leading-relaxed mb-8 max-w-xl">
-              केंद्रप्रमुख आणि विस्तार अधिकाऱ्यांच्या हक्कांसाठी, सन्मानासाठी आणि सक्षम शैक्षणिक व्यवस्थेसाठी महासंघाची वाटचाल.
+
+            <p className="text-sm sm:text-base md:text-lg text-slate-300 leading-relaxed max-w-2xl font-normal">
+              महाराष्ट्रभरातील केंद्रप्रमुख, विस्तार अधिकारी व शिक्षण प्रशासकीय संवर्गाच्या सन्मानासाठी, हक्कांसाठी आणि गुणवत्तापूर्ण प्राथमिक शिक्षणासाठी कार्यरत असलेले सर्वोच्च व्यासपीठ.
             </p>
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => {
-                  setCurrentTab('about');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-3 rounded text-sm sm:text-base inline-flex items-center gap-2 transition-all shadow-md hover:gap-3"
-              >
-                महासंघ जाणून घ्या <ArrowRight className="w-4 h-4" />
-              </button>
+            {/* Quick Action CTAs */}
+            <div className="flex flex-wrap gap-3 pt-2">
               <button
                 onClick={() => {
                   setCurrentTab('membership');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="bg-white hover:bg-slate-100 text-[#09243f] font-bold px-6 py-3 rounded text-sm sm:text-base transition-colors shadow-md"
+                className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-bold px-6 py-3 rounded-lg text-sm sm:text-base flex items-center gap-2 shadow-lg hover:shadow-amber-500/20 transition-all active:scale-98"
               >
-                सदस्यत्व अर्ज करा
+                <span>सदस्यत्व अर्ज करा</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
+
+              <button
+                onClick={() => {
+                  setCurrentTab('appointments');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="bg-white/10 hover:bg-white/20 text-white font-semibold px-5 py-3 rounded-lg text-sm sm:text-base border border-white/20 transition-all flex items-center gap-2"
+              >
+                <Award className="w-4 h-4 text-amber-400" />
+                <span>पदाधिकारी</span>
+              </button>
+
               <button
                 onClick={() => {
                   setCurrentTab('news');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="border border-white/60 hover:bg-white/10 text-white font-semibold px-5 py-3 rounded text-sm sm:text-base transition-colors"
+                className="text-slate-300 hover:text-white font-medium px-4 py-3 text-sm transition-colors"
               >
-                ताज्या बातम्या
+                बातम्या आणि परिपत्रके →
               </button>
+            </div>
+
+            {/* Key Organization Stats Strip (English numerals 0-9) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 border-t border-slate-700/60">
+              <div>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">34</strong>
+                <span className="text-xs text-slate-400">जिल्हा शाखा</span>
+              </div>
+              <div>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">350+</strong>
+                <span className="text-xs text-slate-400">तालुका कार्यकारिणी</span>
+              </div>
+              <div>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">5000</strong>
+                <span className="text-xs text-slate-400">सदस्य उद्दिष्ट</span>
+              </div>
+              <div>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-emerald-400">100%</strong>
+                <span className="text-xs text-slate-400">कायदेशीर संरक्षण</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Founder State President Executive Feature Card */}
+          <div className="lg:col-span-5">
+            <div className="bg-slate-900/90 rounded-2xl border-2 border-amber-500/40 p-6 sm:p-7 shadow-2xl relative backdrop-blur-md">
+              <div className="absolute top-4 right-4 bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                संस्थापक नेतृत्व
+              </div>
+
+              <div className="flex items-center gap-4 mb-4">
+                <img
+                  src="/president.jpg"
+                  alt={ORG_DETAILS.founderPresident.name}
+                  className="w-20 h-20 sm:w-22 sm:h-22 rounded-full object-cover object-center ring-4 ring-amber-500 shadow-md shrink-0 bg-white"
+                />
+                <div>
+                  <span className="text-xs font-semibold text-amber-400 tracking-wide block">
+                    {ORG_DETAILS.founderPresident.role}
+                  </span>
+                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
+                    {ORG_DETAILS.founderPresident.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 font-mono">
+                    {ORG_DETAILS.founderPresident.education}
+                  </p>
+                </div>
+              </div>
+
+              <blockquote className="text-xs sm:text-sm text-slate-300 leading-relaxed italic border-l-2 border-amber-500 pl-3 mb-5">
+                "{ORG_DETAILS.founderPresident.message}"
+              </blockquote>
+
+              <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <a
+                  href={`tel:${ORG_DETAILS.founderPresident.phone}`}
+                  className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-bold px-4 py-2 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>थेट संपर्क: {ORG_DETAILS.founderPresident.phone}</span>
+                </a>
+                <span className="text-slate-400">
+                  कार्यालय: मालेगाव (नाशिक)
+                </span>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Founder President Note Banner at bottom right */}
-        <div className="relative md:absolute md:right-8 md:bottom-0 bg-white text-[#09243f] p-5 sm:px-7 sm:py-5 border-t-4 border-[#df6b16] shadow-xl md:max-w-md w-full md:w-auto z-20">
-          <span className="block text-xs font-semibold text-[#607184] uppercase tracking-wider mb-1">
-            {ORG_DETAILS.founderPresident.role}
-          </span>
-          <strong className="block font-serifDevanagari text-lg sm:text-xl font-bold text-[#09243f]">
-            {ORG_DETAILS.founderPresident.name}
-          </strong>
-          <small className="block text-xs text-[#607184] mt-1 font-medium">
-            {ORG_DETAILS.founderPresident.education}
-          </small>
+      {/* Section 2: Four Core Interactive Portal Hubs (Distinctive Layout) */}
+      <section className="py-12 sm:py-16 max-w-[1240px] mx-auto px-4 sm:px-6">
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-slate-200">
+          <div>
+            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+              महासंघ डिजिटल सेवा केंद्र
+            </span>
+            <h2 className="font-serifDevanagari text-2xl sm:text-3xl font-extrabold text-[#0b1e36] mt-1">
+              प्रमुख सेवा व व्यासपीठ दालन
+            </h2>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 max-w-md">
+            राज्यातील सर्व केंद्रप्रमुख व विस्तार अधिकाऱ्यांसाठी उपलब्ध असलेल्या ऑनलाईन सुविधा व अधिकृत अभिलेख.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {/* Hub 1: Membership Registration */}
+          <div
+            onClick={() => {
+              setCurrentTab('membership');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="group bg-white p-6 rounded-xl border border-slate-200 hover:border-amber-500 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center mb-4 group-hover:bg-amber-500 group-hover:text-white transition-colors">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e36] group-hover:text-amber-800 transition-colors">
+                डिजिटल सदस्यत्व नोंदणी
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                आजीवन (₹100) व वार्षिक (₹120) सदस्यत्व. ऑनलाईन अर्ज भरून पडताळणीनंतर अधिकृत ओळखपत्र व प्रमाणपत्र डाऊनलोड करा.
+              </p>
+            </div>
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-700 group-hover:text-amber-800">
+              <span>ऑनलाईन अर्ज करा</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Hub 2: Official Appointments & Letters */}
+          <div
+            onClick={() => {
+              setCurrentTab('appointments');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="group bg-white p-6 rounded-xl border border-slate-200 hover:border-blue-600 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-800 flex items-center justify-center mb-4 group-hover:bg-[#0b1e36] group-hover:text-white transition-colors">
+                <Award className="w-6 h-6" />
+              </div>
+              <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e36] group-hover:text-blue-900 transition-colors">
+                पदाधिकारी
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                महाराष्ट्रातील 34 जिल्ह्यांचे कार्यकारिणी संपादन, A4 रंगीत स्वाक्षरीयुक्त नियुक्ती पत्रे, WhatsApp प्रेषण व राज्य नोंदवही.
+              </p>
+            </div>
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-blue-700 group-hover:text-blue-900">
+              <span>नियुक्ती पत्रे पहा</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Hub 3: Government Decisions & Circulars */}
+          <div
+            onClick={() => {
+              setCurrentTab('news');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="group bg-white p-6 rounded-xl border border-slate-200 hover:border-emerald-600 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <FileText className="w-6 h-6" />
+              </div>
+              <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e36] group-hover:text-emerald-900 transition-colors">
+                शासन निर्णय व परिपत्रके
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                प्राथमिक शिक्षण विभाग, केंद्रप्रमुख पदोन्नती, सेवाज्येष्ठता, वेतन व महासंघाचे अधिकृत निवेदन संग्रह.
+              </p>
+            </div>
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-700 group-hover:text-emerald-900">
+              <span>परिपत्रके वाचा</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
+
+          {/* Hub 4: State Leadership Directory */}
+          <div
+            onClick={() => {
+              setCurrentTab('leadership');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="group bg-white p-6 rounded-xl border border-slate-200 hover:border-purple-600 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+          >
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-800 flex items-center justify-center mb-4 group-hover:bg-purple-700 group-hover:text-white transition-colors">
+                <School className="w-6 h-6" />
+              </div>
+              <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e36] group-hover:text-purple-900 transition-colors">
+                राज्य व जिल्हा नेतृत्व
+              </h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                राज्य कार्यकारिणी, 6 महसूल विभाग समन्वयक आणि सर्व 34 जिल्हाध्यक्षांचे संपर्क क्रमांक व माहिती.
+              </p>
+            </div>
+            <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-purple-700 group-hover:text-purple-900">
+              <span>कार्यकारिणी पहा</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* Intro Section / आमची भूमिका */}
-      <section className="py-16 md:py-24 bg-[#fbf8f2]">
-        <div className="max-w-[1160px] mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
-            <div className="lg:col-span-5">
-              <p className="text-xs uppercase tracking-widest font-bold text-[#df6b16] mb-2">
-                आमची भूमिका
-              </p>
-              <h2 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-bold text-[#102a43] leading-tight mb-4">
-                जबाबदारीची जाणीव,<br />
-                <span className="text-[#df6b16]">बदलाची दिशा.</span>
+      {/* Section 3: Core Mandate & Educational Quality (Distinctive Architecture) */}
+      <section className="bg-white py-14 sm:py-20 border-y border-slate-200">
+        <div className="max-w-[1240px] mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            <div className="lg:col-span-5 space-y-4">
+              <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+                आमचे ध्येय व कार्यप्रणाली
+              </span>
+              <h2 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] leading-tight">
+                शिक्षणाच्या मुळाशी काम करणाऱ्या अधिकाऱ्यांचा सशक्त आवाज.
               </h2>
-              <div className="w-16 h-1 bg-[#df6b16] rounded-full mb-4"></div>
-            </div>
-            <div className="lg:col-span-7 space-y-4 text-base sm:text-lg text-[#536477] leading-relaxed">
-              <p>
-                महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ ही राज्यभरातील शैक्षणिक अधिकाऱ्यांना एकत्र आणणारी, त्यांच्या प्रश्नांना व्यासपीठ देणारी आणि शैक्षणिक गुणवत्तेसाठी सातत्याने कार्य करणारी नोंदणीकृत श्रमिक संघटना आहे.
-              </p>
-              <p className="text-sm sm:text-base">
-                राज्यातील जिल्हा परिषद शाळा, प्राथमिक शिक्षण विभाग आणि विस्तार व्यवस्थापनाचा कणा म्हणून काम करणाऱ्या केंद्रप्रमुखांच्या न्याय्य हक्कांसाठी आणि प्रशासकीय अडचणींवर प्रभावी तोडगा काढण्यासाठी महासंघ कटिबद्ध आहे.
+              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+                केंद्रप्रमुख हा प्राथमिक शाळा आणि प्रशासन यांच्यातील सर्वात महत्त्वाचा दुवा आहे. शैक्षणिक गुणवत्ता वाढवणे आणि त्याचवेळी अधिकाऱ्यांच्या न्याय्य हक्कांसाठी शासन दरबारी पाठपुरावा करणे हे महासंघाचे मुख्य कर्तव्य आहे.
               </p>
               <div className="pt-2">
                 <button
@@ -107,251 +285,135 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews })
                     setCurrentTab('about');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="font-bold text-[#df6b16] hover:text-[#b85309] text-sm sm:text-base inline-flex items-center gap-2 group"
+                  className="bg-[#0b1e36] hover:bg-[#132f52] text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-lg inline-flex items-center gap-2 transition-colors"
                 >
-                  आमच्याबद्दल अधिक वाचा{' '}
-                  <ExternalLink className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                  <span>आमच्याबद्दल सविस्तर वाचा</span>
+                  <ArrowRight className="w-4 h-4 text-amber-400" />
                 </button>
               </div>
             </div>
+
+            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold mb-3">
+                  01
+                </div>
+                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                  वेतन व सेवाशर्ती सुधारणा
+                </h4>
+                <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                  वेतनश्रेणीतील विसंगती दूर करणे, पदोन्नतीचे मार्ग मोकळे करणे आणि कामाचा योग्य मोबदला मिळवून देण्यासाठी शासनस्तरावर निरंतर पाठपुरावा.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-900 flex items-center justify-center font-bold mb-3">
+                  02
+                </div>
+                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                  शैक्षणिक गुणवत्ता सक्षमीकरण
+                </h4>
+                <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                  नवीन शैक्षणिक धोरण व डिजिटल प्रशासनासाठी केंद्रप्रमुखांना आधुनिक प्रशिक्षण, कार्यशाळा व मार्गदर्शन उपलब्ध करणे.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center font-bold mb-3">
+                  03
+                </div>
+                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                  कायदेशीर व प्रशासकीय संरक्षण
+                </h4>
+                <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                  कामाच्या ठिकाणी स्वाभिमान, अनपेक्षित कारवायांविरुद्ध कायदेविषयक सल्ला आणि संघटनात्मक संरक्षणाची भक्कम हमी.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-900 flex items-center justify-center font-bold mb-3">
+                  04
+                </div>
+                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                  पारदर्शक व डिजिटल महासंघ
+                </h4>
+                <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                  संपूर्ण 34 जिल्ह्यांत डिजिटल ओळखपत्रे, ऑनलाईन नियुक्ती पत्रे व थेट संपर्क प्रणालीद्वारे संपूर्ण पारदर्शक कारभार.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Statistical Strengths */}
-      <section className="bg-[#09243f] text-white py-10 border-y border-[#17366d]">
-        <div className="max-w-[1160px] mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-            <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
-                34
-              </div>
-              <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#efb24b]" />
-                कार्यकारी जिल्हे
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
-                350+
-              </div>
-              <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
-                <School className="w-3.5 h-3.5 text-[#efb24b]" />
-                तालुका समन्वय
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
-                50,000+
-              </div>
-              <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
-                <Users className="w-3.5 h-3.5 text-[#efb24b]" />
-                अधिकारी व सहकारी
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-3xl sm:text-4xl font-bold font-serif text-[#efb24b] mb-1">
-                100%
-              </div>
-              <div className="text-xs sm:text-sm text-[#dbe8f1] font-medium flex items-center justify-center gap-1">
-                <Award className="w-3.5 h-3.5 text-[#efb24b]" />
-                समर्पण व सेवाभाव
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Appointment Portal Banner */}
-      <section className="bg-gradient-to-r from-[#700f13] via-[#851216] to-[#09243f] text-white py-6 border-b border-[#d4af37]">
-        <div className="max-w-[1160px] mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shrink-0">
-              <Award className="w-6 h-6 text-[#efb24b]" />
-            </div>
-            <div>
-              <span className="text-[11px] uppercase tracking-widest text-[#f8d39b] font-bold block">
-                अधिकृत डिजिटल पोर्टल
-              </span>
-              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white">
-                जिल्हा पदाधिकारी यादी व अधिकृत नियुक्ती पत्रे
-              </h3>
-              <p className="text-xs text-[#dbe8f1] mt-0.5">
-                सर्व 36 जिल्ह्यांमधील पदाधिकाऱ्यांची यादी, थेट A4 नियुक्ती पत्र डाऊनलोड व WhatsApp प्रेषण.
-              </p>
-            </div>
+      {/* Section 4: Latest News & Circulars Gazette */}
+      <section className="py-14 max-w-[1240px] mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between gap-4 mb-8 pb-3 border-b border-slate-200">
+          <div>
+            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+              अधिकृत प्रसिद्धी
+            </span>
+            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
+              ताज्या घडामोडी व परिपत्रके
+            </h3>
           </div>
           <button
             onClick={() => {
-              setCurrentTab('appointments');
+              setCurrentTab('news');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="shrink-0 bg-[#efb24b] hover:bg-[#df6b16] text-[#09243f] hover:text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-lg transition-all shadow-md flex items-center gap-2"
+            className="text-xs sm:text-sm font-bold text-amber-800 hover:text-amber-900 flex items-center gap-1"
           >
-            नियुक्ती पत्र पोर्टल उघडा <ChevronRight className="w-4 h-4" />
+            <span>सर्व बातम्या पहा</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
-      </section>
 
-      {/* Core Principles Section / कामाची चार सूत्रे */}
-      <section className="py-16 md:py-20 bg-[#f0e9de]">
-        <div className="max-w-[1160px] mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-            <div>
-              <p className="text-xs uppercase tracking-widest font-bold text-[#df6b16] mb-1">
-                आमची मूल्ये
-              </p>
-              <h2 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#102a43]">
-                कामाची चार सूत्रे
-              </h2>
-            </div>
-            <p className="text-sm text-[#607184] max-w-sm">
-              प्रत्येक उपक्रम आणि निर्णयाच्या केंद्रस्थानी असलेली महासंघाची स्पष्ट मूल्ये.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {CORE_PRINCIPLES.map((principle) => (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {recentNews.map((news, index) => {
+            const imgUrl = news.imageUrl || news.image;
+            const isPhotoOnly = !news.content || news.content.trim() === '';
+            return (
               <article
-                key={principle.num}
-                className="bg-[#fbf8f2] p-6 rounded border border-[#e7ded1] shadow-xs hover:shadow-md transition-shadow relative overflow-hidden group"
-              >
-                <div className="absolute top-0 right-0 w-16 h-16 bg-[#fff0df] rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-125" />
-                <span className="relative text-sm font-bold text-[#df6b16] tracking-wider block mb-4">
-                  {principle.num}
-                </span>
-                <h3 className="font-serifDevanagari text-xl font-bold text-[#102a43] mb-2">
-                  {principle.title}
-                </h3>
-                <p className="text-xs sm:text-sm text-[#607184] leading-relaxed">
-                  {principle.desc}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Latest Updates / ताज्या घडामोडी */}
-      <section className="py-16 md:py-20 bg-[#fbf8f2]">
-        <div className="max-w-[1160px] mx-auto px-4">
-          <div className="flex items-end justify-between mb-8">
-            <div>
-              <p className="text-xs uppercase tracking-widest font-bold text-[#df6b16] mb-1">
-                ताज्या घडामोडी
-              </p>
-              <h2 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#102a43]">
-                महासंघातील नवीनतम वृत्त
-              </h2>
-            </div>
-            <button
-              onClick={() => {
-                setCurrentTab('news');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="text-xs sm:text-sm font-bold text-[#df6b16] hover:text-[#b85309] flex items-center gap-1 group"
-            >
-              सर्व बातम्या <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Feature News 1: Letter Pad */}
-            {INITIAL_NEWS[0] && (
-              <article
-                onClick={() => onSelectNews(INITIAL_NEWS[0])}
-                className="lg:col-span-7 bg-[#09243f] text-white p-6 sm:p-8 rounded-lg border border-[#17366d] shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col justify-between"
+                key={news.id ? `${news.id}-${index}` : `recent-news-${index}`}
+                onClick={() => onSelectNews(news)}
+                className="bg-white rounded-xl border border-slate-200 hover:border-amber-500 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between overflow-hidden group"
               >
                 <div>
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#df6b16] mb-4">
-                    <span>{toEnglishDigits(INITIAL_NEWS[0].date)}</span>
-                    <span className="text-[#b9c9d3]">· {INITIAL_NEWS[0].category}</span>
-                  </div>
-                  <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white mb-3 hover:text-[#f8d39b] transition-colors">
-                    {INITIAL_NEWS[0].title}
-                  </h3>
-                  <p className="text-sm text-[#c8d7e1] leading-relaxed mb-6">
-                    {INITIAL_NEWS[0].summary}
-                  </p>
-                  {INITIAL_NEWS[0].image && (
-                    <div className="bg-[#0e2c4c] p-2 rounded border border-[#23425f] mb-4 max-h-48 overflow-hidden">
+                  {imgUrl && (
+                    <div className="w-full h-40 bg-slate-900/5 relative overflow-hidden border-b border-slate-100">
                       <img
-                        src={INITIAL_NEWS[0].image}
-                        alt="लेटर पॅड"
+                        src={imgUrl}
+                        alt={news.title}
+                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                         loading="lazy"
-                        decoding="async"
-                        className="w-full h-40 object-cover rounded"
                       />
                     </div>
                   )}
+
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500 mb-2.5">
+                      <span className="font-semibold text-amber-700">{news.category}</span>
+                      <span className="font-mono">{toEnglishDigits(news.date)}</span>
+                    </div>
+                    <h4 className="font-serifDevanagari text-base font-bold text-[#0b1e36] line-clamp-2 hover:text-amber-800 transition-colors">
+                      {toEnglishDigits(news.title)}
+                    </h4>
+                    {news.summary && (
+                      <p className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed">
+                        {toEnglishDigits(news.summary)}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-sm font-bold text-[#f8d39b] inline-flex items-center gap-1 pt-2">
-                  सविस्तर वाचा <ArrowRight className="w-4 h-4" />
+
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-amber-800">
+                  <span>{isPhotoOnly ? '📷 फोटो पहा' : 'सविस्तर वाचा'}</span>
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               </article>
-            )}
-
-            {/* Side News Cards */}
-            <div className="lg:col-span-5 space-y-4 flex flex-col">
-              {INITIAL_NEWS.slice(1, 3).map((item) => (
-                <article
-                  key={item.id}
-                  onClick={() => onSelectNews(item)}
-                  className="bg-white p-5 sm:p-6 rounded-lg border border-[#e7ded1] shadow-xs hover:shadow-md cursor-pointer transition-all flex-1 flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center gap-2 text-xs font-bold text-[#df6b16] mb-2">
-                      <span>{toEnglishDigits(item.date)}</span>
-                      <span className="text-[#607184]">· {item.category}</span>
-                    </div>
-                    <h3 className="font-serifDevanagari text-lg font-bold text-[#102a43] mb-2 hover:text-[#df6b16] transition-colors">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-[#607184] leading-relaxed line-clamp-3">
-                      {item.summary}
-                    </p>
-                  </div>
-                  <div className="text-xs font-bold text-[#df6b16] inline-flex items-center gap-1 mt-4">
-                    सविस्तर बातमी →
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact Strip Banner */}
-      <section className="bg-[#df6b16] text-white py-12 md:py-14">
-        <div className="max-w-[1160px] mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <p className="uppercase text-xs font-bold tracking-widest text-[#ffe7c9] mb-1">
-              आपला सहभाग महत्त्वाचा आहे
-            </p>
-            <h2 className="font-serifDevanagari text-2xl sm:text-3xl font-bold">
-              महासंघाशी जोडले जा — आजच सभासद व्हा!
-            </h2>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => {
-                setCurrentTab('membership');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="bg-white hover:bg-slate-50 text-[#09243f] font-bold px-6 py-3 rounded text-sm transition-colors shadow-md inline-flex items-center gap-2"
-            >
-              सदस्यत्व अर्ज <ArrowRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => {
-                setCurrentTab('contact');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="border-2 border-white text-white hover:bg-white/10 font-bold px-5 py-3 rounded text-sm transition-colors"
-            >
-              संपर्क माहिती
-            </button>
-          </div>
+            );
+          })}
         </div>
       </section>
     </div>

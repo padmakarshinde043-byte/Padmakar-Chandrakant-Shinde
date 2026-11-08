@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Tag, ArrowRight, X, Search, FileText } from 'lucide-react';
+import { Calendar, Tag, ArrowRight, X, Search, FileText, RefreshCw, ChevronRight, ShieldCheck, Megaphone, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { NewsItem } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 
@@ -18,202 +18,387 @@ export const NewsTab: React.FC<NewsTabProps> = ({
   onRefreshNews,
   isRefreshing,
 }) => {
-  const [selectedCategory, setSelectedCategory] = useState('सर्व');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const categories = ['सर्व', 'अधिकृत घोषणा', 'संघटना घडामोडी', 'शासन निर्णय', 'शैक्षणिक गुणवत्ता'];
+  // पहिला विभाग (Section 1 Filters: सर्व, अधिकृत घोषणा, संघटना घडामोडी)
+  const section1Categories = ['सर्व', 'अधिकृत घोषणा', 'संघटना घडामोडी'];
+  const [sec1Category, setSec1Category] = useState('सर्व');
 
-  const filteredNews = newsList.filter((item) => {
-    const matchesCat = selectedCategory === 'सर्व' || item.category === selectedCategory;
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.content.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCat && matchesSearch;
+  // पहिला विभाग: बातम्या, अधिकृत घोषणा व संघटना घडामोडी
+  const section1Items = (newsList || []).filter((item) => {
+    if (!item) return false;
+    if (item.category === 'शासन निर्णय') return false; // belongs to Section 2
+
+    const matchesCat = sec1Category === 'सर्व' || item.category === sec1Category;
+    const term = (searchTerm || '').trim().toLowerCase();
+    if (!term) return matchesCat;
+
+    const title = (item.title || '').toLowerCase();
+    const summary = (item.summary || '').toLowerCase();
+    const content = (item.content || '').toLowerCase();
+    return matchesCat && (title.includes(term) || summary.includes(term) || content.includes(term));
+  });
+
+  // दुसरा विभाग: अधिकृत शासन निर्णय व परिपत्रके
+  const section2Items = (newsList || []).filter((item) => {
+    if (!item) return false;
+    if (item.category !== 'शासन निर्णय') return false;
+
+    const term = (searchTerm || '').trim().toLowerCase();
+    if (!term) return true;
+
+    const title = (item.title || '').toLowerCase();
+    const summary = (item.summary || '').toLowerCase();
+    const content = (item.content || '').toLowerCase();
+    return title.includes(term) || summary.includes(term) || content.includes(term);
   });
 
   return (
-    <div className="bg-[#fbf8f2] py-10 md:py-16">
+    <div className="bg-slate-50 py-10 md:py-16 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1160px] mx-auto px-4 mb-10">
-        <div className="border-b border-[#e7ded1] pb-6">
-          <p className="text-xs uppercase tracking-widest font-bold text-[#df6b16] mb-1">
-            बातम्या व घडामोडी
-          </p>
-          <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-bold text-[#09243f]">
-            संघटना व शैक्षणिक बातम्या
-          </h1>
-          <p className="text-base text-[#607184] mt-2 max-w-2xl">
-            राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित अधिकृत परिपत्रके, बैठका व ताज्या घडामोडी.
-          </p>
-        </div>
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-8">
+        <div className="border-b border-slate-200 pb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+              अधिकृत प्रसिद्धी दालन
+            </span>
+            <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-extrabold text-[#0b1e36] mt-1">
+              बातम्या आणि परिपत्रके
+            </h1>
+            <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-2xl leading-relaxed">
+              राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित अधिकृत बातम्या, संघटना घडामोडी आणि महत्त्वाचे शासन निर्णय.
+            </p>
+          </div>
 
-        {/* Filter and Search Bar */}
-        <div className="mt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full transition-colors ${
-                  selectedCategory === cat
-                    ? 'bg-[#df6b16] text-white shadow-xs font-bold'
-                    : 'bg-white text-[#607184] hover:bg-[#fff0df] border border-[#e7ded1]'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* Search Box & Refresh Button */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="बातमी किंवा शब्द शोधा..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 shadow-2xs"
+              />
+            </div>
             {onRefreshNews && (
               <button
                 onClick={onRefreshNews}
                 disabled={isRefreshing}
-                className="text-xs text-[#df6b16] hover:bg-[#fff0df] border border-[#df6b16]/30 px-3 py-1.5 rounded-full transition-colors font-medium flex items-center gap-1 disabled:opacity-50"
-                title="ताज्या घडामोडी तपासा"
+                className="p-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shadow-2xs"
+                title="ताज्या बातम्या लोड करा"
               >
-                {isRefreshing ? 'तपासत आहे...' : '⟳ ताजे अपडेट्स'}
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-600' : ''}`} />
               </button>
             )}
-          </div>
-
-          <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="बातम्या शोधा..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full text-xs pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] bg-white"
-            />
           </div>
         </div>
       </div>
 
-      {/* News Grid */}
-      <div className="max-w-[1160px] mx-auto px-4">
-        {filteredNews.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredNews.map((item) => (
-              <article
-                key={item.id}
-                onClick={() => setSelectedNews(item)}
-                className="bg-white rounded-xl border border-[#e7ded1] overflow-hidden shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
-              >
-                <div>
-                  {item.image ? (
-                    <div className="h-44 bg-slate-100 overflow-hidden relative">
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <span className="absolute top-2.5 left-2.5 bg-[#09243f]/90 text-white text-[10px] font-bold px-2.5 py-1 rounded">
-                        {item.category}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="h-3 bg-[#df6b16]"></div>
-                  )}
+      {/* Main Content: Two Distinct Stacked Sections */}
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 space-y-10">
+        {/* =========================================================================
+            १. पहिला विभाग: महासंघ बातम्या, अधिकृत घोषणा व संघटना घडामोडी
+        ========================================================================= */}
+        <section className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/90 shadow-xs">
+          {/* Section 1 Header: Clear, Bold & Distinct */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-200">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold mb-1.5">
+                <Megaphone className="w-3.5 h-3.5 text-amber-600" />
+                <span>विभाग १</span>
+              </div>
+              <h2 className="font-serifDevanagari text-xl sm:text-2xl font-black text-[#0b1e36] tracking-tight">
+                १. महासंघ बातम्या व संघटना घडामोडी
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                महासंघाच्या अधिकृत घोषणा, बैठका व राज्यस्तरीय संघटनात्मक घडामोडी.
+              </p>
+            </div>
 
-                  <div className="p-5">
-                    <div className="flex items-center gap-3 text-xs text-[#607184] mb-2 font-medium">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
-                        {toEnglishDigits(item.date)}
-                      </span>
-                      {!item.image && (
-                        <span className="flex items-center gap-1 text-[#df6b16] font-semibold">
-                          <Tag className="w-3 h-3" />
-                          {item.category}
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="font-serifDevanagari text-lg font-bold text-[#09243f] mb-2 group-hover:text-[#df6b16] transition-colors leading-snug">
-                      {item.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-[#536477] leading-relaxed line-clamp-3">
-                      {item.summary}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="px-5 pb-5 pt-2 border-t border-[#f0e9de] flex items-center justify-between text-xs font-bold text-[#df6b16]">
-                  <span>सविस्तर वाचा</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </article>
-            ))}
+            {/* Section 1 Filter Tabs: सर्व, अधिकृत घोषणा, संघटना घडामोडी */}
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-50 border border-slate-200 rounded-xl shadow-2xs shrink-0">
+              {section1Categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSec1Category(cat)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                    sec1Category === cat
+                      ? 'bg-[#0b1e36] text-amber-300 shadow-xs'
+                      : 'text-slate-600 hover:text-[#0b1e36] hover:bg-white'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
-        ) : (
-          <div className="bg-white p-12 text-center rounded-xl border border-[#e7ded1] text-[#607184]">
-            <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-base font-semibold">कोणतीही बातमी आढळली नाही.</p>
-            <p className="text-xs mt-1">कृपया शोध शब्द किंवा वर्गवारी बदलून पहा.</p>
-          </div>
-        )}
-      </div>
 
-      {/* News Detail Modal */}
-      {selectedNews && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-[#e7ded1] relative my-8">
-            <button
-              onClick={() => setSelectedNews(null)}
-              className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full z-10 transition-colors"
-              aria-label="बंद करा"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          {/* Section 1 Cards Grid */}
+          <div className="mt-6">
+            {section1Items.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
+                या वर्गात सध्या कोणतीही बातमी उपलब्ध नाही.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {section1Items.map((news, index) => {
+                  const imgUrl = news.imageUrl || news.image;
+                  const isPhotoOnly = !news.content || news.content.trim() === '';
+                  return (
+                    <article
+                      key={news.id ? `${news.id}-${index}` : `news-s1-${index}`}
+                      onClick={() => setSelectedNews(news)}
+                      className="bg-slate-50/60 hover:bg-white rounded-xl border border-slate-200 hover:border-amber-500 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between overflow-hidden group"
+                    >
+                      <div>
+                        {imgUrl && (
+                          <div className="w-full h-44 bg-slate-900/5 relative overflow-hidden border-b border-slate-200">
+                            <img
+                              src={imgUrl}
+                              alt={news.title}
+                              className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                            <div className="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                              <ImageIcon className="w-3 h-3 text-amber-400" />
+                              <span>छायाचित्र</span>
+                            </div>
+                          </div>
+                        )}
 
-            {selectedNews.image && (
-              <div className="w-full bg-[#072038] max-h-72 overflow-hidden flex items-center justify-center p-2">
-                <img
-                  src={selectedNews.image}
-                  alt={selectedNews.title}
-                  className="max-h-64 object-contain rounded"
-                />
+                        <div className="p-5">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2.5">
+                            <span className="font-bold text-amber-800 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded">
+                              {news.category}
+                            </span>
+                            <span className="font-mono text-slate-500">{toEnglishDigits(news.date)}</span>
+                          </div>
+
+                          <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] group-hover:text-amber-800 transition-colors line-clamp-2 leading-snug">
+                            {toEnglishDigits(news.title)}
+                          </h3>
+
+                          {news.summary && (
+                            <p className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed">
+                              {toEnglishDigits(news.summary)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="px-5 py-3 bg-slate-100/70 group-hover:bg-amber-50/50 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-amber-800 group-hover:text-amber-900 transition-colors">
+                        <span>{isPhotoOnly ? '📷 फोटो पहा' : 'सविस्तर वाचा'}</span>
+                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
+          </div>
+        </section>
 
-            <div className="p-6 sm:p-8 space-y-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="bg-[#fff0df] text-[#df6b16] font-bold px-2.5 py-1 rounded-full">
-                  {selectedNews.category}
-                </span>
-                <span className="text-[#607184] flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
-                  {toEnglishDigits(selectedNews.date)}
-                </span>
+        {/* =========================================================================
+            २. दुसरा विभाग: अधिकृत शासन निर्णय व परिपत्रके
+        ========================================================================= */}
+        <section className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/90 shadow-xs">
+          {/* Section 2 Header: Clear, Bold & Distinct */}
+          <div className="pb-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-bold mb-1.5">
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span>विभाग २</span>
+              </div>
+              <h2 className="font-serifDevanagari text-xl sm:text-2xl font-black text-[#0b1e36] tracking-tight">
+                २. अधिकृत शासन निर्णय व परिपत्रके
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                महाराष्ट्र शासन, शिक्षण आयुक्तालय व शालेय शिक्षण विभागाचे अधिकृत शासन निर्णय (GR) व परिपत्रके.
+              </p>
+            </div>
+
+            <div className="text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-100/80 border border-emerald-200 text-emerald-900 self-start sm:self-auto font-mono">
+              एकूण निर्णय: {section2Items.length}
+            </div>
+          </div>
+
+          {/* Section 2 Cards Grid */}
+          <div className="mt-6">
+            {section2Items.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
+                सध्या कोणतेही शासन निर्णय उपलब्ध नाहीत.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {section2Items.map((news, index) => {
+                  const imgUrl = news.imageUrl || news.image;
+                  const isPhotoOnly = !news.content || news.content.trim() === '';
+                  return (
+                    <article
+                      key={news.id ? `${news.id}-${index}` : `news-s2-${index}`}
+                      onClick={() => setSelectedNews(news)}
+                      className="bg-gradient-to-b from-white to-emerald-50/30 rounded-xl border border-slate-200 hover:border-emerald-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between overflow-hidden group"
+                    >
+                      <div>
+                        {imgUrl && (
+                          <div className="w-full h-44 bg-slate-900/5 relative overflow-hidden border-b border-slate-200">
+                            <img
+                              src={imgUrl}
+                              alt={news.title}
+                              className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+                              loading="lazy"
+                            />
+                            <div className="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                              <FileText className="w-3 h-3 text-emerald-400" />
+                              <span>परिपत्रक</span>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="p-5">
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2.5">
+                            <span className="font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded flex items-center gap-1">
+                              <FileText className="w-3 h-3 text-emerald-700" />
+                              {news.category}
+                            </span>
+                            <span className="font-mono text-slate-500">{toEnglishDigits(news.date)}</span>
+                          </div>
+
+                          <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] group-hover:text-emerald-800 transition-colors line-clamp-2 leading-snug">
+                            {toEnglishDigits(news.title)}
+                          </h3>
+
+                          {news.summary && (
+                            <p className="text-xs text-slate-600 mt-2 line-clamp-3 leading-relaxed">
+                              {toEnglishDigits(news.summary)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="px-5 py-3 bg-emerald-50/70 group-hover:bg-emerald-100/70 border-t border-emerald-200/60 flex items-center justify-between text-xs font-bold text-emerald-800 group-hover:text-emerald-950 transition-colors">
+                        <span>{isPhotoOnly ? '📷 परिपत्रक / फोटो पहा' : 'शासन निर्णय वाचा'}</span>
+                        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Copyright Policy (कॉपीराइट धोरण - फुटरच्या अगदी वर लहान अक्षरात) */}
+        <div className="mt-12 pt-6 border-t border-slate-200">
+          <div className="bg-slate-100/80 border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-2xs">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+              <h4 className="font-serifDevanagari text-xs sm:text-sm font-bold text-[#0b1e36]">
+                कॉपीराइट धोरण (Copyright Policy)
+              </h4>
+            </div>
+
+            <p className="text-[11px] sm:text-xs text-slate-700 leading-relaxed font-medium mb-3">
+              या संकेतस्थळावरील सर्व मजकूर, लोगो, परिपत्रके, छायाचित्रे आणि डिजिटल साहित्य हे 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ' यांच्या मालकीचे असून ते कॉपीराइट कायद्यानुसार संरक्षित आहे.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-200 text-[11px] sm:text-xs text-slate-600 leading-relaxed">
+              <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
+                <span className="font-bold text-[#0b1e36] block">● वापराची मर्यादा:</span>
+                <p>या संकेतस्थळावरील माहिती केवळ केंद्रप्रमुख, अधिकारी, शिक्षक आणि शैक्षणिक संदर्भासाठी माहितीच्या उद्देशाने वापरता येईल.</p>
               </div>
 
-              <h2 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#09243f] leading-snug">
-                {selectedNews.title}
+              <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
+                <span className="font-bold text-[#0b1e36] block">● परवानगीशिवाय पुनर्वापर मनाई:</span>
+                <p>महासंघाच्या पूर्वपरवानगीशिवाय या संकेतस्थळावरील कोणताही मजकूर, लोगो किंवा डेटा व्यावसायिक कारणांसाठी कॉपी करणे, विकृत करणे अथवा पुनरुत्पादित करण्यास सक्त मनाई आहे.</p>
+              </div>
+
+              <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
+                <span className="font-bold text-[#0b1e36] block">● अधिकृतता:</span>
+                <p>संकेतस्थळावर प्रसिद्ध करण्यात आलेली परिपत्रके व सूचना संबंधित शासकीय विभागाच्या मूळ आदेशांशी सुसंगत असतील; कोणत्याही कायदेशीर बाबींसाठी मूळ शासकीय राजपत्राचा/परिपत्रकाचा आधार घ्यावा.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Read News / View Photo Modal (सविस्तर बातमी व वर फोटो) */}
+      {selectedNews && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="p-5 bg-[#0b1e36] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-amber-400" />
+                <span className="text-xs font-semibold text-amber-300">
+                  {selectedNews.category} · {toEnglishDigits(selectedNews.date)}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedNews(null)}
+                className="text-slate-300 hover:text-white p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4">
+              {/* वर फोटो (Photo on Top) */}
+              {(selectedNews.imageUrl || selectedNews.image) && (
+                <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xs">
+                  <img
+                    src={selectedNews.imageUrl || selectedNews.image}
+                    alt={selectedNews.title}
+                    className="w-full max-h-[440px] object-contain mx-auto bg-slate-950/5"
+                    loading="lazy"
+                  />
+                  <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-700">
+                    <span className="font-semibold text-slate-600 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                      <span>अधिकृत छायाचित्र / परिपत्रक</span>
+                    </span>
+                    <a
+                      href={selectedNews.imageUrl || selectedNews.image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-800 hover:text-amber-950 font-bold underline flex items-center gap-1 text-[11px]"
+                    >
+                      <span>मोठ्या आकारात पहा</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* खाली बातमी शीर्षक व मजकूर */}
+              <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36] leading-snug">
+                {toEnglishDigits(selectedNews.title)}
               </h2>
 
-              <div className="w-12 h-1 bg-[#df6b16] rounded-full"></div>
+              {selectedNews.summary && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-900 leading-relaxed">
+                  {toEnglishDigits(selectedNews.summary)}
+                </div>
+              )}
 
-              <p className="text-sm sm:text-base font-medium text-[#102a43] leading-relaxed bg-[#fbf8f2] p-4 rounded-lg border border-[#e7ded1]">
-                {selectedNews.summary}
-              </p>
+              {selectedNews.content && (
+                <div className="text-sm text-slate-700 leading-relaxed space-y-3 whitespace-pre-line font-normal">
+                  {toEnglishDigits(selectedNews.content)}
+                </div>
+              )}
+            </div>
 
-              <div className="text-sm text-[#536477] leading-relaxed whitespace-pre-line space-y-3 pt-2">
-                {selectedNews.content}
-              </div>
-
-              <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs text-[#607184]">
-                  महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
-                </span>
-                <button
-                  onClick={() => setSelectedNews(null)}
-                  className="bg-[#09243f] text-white hover:bg-[#102a43] px-5 py-2 rounded text-xs font-bold transition-colors"
-                >
-                  बंद करा
-                </button>
-              </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500 font-mono">
+                {selectedNews.id}
+              </span>
+              <button
+                onClick={() => setSelectedNews(null)}
+                className="bg-[#0b1e36] hover:bg-[#132f52] text-white text-xs font-bold px-5 py-2 rounded-lg"
+              >
+                बंद करा
+              </button>
             </div>
           </div>
         </div>
