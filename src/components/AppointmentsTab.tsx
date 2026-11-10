@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
-  SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD
+  SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
+  DEFAULT_APPOINTED_POSTS
 } from '../data/rkMaharashtraData';
 import {
   fetchOfficials, saveOfficialToRtdb, deleteOfficialFromRtdb,
@@ -167,9 +168,9 @@ export const AppointmentsTab: React.FC = () => {
     return formPost.includes('तालुका');
   }, [postsList, formPost]);
 
-  // District Filtered Officials List
+  // District Filtered & Rank-Sorted Officials List (Sorted by Dropdown Post Hierarchy)
   const districtOfficials = useMemo(() => {
-    return officials.filter((m) => {
+    const list = officials.filter((m) => {
       if (m.district === currentDistrict) return true;
       // Handle Ahilyanagar / Ahmadnagar alias
       if (
@@ -180,7 +181,30 @@ export const AppointmentsTab: React.FC = () => {
       }
       return false;
     });
-  }, [officials, currentDistrict]);
+
+    const rankList = (postsList && postsList.length > 0)
+      ? postsList.map((p) => p.name)
+      : DEFAULT_APPOINTED_POSTS.map((p) => p.name);
+
+    const getRank = (postName: string) => {
+      if (!postName) return 999;
+      const cleanPost = postName.trim();
+      const exactIdx = rankList.findIndex((p) => p === cleanPost);
+      if (exactIdx !== -1) return exactIdx;
+      const partialIdx = rankList.findIndex((p) => cleanPost.includes(p) || p.includes(cleanPost));
+      if (partialIdx !== -1) return partialIdx;
+      return 999;
+    };
+
+    return [...list].sort((a, b) => {
+      const rankA = getRank(a.appointedPost);
+      const rankB = getRank(b.appointedPost);
+      if (rankA !== rankB) return rankA - rankB;
+      const nameA = `${a.firstName} ${a.lastName}`;
+      const nameB = `${b.firstName} ${b.lastName}`;
+      return nameA.localeCompare(nameB, 'mr');
+    });
+  }, [officials, currentDistrict, postsList]);
 
   // Searched Officials
   const searchedOfficials = useMemo(() => {
@@ -503,7 +527,7 @@ export const AppointmentsTab: React.FC = () => {
       return;
     }
 
-    const finalCadre = formCadre === 'इतर' ? (customCadreInput.trim() || 'इतर') : formCadre;
+    const finalCadre = (formCadre === 'इतर' || formCadre === 'इतर स्वतः टाईप करा') ? (customCadreInput.trim() || 'इतर') : formCadre;
     const finalTaluka = isPostNeedsTaluka ? formTaluka : (formWorkingTaluka || formTaluka);
 
     const memberId = editingMemberId || String(Date.now());
@@ -760,8 +784,7 @@ export const AppointmentsTab: React.FC = () => {
     const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`;
     const place = m.taluka ? `${m.taluka}, जिल्हा - ${m.district}` : `जिल्हा - ${m.district}`;
 
-    const text = `*महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ*\n` +
-      `नोंदणी क्र. महा/एनएसके/एन/2427\n\n` +
+    const text = `*महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ*\n\n` +
       `॥ *अधिकृत नियुक्ती पत्र* ॥\n` +
       `नियुक्ती पत्र क्र.: MS/2026/${serialPadded}\n\n` +
       `हार्दिक अभिनंदन! 🎉\n` +
@@ -944,26 +967,29 @@ export const AppointmentsTab: React.FC = () => {
                     return (
                       <div
                         key={m.id}
-                        className="bg-white rounded-xl p-3.5 border border-[#e2e8f0] shadow-xs flex flex-col gap-2"
+                        className="bg-white rounded-xl p-3 sm:p-3.5 border border-[#e2e8f0] shadow-xs flex flex-col gap-1.5 hover:border-[#d4af37] transition-all"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="w-6 h-6 rounded-full bg-[#0f172a] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                        {/* Line 1: Serial + Name, with Golden Badge strictly BELOW name */}
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-6 h-6 rounded-full bg-[#0f172a] text-[#fde68a] text-xs font-bold flex items-center justify-center shrink-0 font-mono mt-0.5">
                             {idx + 1}
                           </div>
-                          <div className="text-base font-extrabold text-[#0f2b48] flex-1 leading-snug">
-                            {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm sm:text-base font-extrabold text-[#0f2b48] leading-snug">
+                              {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                            </div>
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-[#fffbeb] via-[#fef3c7] to-[#fde68a] text-[#851216] border border-[#d4af37] px-2.5 py-0.5 rounded-full text-xs font-extrabold shadow-2xs">
+                                ⭐ {displayPost}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
+                        {/* Line 2 & 3: Currently held post & working place / details */}
                         <div className="text-xs text-[#475569] font-medium leading-relaxed pl-8">
-                          <div><strong className="text-slate-800">सध्याचे पद:</strong> {cadre}</div>
-                          {details && <div className="text-slate-500">{details}</div>}
-                        </div>
-
-                        <div className="pl-8 pt-1">
-                          <span className="inline-block bg-gradient-to-r from-[#fffbeb] to-[#fef3c7] text-[#851216] border border-[#d4af37] px-3 py-1 rounded-full text-xs font-extrabold shadow-xs">
-                            ⭐ {displayPost}
-                          </span>
+                          <span className="text-slate-800 font-bold">सध्याचे पद:</span> {cadre}
+                          {details && <span className="text-slate-500"> · {details}</span>}
                         </div>
                       </div>
                     );
@@ -976,9 +1002,8 @@ export const AppointmentsTab: React.FC = () => {
                     <thead className="bg-[#f8fafc] text-[#0f172a] uppercase font-extrabold border-b border-slate-200">
                       <tr>
                         <th className="py-3 px-4 w-12 text-center">अनु.</th>
-                        <th className="py-3 px-4 text-sm">पदाधिकाऱ्याचे संपूर्ण नाव</th>
+                        <th className="py-3 px-4 text-sm">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
                         <th className="py-3 px-4">सध्याचे पद व कार्यक्षेत्र</th>
-                        <th className="py-3 px-4">महासंघातील बहाल केलेले पद</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -988,21 +1013,23 @@ export const AppointmentsTab: React.FC = () => {
                         const details = [m.workingPlace, m.taluka ? `ता. ${m.taluka}` : ''].filter(Boolean).join(', ');
 
                         return (
-                          <tr key={m.id} className="hover:bg-amber-50/30">
+                          <tr key={m.id} className="hover:bg-amber-50/30 transition-colors">
                             <td className="py-3 px-4 text-center font-bold text-slate-600 font-serif">
                               {idx + 1}
                             </td>
-                            <td className="py-3 px-4 font-bold text-[#0f2b48] text-sm">
-                              {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                            <td className="py-3 px-4">
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="font-extrabold text-[#0f2b48] text-sm sm:text-base leading-snug">
+                                  {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                                </span>
+                                <span className="inline-flex items-center gap-1 bg-gradient-to-r from-[#fffbeb] via-[#fef3c7] to-[#fde68a] text-[#851216] border border-[#d4af37] px-2.5 py-0.5 rounded-full text-xs font-extrabold shadow-2xs">
+                                  ⭐ {displayPost}
+                                </span>
+                              </div>
                             </td>
                             <td className="py-3 px-4 text-slate-600">
                               <strong className="text-slate-800 block text-xs">{cadre}</strong>
-                              <span className="text-[11px] text-slate-500">{details}</span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="inline-block bg-gradient-to-r from-[#fffbeb] to-[#fef3c7] text-[#851216] border border-[#d4af37] px-3 py-1 rounded-full text-xs font-extrabold shadow-xs">
-                                ⭐ {displayPost}
-                              </span>
+                              <span className="text-xs text-slate-500">{details}</span>
                             </td>
                           </tr>
                         );
@@ -1074,29 +1101,33 @@ export const AppointmentsTab: React.FC = () => {
                     return (
                       <div
                         key={m.id}
-                        className="bg-white rounded-xl p-3.5 border border-[#e2e8f0] shadow-xs flex flex-col gap-2"
+                        className="bg-white rounded-xl p-3 sm:p-3.5 border border-[#e2e8f0] shadow-xs flex flex-col gap-1.5 hover:border-[#d4af37] transition-all"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="w-6 h-6 rounded-full bg-[#0f172a] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                        {/* Line 1: Serial + Name, with Golden Badge strictly BELOW name */}
+                        <div className="flex items-start gap-2.5">
+                          <div className="w-6 h-6 rounded-full bg-[#0f172a] text-[#fde68a] text-xs font-bold flex items-center justify-center shrink-0 font-mono mt-0.5">
                             {idx + 1}
                           </div>
-                          <div className="text-base font-extrabold text-[#0f2b48] flex-1 leading-snug">
-                            {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm sm:text-base font-extrabold text-[#0f2b48] leading-snug">
+                              {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                            </div>
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-[#fffbeb] via-[#fef3c7] to-[#fde68a] text-[#851216] border border-[#d4af37] px-2.5 py-0.5 rounded-full text-xs font-extrabold shadow-2xs">
+                                ⭐ {displayPost}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
+                        {/* Line 2: Currently held post & working place */}
                         <div className="text-xs text-[#475569] font-medium leading-relaxed pl-8 space-y-0.5">
                           <div><strong>सध्याचे पद:</strong> {cadre} ({details})</div>
                           <div><strong>मोबाईल:</strong> {m.mobile}</div>
                         </div>
 
-                        <div className="pl-8 pt-1">
-                          <span className="inline-block bg-gradient-to-r from-[#fffbeb] to-[#fef3c7] text-[#851216] border border-[#d4af37] px-3 py-1 rounded-full text-xs font-extrabold shadow-xs">
-                            ⭐ {displayPost}
-                          </span>
-                        </div>
-
-                        <div className="pl-8 pt-2 flex gap-2 border-t border-slate-100 mt-1">
+                        {/* Line 3: Action Buttons */}
+                        <div className="pl-8 pt-1.5 flex gap-2 border-t border-slate-100 mt-0.5">
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(m)}
@@ -1124,9 +1155,8 @@ export const AppointmentsTab: React.FC = () => {
                   <thead className="bg-[#f8fafc] text-slate-700 uppercase font-bold border-b border-slate-200">
                     <tr>
                       <th className="py-3 px-4 w-12 text-center">अनु.</th>
-                      <th className="py-3 px-4">पदाधिकाऱ्याचे नाव</th>
+                      <th className="py-3 px-4 text-sm">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
                       <th className="py-3 px-4">सध्याचे पद व कार्यक्षेत्र</th>
-                      <th className="py-3 px-4">बहाल केलेले पद</th>
                       <th className="py-3 px-4">व्हॉट्सअ‍ॅप नंबर</th>
                       <th className="py-3 px-4 text-center w-28">कृती</th>
                     </tr>
@@ -1134,50 +1164,56 @@ export const AppointmentsTab: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                     {districtOfficials.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-500">
+                        <td colSpan={5} className="py-8 text-center text-slate-500">
                           या जिल्ह्यात कोणतेही पदाधिकारी नोंदवलेले नाहीत. कृपया 'नवीन पदाधिकारी जोडा' वर क्लिक करा.
                         </td>
                       </tr>
                     ) : (
-                      districtOfficials.map((m, idx) => (
-                        <tr key={m.id} className="hover:bg-slate-50">
-                          <td className="py-3 px-4 text-center font-bold text-slate-500 font-serif">
-                            {idx + 1}
-                          </td>
-                          <td className="py-3 px-4 font-bold text-[#09243f]">
-                            {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
-                          </td>
-                          <td className="py-3 px-4 text-slate-600">
-                            {m.currentCadre} ({m.workingPlace})
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-extrabold text-[#df6b16]">
-                              {m.appointedPost} {m.taluka ? `(${m.taluka})` : ''}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 font-semibold text-slate-700 font-serif">
-                            {m.mobile}
-                          </td>
-                          <td className="py-3 px-4 text-center space-x-1.5 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(m)}
-                              className="bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold p-1.5 rounded text-xs inline-flex items-center active:scale-95 transition-all"
-                              title="दुरुस्त करा"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteMember(m)}
-                              className="bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold p-1.5 rounded text-xs inline-flex items-center active:scale-95 transition-all"
-                              title="वगळा"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                      districtOfficials.map((m, idx) => {
+                        const displayPost = m.taluka ? `${m.appointedPost} (${m.taluka} तालुका)` : m.appointedPost;
+                        return (
+                          <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-3 px-4 text-center font-bold text-slate-500 font-serif">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="font-extrabold text-[#09243f] text-sm sm:text-base leading-snug">
+                                  {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                                </span>
+                                <span className="inline-flex items-center gap-1 bg-gradient-to-r from-[#fffbeb] via-[#fef3c7] to-[#fde68a] text-[#851216] border border-[#d4af37] px-2.5 py-0.5 rounded-full text-xs font-extrabold shadow-2xs">
+                                  ⭐ {displayPost}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600">
+                              <strong className="text-slate-800 block text-xs">{m.currentCadre}</strong>
+                              <span className="text-xs text-slate-500">{m.workingPlace}</span>
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-slate-700 font-serif">
+                              {m.mobile}
+                            </td>
+                            <td className="py-3 px-4 text-center space-x-1.5 whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditModal(m)}
+                                className="bg-[#f59e0b] hover:bg-[#d97706] text-white font-bold p-1.5 rounded text-xs inline-flex items-center active:scale-95 transition-all"
+                                title="दुरुस्त करा"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMember(m)}
+                                className="bg-[#ef4444] hover:bg-[#dc2626] text-white font-bold p-1.5 rounded text-xs inline-flex items-center active:scale-95 transition-all"
+                                title="वगळा"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1271,7 +1307,7 @@ export const AppointmentsTab: React.FC = () => {
                   title="राज्यस्तरीय 1 ते शेवटपर्यंत नोंदवही PDF"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  राज्य नोंदवही
+                  नियुक्ती क्रमांकानुसार माहिती
                 </button>
 
                 {/* 7. राज्याध्यक्ष पासवर्ड बदला */}
@@ -2078,12 +2114,12 @@ export const AppointmentsTab: React.FC = () => {
                     className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                   >
                     <option value="केंद्रप्रमुख">केंद्रप्रमुख</option>
-                    <option value="विस्तार अधिकारी">विस्तार अधिकारी</option>
-                    <option value="मुख्याध्यापक">मुख्याध्यापक</option>
-                    <option value="इतर">इतर (स्वतः टाईप करा)</option>
+                    <option value="शिक्षण विस्तार अधिकारी">शिक्षण विस्तार अधिकारी</option>
+                    <option value="गटशिक्षणाधिकारी">गटशिक्षणाधिकारी</option>
+                    <option value="इतर स्वतः टाईप करा">इतर स्वतः टाईप करा</option>
                   </select>
                 </div>
-                {formCadre === 'इतर' && (
+                {(formCadre === 'इतर' || formCadre === 'इतर स्वतः टाईप करा') && (
                   <div>
                     <label className="font-bold block mb-1">सध्याचे पद टाईप करा *</label>
                     <input

@@ -13,19 +13,25 @@ import { AppointmentsTab } from './components/AppointmentsTab';
 import {
   INITIAL_NEWS,
   INITIAL_APPLICATIONS,
+  INITIAL_GOV_ORDERS,
   NewsItem,
   MembershipApplication,
+  GovOrder,
 } from './data/mahasanghData';
 import {
   testConnectionOncePerSession,
   fetchNewsCached,
+  fetchGovOrders,
   saveNewsToFirestore,
   saveApplicationToFirestore,
   trackSingleApplicationInFirestore,
   fetchApplicationsForAdmin,
   approveApplicationInFirestore,
+  rejectApplicationInFirestore,
+  deleteApplicationFromFirestore,
   saveContactToFirestore,
   deleteNewsFromFirestore,
+  sortNewsDescending,
 } from './firebase';
 
 function isPathAdminRoute(): boolean {
@@ -52,15 +58,17 @@ export function App() {
     return INITIAL_APPLICATIONS;
   });
 
-  // News state (Starts from local storage or cached data)
+  const [govOrders, setGovOrders] = useState<GovOrder[]>([]);
+
+  // News state (Starts from local storage or cached data, always newest first)
   const [newsList, setNewsList] = useState<NewsItem[]>(() => {
     try {
       const saved = localStorage.getItem('mahasangh_news_cache_v2');
-      if (saved) return JSON.parse(saved);
+      if (saved) return sortNewsDescending(JSON.parse(saved));
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_NEWS;
+    return sortNewsDescending(INITIAL_NEWS);
   });
 
   // Listen to browser URL changes (e.g. /admin or #admin)
@@ -103,8 +111,10 @@ export function App() {
       try {
         const news = await fetchNewsCached(false);
         setNewsList(news);
+        const govOrders = await fetchGovOrders();
+        setGovOrders(govOrders);
       } catch (err) {
-        console.warn('News cache init error:', err);
+        console.warn('Data init error:', err);
       }
     };
 
@@ -216,12 +226,49 @@ export function App() {
     }
   };
 
-  // Admin: Add news (Single write)
-  const handleAddNews = async (newNews: NewsItem) => {
-    setNewsList((prev) => [newNews, ...prev.filter((x) => x.id !== newNews.id)]);
+  // Admin: Reject application (Single write)
+  const handleRejectApplication = async (id: string, reason: string) => {
+    setApplications((prev) =>
+      prev.map((app) =>
+        app.id === id
+          ? {
+              ...app,
+              status: 'rejected',
+              rejectReason: reason,
+              rejectedAt: new Date().toISOString(),
+            }
+          : app
+      )
+    );
 
     try {
-      await saveNewsToFirestore(newNews);
+      await rejectApplicationInFirestore(id, reason);
+    } catch (err) {
+      console.warn('Rejected locally, Firestore sync error:', err);
+    }
+  };
+
+  // Admin: Delete application permanently
+  const handleDeleteApplication = async (id: string) => {
+    setApplications((prev) => prev.filter((app) => app.id !== id));
+
+    try {
+      await deleteApplicationFromFirestore(id);
+    } catch (err) {
+      console.warn('Deleted locally, Firestore sync error:', err);
+    }
+  };
+
+  // Admin: Add news (Single write, sorted newest first)
+  const handleAddNews = async (newNews: NewsItem) => {
+    const itemWithTime = {
+      ...newNews,
+      createdAt: newNews.createdAt || new Date().toISOString(),
+    };
+    setNewsList((prev) => sortNewsDescending([itemWithTime, ...prev.filter((x) => x.id !== newNews.id)]));
+
+    try {
+      await saveNewsToFirestore(itemWithTime);
     } catch (err) {
       console.warn('Saved news locally, Firestore sync error:', err);
     }
@@ -230,7 +277,7 @@ export function App() {
   // Admin: Update existing news / circular
   const handleUpdateNews = async (updatedNews: NewsItem) => {
     setNewsList((prev) =>
-      prev.map((item) => (item.id === updatedNews.id ? updatedNews : item))
+      sortNewsDescending(prev.map((item) => (item.id === updatedNews.id ? updatedNews : item)))
     );
 
     try {
@@ -284,9 +331,13 @@ export function App() {
       <AdminTab
         applications={applications}
         onApproveApplication={handleApproveApplication}
+        onRejectApplication={handleRejectApplication}
+        onDeleteApplication={handleDeleteApplication}
         onAddNews={handleAddNews}
         onUpdateNews={handleUpdateNews}
         onDeleteNews={handleDeleteNews}
+        govOrders={govOrders}
+        setGovOrders={setGovOrders}
         newsList={newsList}
         onFetchApplications={handleFetchAdminApplications}
         isLoadingApps={isLoadingAdminApps}
@@ -321,6 +372,7 @@ export function App() {
         {currentTab === 'news' && (
           <NewsTab
             newsList={newsList}
+            govOrders={govOrders}
             selectedNews={selectedNews}
             setSelectedNews={setSelectedNews}
             onRefreshNews={handleRefreshNews}

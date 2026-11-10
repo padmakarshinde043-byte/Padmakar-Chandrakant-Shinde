@@ -72,44 +72,39 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
     return region.includes(term) || name.includes(term);
   });
 
-  // Executive Leader Capsule: Full-height photo on left, 3 bold rows on right: Name, Role, District/Region
+  // Executive Leader Capsule: Well-balanced card, perfectly proportioned photo without top/bottom empty gaps
   const renderLeaderCard = (leader: Leader, _categoryBadge?: string) => (
     <div
       key={(leader.id || leader.name) + leader.region}
-      className="bg-white rounded-xl border border-slate-200 shadow-xs hover:border-amber-500 hover:shadow-md transition-all flex items-stretch overflow-hidden group min-h-[92px]"
+      className="bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col items-center p-3.5 text-center group overflow-hidden"
     >
-      {/* Left Column: Full-height Leader Photo */}
-      <div className="w-24 sm:w-28 shrink-0 bg-slate-100 flex items-center justify-center relative overflow-hidden border-r border-slate-200/80">
+      {/* Leader Photo Container - Proportioned height for full headshot visibility on Desktop & Mobile */}
+      <div className="w-full h-48 sm:h-60 lg:h-68 bg-slate-100 flex items-center justify-center mb-3 rounded-lg overflow-hidden border border-slate-200/80 group-hover:border-amber-200 transition-all relative shrink-0">
         {leader.photo ? (
           <img
             src={leader.photo}
             alt={leader.name}
-            className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover object-top"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 text-slate-400 p-2">
-            <ImageIcon className="w-6 h-6 mb-0.5 opacity-60" />
-            <span className="text-[9px] font-bold text-slate-400">फोटो</span>
+          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/70">
+            <ImageIcon className="w-8 h-8 opacity-40" />
+            <span className="text-[10px] font-bold mt-1 text-slate-400">फोटो नाही</span>
           </div>
         )}
       </div>
 
-      {/* Right Column: Exactly 3 bold rows - Name, Role, District/Region */}
-      <div className="flex-1 p-3 sm:p-3.5 flex flex-col justify-center min-w-0 space-y-1">
-        {/* Row 1: Name */}
-        <div className="font-serifDevanagari text-xs sm:text-sm font-bold text-[#0b1e36] truncate leading-tight group-hover:text-amber-800 transition-colors">
+      {/* Leader Details - Well-Balanced Typography */}
+      <div className="flex-1 w-full space-y-1 flex flex-col justify-center">
+        <h5 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] leading-snug group-hover:text-amber-800 transition-colors">
           {leader.name}
-        </div>
-
-        {/* Row 2: Post / Role */}
-        <div className="text-[11px] sm:text-xs font-bold text-amber-800 truncate leading-tight">
+        </h5>
+        <p className="text-xs sm:text-sm font-bold text-amber-800 tracking-wide">
           {leader.role}
-        </div>
-
-        {/* Row 3: District or Division */}
-        <div className="text-[11px] sm:text-xs font-bold text-slate-700 truncate leading-tight">
+        </p>
+        <p className="text-xs sm:text-sm font-semibold text-slate-600">
           {leader.region}
-        </div>
+        </p>
       </div>
     </div>
   );
@@ -118,16 +113,13 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
     <div className="bg-slate-50 py-10 md:py-16 text-slate-800">
       {/* Page Header */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-10">
-        <div className="border-b border-slate-200 pb-6">
+        <div className="border-b-2 border-[#102a43] pb-6">
           <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
             नेतृत्व व पदाधिकारी सूची
           </span>
           <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-extrabold text-[#0b1e36] mt-1">
             महासंघाची राज्य, विभागीय व जिल्हा कार्यकारिणी
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-3xl leading-relaxed">
-            अनुभवी, समर्पित आणि ध्येयवादी नेतृत्वाच्या मार्गदर्शनाखाली संपूर्ण महाराष्ट्रात अखंडपणे सुरू असलेले संघटन कार्य.
-          </p>
         </div>
       </div>
 
@@ -170,69 +162,52 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
                   <Phone className="w-3.5 h-3.5" />
                   <span>थेट संपर्क: {ORG_DETAILS.founderPresident.phone}</span>
                 </a>
-                <span className="text-slate-300">
-                  कार्यालय: मालेगाव (जि. नाशिक)
-                </span>
               </div>
             </div>
           </div>
         </section>
 
         {/* Section 2: राज्य कार्यकारिणी */}
-        <section>
-          <div className="mb-4 pb-2 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
-                राज्यस्तरीय मंडळ
-              </span>
-              <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-                राज्य कार्यकारिणी
-              </h3>
-            </div>
-            <span className="text-xs text-slate-500 font-medium hidden sm:inline-block">
-              एकूण: <strong className="font-mono text-[#0b1e36]">{stateExecutive.length}</strong> प्रमुख पदाधिकारी
+        <section className="bg-white p-6 rounded-2xl border-l-8 border-amber-600 shadow-sm">
+          <div className="mb-8 flex items-center justify-between">
+            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+              राज्य कार्यकारिणी
+            </h3>
+            <span className="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
+              एकूण: <strong className="font-mono text-[#0b1e36]">{stateExecutive.length}</strong>
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {stateExecutive.map((leader) => renderLeaderCard(leader, 'राज्य कार्यकारिणी'))}
           </div>
         </section>
 
         {/* Section 3: Divisional Executive */}
-        <section>
-          <div className="mb-4 pb-2 border-b border-slate-200">
-            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
-              विभागीय समन्वय
-            </span>
-            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
+        <section className="bg-white p-6 rounded-2xl border-l-8 border-blue-600 shadow-sm">
+          <div className="mb-8">
+            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
               विभागीय कार्यकारिणी
             </h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {divisional.map((leader) => renderLeaderCard(leader, 'विभागीय कार्यकारिणी'))}
           </div>
         </section>
 
-        {/* Section 4: District Presidents with Live Search */}
-        <section className="bg-white p-5 sm:p-7 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-3 border-b border-slate-200">
+        {/* Section 4: District Presidents */}
+        <section className="bg-white p-6 rounded-2xl border-l-8 border-emerald-600 shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
-                जिल्हास्तरीय नेतृत्व
-              </span>
-              <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-                महाराष्ट्रातील सर्व 34 जिल्ह्यांचे अध्यक्ष
+              <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+                जिल्हा अध्यक्ष
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                आपल्या जिल्ह्याच्या अध्यक्षांशी थेट संपर्क साधून महासंघाशी जोडले जा.
-              </p>
             </div>
 
             <div className="relative w-full md:w-72">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="जिल्हा किंवा नाव शोधा..."
+                placeholder="जिल्हा शोधा..."
                 value={districtSearch}
                 onChange={(e) => setDistrictSearch(e.target.value)}
                 className="w-full text-xs pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 bg-slate-50"
@@ -240,28 +215,25 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredDistricts.length > 0 ? (
               filteredDistricts.map((leader) => renderLeaderCard(leader, 'जिल्हा अध्यक्ष'))
             ) : (
               <div className="col-span-full py-8 text-center text-xs text-slate-500">
-                '{districtSearch}' या शोधानुसार कोणताही जिल्हा किंवा अध्यक्ष आढळला नाही.
+                कोणताही जिल्हा आढळला नाही.
               </div>
             )}
           </div>
         </section>
 
         {/* Section 5: Advisory Board */}
-        <section>
-          <div className="mb-4 pb-2 border-b border-slate-200">
-            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
-              मार्गदर्शन
-            </span>
-            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
+        <section className="bg-white p-6 rounded-2xl border-l-8 border-purple-600 shadow-sm">
+          <div className="mb-8">
+            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
               सल्लागार मंडळ
             </h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {advisory.map((leader) => renderLeaderCard(leader))}
           </div>
         </section>

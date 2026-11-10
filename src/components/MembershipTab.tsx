@@ -39,6 +39,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [education, setEducation] = useState('');
   const [professionalQualification, setProfessionalQualification] = useState('');
   const [professional, setProfessional] = useState('');
+  const [customProfessional, setCustomProfessional] = useState('');
   
   // Passport photo (<200KB base64) with live preview
   const [photoDataUrl, setPhotoDataUrl] = useState<string>('');
@@ -58,11 +59,24 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
   // Submission & Tracking
   const [submittedApp, setSubmittedApp] = useState<MembershipApplication | null>(null);
+  const submittedAppRef = useRef<HTMLDivElement | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<MembershipApplication | null | 'not_found'>(null);
   const [isDownloadingCert, setIsDownloadingCert] = useState<boolean>(false);
   const [formAlert, setFormAlert] = useState<string>('');
   const [declarationAccepted, setDeclarationAccepted] = useState<boolean>(false);
+
+  // Available talukas dynamically populated based on selected district
+  const availableTalukas = useMemo(() => {
+    return district ? (DISTRICT_TALUKAS_MAP[district] || []) : [];
+  }, [district]);
+
+  // Scroll to submission banner at bottom when submittedApp is set
+  useEffect(() => {
+    if (submittedApp && submittedAppRef.current) {
+      submittedAppRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [submittedApp]);
 
   // Load officials from RTDB for automatic matching
   useEffect(() => {
@@ -200,8 +214,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     e.preventDefault();
     setFormAlert('');
 
-    if (!salutation || !fullName.trim() || !phone.trim() || !email.trim() || !address.trim() || !education.trim() || !professionalQualification.trim() || !professional.trim() || !district) {
-      setFormAlert('कृपया सर्व आवश्यक (*) माहिती अचूकपणे भरा.');
+    if (!salutation || !fullName.trim() || !phone.trim() || !email.trim() || !address.trim() || !education.trim() || !professionalQualification.trim() || !professional.trim() || !district || !taluka) {
+      setFormAlert('कृपया सर्व आवश्यक (*) माहिती (जिल्हा व तालुक्यासह) अचूकपणे निवडा व भरा.');
       return;
     }
 
@@ -209,7 +223,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     const invalidFields: string[] = [];
     if (hasEnglishLetters(fullName)) invalidFields.push('संपूर्ण नाव');
     if (hasEnglishLetters(address)) invalidFields.push('पत्ता / कार्यक्षेत्र');
-    if (hasEnglishLetters(taluka)) invalidFields.push('तालुका');
     if (hasEnglishLetters(hobby)) invalidFields.push('छंद');
 
     if (invalidFields.length > 0) {
@@ -240,11 +253,12 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       email: email.trim(),
       address: address.trim(),
       district: district,
+      taluka: taluka,
       familyMembers: toEnglishDigits(familyMembers.trim()),
       hobby: hobby.trim(),
       education,
       professionalQualification,
-      professional,
+      professional: (professional === 'इतर स्वतः टाईप करा' || professional === 'इतर') ? (customProfessional.trim() || 'इतर') : professional,
       status: 'pending',
       createdAt: new Date().toISOString(),
       photo: photoDataUrl,
@@ -323,15 +337,15 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   };
 
   return (
-    <div className="bg-[#f7f9fc] py-8 sm:py-12 md:py-16">
+    <div className="bg-[#f7f9fc] py-6 sm:py-10">
       <div className="max-w-[1000px] mx-auto px-4">
         {/* Hero Section */}
-        <div className="bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white rounded-2xl p-6 sm:p-10 mb-8 shadow-md border-t-4 border-[#efb24b]">
+        <div className="bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white rounded-2xl p-5 sm:p-8 mb-6 shadow-md border-t-4 border-[#efb24b]">
           <div className="flex items-center gap-2 text-xs font-bold text-[#f8d39b] mb-2 uppercase tracking-wider">
             <UserCheck className="w-4 h-4 text-[#efb24b]" />
             महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
           </div>
-          <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
+          <h1 className="font-serifDevanagari text-2xl sm:text-3xl font-bold mb-2">
             नवीन सदस्यत्व नोंदणी अर्ज
           </h1>
           <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-2xl">
@@ -448,8 +462,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="mt-3 text-xs text-slate-600">
-                  आपला अर्ज प्राप्त झाला असून पडताळणीची प्रक्रिया सुरू आहे. कृपया आपल्या जिल्हाध्यक्षांकडे ₹500 शुल्क पाठवल्याची खात्री करा.
+                <div className="mt-3 text-xs text-slate-700 font-medium">
+                  आपला अर्ज प्राप्त झाला असून पडताळणीची प्रक्रिया सुरू आहे. कृपया आपल्या जिल्हाध्यक्षांकडे <strong>₹220 शुल्क</strong> (आजीवन सदस्यत्व ₹100 + वार्षिक वर्गणी ₹120) पाठवल्याची खात्री करा.
                 </div>
               )}
             </div>
@@ -463,34 +477,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           )}
         </div>
 
-        {/* Success Banner After Submission */}
-        {submittedApp && (
-          <div className="bg-[#ecfdf3] border-2 border-[#a7e5bd] text-[#14532d] rounded-xl p-6 mb-8 shadow-sm">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="space-y-2">
-                <h3 className="font-serifDevanagari text-lg font-bold">
-                  आपला सदस्यत्व अर्ज यशस्वीपणे नोंदवला गेला आहे!
-                </h3>
-                <p className="text-xs sm:text-sm">
-                  आपला अर्ज क्रमांक: <strong className="text-base text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-300">{submittedApp.applicationNumber}</strong>
-                </p>
-                <p className="text-xs text-emerald-800 leading-relaxed">
-                  "महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" या संघटनेसाठी आजीवन सदस्यत्व फी 100 रुपये व वार्षिक वर्गणी 120 रुपये खालील अधिकृत खात्यावर जमा करावी:<br />
-                  <strong className="text-emerald-950 font-mono">KENDRAPRAMUKH V ADHIKARI MAHASNAGH | Ac. No. 60597730518 | IFSC: MAHB0002075</strong>
-                </p>
-                <div className="pt-2 flex gap-3">
-                  <button
-                    onClick={() => setSubmittedApp(null)}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2 rounded flex items-center gap-1.5"
-                  >
-                    नवीन अर्ज भरा
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Main Application Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -681,25 +668,22 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
               <div>
                 <label className="font-bold text-[#172033] block mb-1">
-                  तालुका (उपलब्ध असल्यास)
-                  <span className="text-[11px] font-bold text-[#df6b16] ml-1.5">(फक्त मराठीत)</span>
+                  तालुका निवडा <span className="text-[#df6b16]">*</span>
                 </label>
-                <input
-                  type="text"
+                <select
                   value={taluka}
                   onChange={(e) => setTaluka(e.target.value)}
-                  placeholder="उदा. मालेगाव"
-                  className={`w-full p-2.5 bg-white border rounded-lg focus:outline-none transition-colors ${
-                    hasEnglishLetters(taluka)
-                      ? 'border-rose-500 bg-rose-50/30 focus:border-rose-600'
-                      : 'border-[#c8d2e2] focus:border-[#df6b16]'
-                  }`}
-                />
-                {hasEnglishLetters(taluka) && (
-                  <p className="text-[11px] text-rose-600 font-bold mt-1">
-                    ⚠️ कृपया तालुका फक्त मराठीत लिहा.
-                  </p>
-                )}
+                  required
+                  disabled={!district}
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16] disabled:bg-slate-100 disabled:cursor-not-allowed font-medium text-[#172033]"
+                >
+                  <option value="">{district ? '-- तालुका निवडा --' : '-- आधी जिल्हा निवडा --'}</option>
+                  {availableTalukas.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -816,24 +800,42 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 </div>
               </div>
 
-              {/* 3. सध्याचे पद / संवर्ग (केवळ विचारलेले ५ पर्याय) */}
-              <div>
-                <label className="font-bold text-[#172033] block mb-1">
-                  सध्याचे पद / संवर्ग <span className="text-[#df6b16]">*</span>
-                </label>
-                <select
-                  value={professional}
-                  onChange={(e) => setProfessional(e.target.value)}
-                  required
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
-                >
-                  <option value="">सध्याचे पद / संवर्ग निवडा</option>
-                  {OFFICIAL_CADRES.map((cadre) => (
-                    <option key={cadre} value={cadre}>
-                      {cadre}
-                    </option>
-                  ))}
-                </select>
+              {/* 3. सध्याचे पद / संवर्ग */}
+              <div className="space-y-3">
+                <div>
+                  <label className="font-bold text-[#172033] block mb-1">
+                    सध्याचे पद / संवर्ग <span className="text-[#df6b16]">*</span>
+                  </label>
+                  <select
+                    value={professional}
+                    onChange={(e) => setProfessional(e.target.value)}
+                    required
+                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  >
+                    <option value="">सध्याचे पद / संवर्ग निवडा</option>
+                    {OFFICIAL_CADRES.map((cadre) => (
+                      <option key={cadre} value={cadre}>
+                        {cadre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {(professional === 'इतर स्वतः टाईप करा' || professional === 'इतर') && (
+                  <div>
+                    <label className="font-bold text-[#172033] block mb-1">
+                      सध्याचे पद टाईप करा <span className="text-[#df6b16]">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="उदा. विशेष शिक्षक / इतर पद"
+                      value={customProfessional}
+                      onChange={(e) => setCustomProfessional(e.target.value)}
+                      className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -938,6 +940,39 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             );
           })()}
         </form>
+
+        {/* Success Banner After Submission (Displayed at Bottom of Form) */}
+        {submittedApp && (
+          <div ref={submittedAppRef} className="mt-8 bg-[#ecfdf3] border-2 border-[#a7e5bd] text-[#14532d] rounded-2xl p-6 shadow-md transition-all">
+            <div className="flex items-start gap-3.5">
+              <CheckCircle2 className="w-7 h-7 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="space-y-2.5">
+                <h3 className="font-serifDevanagari text-xl font-bold text-emerald-950">
+                  आपला सदस्यत्व अर्ज यशस्वीपणे नोंदवला गेला आहे!
+                </h3>
+                <p className="text-sm text-emerald-900 font-medium">
+                  आपला अर्ज संदर्भ क्रमांक (Reference Number): <strong className="text-base text-emerald-950 bg-white px-2.5 py-1 rounded-md border border-emerald-400 font-mono shadow-2xs">{submittedApp.applicationNumber}</strong>
+                </p>
+                <p className="text-xs sm:text-sm text-emerald-800 leading-relaxed bg-white/60 p-3 rounded-lg border border-emerald-200">
+                  "महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" या संघटनेसाठी आजीवन सदस्यत्व फी ₹100 व वार्षिक वर्गणी ₹120 (एकूण ₹220) खालील अधिकृत खात्यावर जमा करावी:<br />
+                  <strong className="text-emerald-950 font-mono block mt-1">KENDRAPRAMUKH V ADHIKARI MAHASNAGH | Ac. No. 60597730518 | IFSC: MAHB0002075</strong>
+                </p>
+                <div className="pt-1 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmittedApp(null);
+                      window.scrollTo({ top: 380, behavior: 'smooth' });
+                    }}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors"
+                  >
+                    नवीन अर्ज भरा
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

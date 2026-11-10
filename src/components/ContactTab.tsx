@@ -57,27 +57,27 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
   };
 
   return (
-    <div className="bg-slate-50 py-10 md:py-16 text-slate-800">
+    <div className="bg-slate-50 py-6 sm:py-10 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-10">
-        <div className="border-b border-slate-200 pb-6">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-6">
+        <div className="border-b border-slate-200 pb-4">
           <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
             थेट संवाद व मार्गदर्शन
           </span>
-          <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-extrabold text-[#0b1e36] mt-1">
+          <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
             महासंघ संपर्क व तक्रार निवारण दालन
           </h1>
-          <p className="text-sm sm:text-base text-slate-600 mt-2 max-w-2xl leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-700 mt-2 max-w-2xl leading-relaxed">
             राज्यातील प्राथमिक शिक्षण विभागातील केंद्रप्रमुख व अधिकाऱ्यांच्या अडीअडचणी व मार्गदर्शनासाठी मुख्य कार्यालयाशी थेट संपर्क साधा.
           </p>
         </div>
       </div>
 
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Official Administrative Headquarters Information */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="bg-[#0b1e36] text-white p-6 sm:p-8 rounded-2xl border border-slate-800 shadow-lg space-y-5">
+          <div className="lg:col-span-5 space-y-5">
+            <div className="bg-[#0b1e36] text-white p-5 sm:p-7 rounded-2xl border border-slate-800 shadow-lg space-y-4">
               <span className="text-xs uppercase tracking-widest font-bold text-amber-400">
                 मध्यवर्ती प्रशासकीय कार्यालय
               </span>
@@ -97,15 +97,15 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                 <div className="flex items-start gap-3">
                   <Phone className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div className="w-full min-w-0">
-                    <strong className="text-white block text-sm mb-2.5 font-bold tracking-wide">
+                    <strong className="text-white block text-sm mb-2 font-bold tracking-wide">
                       Grievance Redressal Committee :
                     </strong>
                     {/* तीन सदस्यांची एकाखाली एक रचना (मोबाईलवर सुटसुटीत, डेस्कटॉपवर ३ कॉलम) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       {/* 1. श्री. राजेंद्र खैरनार */}
-                      <div className="p-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
                         <div>
-                          <span className="text-white text-xs sm:text-sm font-bold block" title="श्री. राजेंद्र खैरनार">
+                          <span className="text-white text-xs font-bold block" title="श्री. राजेंद्र खैरनार">
                             श्री. राजेंद्र खैरनार
                           </span>
                           <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
@@ -114,7 +114,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                         </div>
                         <a
                           href="tel:9860704098"
-                          className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
+                          className="mt-2 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
                           title="कॉल करा"
                         >
                           <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -123,9 +123,9 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                       </div>
 
                       {/* 2. श्री. निलेश पाटील */}
-                      <div className="p-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
                         <div>
-                          <span className="text-white text-xs sm:text-sm font-bold block" title="श्री. निलेश पाटील">
+                          <span className="text-white text-xs font-bold block" title="श्री. निलेश पाटील">
                             श्री. निलेश पाटील
                           </span>
                           <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
@@ -134,7 +134,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                         </div>
                         <a
                           href="tel:9421385165"
-                          className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
+                          className="mt-2 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
                           title="कॉल करा"
                         >
                           <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -143,9 +143,9 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                       </div>
 
                       {/* 3. श्री. नितीन शिंदे */}
-                      <div className="p-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
                         <div>
-                          <span className="text-white text-xs sm:text-sm font-bold block" title="श्री. नितीन शिंदे">
+                          <span className="text-white text-xs font-bold block" title="श्री. नितीन शिंदे">
                             श्री. नितीन शिंदे
                           </span>
                           <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
@@ -154,7 +154,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                         </div>
                         <a
                           href="tel:9763099698"
-                          className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
+                          className="mt-2 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
                           title="कॉल करा"
                         >
                           <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -183,19 +183,14 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                   </div>
                 </div>
               </div>
-
-              <div className="pt-4 border-t border-slate-700 flex items-center justify-between text-xs text-slate-400">
-                <span>नोंदणी क्र: <strong className="text-amber-300 font-mono">{ORG_DETAILS.registrationNo}</strong></span>
-                <span className="text-emerald-400 font-semibold">● अधिकृत संघटना</span>
-              </div>
             </div>
 
             {/* Quick District Leadership Info */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
-              <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] mb-2">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+              <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] mb-1.5">
                 जिल्हास्तरीय संपर्क हवा आहे का?
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed mb-4">
+              <p className="text-sm text-slate-700 leading-relaxed mb-3">
                 महाराष्ट्रातील सर्व 34 जिल्ह्यांचे अध्यक्ष व प्रतिनिधींचे अधिकृत संपर्क क्रमांक 'नेतृत्व' या टॅबवर उपलब्ध आहेत.
               </p>
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 flex items-center gap-2">
@@ -206,21 +201,21 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
           </div>
 
           {/* Right Column: Direct Message / Suggestion Form */}
-          <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs">
-            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36] mb-2">
+          <div className="lg:col-span-7 bg-white p-5 sm:p-7 rounded-2xl border border-slate-200 shadow-xs">
+            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36] mb-1.5">
               आपला संदेश किंवा प्रश्न पाठवा
             </h2>
-            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            <p className="text-sm text-slate-600 mb-5 leading-relaxed">
               महासंघाच्या कामकाजाबाबत सूचना, सेवाविषयक अडचण किंवा विचारणा असल्यास खालील फॉर्म भरा. मुख्य कार्यालयाकडून लवकरच संपर्क केला जाईल.
             </p>
 
             {submitted ? (
-              <div className="p-6 bg-emerald-50 border border-emerald-300 rounded-xl text-center space-y-3">
-                <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto" />
+              <div className="p-5 bg-emerald-50 border border-emerald-300 rounded-xl text-center space-y-3">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
                 <h3 className="font-serifDevanagari text-lg font-bold text-emerald-900">
                   आपला संदेश यशस्वीपणे पाठवण्यात आला आहे!
                 </h3>
-                <p className="text-xs text-emerald-700 leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-emerald-800 leading-relaxed max-w-md mx-auto">
                   आपल्या संदेशाची नोंद घेण्यात आली असून महासंघ कार्यालयाकडून लवकरच आपल्याशी संपर्क साधला जाईल. धन्यवाद!
                 </p>
                 <button
@@ -234,7 +229,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4 text-xs">
                 {formError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg font-medium">
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg font-medium text-xs">
                     {formError}
                   </div>
                 )}
@@ -250,7 +245,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                       placeholder="उदा. श्री. संतोष पाटील"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 text-xs sm:text-sm"
                     />
                   </div>
 
@@ -265,7 +260,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                       placeholder="10 अंकी मोबाईल"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono text-xs sm:text-sm"
                     />
                   </div>
                 </div>
@@ -280,7 +275,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                       placeholder="example@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono text-xs sm:text-sm"
                     />
                   </div>
 
@@ -291,7 +286,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     <select
                       value={district}
                       onChange={(e) => setDistrict(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-medium text-slate-700"
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-medium text-slate-700 text-xs sm:text-sm"
                     >
                       <option value="">जिल्हा निवडा (ऐच्छिक)</option>
                       {MAHARASHTRA_DISTRICTS.map((d) => (
@@ -310,7 +305,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     placeholder="उदा. सदस्यत्व, पदोन्नती, किंवा तक्रार"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 text-xs sm:text-sm"
                   />
                 </div>
 
@@ -324,13 +319,13 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     placeholder="आपला सविस्तर संदेश येथे टाईप करा..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 resize-none"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 resize-none text-xs sm:text-sm"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="bg-[#0b1e36] hover:bg-[#132f52] text-amber-300 font-bold px-6 py-3 rounded-lg text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
+                  className="bg-[#0b1e36] hover:bg-[#132f52] text-amber-300 font-bold px-6 py-2.5 rounded-lg text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
                 >
                   <Send className="w-4 h-4 text-amber-400" />
                   <span>संदेश पाठवा</span>
@@ -341,13 +336,13 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
         </div>
 
         {/* Website Information Manager (संकेतस्थळ माहिती व्यवस्थापक - संपर्क फॉर्म नंतर व फुटर च्या वर) */}
-        <div className="mt-12 pt-8 border-t border-slate-200">
-          <div className="bg-gradient-to-br from-[#07182c] via-[#0b1e36] to-[#0f2a4a] text-white rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-xl relative overflow-hidden">
+        <div className="mt-8 pt-6 border-t border-slate-200">
+          <div className="bg-gradient-to-br from-[#07182c] via-[#0b1e36] to-[#0f2a4a] text-white rounded-2xl p-5 sm:p-7 border border-slate-800 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
               {/* Left Column: Context & Official Notice */}
-              <div className="lg:col-span-7 space-y-3">
+              <div className="lg:col-span-7 space-y-2.5">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 border border-amber-400/40 rounded-full text-amber-300 text-xs font-semibold">
                   <Globe className="w-3.5 h-3.5 text-amber-400" />
                   <span>Website Information Manager · संकेतस्थळ कक्ष</span>
@@ -357,18 +352,25 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                   संकेतस्थळ माहिती व्यवस्थापक
                 </h3>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+                <p className="text-sm text-slate-300 leading-relaxed font-normal">
                   संकेतस्थळावरील सामग्री, दुवे किंवा माहिती अद्ययावत किंवा अचूकतेबाबत काही सूचना अथवा तक्रारी असल्यास खालील तपशीलावर संपर्क साधावा.
                 </p>
               </div>
 
               {/* Right Column: Manager Details Official Card */}
               <div className="lg:col-span-5">
-                <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-xl p-5 space-y-3.5 shadow-inner">
+                <div className="bg-white/10 backdrop-blur-md border border-white/15 rounded-xl p-4 sm:p-5 space-y-3 shadow-inner">
                   <div className="space-y-2 text-xs sm:text-sm">
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex items-start gap-2">
                       <span className="text-slate-400 font-semibold min-w-[70px]">नाव :</span>
-                      <strong className="text-white font-bold text-sm sm:text-base">श्री. पदमाकर चंद्रकांत शिंदे</strong>
+                      <div>
+                        <strong className="text-white font-bold text-sm sm:text-base block">
+                          श्री. पदमाकर चंद्रकांत शिंदे
+                        </strong>
+                        <span className="text-amber-300 font-semibold text-xs sm:text-sm block mt-0.5 font-sans">
+                          (केंद्रप्रमुख माजलगाव जिल्हा बीड)
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex items-baseline gap-2">
@@ -382,7 +384,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     </div>
                   </div>
 
-                  <div className="pt-3 border-t border-white/10 flex items-center gap-2">
+                  <div className="pt-2.5 border-t border-white/10 flex items-center gap-2">
                     <span className="text-slate-400 text-xs sm:text-sm font-semibold">संपर्क क्रमांक :</span>
                     <a
                       href="tel:7219123699"

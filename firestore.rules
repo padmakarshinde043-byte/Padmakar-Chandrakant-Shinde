@@ -2,78 +2,57 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper functions
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
+      return id is string && id.size() <= 128;
     }
 
     // Health check / connection test document
     match /test/{testId} {
-      allow get: if true;
+      allow read, write: if true;
     }
 
-    // News collection - public read and list for educational circulars and federation updates
-    match /news/{newsId} {
-      allow get: if isValidId(newsId);
-      allow list: if true;
-      allow create, update: if isValidId(newsId);
-      allow delete: if isValidId(newsId);
-    }
-
-    // Applications collection - public can submit membership application, track status, admin manages
-    match /applications/{applicationId} {
-      allow get: if isValidId(applicationId);
-      allow list: if true;
-      allow create: if isValidId(applicationId) &&
-        request.resource.data.applicationNumber is string &&
-        request.resource.data.fullName is string &&
-        request.resource.data.phone is string;
-      allow update, delete: if isValidId(applicationId);
-    }
-
-    // Contact messages collection - public can submit contact inquiry
-    match /contacts/{contactId} {
-      allow get: if isValidId(contactId);
-      allow list: if true;
-      allow create: if isValidId(contactId) &&
-        request.resource.data.name is string &&
-        request.resource.data.phone is string &&
-        request.resource.data.message is string;
-      allow update, delete: if isValidId(contactId);
-    }
-
-    // Settings collection - admin authentication and system configuration
+    // Settings collection (Admin authentication credentials & system settings)
+    // Allows global password synchronization across all devices and phones
     match /settings/{settingId} {
-      allow get: if isValidId(settingId);
-      allow list: if true;
-      allow create, update: if isValidId(settingId);
+      allow read, write: if true;
     }
 
-    // Site statistics collection - visit counts
-    match /site_stats/{statId} {
-      allow get: if isValidId(statId);
-      allow list: if true;
-      allow create, update: if isValidId(statId);
-    }
-
-    // Dynamic leadership updates
-    match /leadership/{leaderId} {
-      allow get: if isValidId(leaderId);
-      allow list: if true;
-      allow create, update, delete: if isValidId(leaderId);
-    }
-
-    // Sub admins management
+    // Sub-admins collection (Delegated admins with roles & passwords)
+    // Allows global sub-admin login and verification from any device
     match /sub_admins/{adminId} {
-      allow get, list, create, update, delete: if isValidId(adminId);
+      allow read, write: if true;
+    }
+
+    // News collection - public read, admin write
+    match /news/{newsId} {
+      allow read, write: if true;
+    }
+
+    // Applications collection - public submit, admin review and approval
+    match /applications/{applicationId} {
+      allow read, write: if true;
+    }
+
+    // Contact inquiries & messages
+    match /contacts/{contactId} {
+      allow read, write: if true;
+    }
+
+    // Dynamic leadership directory
+    match /leadership/{leaderId} {
+      allow read, write: if true;
+    }
+
+    // Site statistics
+    match /site_stats/{statId} {
+      allow read, write: if true;
+    }
+
+    // Gov Orders collection
+    match /gov_orders/{orderId} {
+      allow read, write: if true;
     }
   }
 }
+

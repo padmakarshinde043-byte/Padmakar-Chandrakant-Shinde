@@ -64,7 +64,7 @@ export async function uploadToCloudinary(
   const cleanCloudName = config.cloudName.trim();
   const cleanPreset = config.uploadPreset.trim();
 
-  const endpoint = `https://api.cloudinary.com/v1_1/${cleanCloudName}/image/upload`;
+  const endpoint = `https://api.cloudinary.com/v1_1/${cleanCloudName}/auto/upload`;
 
   const formData = new FormData();
   formData.append('file', file);

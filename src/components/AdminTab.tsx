@@ -2,13 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Lock, LogOut, Award, Printer, PlusCircle, Search,
   UserCheck, ShieldAlert, KeyRound, CheckCircle2, ArrowLeft, Eye, EyeOff,
-  Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download,
+  Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download, List,
   UserPlus, Shield, CheckSquare, Square, MessageSquare, Mail, PhoneCall, RefreshCw,
-  Cloud, CloudUpload, ExternalLink, AlertCircle, Settings
+  Cloud, CloudUpload, ExternalLink, AlertCircle, Settings, RotateCcw, Calendar
 } from 'lucide-react';
 import {
   MembershipApplication,
   NewsItem,
+  GovOrder,
+  INITIAL_GOV_ORDERS,
   ORG_DETAILS,
   Leader,
   STATE_EXECUTIVE,
@@ -28,6 +30,7 @@ import {
   saveAdminUser,
   deleteAdminUser,
   setAdminUserPassword,
+  resetAdminUserToFirstLogin,
   AdminUser,
   AdminPermissions,
   ContactMessage,
@@ -43,13 +46,21 @@ import {
   uploadToCloudinary,
   CloudinaryConfig
 } from '../utils/cloudinary';
+import {
+    saveGovOrderToFirestore,
+    deleteGovOrderFromFirestore
+} from '../firebase';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
   onApproveApplication: (id: string, memberNumber: string) => void;
+  onRejectApplication: (id: string, reason: string) => void;
+  onDeleteApplication: (id: string) => void;
   onAddNews: (news: NewsItem) => void;
   onUpdateNews?: (news: NewsItem) => void;
   onDeleteNews?: (id: string) => void;
+  govOrders: GovOrder[];
+  setGovOrders: React.Dispatch<React.SetStateAction<GovOrder[]>>;
   newsList?: NewsItem[];
   onFetchApplications?: () => Promise<void>;
   isLoadingApps?: boolean;
@@ -61,9 +72,13 @@ const DYNAMIC_LEADERSHIP_STORAGE_KEY = 'mahasangh_dynamic_leadership_v1';
 export const AdminTab: React.FC<AdminTabProps> = ({
   applications,
   onApproveApplication,
+  onRejectApplication,
+  onDeleteApplication,
   onAddNews,
   onUpdateNews,
   onDeleteNews,
+  govOrders,
+  setGovOrders,
   newsList = [],
   onFetchApplications,
   isLoadingApps,
@@ -87,17 +102,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [firstLoginError, setFirstLoginError] = useState('');
   const [firstLoginSuccess, setFirstLoginSuccess] = useState('');
 
-  // Password Reset / Create New Password Mode on Login Screen (for Super Admin)
-  const [isResetMode, setIsResetMode] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetMasterKey, setResetMasterKey] = useState('');
-  const [resetNewPassword, setResetNewPassword] = useState('');
-  const [resetConfirmPassword, setResetConfirmPassword] = useState('');
-  const [resetError, setResetError] = useState('');
-  const [resetSuccess, setResetSuccess] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active view inside Admin Dashboard
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'leadership' | 'add_news' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary'>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'leadership' | 'add_news' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary'>('applications');
 
   // Contact Inquiries (प्राप्त संदेश / विचारणा)
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -203,8 +211,38 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  // News Date Formatters
+  const formatPublishDateToDisplay = (dateInputStr: string): string => {
+    if (!dateInputStr) return formatDateWithEnglishDigits(new Date());
+    const cleanStr = toEnglishDigits(dateInputStr.trim());
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) {
+      const [y, m, d] = cleanStr.split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return cleanStr;
+  };
+
+  const parseDateStringToYYYYMMDD = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString().split('T')[0];
+    const cleanStr = toEnglishDigits(dateStr.trim());
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanStr)) return cleanStr;
+    const ddmmyyyy = cleanStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (ddmmyyyy) {
+      const d = String(ddmmyyyy[1]).padStart(2, '0');
+      const m = String(ddmmyyyy[2]).padStart(2, '0');
+      const y = ddmmyyyy[3];
+      return `${y}-${m}-${d}`;
+    }
+    const t = new Date(cleanStr).getTime();
+    if (!isNaN(t) && t > 0) {
+      return new Date(t).toISOString().split('T')[0];
+    }
+    return new Date().toISOString().split('T')[0];
+  };
+
   // News State & Management (Full News, Quick Photo Only, Edit, Live Preview)
   const [newsTitle, setNewsTitle] = useState('');
+  const [newsDate, setNewsDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [newsCategory, setNewsCategory] = useState('अधिकृत घोषणा');
   const [newsSummary, setNewsSummary] = useState('');
   const [newsContent, setNewsContent] = useState('');
@@ -213,14 +251,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [newsCreatedSuccess, setNewsCreatedSuccess] = useState(false);
   const [newsError, setNewsError] = useState('');
 
+  // GovOrder State & Management (using props.govOrders)
+  const [goTitle, setGoTitle] = useState('');
+  const [goDate, setGoDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [goType, setGoType] = useState<'शासन निर्णय' | 'न्यायालयीन आदेश' | 'परिपत्रक'>('शासन निर्णय');
+  const [goFileUrl, setGoFileUrl] = useState('');
+  const [goDriveUrl, setGoDriveUrl] = useState('');
+  const [goSummary, setGoSummary] = useState('');
+  const [isUploadingGoFile, setIsUploadingGoFile] = useState(false);
+  const [goCreatedSuccess, setGoCreatedSuccess] = useState(false);
+  const [goError, setGoError] = useState('');
+
   // Editing existing news / GR / Photo
   const [editingNewsItem, setEditingNewsItem] = useState<NewsItem | null>(null);
-  const [newsManageMode, setNewsManageMode] = useState<'form' | 'photo_only' | 'list'>('form');
+  const [newsManageMode, setNewsManageMode] = useState<'form' | 'photo_only' | 'gov_order' | 'list'>('form');
   const [previewNewsItem, setPreviewNewsItem] = useState<NewsItem | null>(null);
 
   // Quick Photo Only state
   const [photoOnlyTitle, setPhotoOnlyTitle] = useState('');
+  const [photoOnlyDate, setPhotoOnlyDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [photoOnlyImageUrl, setPhotoOnlyImageUrl] = useState('');
+  const [photoOnlyCategory, setPhotoOnlyCategory] = useState('टॅगलाईन फोटो');
   const [isUploadingPhotoOnly, setIsUploadingPhotoOnly] = useState(false);
 
   // News search query in admin
@@ -296,6 +347,26 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  const handleGoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
+      setIsUploadingGoFile(true);
+      setGoError('');
+      try {
+        const result = await uploadToCloudinary(file, cloudinaryConfig);
+        setGoFileUrl(result.url);
+      } catch (err: any) {
+        setGoError('फाइल अपलोड अयशस्वी: ' + (err.message || ''));
+      } finally {
+        setIsUploadingGoFile(false);
+      }
+    } else {
+      setGoError('कृपया Admin पॅनलमध्ये Cloudinary सेटिंग्ज तपासा.');
+    }
+  };
+
   // ==========================================
   // Leadership Management State (Point 7)
   // ==========================================
@@ -366,6 +437,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     fetchAdminUsers().then(setAdminUsersList).catch(() => {});
   }, []);
 
+  const handleDownloadZip = async (e: React.MouseEvent) => {
+    try {
+      const res = await fetch('/dist.zip');
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'dist.zip';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      e.preventDefault();
+    } catch {
+      // Allow default href fallback
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError('');
@@ -379,7 +469,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
 
     try {
-      // Refresh admin list and super admin creds
+      setIsLoggingIn(true);
+      // Refresh admin list and super admin creds directly from cloud server
       const [creds, subAdmins] = await Promise.all([
         getAdminCredentials(),
         fetchAdminUsers()
@@ -474,6 +565,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setLoginError('अवैध ई-मेल. कृपया अधिकृत ॲडमिन ई-मेल वापरा किंवा मुख्य प्रशासकाशी संपर्क साधा.');
     } catch (err: any) {
       setLoginError('लॉगिन करताना त्रुटी आली: ' + (err.message || 'Error'));
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -532,58 +625,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  // Handle Create / Reset Password from Login Screen (Super Admin)
-  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setResetError('');
-    setResetSuccess('');
-
-    const targetEmail = resetEmail.trim().toLowerCase();
-    const masterKey = resetMasterKey.trim();
-    const newPwd = resetNewPassword.trim();
-    const confirmPwd = resetConfirmPassword.trim();
-
-    if (!targetEmail || !masterKey || !newPwd || !confirmPwd) {
-      setResetError('कृपया सर्व माहिती भरा.');
-      return;
-    }
-
-    if (newPwd.length < 4) {
-      setResetError('नवीन पासवर्ड किमान 4 अक्षरांचा असावा.');
-      return;
-    }
-
-    if (newPwd !== confirmPwd) {
-      setResetError('दोन्ही पासवर्ड एकमेकांशी जुळत नाहीत.');
-      return;
-    }
-
-    try {
-      const creds = await getAdminCredentials();
-      const isEmailMatch = targetEmail === creds.email.toLowerCase() || targetEmail === DEFAULT_ADMIN_EMAIL.toLowerCase();
-      const isAuthAuthorized = masterKey === MASTER_RECOVERY_KEY || masterKey === creds.password;
-
-      if (!isEmailMatch) {
-        setResetError('नोंदणीकृत अधिकृत ॲडमिन ई-मेल जुळत नाही.');
-        return;
-      }
-
-      if (!isAuthAuthorized) {
-        setResetError('मास्टर सिक्युरिटी की किंवा जुना पासवर्ड चुकीचा आहे.');
-        return;
-      }
-
-      await updateAdminCredentials(newPwd, targetEmail);
-      setResetSuccess('नवीन पासवर्ड यशस्वीपणे तयार करण्यात आला आहे! आता आपण लॉगिन करू शकता.');
-      setTimeout(() => {
-        setIsResetMode(false);
-        setPassword(newPwd);
-        setResetSuccess('');
-      }, 1500);
-    } catch (err: any) {
-      setResetError('पासवर्ड सेव्ह करताना त्रुटी आली: ' + err.message);
-    }
-  };
+  // Removed handleResetPasswordSubmit function.
 
   // Handle Change Password inside Logged-in Dashboard (Super Admin or Sub-Admin)
   const handleChangePasswordInside = async (e: React.FormEvent) => {
@@ -626,7 +668,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setCurrentUser({ ...currentUser, password: newP });
       }
 
-      setChangePassStatus({ text: 'पासवर्ड यशस्वीपणे बदलण्यात आला आहे!', type: 'success' });
+      setChangePassStatus({
+        text: '✓ पासवर्ड यशस्वीपणे बदलण्यात आला आहे! हा पासवर्ड क्लाउडवर सेव्ह झाला असून आता सर्व मोबाईल व उपकरणांवरून लॉगिन करताना हाच पासवर्ड चालेल.',
+        type: 'success'
+      });
       setCurrentPassInput('');
       setNewPassInput('');
       setConfirmPassInput('');
@@ -693,6 +738,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setAdminActionMsg({ text: `${targetEmail} यांचे व्यवस्थापक अधिकार काढण्यात आले.`, type: 'success' });
     } catch (err: any) {
       setAdminActionMsg({ text: 'व्यवस्थापक हटवताना त्रुटी आली.', type: 'error' });
+    }
+  };
+
+  // Manage Admins: Reset Sub-Admin Password (allow them to set new password from any mobile)
+  const handleResetSubAdmin = async (id: string, targetEmail: string) => {
+    try {
+      await resetAdminUserToFirstLogin(id);
+      const updated = await fetchAdminUsers();
+      setAdminUsersList(updated);
+      setAdminActionMsg({
+        text: `✓ ${targetEmail} यांचा पासवर्ड यशस्वीरीत्या रिसेट करण्यात आला! ते आता कोणत्याही मोबाईलवरून लॉगिन करताना नवीन पासवर्ड तयार करू शकतील.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setAdminActionMsg({ text: 'पासवर्ड रिसेट करताना त्रुटी आली: ' + (err.message || 'Error'), type: 'error' });
     }
   };
 
@@ -898,12 +958,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
     setNewsError('');
 
-    const todayStr = formatDateWithEnglishDigits(new Date());
+    const displayDate = formatPublishDateToDisplay(newsDate);
+    const publishDateStr = newsDate || new Date().toISOString().split('T')[0];
 
     if (editingNewsItem) {
       const updatedPost: NewsItem = {
         ...editingNewsItem,
         title: toEnglishDigits(newsTitle.trim()),
+        date: displayDate,
+        publishDate: publishDateStr,
         category: newsCategory,
         summary: toEnglishDigits(newsSummary.trim()),
         content: toEnglishDigits(newsContent.trim()),
@@ -923,6 +986,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setNewsSummary('');
       setNewsContent('');
       setNewsImageUrl('');
+      setNewsDate(new Date().toISOString().split('T')[0]);
       setTimeout(() => setNewsCreatedSuccess(false), 4000);
       return;
     }
@@ -930,13 +994,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const newPost: NewsItem = {
       id: `post-${Date.now()}`,
       title: toEnglishDigits(newsTitle.trim()),
-      date: todayStr,
+      date: displayDate,
+      publishDate: publishDateStr,
       category: newsCategory,
       summary: toEnglishDigits(newsSummary.trim()),
       content: toEnglishDigits(newsContent.trim()),
       image: newsImageUrl || undefined,
       imageUrl: newsImageUrl || undefined,
-      featured: false
+      featured: newsCategory === 'टॅगलाईन फोटो',
+      createdAt: new Date(publishDateStr).toISOString(),
     };
 
     onAddNews(newPost);
@@ -945,10 +1011,50 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setNewsSummary('');
     setNewsContent('');
     setNewsImageUrl('');
+    setNewsDate(new Date().toISOString().split('T')[0]);
     setTimeout(() => setNewsCreatedSuccess(false), 4000);
   };
 
-  // Quick Photo Only Publish
+  const handleCreateGovOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGoError('');
+
+    const newGovOrder: GovOrder = {
+      id: `go-${Date.now()}`,
+      title: toEnglishDigits(goTitle.trim()),
+      date: goDate || new Date().toISOString().split('T')[0],
+      type: goType,
+      fileUrl: goFileUrl || undefined,
+      driveUrl: goDriveUrl || undefined,
+      summary: toEnglishDigits(goSummary.trim()),
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+        await saveGovOrderToFirestore(newGovOrder);
+        setGovOrders(prev => [newGovOrder, ...prev]);
+        setGoCreatedSuccess(true);
+        setGoTitle('');
+        setGoSummary('');
+        setGoFileUrl('');
+        setGoDriveUrl('');
+        setGoDate(new Date().toISOString().split('T')[0]);
+        setTimeout(() => setGoCreatedSuccess(false), 4000);
+    } catch (err: any) {
+        setGoError('शासन निर्णय सेव्ह करताना त्रुटी: ' + err.message);
+    }
+  };
+
+  const handleDeleteGovOrder = async (id: string) => {
+      try {
+          await deleteGovOrderFromFirestore(id);
+          setGovOrders(prev => prev.filter(go => go.id !== id));
+      } catch (err: any) {
+          alert('हटवताना त्रुटी: ' + err.message);
+      }
+  };
+
+  // Quick Photo Only Publish (with Tagline Photo support)
   const handleCreatePhotoOnly = (e: React.FormEvent) => {
     e.preventDefault();
     if (!photoOnlyTitle.trim() || !photoOnlyImageUrl) {
@@ -957,23 +1063,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
     setNewsError('');
 
-    const todayStr = formatDateWithEnglishDigits(new Date());
+    const displayDate = formatPublishDateToDisplay(photoOnlyDate);
+    const publishDateStr = photoOnlyDate || new Date().toISOString().split('T')[0];
     const photoPost: NewsItem = {
       id: `photo-${Date.now()}`,
       title: toEnglishDigits(photoOnlyTitle.trim()),
-      date: todayStr,
-      category: 'अधिकृत छायाचित्र / परिपत्रक',
-      summary: 'अधिकृत छायाचित्र / परिपत्रक',
+      date: displayDate,
+      publishDate: publishDateStr,
+      category: photoOnlyCategory || 'टॅगलाईन फोटो',
+      summary: toEnglishDigits(photoOnlyTitle.trim()),
       content: '', // Empty content indicates photo-only mode
       image: photoOnlyImageUrl,
       imageUrl: photoOnlyImageUrl,
-      featured: false
+      featured: photoOnlyCategory === 'टॅगलाईन फोटो',
+      createdAt: new Date(publishDateStr).toISOString(),
     };
 
     onAddNews(photoPost);
     setNewsCreatedSuccess(true);
     setPhotoOnlyTitle('');
     setPhotoOnlyImageUrl('');
+    setPhotoOnlyDate(new Date().toISOString().split('T')[0]);
     setTimeout(() => setNewsCreatedSuccess(false), 4000);
   };
 
@@ -981,6 +1091,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleStartEditNews = (item: NewsItem) => {
     setEditingNewsItem(item);
     setNewsTitle(item.title || '');
+    setNewsDate(parseDateStringToYYYYMMDD(item.publishDate || item.date || ''));
     setNewsCategory(item.category || 'अधिकृत घोषणा');
     setNewsSummary(item.summary || '');
     setNewsContent(item.content || '');
@@ -997,12 +1108,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setNewsSummary('');
     setNewsContent('');
     setNewsImageUrl('');
+    setNewsDate(new Date().toISOString().split('T')[0]);
     setNewsError('');
   };
 
-  // Delete News
+  // Delete News with fallback for corrupt/missing titles
   const handleDeleteNewsItem = (item: NewsItem) => {
-    if (window.confirm(`आपण खात्रीने '${item.title}' ही बातमी / परिपत्रक हटवू इच्छिता?`)) {
+    const displayTitle = item.title || (item as any).headline || 'ही बातमी';
+    if (window.confirm(`आपण खात्रीने '${displayTitle}' ही बातमी / परिपत्रक / फोटो हटवू इच्छिता?`)) {
       if (onDeleteNews) {
         onDeleteNews(item.id);
       }
@@ -1020,7 +1133,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       id: editingNewsItem ? editingNewsItem.id : 'preview-temp',
       title: newsTitle.trim(),
       category: newsCategory,
-      date: formatDateWithEnglishDigits(new Date()),
+      date: formatPublishDateToDisplay(newsDate),
+      publishDate: newsDate,
       summary: newsSummary.trim(),
       content: newsContent.trim(),
       image: newsImageUrl || undefined,
@@ -1037,8 +1151,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setPreviewNewsItem({
       id: 'preview-photo-temp',
       title: photoOnlyTitle.trim(),
-      category: 'अधिकृत छायाचित्र / परिपत्रक',
-      date: formatDateWithEnglishDigits(new Date()),
+      category: photoOnlyCategory || 'अधिकृत छायाचित्र / परिपत्रक',
+      date: formatPublishDateToDisplay(photoOnlyDate),
+      publishDate: photoOnlyDate,
       summary: 'अधिकृत छायाचित्र / परिपत्रक',
       content: '',
       image: photoOnlyImageUrl || undefined,
@@ -1116,6 +1231,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
             {isLoggedIn && (
               <div className="flex items-center gap-3">
+                {currentUser?.isSuperAdmin && (
+                  <a
+                    href="/dist.zip"
+                    download="dist.zip"
+                    onClick={handleDownloadZip}
+                    className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-colors shrink-0"
+                    title="प्रशासकीय बिल्ड फाईल (dist.zip) डाऊनलोड करा"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="hidden sm:inline">dist.zip डाऊनलोड</span>
+                  </a>
+                )}
                 <div className="text-right hidden sm:block">
                   <div className="text-xs font-bold text-[#17366d] flex items-center justify-end gap-1">
                     <Shield className="w-3.5 h-3.5 text-[#df6b16]" />
@@ -1220,28 +1347,28 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </div>
                 </form>
               </div>
-            ) : !isResetMode ? (
-              <div>
-                <div className="w-12 h-12 bg-[#fff0df] rounded-full flex items-center justify-center text-[#df6b16] mb-3 mx-auto">
-                  <Lock className="w-6 h-6" />
+            ) : (
+              <div className="max-w-md w-full mx-auto p-8 bg-white rounded-2xl shadow-xl border border-slate-100">
+                <div className="w-16 h-16 bg-[#fff0df] rounded-full flex items-center justify-center text-[#df6b16] mb-6 mx-auto">
+                  <Lock className="w-8 h-8" />
                 </div>
-                <h2 className="font-serifDevanagari text-xl font-bold text-center text-[#17366d] mb-1">
-                  प्रशासन लॉगिन (Admin Login)
+                <h2 className="font-serifDevanagari text-2xl font-bold text-center text-[#17366d] mb-2">
+                  प्रशासन लॉगिन
                 </h2>
-                <p className="text-xs text-center text-slate-500 mb-5">
+                <p className="text-sm text-center text-slate-500 mb-8">
                   केवळ अधिकृत व्यवस्थापकांसाठी राखीव पोर्टल
                 </p>
 
                 {loginError && (
-                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg flex items-center gap-3">
+                    <ShieldAlert className="w-5 h-5 shrink-0" />
                     <span>{loginError}</span>
                   </div>
                 )}
 
-                <form onSubmit={handleLogin} className="space-y-4 text-xs">
+                <form onSubmit={handleLogin} className="space-y-5">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">
+                    <label className="font-bold text-slate-700 block mb-2">
                       ई-मेल (Admin Email)
                     </label>
                     <input
@@ -1250,12 +1377,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder="आपला ॲडमिन ई-मेल प्रविष्ट करा"
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      className="w-full p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#df6b16] focus:border-transparent"
                     />
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">
+                    <label className="font-bold text-slate-700 block mb-2">
                       पासवर्ड (Password)
                     </label>
                     <div className="relative">
@@ -1263,33 +1390,41 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="पासवर्ड प्रविष्ट करा (नवीन असल्यास रिक्त ठेवा)"
-                        className="w-full p-2.5 pr-10 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        placeholder="पासवर्ड प्रविष्ट करा"
+                        className="w-full p-3 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#df6b16] focus:border-transparent"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                        className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
                       >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                       </button>
                     </div>
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 rounded-lg text-sm transition-colors shadow-sm"
+                    disabled={isLoggingIn}
+                    className="w-full bg-[#17366d] hover:bg-[#0b1e36] text-white font-bold py-3.5 rounded-xl text-base transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-75"
                   >
-                    Login करा
+                    {isLoggingIn ? (
+                      <>
+                        <RefreshCw className="w-5 h-5 animate-spin" />
+                        <span>लॉगिन पडताळणी होत आहे...</span>
+                      </>
+                    ) : (
+                      <span>Login करा</span>
+                    )}
                   </button>
                 </form>
 
-                <div className="mt-5 pt-4 border-t border-slate-200 space-y-2 text-center">
+                <div className="mt-8 pt-6 border-t border-slate-100 text-center">
                   <button
                     type="button"
                     onClick={() => {
                       if (!email.trim()) {
-                        setLoginError('कृपया आधी वर आपला अधिकृत ई-मेल प्रविष्ट करा.');
+                        setLoginError('कृपया आधी आपला अधिकृत ई-मेल प्रविष्ट करा.');
                         return;
                       }
                       setIsFirstLoginMode(true);
@@ -1297,286 +1432,221 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       setFirstLoginError('');
                       setFirstLoginSuccess('');
                     }}
-                    className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center justify-center gap-1.5 mx-auto transition-colors"
+                    className="text-sm text-amber-700 hover:text-amber-900 font-bold flex items-center justify-center gap-2 mx-auto transition-colors"
                   >
-                    <UserPlus className="w-3.5 h-3.5 text-amber-600" />
-                    नवीन ॲडमिन? पहिल्या लॉगिनसाठी येथे पासवर्ड तयार करा
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsResetMode(true);
-                      setResetEmail(email || DEFAULT_ADMIN_EMAIL);
-                      setResetError('');
-                      setResetSuccess('');
-                    }}
-                    className="text-xs text-[#09243f] hover:text-[#df6b16] font-bold flex items-center justify-center gap-1.5 mx-auto transition-colors"
-                  >
-                    <KeyRound className="w-3.5 h-3.5 text-[#df6b16]" />
-                    मुख्य प्रशासक पासवर्ड रीसेट (Reset Password)
+                    <UserPlus className="w-4 h-4" />
+                    नवीन ॲडमिन? पासवर्ड तयार करा
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <h2 className="font-serifDevanagari text-xl font-bold text-center text-[#17366d] mb-1">
-                  नवीन पासवर्ड तयार करा
-                </h2>
-                <p className="text-xs text-center text-slate-500 mb-5">
-                  अधिकृत ॲडमिन ई-मेल आणि चालू पासवर्ड अथवा सिक्युरिटी की प्रविष्ट करा
-                </p>
-
-                {resetError && (
-                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <span>{resetError}</span>
-                  </div>
-                )}
-
-                {resetSuccess && (
-                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                    <span>{resetSuccess}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleResetPasswordSubmit} className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      नोंदणीकृत ॲडमिन ई-मेल
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      चालू पासवर्ड किंवा सिक्युरिटी की
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={resetMasterKey}
-                      onChange={(e) => setResetMasterKey(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      नवीन पासवर्ड
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={resetNewPassword}
-                      onChange={(e) => setResetNewPassword(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      नवीन पासवर्ड पुन्हा टाका
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={resetConfirmPassword}
-                      onChange={(e) => setResetConfirmPassword(e.target.value)}
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsResetMode(false)}
-                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-lg text-xs"
-                    >
-                      रद्द करा
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 rounded-lg text-xs"
-                    >
-                      सेव्ह करा
-                    </button>
-                  </div>
-                </form>
               </div>
             )}
           </div>
         ) : (
-          /* Logged In Dashboard */
+          /* Admin Dashboard */
           <div className="space-y-6">
-            {/* Stats Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">एकूण अर्ज प्राप्त</span>
-                <strong className="text-2xl font-serifDevanagari text-[#17366d]">
-                  {toEnglishDigits(totalCount)}
-                </strong>
-              </div>
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">मंजूर सदस्य</span>
-                <strong className="text-2xl font-serifDevanagari text-emerald-600">
-                  {toEnglishDigits(approvedCount)}
-                </strong>
-              </div>
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">प्रलंबित अर्ज</span>
-                <strong className="text-2xl font-serifDevanagari text-amber-600">
-                  {toEnglishDigits(pendingCount)}
-                </strong>
-              </div>
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-slate-500 block">नाकारलेले</span>
-                <strong className="text-2xl font-serifDevanagari text-rose-600">
-                  {toEnglishDigits(rejectedCount)}
-                </strong>
+            {/* Sub-tabs Navigation Bar (Always at top after login) */}
+            <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                {currentUser?.permissions.approveMembers && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('applications')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'applications'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>सदस्यत्व अर्ज ({totalCount})</span>
+                  </button>
+                )}
+
+                {currentUser?.permissions.manageLeadership && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('leadership')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'leadership'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Award className="w-4 h-4" />
+                    <span>नेतृत्व व पदाधिकारी</span>
+                  </button>
+                )}
+
+                {currentUser?.permissions.manageNews && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('add_news')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'add_news'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>बातम्या</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('gov_order')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'gov_order'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      <span>शासन निर्णय</span>
+                    </button>
+                  </>
+                )}
+
+                {currentUser?.isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('manage_admins')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'manage_admins'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>व्यवस्थापक (Admins)</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setActiveAdminSubTab('contact_messages')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    activeAdminSubTab === 'contact_messages'
+                      ? 'bg-[#17366d] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>प्राप्त संदेश</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveAdminSubTab('password')}
+                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                    activeAdminSubTab === 'password'
+                      ? 'bg-[#17366d] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <KeyRound className="w-4 h-4" />
+                  <span>पासवर्ड बदला</span>
+                </button>
+
+                {currentUser?.isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('cloudinary')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'cloudinary'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Cloud className="w-4 h-4" />
+                    <span>क्लाउड स्टोरेज</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Sub-nav Tabs with RBAC Permissions */}
-            <div className="flex flex-wrap border-b border-slate-300 gap-1">
-              {(currentUser?.isSuperAdmin || currentUser?.permissions?.approveMembers) && (
-                <button
-                  type="button"
-                  onClick={() => setActiveAdminSubTab('applications')}
-                  className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-                    activeAdminSubTab === 'applications'
-                      ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
-                      : 'border-transparent text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <UserCheck className="w-4 h-4" />
-                  अर्ज पडताळणी व मंजुरी ({toEnglishDigits(applications.length)})
-                </button>
-              )}
-
-              {(currentUser?.isSuperAdmin || currentUser?.permissions?.manageLeadership) && (
-                <button
-                  type="button"
-                  onClick={() => setActiveAdminSubTab('leadership')}
-                  className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-                    activeAdminSubTab === 'leadership'
-                      ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
-                      : 'border-transparent text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  नेतृत्व व्यवस्थापन (Leadership)
-                </button>
-              )}
-
-              {(currentUser?.isSuperAdmin || currentUser?.permissions?.manageNews) && (
-                <button
-                  type="button"
-                  onClick={() => setActiveAdminSubTab('add_news')}
-                  className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-                    activeAdminSubTab === 'add_news'
-                      ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
-                      : 'border-transparent text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  बातम्या व परिपत्रके
-                </button>
-              )}
-
-              {(currentUser?.isSuperAdmin || currentUser?.permissions?.manageAdmins) && (
-                <button
-                  type="button"
-                  onClick={() => setActiveAdminSubTab('manage_admins')}
-                  className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-                    activeAdminSubTab === 'manage_admins'
-                      ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
-                      : 'border-transparent text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Shield className="w-4 h-4 text-[#df6b16]" />
-                  व्यवस्थापक प्रशासन (Manage Admins)
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setActiveAdminSubTab('contact_messages')}
-                className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-                  activeAdminSubTab === 'contact_messages'
-                    ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                प्राप्त संदेश / विचारणा ({toEnglishDigits(contactMessages.length)})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveAdminSubTab('password')}
-                className={`py-3 px-5 text-xs sm:text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${
-                  activeAdminSubTab === 'password'
-                    ? 'border-[#df6b16] text-[#df6b16] bg-white rounded-t-lg shadow-xs'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <KeyRound className="w-4 h-4" />
-                पासवर्ड व्यवस्थापन
-              </button>
-            </div>
-
-            {/* Sub-tab 1: Applications Management */}
+            {/* Sub-tab 1: Applications */}
             {activeAdminSubTab === 'applications' && (
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
+                      सदस्यत्व अर्ज तपासणी व मंजुरी (Membership Applications)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      येथे प्राप्त झालेले सर्व अर्ज तपासा, बँक पेमेंट पडताळा व अधिकृत सदस्य क्रमांक द्या.
+                    </p>
+                  </div>
+                  {onFetchApplications && (
+                    <button
+                      type="button"
+                      onClick={onFetchApplications}
+                      disabled={isLoadingApps}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
+                      <span>{isLoadingApps ? 'लोड होत आहे...' : 'ताजे करा'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Stats Grid inside Applications Sub-Tab */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                    <span className="text-slate-500 text-xs font-bold block">एकूण अर्ज</span>
+                    <span className="text-2xl font-black text-[#17366d] font-mono">{totalCount}</span>
+                  </div>
+                  <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-emerald-800 text-xs font-bold block">मंजूर अर्ज</span>
+                    <span className="text-2xl font-black text-emerald-600 font-mono">{approvedCount}</span>
+                  </div>
+                  <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 shadow-2xs">
+                    <span className="text-amber-800 text-xs font-bold block">प्रलंबित अर्ज</span>
+                    <span className="text-2xl font-black text-amber-600 font-mono">{pendingCount}</span>
+                  </div>
+                  <div className="bg-rose-50/50 p-3.5 rounded-xl border border-rose-200 shadow-2xs">
+                    <span className="text-rose-800 text-xs font-bold block">नाकारलेले अर्ज</span>
+                    <span className="text-2xl font-black text-rose-600 font-mono">{rejectedCount}</span>
+                  </div>
+                </div>
+
+                {/* Filters & Search */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
                     {(['all', 'pending', 'approved', 'rejected'] as const).map((st) => (
                       <button
                         key={st}
                         type="button"
                         onClick={() => setFilterStatus(st)}
-                        className={`px-3 py-1.5 rounded-full font-bold transition-colors ${
+                        className={`px-3 py-1.5 rounded-md font-bold transition-all ${
                           filterStatus === st
-                            ? 'bg-[#17366d] text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-[#17366d] text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        {st === 'all' && `सर्व (${toEnglishDigits(totalCount)})`}
-                        {st === 'pending' && `प्रलंबित (${toEnglishDigits(pendingCount)})`}
-                        {st === 'approved' && `मंजूर (${toEnglishDigits(approvedCount)})`}
-                        {st === 'rejected' && `नाकारलेले (${toEnglishDigits(rejectedCount)})`}
+                        {st === 'all' && `सर्व (${totalCount})`}
+                        {st === 'pending' && `प्रलंबित (${pendingCount})`}
+                        {st === 'approved' && `मंजूर (${approvedCount})`}
+                        {st === 'rejected' && `नाकारलेले (${rejectedCount})`}
                       </button>
                     ))}
                   </div>
 
                   <div className="relative w-full sm:w-64">
-                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="नाव, अर्ज क्र., फोन किंवा जिल्हा..."
+                      placeholder="नाव, अर्ज क्र., मोबाईल किंवा जिल्हा शोधा..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#df6b16]"
+                      className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-500">
-                  💡 <em>टीप: संपूर्ण माहिती व पासपोर्ट फोटो पाहण्यासाठी कोणत्याही अर्जदाराच्या नावावर क्लिक करा.</em>
-                </p>
-
                 {/* Table */}
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto border border-slate-200 rounded-xl">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#f8fafc] text-slate-700 uppercase font-bold border-b border-slate-200">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="py-3 px-4">फोटो</th>
                         <th className="py-3 px-4">अर्ज क्र. / तारीख</th>
@@ -1662,13 +1732,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             </td>
                             <td className="py-3 px-4 text-center">
                               {app.status === 'pending' ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenVerification(app)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
-                                >
-                                  पडताळणी करा
-                                </button>
+                                <div className="flex flex-col gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenVerification(app)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
+                                  >
+                                    मंजूर करा
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const reason = prompt("अर्ज नाकारण्याचे कारण प्रविष्ट करा:");
+                                      if(reason !== null) onRejectApplication(app.id, reason);
+                                    }}
+                                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
+                                  >
+                                    नाकारा
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if(window.confirm("हा अर्ज कायमचा डिलीट करायचा?")) onDeleteApplication(app.id);
+                                    }}
+                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
+                                  >
+                                    डिलीट
+                                  </button>
+                                </div>
                               ) : (
                                 <button
                                   type="button"
@@ -1727,7 +1818,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     विद्यमान पदाधिकारी ({leaderCategory})
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {categoryLeaders.map((ldr) => (
+                    {categoryLeaders.map((ldr, index) => (
                       <div
                         key={ldr.id || ldr.name}
                         className="bg-white rounded-full p-2 pr-4 border border-[#e2e8f0] shadow-xs flex items-center justify-between gap-3 hover:border-[#df6b16] transition-all"
@@ -1752,6 +1843,40 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               {ldr.role} {ldr.region ? `(${ldr.region})` : ''}
                             </span>
                           </div>
+                        </div>
+
+                        {/* Reordering Controls */}
+                        <div className="flex gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={() => {
+                              const newLeaders = [...dynamicLeaders];
+                              const currentIndex = newLeaders.findIndex(l => l.id === ldr.id);
+                              if (currentIndex > 0) {
+                                [newLeaders[currentIndex], newLeaders[currentIndex - 1]] = [newLeaders[currentIndex - 1], newLeaders[currentIndex]];
+                                saveLeadersToStorage(newLeaders);
+                              }
+                            }}
+                            className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-[#df6b16] hover:text-white text-slate-400 disabled:opacity-30 transition-all text-[10px]"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === categoryLeaders.length - 1}
+                            onClick={() => {
+                              const newLeaders = [...dynamicLeaders];
+                              const currentIndex = newLeaders.findIndex(l => l.id === ldr.id);
+                              if (currentIndex < newLeaders.length - 1) {
+                                [newLeaders[currentIndex], newLeaders[currentIndex + 1]] = [newLeaders[currentIndex + 1], newLeaders[currentIndex]];
+                                saveLeadersToStorage(newLeaders);
+                              }
+                            }}
+                            className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-[#df6b16] hover:text-white text-slate-400 disabled:opacity-30 transition-all text-[10px]"
+                          >
+                            ▼
+                          </button>
                         </div>
 
                         {/* Edit and Delete Actions */}
@@ -2016,8 +2141,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                       }`}
                     >
-                      <FileText className="w-4 h-4" />
-                      <span>📋 सर्व बातम्या व परिपत्रके ({newsList.length})</span>
+                      <List className="w-4 h-4" />
+                      <span>📋 सर्व बातम्या ({newsList.length})</span>
                     </button>
                   </div>
 
@@ -2105,7 +2230,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
+                            <span>प्रसिद्धी दिनांक (Publication Date)</span> <span className="text-rose-600">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={newsDate}
+                            onChange={(e) => setNewsDate(e.target.value)}
+                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-bold bg-white"
+                          />
+                        </div>
+
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
                             श्रेणी (Category) <span className="text-rose-600">*</span>
@@ -2116,10 +2255,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                           >
                             <option value="अधिकृत घोषणा">अधिकृत घोषणा</option>
+                            <option value="अधिकृत वृत्त">अधिकृत वृत्त</option>
+                            <option value="संघटना वृत्त">संघटना वृत्त</option>
+                            <option value="अभिनंदन">अभिनंदन</option>
+                            <option value="टॅगलाईन फोटो">टॅगलाईन फोटो (मुख्यपृष्ठ ताज्या घडामोडी)</option>
                             <option value="शासन निर्णय (GR)">शासन निर्णय (GR)</option>
                             <option value="बैठक अहवाल">बैठक अहवाल</option>
                             <option value="जिल्हा वृत्त">जिल्हा वृत्त</option>
-                            <option value="अभिनंदन">अभिनंदन</option>
                             <option value="अधिकृत छायाचित्र / परिपत्रक">अधिकृत छायाचित्र / परिपत्रक</option>
                           </select>
                         </div>
@@ -2158,10 +2300,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 </button>
                               )}
                             </div>
-
-                            <p className="text-[11px] text-slate-500">
-                              ☁️ निवडलेला फोटो थेट मोफत Cloudinary CDN वर सेव्ह होतो (Firebase चा ०% कोटा वापरला जातो).
-                            </p>
                           </div>
                         </div>
                       </div>
@@ -2259,15 +2397,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       </p>
                     </div>
 
-                    <div className="mb-5 p-3.5 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 space-y-1">
-                      <p className="font-bold flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-sky-600" />
-                        थेट क्लाऊडनरी मोफत इमेज होस्टिंग (०% Firebase डेटा खर्च)
-                      </p>
-                      <p className="text-[11px] text-sky-800">
-                        येथे अपलोड केलेला फोटो आपोआप Cloudinary वर जाईल आणि मुख्य वेबसाईटवर संबंधित विभागात 100% स्पष्ट दिसेल.
-                      </p>
-                    </div>
+
 
                     <form onSubmit={handleCreatePhotoOnly} className="space-y-4 text-xs">
                       <div>
@@ -2284,9 +2414,43 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         />
                       </div>
 
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1 flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
+                            <span>२. प्रसिद्धी दिनांक (Publication Date)</span> <span className="text-rose-600">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={photoOnlyDate}
+                            onChange={(e) => setPhotoOnlyDate(e.target.value)}
+                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-bold bg-white"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            ३. प्रकार / श्रेणी (Category) <span className="text-rose-600">*</span>
+                          </label>
+                          <select
+                            value={photoOnlyCategory}
+                            onChange={(e) => setPhotoOnlyCategory(e.target.value)}
+                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-semibold"
+                          >
+                            <option value="टॅगलाईन फोटो">📷 टॅगलाईन फोटो (मुख्यपृष्ठ ताज्या घडामोडी)</option>
+                            <option value="अधिकृत वृत्त">📰 अधिकृत वृत्त</option>
+                            <option value="संघटना वृत्त">🚩 संघटना वृत्त</option>
+                            <option value="अभिनंदन">💐 अभिनंदन</option>
+                            <option value="अधिकृत छायाचित्र / परिपत्रक">🖼️ अधिकृत छायाचित्र / परिपत्रक</option>
+                            <option value="अधिकृत घोषणा">📢 अधिकृत घोषणा</option>
+                          </select>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          २. फोटो निवडा (Upload Photo to Cloudinary) <span className="text-rose-600">*</span>
+                          ३. फोटो निवडा (Upload Photo to Cloudinary) <span className="text-rose-600">*</span>
                         </label>
                         <div className="space-y-3">
                           <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold rounded-lg shadow-xs transition-colors">
@@ -2569,6 +2733,78 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
+            {/* Sub-tab 3.5: Gov Orders */}
+            {activeAdminSubTab === 'gov_order' && (
+              <div className="space-y-6">
+              <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
+                <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-5">
+                  शासन निर्णय अपलोड (Upload Gov Order)
+                </h3>
+                {goCreatedSuccess && (
+                  <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 shadow-xs">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <span className="font-semibold">शासन निर्णय यशस्वीपणे प्रसिद्ध करण्यात आला आहे!</span>
+                  </div>
+                )}
+                {goError && (
+                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{goError}</span>
+                  </div>
+                )}
+                <form onSubmit={handleCreateGovOrder} className="space-y-4 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">शीर्षक</label>
+                    <input type="text" value={goTitle} onChange={e => setGoTitle(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">प्रकार</label>
+                    <select value={goType} onChange={e => setGoType(e.target.value as any)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]">
+                       <option value="शासन निर्णय">शासन निर्णय</option>
+                       <option value="न्यायालयीन आदेश">न्यायालयीन आदेश</option>
+                       <option value="परिपत्रक">परिपत्रक</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">प्रसिद्धी दिनांक</label>
+                    <input type="date" value={goDate} onChange={e => setGoDate(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">फाइल निवडा (Upload File - Image Only)</label>
+                    <input type="file" onChange={handleGoFileUpload} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" />
+                    {goFileUrl && <div className="text-emerald-700 font-bold mt-2">✓ फाइल सज्ज आहे!</div>}
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Google Drive लिंक (PDF साठी)</label>
+                    <input type="url" value={goDriveUrl} onChange={e => setGoDriveUrl(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" placeholder="https://drive.google.com/..." />
+                  </div>
+                  <button type="submit" disabled={isUploadingGoFile} className="bg-[#10b981] text-white font-bold py-2.5 px-6 rounded-lg text-xs disabled:opacity-50">
+                    {isUploadingGoFile ? 'अपलोड होत आहे...' : 'प्रसिद्ध करा'}
+                  </button>
+                </form>
+              </div>
+
+              <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
+                <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d] mb-4">
+                  शासन निर्णय सूची
+                </h3>
+                <div className="space-y-3">
+                  {govOrders.map(go => (
+                      <div key={go.id} className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                          <div>
+                              <div className="font-bold text-[#17366d]">{go.title}</div>
+                              <div className="text-xs text-slate-500">{go.type} · {go.date}</div>
+                          </div>
+                          <button onClick={() => handleDeleteGovOrder(go.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded">
+                              <Trash2 className="w-4 h-4" />
+                          </button>
+                      </div>
+                  ))}
+                </div>
+              </div>
+              </div>
+            )}
+
             {/* Sub-tab: Manage Admins (Role-Based Access Control) */}
             {activeAdminSubTab === 'manage_admins' && (
               <div className="space-y-6">
@@ -2791,24 +3027,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               <td className="p-3">
                                 <div className="flex flex-wrap gap-1.5">
                                   {subAdmin.permissions.approveMembers && (
-                                    <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    <span key="approveMembers" className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
                                       सदस्य मंजुरी
                                     </span>
                                   )}
                                   {subAdmin.permissions.manageNews && (
-                                    <span className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    <span key="manageNews" className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded text-[10px] font-bold">
                                       बातम्या व परिपत्रके
                                     </span>
                                   )}
                                   {subAdmin.permissions.manageLeadership && (
-                                    <span className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    <span key="manageLeadership" className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded text-[10px] font-bold">
                                       नेतृत्व व्यवस्थापन
                                     </span>
                                   )}
                                   {!subAdmin.permissions.approveMembers &&
                                     !subAdmin.permissions.manageNews &&
                                     !subAdmin.permissions.manageLeadership && (
-                                      <span className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
+                                      <span key="noPermissions" className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
                                     )}
                                 </div>
                               </td>
@@ -2824,11 +3060,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   </span>
                                 )}
                               </td>
-                              <td className="p-3 text-center">
+                              <td className="p-3 text-center whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() => handleResetSubAdmin(subAdmin.id, subAdmin.email)}
+                                  className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded transition-colors mr-1 inline-flex items-center"
+                                  title="पासवर्ड रिसेट करा (पुन्हा नवीन पासवर्ड सेट करू द्या)"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteAdmin(subAdmin.id, subAdmin.email)}
-                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors"
+                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors inline-flex items-center"
                                   title="व्यवस्थापक अधिकार काढून टाका"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -3311,57 +3555,97 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </div>
               )}
 
-              {/* Mandatory Checkbox for Payment Verification */}
-              <div className="bg-[#fff7f0] border-2 border-[#df6b16] p-4 rounded-xl">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={paymentConfirmedChecked}
-                    onChange={(e) => setPaymentConfirmedChecked(e.target.checked)}
-                    className="w-5 h-5 text-[#df6b16] rounded border-slate-300 focus:ring-[#df6b16]"
-                  />
-                  <div>
-                    <strong className="text-xs text-[#09243f] block">
-                      सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री केली आहे <span className="text-rose-600">*</span>
-                    </strong>
-                    <span className="text-[11px] text-slate-600">
-                      आजीवन सदस्यत्व (₹100) किंवा वार्षिक वर्गणी (₹120) महासंघाच्या अधिकृत बँक ऑफ महाराष्ट्र खात्यावर जमा झाल्याची पडताळणी झाली आहे.
-                    </span>
+              {/* Action Section: Pending vs Already Decided */}
+              {selectedAppForVerification.status === 'pending' ? (
+                <>
+                  {/* Mandatory Checkbox for Payment Verification */}
+                  <div className="bg-[#fff7f0] border-2 border-[#df6b16] p-4 rounded-xl">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={paymentConfirmedChecked}
+                        onChange={(e) => setPaymentConfirmedChecked(e.target.checked)}
+                        className="w-5 h-5 text-[#df6b16] rounded border-slate-300 focus:ring-[#df6b16]"
+                      />
+                      <div>
+                        <strong className="text-xs text-[#09243f] block">
+                          सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री केली आहे <span className="text-rose-600">*</span>
+                        </strong>
+                        <span className="text-[11px] text-slate-600">
+                          आजीवन सदस्यत्व (₹100) किंवा वार्षिक वर्गणी (₹120) महासंघाच्या अधिकृत बँक ऑफ महाराष्ट्र खात्यावर जमा झाल्याची पडताळणी झाली आहे.
+                        </span>
+                      </div>
+                    </label>
                   </div>
-                </label>
-              </div>
 
-              {/* Action Buttons: Disabled unless Checkbox Checked */}
-              <div className="pt-2 flex items-center justify-between gap-3">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={!paymentConfirmedChecked}
-                    onClick={handleApproveVerified}
-                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm text-xs transition-all"
-                  >
-                    <Check className="w-4 h-4" />
-                    मंजूर करा (Approve)
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!paymentConfirmedChecked}
-                    onClick={handleRejectVerified}
-                    className="bg-rose-50 hover:bg-rose-100 border border-rose-300 disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 text-xs transition-all"
-                  >
-                    <X className="w-4 h-4" />
-                    नाकारा (Reject)
-                  </button>
+                  {/* Action Buttons */}
+                  <div className="pt-2 flex items-center justify-between gap-3">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={!paymentConfirmedChecked}
+                        onClick={handleApproveVerified}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm text-xs transition-all"
+                      >
+                        <Check className="w-4 h-4" />
+                        मंजूर करा (Approve)
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!paymentConfirmedChecked}
+                        onClick={handleRejectVerified}
+                        className="bg-rose-50 hover:bg-rose-100 border border-rose-300 disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 text-xs transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                        नाकारा (Reject)
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAppForVerification(null)}
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-lg text-xs"
+                    >
+                      बंद करा
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4 pt-2">
+                  {/* Decision Recorded Locked Status Notice */}
+                  {selectedAppForVerification.status === 'approved' ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-950 rounded-xl text-xs space-y-1">
+                      <div className="font-bold flex items-center gap-2 text-sm text-emerald-800">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <span>निर्णय अंतिम: हा अर्ज मंजूर झाला आहे!</span>
+                      </div>
+                      <p className="text-slate-700">
+                        अधिकृत सदस्य नोंदणी क्रमांक: <strong className="font-mono text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">{selectedAppForVerification.memberNumber || 'MS-2026-MEMBER'}</strong>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-rose-50 border border-rose-300 text-rose-950 rounded-xl text-xs space-y-1">
+                      <div className="font-bold flex items-center gap-2 text-sm text-rose-800">
+                        <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
+                        <span>निर्णय अंतिम: हा अर्ज नाकारण्यात आला आहे.</span>
+                      </div>
+                      <p className="text-slate-700">
+                        या अर्जावर प्रशासनाकडून अंतिम निर्णय झालेला आहे.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAppForVerification(null)}
+                      className="bg-[#17366d] hover:bg-[#0b1e36] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-xs"
+                    >
+                      बंद करा
+                    </button>
+                  </div>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedAppForVerification(null)}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-lg text-xs"
-                >
-                  बंद करा
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -3488,3 +3772,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     </div>
   );
 };
+// Inside AdminTab, add the new section in the render logic where activeAdminSubTab is handled.
+// Since AdminTab is huge, I will just provide the conceptual UI update.
+// In a real scenario, this would be injected into the main render switch case.
+// Assuming the user wants the form to be available in AdminTab.
+// I will just add the form logic here.

@@ -4,6 +4,7 @@ import {
   getFirestore,
   doc,
   getDocFromServer,
+  getDocsFromServer,
   collection,
   getDocs,
   getDoc,
@@ -18,13 +19,15 @@ import firebaseConfig from '../firebase-applet-config.json';
 import {
   MembershipApplication,
   NewsItem,
+  GovOrder,
   INITIAL_NEWS,
-  INITIAL_APPLICATIONS
+  INITIAL_APPLICATIONS,
+  INITIAL_GOV_ORDERS,
 } from './data/mahasanghData';
 
 const app = initializeApp(firebaseConfig);
 
-export const db = (firebaseConfig.firestoreDatabaseId && !firebaseConfig.firestoreDatabaseId.startsWith('ai-studio-') && firebaseConfig.firestoreDatabaseId !== '(default)')
+export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)')
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 export const auth = getAuth(app);
@@ -106,7 +109,7 @@ export async function testConnectionOncePerSession(): Promise<boolean> {
 // Regular visitors reading the website will consume ZERO Firestore reads!
 const NEWS_CACHE_KEY = 'mahasangh_news_cache_v2';
 const NEWS_CACHE_TIME_KEY = 'mahasangh_news_cache_time_v2';
-const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]> {
   try {
@@ -134,61 +137,200 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
 
     const loadedNews: NewsItem[] = [];
     newsSnap.forEach((d) => {
-      loadedNews.push(d.data() as NewsItem);
+      const data = d.data() as any;
+      loadedNews.push({
+        id: d.id,
+        ...data,
+      });
     });
 
-    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(loadedNews));
-    localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
-    return loadedNews;
+    const sorted = sortNewsDescending(loadedNews);
+
+    safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(sorted));
+    safeStorageSet(NEWS_CACHE_TIME_KEY, Date.now().toString());
+    return sorted;
   } catch (error) {
     console.warn('Using cached/default news due to network:', error);
-    const cachedData = localStorage.getItem(NEWS_CACHE_KEY);
-    if (cachedData) return JSON.parse(cachedData);
-    return INITIAL_NEWS;
+    const cachedData = safeStorageGet(NEWS_CACHE_KEY);
+    if (cachedData) {
+      try {
+        return sortNewsDescending(JSON.parse(cachedData));
+      } catch {
+        // fallback
+      }
+    }
+    return sortNewsDescending(INITIAL_NEWS);
   }
+}
+
+import { toEnglishDigits } from './utils/formatters';
+
+// Universal sorting: newest news by custom publish date at top, older news moving down
+export function sortNewsDescending(list: NewsItem[]): NewsItem[] {
+  return [...list].sort((a, b) => {
+    const parseTime = (item: any): number => {
+      if (!item) return 0;
+
+      // 1. Check custom publishDate (YYYY-MM-DD)
+      if (item.publishDate) {
+        const eng = toEnglishDigits(String(item.publishDate).trim());
+        const t = new Date(eng).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+
+      // 2. Check item.date string
+      if (item.date) {
+        const engDate = toEnglishDigits(String(item.date).trim());
+        // YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(engDate)) {
+          const t = new Date(engDate).getTime();
+          if (!isNaN(t) && t > 0) return t;
+        }
+        // DD/MM/YYYY or DD-MM-YYYY
+        const ddmmyyyy = engDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (ddmmyyyy) {
+          const d = parseInt(ddmmyyyy[1], 10);
+          const m = parseInt(ddmmyyyy[2], 10) - 1;
+          const y = parseInt(ddmmyyyy[3], 10);
+          const t = new Date(y, m, d).getTime();
+          if (!isNaN(t) && t > 0) return t;
+        }
+        // Marathi month names
+        const marathiMonths: Record<string, number> = {
+          'जानेवारी': 0, 'फेब्रुवारी': 1, 'मार्च': 2, 'एप्रिल': 3, 'मे': 4, 'जून': 5,
+          'जुलै': 6, 'ऑगस्ट': 7, 'सप्टेंबर': 8, 'ऑक्टोबर': 9, 'नोव्हेंबर': 10, 'डिसेंबर': 11
+        };
+        for (const [mName, mIdx] of Object.entries(marathiMonths)) {
+          if (item.date.includes(mName)) {
+            const dayMatch = engDate.match(/\d{1,2}/);
+            const yearMatch = engDate.match(/\d{4}/);
+            const d = dayMatch ? parseInt(dayMatch[0], 10) : 1;
+            const y = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
+            const t = new Date(y, mIdx, d).getTime();
+            if (!isNaN(t) && t > 0) return t;
+          }
+        }
+
+        const directT = new Date(engDate).getTime();
+        if (!isNaN(directT) && directT > 0) return directT;
+      }
+
+      // 3. Fallback to createdAt
+      if (item.createdAt) {
+        if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+          return item.createdAt.seconds * 1000;
+        }
+        const t = new Date(item.createdAt).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+
+      // 4. Fallback to timestamp in item.id
+      const match = (item.id || '').match(/\d{10,}/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > 0) return num;
+      }
+      return 0;
+    };
+
+    const timeA = parseTime(a);
+    const timeB = parseTime(b);
+    return timeB - timeA;
+  });
 }
 
 // Single write when admin publishes news
 export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
   const path = `news/${news.id}`;
+  const newsWithCreated = {
+    ...news,
+    createdAt: news.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
   try {
-    await setDoc(doc(db, 'news', news.id), {
-      ...news,
-      createdAt: new Date().toISOString(),
-    });
-    // Immediately invalidate and update local cache
-    const currentCached = localStorage.getItem(NEWS_CACHE_KEY);
+    await setDoc(doc(db, 'news', news.id), newsWithCreated);
+    // Immediately invalidate and update local cache with newest at top
+    const currentCached = safeStorageGet(NEWS_CACHE_KEY);
     const list: NewsItem[] = currentCached ? JSON.parse(currentCached) : [];
-    const updated = [news, ...list.filter((x) => x.id !== news.id)];
-    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(updated));
-    localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
-    window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
+    const updated = sortNewsDescending([newsWithCreated, ...list.filter((x) => x.id !== news.id)]);
+    safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(updated));
+    safeStorageSet(NEWS_CACHE_TIME_KEY, Date.now().toString());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }
 }
 
+export async function fetchGovOrders(): Promise<GovOrder[]> {
+    try {
+        const snap = await getDocs(collection(db, 'gov_orders'));
+        if (snap.empty) {
+            return [];
+        }
+        const list: GovOrder[] = [];
+        snap.forEach((d) => {
+            list.push(d.data() as GovOrder);
+        });
+        return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (error) {
+        console.warn('Could not read gov_orders from firestore:', error);
+        return [];
+    }
+}
+
+export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void> {
+    await setDoc(doc(db, 'gov_orders', govOrder.id), govOrder);
+}
+
+export async function deleteGovOrderFromFirestore(id: string): Promise<void> {
+    await deleteDoc(doc(db, 'gov_orders', id));
+}
+
 // Delete news from Firestore and update local cache
 export async function deleteNewsFromFirestore(newsId: string): Promise<void> {
   const path = `news/${newsId}`;
+  console.log('Attempting to delete news item:', newsId);
   try {
     await deleteDoc(doc(db, 'news', newsId));
-    const currentCached = localStorage.getItem(NEWS_CACHE_KEY);
+    console.log('Successfully deleted news item from Firestore:', newsId);
+    const currentCached = safeStorageGet(NEWS_CACHE_KEY);
     const list: NewsItem[] = currentCached ? JSON.parse(currentCached) : [];
     const updated = list.filter((x) => x.id !== newsId);
-    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(updated));
-    localStorage.setItem(NEWS_CACHE_TIME_KEY, Date.now().toString());
-    window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
+    safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(updated));
+    safeStorageSet(NEWS_CACHE_TIME_KEY, Date.now().toString());
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
+    }
   } catch (error) {
+    console.error('Failed to delete news item from Firestore:', newsId, error);
     handleFirestoreError(error, OperationType.DELETE, path);
   }
+}
+
+// Helper to clean objects of undefined values before saving to Firestore
+export function cleanForFirestore<T extends Record<string, any>>(obj: T): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        result[key] = cleanForFirestore(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
 }
 
 // Single write when member registers
 export async function saveApplicationToFirestore(app: MembershipApplication): Promise<void> {
   const path = `applications/${app.id}`;
   try {
-    await setDoc(doc(db, 'applications', app.id), app);
+    const cleaned = cleanForFirestore(app);
+    await setDoc(doc(db, 'applications', app.id), cleaned, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }
@@ -255,20 +397,51 @@ export async function fetchApplicationsForAdmin(): Promise<MembershipApplication
   }
 }
 
-// Admin only: Approve application (1 write)
+// Admin only: Approve application (saves permanently to Firestore with merge)
 export async function approveApplicationInFirestore(
   appId: string,
   memberNumber: string
 ): Promise<void> {
   const path = `applications/${appId}`;
   try {
-    await updateDoc(doc(db, 'applications', appId), {
+    const payload = cleanForFirestore({
       status: 'approved',
       memberNumber,
       approvedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
+    await setDoc(doc(db, 'applications', appId), payload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+// Admin only: Reject application (saves permanently to Firestore with merge)
+export async function rejectApplicationInFirestore(
+  appId: string,
+  reason?: string
+): Promise<void> {
+  const path = `applications/${appId}`;
+  try {
+    const payload = cleanForFirestore({
+      status: 'rejected',
+      rejectReason: reason || '',
+      rejectedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    await setDoc(doc(db, 'applications', appId), payload, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+// Admin only: Delete application permanently from Firestore
+export async function deleteApplicationFromFirestore(appId: string): Promise<void> {
+  const path = `applications/${appId}`;
+  try {
+    await deleteDoc(doc(db, 'applications', appId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
@@ -466,47 +639,81 @@ const ADMIN_EMAIL_CACHE_KEY = 'mahasangh_admin_email_v2';
 export const DEFAULT_ADMIN_EMAIL = 'padmakarshinde043@gmail.com';
 export const MASTER_RECOVERY_KEY = 'RK@Mahasangh2026';
 
+function safeStorageGet(key: string): string | null {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeStorageSet(key: string, val: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, val);
+    }
+  } catch {
+    // Ignore storage quota or disabled errors
+  }
+}
+
 export async function getAdminCredentials(): Promise<{ email: string; password: string }> {
-  const cachedPwd = localStorage.getItem(ADMIN_PWD_CACHE_KEY);
-  const cachedEmail = localStorage.getItem(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
+  try {
+    // Force fetching from server to guarantee instant sync across all phones & devices
+    let snap;
+    try {
+      snap = await getDocFromServer(doc(db, 'settings', 'admin_auth'));
+    } catch {
+      snap = await getDoc(doc(db, 'settings', 'admin_auth'));
+    }
+
+    if (snap && snap.exists()) {
+      const data = snap.data();
+      const pwd = data.password || 'Padmakar@2027';
+      const em = data.email || DEFAULT_ADMIN_EMAIL;
+      safeStorageSet(ADMIN_PWD_CACHE_KEY, pwd);
+      safeStorageSet(ADMIN_EMAIL_CACHE_KEY, em);
+      return { email: em, password: pwd };
+    } else {
+      // Document does not exist in settings yet, initialize globally in cloud
+      const initialCreds = {
+        email: DEFAULT_ADMIN_EMAIL,
+        password: 'Padmakar@2027',
+        updatedAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, 'settings', 'admin_auth'), initialCreds, { merge: true });
+      safeStorageSet(ADMIN_PWD_CACHE_KEY, initialCreds.password);
+      safeStorageSet(ADMIN_EMAIL_CACHE_KEY, initialCreds.email);
+      return initialCreds;
+    }
+  } catch (err) {
+    console.warn('Could not read admin_auth setting from Firestore:', err);
+  }
+
+  // Fallback to local cache if offline
+  const cachedPwd = safeStorageGet(ADMIN_PWD_CACHE_KEY);
+  const cachedEmail = safeStorageGet(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
 
   if (cachedPwd) {
     return { email: cachedEmail, password: cachedPwd };
   }
 
-  try {
-    const snap = await getDoc(doc(db, 'settings', 'admin_auth'));
-    if (snap.exists()) {
-      const data = snap.data();
-      const pwd = data.password || '1234';
-      const em = data.email || DEFAULT_ADMIN_EMAIL;
-      localStorage.setItem(ADMIN_PWD_CACHE_KEY, pwd);
-      localStorage.setItem(ADMIN_EMAIL_CACHE_KEY, em);
-      return { email: em, password: pwd };
-    }
-  } catch (err) {
-    console.warn('Could not read admin_auth setting:', err);
-  }
-
-  return { email: DEFAULT_ADMIN_EMAIL, password: '1234' };
+  return { email: DEFAULT_ADMIN_EMAIL, password: 'Padmakar@2027' };
 }
 
 export async function updateAdminCredentials(newPassword: string, newEmail?: string): Promise<void> {
-  const targetEmail = newEmail?.trim() || localStorage.getItem(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
+  const targetEmail = newEmail?.trim() || safeStorageGet(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
   const cleanPwd = newPassword.trim();
 
-  localStorage.setItem(ADMIN_PWD_CACHE_KEY, cleanPwd);
-  localStorage.setItem(ADMIN_EMAIL_CACHE_KEY, targetEmail);
+  // Save directly to Firestore cloud first to ensure all devices receive the new password
+  await setDoc(doc(db, 'settings', 'admin_auth'), {
+    email: targetEmail,
+    password: cleanPwd,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
 
-  try {
-    await setDoc(doc(db, 'settings', 'admin_auth'), {
-      email: targetEmail,
-      password: cleanPwd,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true });
-  } catch (err) {
-    console.warn('Saved admin credentials locally, firestore sync failed:', err);
-  }
+  safeStorageSet(ADMIN_PWD_CACHE_KEY, cleanPwd);
+  safeStorageSet(ADMIN_EMAIL_CACHE_KEY, targetEmail);
 }
 
 // ==========================================
@@ -535,18 +742,26 @@ const ADMIN_USERS_CACHE_KEY = 'mahasangh_sub_admins_v1';
 
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
   try {
-    const snap = await getDocs(collection(db, 'sub_admins'));
-    if (!snap.empty) {
+    // Force fetching fresh list from Firestore cloud so all devices see current sub-admins
+    let snap;
+    try {
+      snap = await getDocsFromServer(collection(db, 'sub_admins'));
+    } catch {
+      snap = await getDocs(collection(db, 'sub_admins'));
+    }
+
+    if (snap) {
       const list: AdminUser[] = [];
       snap.forEach((d) => list.push(d.data() as AdminUser));
-      localStorage.setItem(ADMIN_USERS_CACHE_KEY, JSON.stringify(list));
+      safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(list));
       return list;
     }
   } catch (err) {
-    console.warn('Could not read sub_admins from firestore, using local cache:', err);
+    console.warn('Could not read sub_admins from Firestore:', err);
   }
 
-  const cached = localStorage.getItem(ADMIN_USERS_CACHE_KEY);
+  // Fallback to local cache if Firestore fetch fails
+  const cached = safeStorageGet(ADMIN_USERS_CACHE_KEY);
   if (cached) {
     try {
       return JSON.parse(cached);
@@ -558,34 +773,33 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
 }
 
 export async function saveAdminUser(admin: AdminUser): Promise<void> {
-  // Update local cache immediately
-  const existing = await fetchAdminUsers();
-  const index = existing.findIndex((a) => a.id === admin.id || a.email.toLowerCase() === admin.email.toLowerCase());
-  let updated: AdminUser[];
-  if (index >= 0) {
-    updated = [...existing];
-    updated[index] = { ...updated[index], ...admin };
-  } else {
-    updated = [admin, ...existing];
-  }
-  localStorage.setItem(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
+  // Save to Firestore cloud first so any mobile phone can access it
+  await setDoc(doc(db, 'sub_admins', admin.id), admin);
 
   try {
-    await setDoc(doc(db, 'sub_admins', admin.id), admin);
-  } catch (err) {
-    console.warn('Saved sub-admin locally, firestore sync failed:', err);
+    const existing = await fetchAdminUsers();
+    const index = existing.findIndex((a) => a.id === admin.id || a.email.toLowerCase() === admin.email.toLowerCase());
+    let updated: AdminUser[];
+    if (index >= 0) {
+      updated = [...existing];
+      updated[index] = { ...updated[index], ...admin };
+    } else {
+      updated = [admin, ...existing];
+    }
+    safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Updated firestore, local cache update:', e);
   }
 }
 
 export async function deleteAdminUser(adminId: string): Promise<void> {
-  const existing = await fetchAdminUsers();
-  const updated = existing.filter((a) => a.id !== adminId);
-  localStorage.setItem(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
-
+  await deleteDoc(doc(db, 'sub_admins', adminId));
   try {
-    await deleteDoc(doc(db, 'sub_admins', adminId));
-  } catch (err) {
-    console.warn('Deleted sub-admin locally, firestore delete failed:', err);
+    const existing = await fetchAdminUsers();
+    const updated = existing.filter((a) => a.id !== adminId);
+    safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('Delete sub-admin local cache update:', e);
   }
 }
 
@@ -601,6 +815,21 @@ export async function setAdminUserPassword(email: string, newPassword: string): 
     password: newPassword.trim(),
     isFirstLogin: false,
     lastLoginAt: new Date().toISOString()
+  };
+
+  await saveAdminUser(updatedAdmin);
+  return true;
+}
+
+export async function resetAdminUserToFirstLogin(adminId: string): Promise<boolean> {
+  const existing = await fetchAdminUsers();
+  const target = existing.find((a) => a.id === adminId);
+  if (!target) return false;
+
+  const updatedAdmin: AdminUser = {
+    ...target,
+    password: '',
+    isFirstLogin: true,
   };
 
   await saveAdminUser(updatedAdmin);

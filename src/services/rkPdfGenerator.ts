@@ -128,52 +128,52 @@ export async function generateSingleLetterPdf(
     <div style="width: 794px; height: 1123px; padding: 22px 36px 20px 36px; background: #ffffff; color: #1e293b; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
       <div>
         <!-- टॉप हेडर बॅनर कार्ड -->
-        <div style="background: linear-gradient(180deg, #fffcf5 0%, #faecd0 50%, #fbf3e0 100%); border-radius: 8px; padding: 6px 12px; border: 1.5px solid #d4af37; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center; margin-bottom: 10px;">
+        <div style="background: linear-gradient(180deg, #fffcf5 0%, #faecd0 50%, #fbf3e0 100%); border-radius: 8px; padding: 6px 12px; border: 1.5px solid #d4af37; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center; margin-bottom: 12px;">
           <img src="${hedingUrl}" alt="लेटरपॅड" style="width: 100%; height: auto; max-height: 165px; object-fit: contain; display: block; margin: 0 auto;">
         </div>
 
         <!-- जावक व दिनांक पट्टी -->
-        <div style="display: flex; justify-content: space-between; font-size: 11.5pt; font-weight: 800; padding-bottom: 4px; border-bottom: 1.5px dashed #851216; margin-bottom: 10px; color: #000;">
+        <div style="display: flex; justify-content: space-between; font-size: 11.5pt; font-weight: 800; padding-bottom: 4px; border-bottom: 1.5px dashed #851216; margin-bottom: 12px; color: #000;">
           <div><strong>नियुक्ती पत्र क्र.:</strong> <span style="font-family: monospace; color: #851216;">MS/2026/${serialPadded}</span></div>
           <div><strong>दिनांक:</strong> <span>${todayStr}</span></div>
         </div>
 
-        <!-- अधिकृत नियुक्ती पत्र पिल -->
-        <div style="text-align: center; margin-bottom: 10px;">
-          <span style="background: linear-gradient(135deg, #851216, #991b1b); color: #ffffff; padding: 4px 34px; font-size: 13.5pt; font-weight: 700; border-radius: 25px; border: 1.5px solid #d4af37; display: inline-block;">
+        <!-- अधिकृत नियुक्ती पत्र चॉकलेटी बॉक्स (तंतोतंत मध्यभागी) -->
+        <div style="display: flex; justify-content: center; align-items: center; text-align: center; margin-bottom: 12px;">
+          <span style="background: linear-gradient(135deg, #851216, #991b1b); color: #ffffff; padding: 6px 36px 8px 36px; font-size: 14pt; font-weight: 800; border-radius: 25px; border: 1.5px solid #d4af37; display: inline-flex; align-items: center; justify-content: center; line-height: 1.2;">
             ॥ अधिकृत नियुक्ती पत्र ॥
           </span>
         </div>
 
         <!-- प्रति (Recipient) -->
-        <div style="font-size: 12pt; line-height: 1.4; margin-bottom: 8px;">
+        <div style="font-size: 12pt; line-height: 1.5; margin-bottom: 10px;">
           प्रति,<br>
           <span style="font-size: 15pt; font-weight: 900; color: #0b1e33;">मा. ${fullName}</span><br>
           <span style="color: #475569;">(${wp.cadre}${wp.details ? ', ' + wp.details : ''}, जिल्हा - ${member.district})</span>
         </div>
 
         <!-- विषय -->
-        <div style="font-size: 12.5pt; font-weight: 800; color: #0f172a; margin-bottom: 8px;">
+        <div style="font-size: 12.5pt; font-weight: 800; color: #0f172a; margin-bottom: 10px;">
           विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...
         </div>
 
-        <!-- मुख्य मजकूर -->
-        <div style="font-size: 12pt; font-weight: 500; line-height: 1.5; text-align: justify; color: #111;">
-          <p style="font-weight: 700; margin-bottom: 4px;">सस्नेह नमस्कार,</p>
-          <p style="margin-bottom: 5px; text-indent: 20px;">
+        <!-- मुख्य मजकूर (ओळीतील अंतर वाढवले) -->
+        <div style="font-size: 12pt; font-weight: 500; line-height: 1.7; text-align: justify; color: #111;">
+          <p style="font-weight: 700; margin-bottom: 6px;">सस्नेह नमस्कार,</p>
+          <p style="margin-bottom: 8px; text-indent: 20px;">
             महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ हा राज्यातील शिक्षण क्षेत्राच्या रुपांतरणासाठी झटणाऱ्या केंद्रप्रमुख व विस्तार अधिकारी संघटनांच्या हक्कासाठी, व्यावसायिक स्वाभिमानासाठी आणि गुणवत्तापूर्ण शिक्षणासाठी कटिबद्ध असलेली अग्रगण्य संघटना आहे. महासंघाच्या सर्व सदस्यांच्या उत्स्फूर्त प्रतिसादानुसार आणि जिल्हा सभेत निवड प्रक्रियेत लोकशाहीच्या मूल्यांचा आदर करत सर्वानुमते हा निर्णय घेण्यात आला आहे.
           </p>
-          <p style="margin-bottom: 5px; text-indent: 20px;">
+          <p style="margin-bottom: 8px; text-indent: 20px;">
             आपला प्रदीर्घ आणि निष्कलंक सेवाप्रवास, शाळा-शिक्षणाविषयी असलेली तळमळ, उत्कृष्ट प्रशासकीय समन्वय आणि संघटनकौशल्यावरील आपली अढळ निष्ठा आम्ही अत्यंत जवळून अनुभवली आहे. सहकाऱ्यांच्या अडीअडचणीत धावून जाण्याची आपली वृत्ती आणि नेतृत्वगुणांची सार्थ दखल घेत, सर्व सदस्यांच्या बहुमताने व राज्य कार्यकारिणीच्या निर्णयानुसार आपणास—
           </p>
         </div>
 
         <!-- बहाल पद गोल्डन कॉलआउट -->
-        <div style="padding: 9px 0; text-align: center; margin: 8px 0; border: 1.5px solid #d4af37; background: #fffdf7; border-radius: 8px;">
+        <div style="padding: 10px 0; text-align: center; margin: 10px 0; border: 1.5px solid #d4af37; background: #fffdf7; border-radius: 8px;">
           <div style="font-size: 11.5pt; color: #334155; font-weight: 700;">
             महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या <strong style="color: #000;">${member.district}</strong> जिल्हा कार्यकारिणीवर
           </div>
-          <div style="font-size: 20pt; font-weight: 800; color: #851216; margin: 2px 0;">
+          <div style="font-size: 20.5pt; font-weight: 800; color: #851216; margin: 3px 0;">
             ⭐ « ${displayPost} » ⭐
           </div>
           <div style="font-size: 11.5pt; color: #851216; font-weight: 700;">
@@ -182,27 +182,19 @@ export async function generateSingleLetterPdf(
         </div>
 
         <!-- अभिनंदन व जबाबदारी -->
-        <div style="font-size: 12pt; font-weight: 500; line-height: 1.5; text-align: justify; color: #111;">
+        <div style="font-size: 12pt; font-weight: 500; line-height: 1.7; text-align: justify; color: #111;">
           <p style="margin: 0; text-indent: 20px;">
             हे पद केवळ सन्मानाचे प्रतीक नसून महासंघाच्या पवित्र विचारांचे धोरण आहे. केंद्रप्रमुख व विस्तार अधिकारी संवर्गाचे न्याय प्रश्न सोडवणे, आत्मसन्मान जपणे आणि सर्व सहकाऱ्यांच्या पाठीशी खंबीरपणे उभे राहणे हीच आपली मुख्य जबाबदारी आहे. सर्व सदस्यांनी आपल्यावर दाखवलेला हा विश्वास आणि आपल्या दूरदर्शी नेतृत्वाखाली संघटनेची पताका निश्चितच अभिमानाने गगनभरारी घेईल, हा ठाम विश्वास आहे. या मानाच्या नियुक्तीबद्दल आपले मनःपूर्वक अभिनंदन व भावी वाटचालीस हार्दिक शुभेच्छा!
           </p>
         </div>
       </div>
 
-      <!-- स्वाक्षरी ब्लॉक -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px; border-top: 1.5px solid #e2e8f0; margin-top: 8px;">
-        <div style="text-align: center; width: 240px;">
-          <div style="height: 38px;"></div>
-          <div style="font-size: 11.5pt; font-weight: 700; color: #000;">( श्री. विजय सावंत )</div>
-          <div style="font-size: 10pt; font-weight: 600; color: #334155; line-height: 1.2;">
-            राज्य सरचिटणीस<br>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
-          </div>
-        </div>
-
-        <div style="text-align: center; width: 240px;">
-          <img src="${signUrl}" alt="स्वाक्षरी" style="height: 48px; max-width: 170px; object-fit: contain; display: block; margin: 0 auto 2px auto;">
-          <div style="font-size: 11.5pt; font-weight: 700; color: #000;">( श्री. राजेंद्र शिवाजी खैरनार )</div>
-          <div style="font-size: 10pt; font-weight: 600; color: #334155; line-height: 1.2;">
+      <!-- स्वाक्षरी ब्लॉक (फक्त राजेंद्र खैरनार सर, अंतर कमी) -->
+      <div style="display: flex; justify-content: flex-end; align-items: flex-end; padding-top: 10px; border-top: 1.5px solid #e2e8f0; margin-top: 10px;">
+        <div style="text-align: center; min-width: 250px;">
+          <img src="${signUrl}" alt="स्वाक्षरी" style="height: 52px; max-width: 180px; object-fit: contain; display: block; margin: 0 auto -2px auto;">
+          <div style="font-size: 12pt; font-weight: 800; color: #000; margin-top: 0;">( श्री. राजेंद्र शिवाजी खैरनार )</div>
+          <div style="font-size: 10pt; font-weight: 700; color: #334155; line-height: 1.2; margin-top: 1px;">
             संस्थापक राज्याध्यक्ष<br>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
           </div>
         </div>
@@ -336,9 +328,9 @@ export async function generateDistrictExecutivePdf(
 
       if (pageData.isFirst) {
         pageHTML += `
-          <!-- मूळ रंगीत लेटरपॅड (व्यवस्थित नियंत्रित उंची 140px) -->
+          <!-- मूळ रंगीत लेटरपॅड (सुधारीत उंची 165px) -->
           <div style="width: 100%; text-align: center; margin-bottom: 4px;">
-            <img src="${hedingUrl}" alt="लेटरपॅड" style="width: 100%; height: auto; max-height: 140px; object-fit: contain; display: block; margin: 0 auto;">
+            <img src="${hedingUrl}" alt="लेटरपॅड" style="width: 100%; height: auto; max-height: 165px; object-fit: contain; display: block; margin: 0 auto;">
           </div>
           <!-- शुद्ध काळी ठळक माहिती पट्टी -->
           <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #000000; border-bottom: 2px solid #000000; padding: 5px 6px; margin-bottom: 8px; font-weight: 900; font-size: 11.5pt; color: #000000;">
@@ -361,16 +353,16 @@ export async function generateDistrictExecutivePdf(
         <div style="width: 100%; border: 1.8px solid #000000; border-bottom: none; background: #ffffff; box-sizing: border-box;">
           <!-- Table Header -->
           <div style="display: flex; background: #f1f5f9; border-bottom: 1.8px solid #000000; font-weight: 900; box-sizing: border-box;">
-            <div style="width: 44px; border-right: 1.5px solid #000000; padding: 6px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10.5pt; color: #000000; box-sizing: border-box;">
+            <div style="width: 44px; border-right: 1.5px solid #000000; padding: 6px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
               अनु.
             </div>
-            <div style="width: 240px; border-right: 1.5px solid #000000; padding: 6px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11pt; color: #000000; box-sizing: border-box;">
+            <div style="width: 230px; border-right: 1.5px solid #000000; padding: 6px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 11pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
               पदाधिकाऱ्याचे संपूर्ण नाव
             </div>
-            <div style="width: 220px; border-right: 1.5px solid #000000; padding: 6px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10.5pt; color: #000000; box-sizing: border-box;">
+            <div style="width: 240px; border-right: 1.5px solid #000000; padding: 6px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
               सध्याचे पद व कार्यक्षेत्र
             </div>
-            <div style="flex: 1; padding: 6px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11pt; color: #000000; box-sizing: border-box;">
+            <div style="flex: 1; padding: 6px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
               महासंघातील बहाल केलेले पद
             </div>
           </div>
@@ -379,23 +371,23 @@ export async function generateDistrictExecutivePdf(
       pageData.chunk.forEach((m, cIdx) => {
         const rowNumber = pageData.startIndex + cIdx + 1;
         const wp = getWorkingPlaceDisplay(m);
+        const fullCadreArea = `${wp.cadre}${wp.details ? ' (' + wp.details + ')' : ''}`;
         pageHTML += `
           <div style="display: flex; align-items: stretch; border-bottom: 1.2px solid #000000; min-height: 36px; box-sizing: border-box;">
             <!-- अनुक्रमांक -->
-            <div style="width: 44px; border-right: 1.2px solid #000000; padding: 4px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 10.5pt; color: #000000; box-sizing: border-box;">
+            <div style="width: 44px; border-right: 1.2px solid #000000; padding: 4px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
               ${rowNumber}
             </div>
-            <!-- संपूर्ण नाव -->
-            <div style="width: 240px; border-right: 1.2px solid #000000; padding: 4px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 11pt; color: #000000; line-height: 1.3; box-sizing: border-box;">
+            <!-- संपूर्ण नाव (डाव्या बाजूला व मध्यभागी - Left & Center) -->
+            <div style="width: 230px; border-right: 1.2px solid #000000; padding: 4px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 800; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}
             </div>
-            <!-- पद व कार्यक्षेत्र (नावात/कार्यक्षेत्रात ओव्हरलॅप होणार नाही) -->
-            <div style="width: 220px; border-right: 1.2px solid #000000; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-size: 10pt; color: #000000; line-height: 1.25; box-sizing: border-box;">
-              <span style="font-weight: 900; font-size: 10.5pt; color: #000000; display: block;">${wp.cadre}</span>
-              ${wp.details ? `<span style="font-weight: 700; color: #000000; font-size: 9.5pt; display: block; margin-top: 1px;">${wp.details}</span>` : ''}
+            <!-- पद व कार्यक्षेत्र एकाच ओळीत -->
+            <div style="width: 240px; border-right: 1.2px solid #000000; padding: 4px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; font-weight: 800; color: #000000; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${fullCadreArea}
             </div>
-            <!-- बहाल केलेले पद -->
-            <div style="flex: 1; padding: 4px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 11pt; color: #000000; line-height: 1.3; box-sizing: border-box;">
+            <!-- बहाल केलेले पद एकाच ओळीत -->
+            <div style="flex: 1; padding: 4px 8px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
               ${getDisplayPost(m)}
             </div>
           </div>
@@ -489,7 +481,7 @@ export async function generateStatewideRegistryPdf(
   });
 
   const totalRecords = sorted.length;
-  const ROWS_PER_PAGE = 35; // 35 rows per page for fast rendering (~3-4 pages total)
+  const ROWS_PER_PAGE = 26; // 26 rows per page to prevent any bottom text cutoff
   const totalPages = Math.ceil(totalRecords / ROWS_PER_PAGE);
   const formattedDate = getTodayFormattedDate();
 
@@ -501,7 +493,7 @@ export async function generateStatewideRegistryPdf(
 
   try {
     for (let pIdx = 0; pIdx < totalPages; pIdx++) {
-      if (onProgress) onProgress(`नोंदवही पान ${pIdx + 1} / ${totalPages} तयार होत आहे...`);
+      if (onProgress) onProgress(`माहिती पान ${pIdx + 1} / ${totalPages} तयार होत आहे...`);
 
       const startIndex = pIdx * ROWS_PER_PAGE;
       const chunk = sorted.slice(startIndex, startIndex + ROWS_PER_PAGE);
@@ -517,7 +509,7 @@ export async function generateStatewideRegistryPdf(
             </div>
 
             <div style="border: 1.5px solid #000000; padding: 5px 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 10.5pt; font-weight: 900; background: #f8fafc;">
-              <div>॥ राज्यस्तरीय अधिकृत नियुक्ती पत्र जावक नोंदवही ॥</div>
+              <div>॥ नियुक्ती क्रमांकानुसार सर्व माहिती ॥</div>
               <div>एकूण जारी नियुक्ती: ${toEnglishDigits(totalRecords)}</div>
               <div>दिनांक: ${formattedDate}</div>
             </div>
@@ -526,19 +518,19 @@ export async function generateStatewideRegistryPdf(
             <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; background: #ffffff; box-sizing: border-box;">
               <!-- Header Row -->
               <div style="display: flex; background: #f1f5f9; border-bottom: 1.5px solid #000000; font-weight: 900; box-sizing: border-box;">
-                <div style="width: 44px; border-right: 1.2px solid #000000; padding: 5px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9.5pt; box-sizing: border-box;">
+                <div style="width: 44px; border-right: 1.2px solid #000000; padding: 5px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
                   अनु.
                 </div>
-                <div style="width: 90px; border-right: 1.2px solid #000000; padding: 5px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9.5pt; box-sizing: border-box;">
+                <div style="width: 95px; border-right: 1.2px solid #000000; padding: 5px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
                   नियुक्ती क्र.
                 </div>
-                <div style="width: 110px; border-right: 1.2px solid #000000; padding: 5px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; box-sizing: border-box;">
+                <div style="width: 110px; border-right: 1.2px solid #000000; padding: 5px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; box-sizing: border-box; white-space: nowrap;">
                   जिल्हा
                 </div>
-                <div style="flex: 1; border-right: 1.2px solid #000000; padding: 5px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; box-sizing: border-box;">
+                <div style="flex: 1; border-right: 1.2px solid #000000; padding: 5px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; box-sizing: border-box; white-space: nowrap;">
                   पदाधिकाऱ्याचे संपूर्ण नाव
                 </div>
-                <div style="width: 240px; padding: 5px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; box-sizing: border-box;">
+                <div style="width: 230px; padding: 5px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 10pt; box-sizing: border-box; white-space: nowrap;">
                   बहाल केलेले पद
                 </div>
               </div>
@@ -554,20 +546,20 @@ export async function generateStatewideRegistryPdf(
                       : m.district || '-';
                   const postName = m.taluka ? `${m.appointedPost} (${m.taluka})` : m.appointedPost;
                   return `
-                    <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 25px; box-sizing: border-box;">
-                      <div style="width: 44px; border-right: 1px solid #000000; padding: 3px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 9.5pt; box-sizing: border-box;">
+                    <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 28px; box-sizing: border-box;">
+                      <div style="width: 44px; border-right: 1px solid #000000; padding: 3px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
                         ${serialNo}
                       </div>
-                      <div style="width: 90px; border-right: 1px solid #000000; padding: 3px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 9.5pt; font-family: monospace; box-sizing: border-box;">
+                      <div style="width: 95px; border-right: 1px solid #000000; padding: 3px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 9.5pt; font-family: monospace; box-sizing: border-box; white-space: nowrap;">
                         MS/2026/${outwardFormatted}
                       </div>
-                      <div style="width: 110px; border-right: 1px solid #000000; padding: 3px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 9.5pt; box-sizing: border-box;">
+                      <div style="width: 110px; border-right: 1px solid #000000; padding: 3px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
                         ${distName}
                       </div>
-                      <div style="flex: 1; border-right: 1px solid #000000; padding: 3px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 10pt; line-height: 1.25; box-sizing: border-box;">
+                      <div style="flex: 1; border-right: 1px solid #000000; padding: 3px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                         ${m.salutation || ''} ${m.firstName || ''} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName || ''}
                       </div>
-                      <div style="width: 240px; padding: 3px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 10pt; line-height: 1.25; box-sizing: border-box;">
+                      <div style="width: 230px; padding: 3px 6px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                         ${postName}
                       </div>
                     </div>
@@ -578,7 +570,7 @@ export async function generateStatewideRegistryPdf(
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9pt; font-weight: 800; border-top: 1.5px solid #000000; padding-top: 4px; margin-top: 6px;">
-            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - राज्यस्तरीय मास्टर यादी</div>
+            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - नियुक्ती क्रमांकानुसार माहिती</div>
             <div>पान क्र. ${pIdx + 1} / ${totalPages}</div>
           </div>
         </div>
@@ -588,7 +580,7 @@ export async function generateStatewideRegistryPdf(
       await new Promise((res) => setTimeout(res, 40));
 
       const canvas = await html2canvas(renderWrapper.firstElementChild as HTMLElement, {
-        scale: 1.65, // High definition
+        scale: 1.5, // Fast & crisp
         useCORS: false,
         allowTaint: true,
         backgroundColor: '#ffffff',
@@ -603,13 +595,13 @@ export async function generateStatewideRegistryPdf(
         logging: false
       });
 
-      const imgData = canvas.toDataURL('image/jpeg', 0.88);
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
       if (pIdx > 0) pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
     }
 
     if (onProgress) onProgress('PDF फाईल डाऊनलोड होत आहे...');
-    pdf.save('राज्यस्तरीय_मास्टर_नोंदवही_यादी.pdf');
+    pdf.save('नियुक्ती_क्रमांकानुसार_सर्व_माहिती.pdf');
   } finally {
     document.body.removeChild(renderWrapper);
   }
@@ -620,6 +612,13 @@ export async function generateStatewideRegistryPdf(
  * - Uses /heding.jpg as the official header
  * - Member's passport photo on the left/top-right
  * - Removes Vijay Sawant completely; Only Rajendra Khairnar on the right with /sign.jpg
+ * - High-definition direct download without browser print dialog
+ */
+/**
+ * 4. Royal Official Membership Certificate (आजीवन सभासदत्व प्रमाणपत्र PDF)
+ * - Uses /heding.jpg as the official header
+ * - Member's passport photo on the left/top-right
+ * - Only Rajendra Khairnar on the right with /sign.jpg
  * - High-definition direct download without browser print dialog
  */
 export async function generateMembershipCertificatePdf(app: MembershipApplication): Promise<void> {
@@ -649,93 +648,75 @@ export async function generateMembershipCertificatePdf(app: MembershipApplicatio
   wrapper.style.overflow = 'hidden';
 
   const certHtml = `
-    <div style="width: 794px; height: 1123px; padding: 24px 32px; background: #ffffff; color: #1e293b; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
+    <div style="width: 794px; height: 1123px; padding: 14px 20px; background: #ffffff; color: #1e293b; box-sizing: border-box; display: flex; flex-direction: column; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
       <!-- Outer Royal Double Border Container -->
-      <div style="border: 4px solid #851216; padding: 6px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(180deg, #fffdf8 0%, #ffffff 50%, #fffbf0 100%);">
-        <div style="border: 2px solid #d4af37; padding: 18px 24px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <!-- Top Official Header Banner -->
-            <div style="text-align: center; margin-bottom: 12px;">
-              <img src="${hedingUrl}" alt="महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" style="width: 100%; max-height: 155px; object-fit: contain; display: block; margin: 0 auto;">
-            </div>
+      <div style="border: 4px solid #851216; padding: 4px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; background: linear-gradient(180deg, #fffdf8 0%, #ffffff 50%, #fffbf0 100%);">
+        <div style="border: 2px solid #d4af37; padding: 12px 16px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column;">
+          
+          <!-- Top Official Header Banner -->
+          <div style="text-align: center; margin-bottom: 8px;">
+            <img src="${hedingUrl}" alt="महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" style="width: 100%; max-height: 140px; object-fit: contain; display: block; margin: 0 auto;">
+          </div>
 
-            <!-- Royal Certificate Title Pill (Perfect Vertical Center) -->
-            <div style="text-align: center; margin-bottom: 14px; display: flex; justify-content: center;">
-              <div style="background: linear-gradient(135deg, #851216, #991b1b); color: #ffffff; padding: 7px 42px; font-size: 15pt; font-weight: 800; border-radius: 30px; border: 2px solid #d4af37; display: inline-flex; align-items: center; justify-content: center; line-height: 1.1; box-shadow: 0 4px 10px rgba(133, 18, 22, 0.2);">
-                ॥ आजीवन सदस्य प्रमाणपत्र ॥
-              </div>
-            </div>
-
-            <!-- Member Number & Date Bar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px dashed #851216; padding-bottom: 6px; margin-bottom: 16px; font-size: 11pt; font-weight: 800; color: #000;">
-              <div><strong>सदस्य क्रमांक:</strong> <span style="font-family: monospace; color: #851216; font-size: 13pt;">${memberNo}</span></div>
-              <div><strong>नोंदणी दिनांक:</strong> <span>${approvalDate}</span></div>
-            </div>
-
-            <!-- Member Photo & Main Details Presentation -->
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 16px; padding: 12px 18px; background: #fffcf2; border: 1.5px solid #e7ded1; border-radius: 12px;">
-              <div style="flex: 1;">
-                <div style="font-size: 11pt; color: #475569; font-weight: 700; margin-bottom: 2px;">
-                  गौरवपूर्वक प्रमाणित करण्यात येते की,
-                </div>
-                <div style="font-size: 22pt; font-weight: 900; color: #851216; line-height: 1.2; margin-bottom: 6px;">
-                  ${app.salutation} ${app.fullName}
-                </div>
-                <div style="font-size: 11.5pt; color: #1e293b; font-weight: 700; line-height: 1.4;">
-                  <span>सध्याचे पद / व्यवसाय: <strong>${cadre}</strong></span><br>
-                  <span>कार्यक्षेत्र: <strong>${app.address ? app.address + ', ' : ''}जिल्हा - ${app.district}</strong></span>
-                </div>
-              </div>
-
-              <!-- Passport Photo Box (Right side of name card) -->
-              <div style="width: 105px; height: 125px; border: 2.5px solid #d4af37; border-radius: 8px; overflow: hidden; background: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 8px rgba(0,0,0,0.1); shrink-0;">
-                ${
-                  app.photo
-                    ? `<img src="${app.photo}" alt="${app.fullName}" style="width: 100%; height: 100%; object-fit: cover; display: block;">`
-                    : `<div style="text-align: center; color: #94a3b8; font-size: 9pt; font-weight: 700; padding: 6px;">अधिकृत फोटो</div>`
-                }
-              </div>
-            </div>
-
-            <!-- Organization Designation Badge: Exact "⭐ आजीवन सदस्य ⭐" as requested -->
-            <div style="text-align: center; margin-bottom: 16px; display: flex; justify-content: center;">
-              <span style="background: #fff8e6; border: 1.8px solid #d4af37; color: #851216; padding: 6px 36px; border-radius: 20px; font-size: 13pt; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; line-height: 1.1;">
-                ⭐ आजीवन सदस्य ⭐
-              </span>
-            </div>
-
-            <!-- Citation Text with expanded line height and spacing to prevent empty gap -->
-            <div style="font-size: 13pt; font-weight: 600; line-height: 2.1; text-align: justify; color: #111827; padding: 18px 12px; margin: 15px 0 20px 0;">
-              <p style="margin: 0; text-indent: 32px;">
-                आपण महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे अधिकृत आजीवन सदस्यत्व स्वीकारले असून, संघटनेच्या संघटन, सन्मान, समर्पण व शैक्षणिक गुणवत्ता या चतुःसूत्रीशी कटिबद्ध राहून शिक्षण क्षेत्राच्या सर्वांगीण विकासासाठी आणि सहकारी बांधवांच्या हक्कांच्या रक्षणासाठी सक्रिय योगदान देण्याचा संकल्प केला आहे. याबद्दल महासंघातर्फे हे आजीवन सदस्य प्रमाणपत्र सस्नेह व गौरवपूर्वक बहाल करण्यात येत आहे.
-              </p>
+          <!-- Royal Certificate Title Pill (Perfect Vertical Center) -->
+          <div style="text-align: center; margin-bottom: 10px; display: flex; justify-content: center;">
+            <div style="background: linear-gradient(135deg, #851216, #991b1b); color: #ffffff; padding: 8px 30px; font-size: 14pt; font-weight: 800; border-radius: 30px; border: 2px solid #d4af37; display: inline-flex; align-items: center; justify-content: center; line-height: 1;">
+              ॥ आजीवन सदस्य प्रमाणपत्र ॥
             </div>
           </div>
 
-          <!-- Bottom Official Registration Info & Founder State President Signature (Stamp removed completely) -->
-          <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 14px; border-top: 1.5px solid #cbd5e1; margin-top: 10px;">
-            <!-- Left: Official Association Registration Details (Stamp removed) -->
-            <div style="text-align: left; width: 240px; padding-left: 6px;">
-              <div style="font-size: 11pt; font-weight: 800; color: #851216; line-height: 1.3;">
-                महाराष्ट्र राज्य<br>केंद्रप्रमुख व अधिकारी महासंघ
+          <!-- Member Number & Date Bar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px dashed #851216; padding-bottom: 4px; margin-bottom: 12px; font-size: 10.5pt; font-weight: 800; color: #000;">
+            <div><strong>सदस्य क्रमांक:</strong> <span style="font-family: monospace; color: #851216; font-size: 12pt;">${memberNo}</span></div>
+            <div><strong>नोंदणी दिनांक:</strong> <span>${approvalDate}</span></div>
+          </div>
+
+          <!-- Member Photo & Main Details Presentation -->
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 12px; padding: 10px 15px; background: #fffcf2; border: 1.5px solid #e7ded1; border-radius: 8px;">
+            <div style="flex: 1;">
+              <div style="font-size: 10.5pt; color: #475569; font-weight: 700; margin-bottom: 2px;">
+                गौरवपूर्वक प्रमाणित करण्यात येते की,
               </div>
-              <div style="font-size: 9.5pt; font-weight: 700; color: #475569; margin-top: 4px;">
-                नोंदणी क्र. महा/एनएसके/एन/2427
+              <div style="font-size: 18pt; font-weight: 900; color: #851216; line-height: 1.2; margin-bottom: 4px;">
+                ${app.salutation} ${app.fullName}
+              </div>
+              <div style="font-size: 11pt; color: #1e293b; font-weight: 700; line-height: 1.3;">
+                <span>सध्याचे पद / व्यवसाय: <strong>${cadre}</strong></span><br>
+                <span>कार्यक्षेत्र: <strong>${app.address ? app.address + ', ' : ''}जिल्हा - ${app.district}</strong></span>
               </div>
             </div>
 
-            <!-- Right: Founder State President Signature ONLY (Vijay Sawant and stamp removed) -->
-            <div style="text-align: center; width: 260px;">
-              <img src="${signUrl}" alt="स्वाक्षरी" style="height: 52px; max-width: 175px; object-fit: contain; display: block; margin: 0 auto 3px auto;">
-              <div style="font-size: 12.5pt; font-weight: 900; color: #000000; line-height: 1.2;">
-                ( श्री. राजेंद्र शिवाजी खैरनार )
-              </div>
-              <div style="font-size: 10.5pt; font-weight: 800; color: #851216; margin-top: 2px;">
-                संस्थापक राज्याध्यक्ष
-              </div>
-              <div style="font-size: 9.5pt; font-weight: 700; color: #334155;">
-                महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
-              </div>
+            <!-- Passport Photo Box (Right side of name card) -->
+            <div style="width: 90px; height: 110px; border: 2px solid #d4af37; border-radius: 6px; overflow: hidden; background: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+              ${
+                app.photo
+                  ? `<img src="${app.photo}" alt="${app.fullName}" style="width: 100%; height: 100%; object-fit: cover; display: block;">`
+                  : `<div style="text-align: center; color: #94a3b8; font-size: 8pt; font-weight: 700; padding: 4px;">अधिकृत फोटो</div>`
+              }
+            </div>
+          </div>
+
+          <!-- Organization Designation Badge -->
+          <div style="text-align: center; margin-bottom: 12px; display: flex; justify-content: center;">
+            <span style="background: #fff8e6; border: 1.5px solid #d4af37; color: #851216; padding: 8px 28px; border-radius: 20px; font-size: 12pt; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; line-height: 1;">
+              ⭐ आजीवन सदस्य ⭐
+            </span>
+          </div>
+
+          <!-- Citation Text -->
+          <div style="font-size: 12pt; font-weight: 600; line-height: 1.6; text-align: justify; color: #111827; padding: 5px 8px; margin: 2px 0 8px 0; flex-grow: 1;">
+            <p style="margin: 0; text-indent: 20px;">
+              आपण महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे अधिकृत आजीवन सदस्यत्व स्वीकारले असून, संघटनेच्या संघटन, सन्मान, समर्पण व शैक्षणिक गुणवत्ता या चतुःसूत्रीशी कटिबद्ध राहून शिक्षण क्षेत्राच्या सर्वांगीण विकासासाठी आणि सहकारी बांधवांच्या हक्कांच्या रक्षणासाठी सक्रिय योगदान देण्याचा संकल्प केला आहे. याबद्दल महासंघातर्फे हे आजीवन सदस्य प्रमाणपत्र सस्नेह व गौरवपूर्वक बहाल करण्यात येत आहे.
+            </p>
+          </div>
+
+          <!-- Founder State President Signature -->
+          <div style="display: flex; justify-content: flex-end; align-items: center; padding-top: 5px; border-top: 1.5px solid #cbd5e1;">
+            <div style="text-align: center; width: 200px;">
+              <img src="${signUrl}" alt="स्वाक्षरी" style="height: 45px; max-width: 150px; object-fit: contain; display: block; margin: 0 auto -2px auto;">
+              <div style="font-size: 11pt; font-weight: 900; color: #000; line-height: 1.2;">( श्री. राजेंद्र शिवाजी खैरनार )</div>
+              <div style="font-size: 9.5pt; font-weight: 800; color: #000;">संस्थापक राज्याध्यक्ष</div>
+              <div style="font-size: 8.5pt; font-weight: 700; color: #000;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
             </div>
           </div>
         </div>
@@ -774,6 +755,7 @@ export async function generateMembershipCertificatePdf(app: MembershipApplicatio
   }
 }
 
+
 /**
  * 5. Organization Status Matrix A4 Black & White PDF (संघटना सद्यस्थिती अहवाल)
  * - All 34 districts with counts for State Rep, Division Rep, District Officials, Taluka Officials, Members
@@ -792,14 +774,18 @@ export async function generateOrganizationStatusPdf(
 ): Promise<void> {
   const todayFormatted = getTodayFormattedDate();
   const totals = stats.reduce(
-    (acc, cur) => ({
-      stateRep: acc.stateRep + cur.stateRep,
-      divRep: acc.divRep + cur.divRep,
-      distOfficial: acc.distOfficial + cur.distOfficial,
-      talukaOfficial: acc.talukaOfficial + cur.talukaOfficial,
-      members: acc.members + cur.members,
-    }),
-    { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, members: 0 }
+    (acc, cur) => {
+      const rowSum = cur.stateRep + cur.divRep + cur.distOfficial + cur.talukaOfficial + cur.members;
+      return {
+        stateRep: acc.stateRep + cur.stateRep,
+        divRep: acc.divRep + cur.divRep,
+        distOfficial: acc.distOfficial + cur.distOfficial,
+        talukaOfficial: acc.talukaOfficial + cur.talukaOfficial,
+        members: acc.members + cur.members,
+        grandTotal: acc.grandTotal + rowSum
+      };
+    },
+    { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, members: 0, grandTotal: 0 }
   );
 
   const wrapper = document.createElement('div');
@@ -815,62 +801,68 @@ export async function generateOrganizationStatusPdf(
     if (onProgress) onProgress('संघटना सद्यस्थिती तक्ता तयार होत आहे...');
 
     const pageHTML = `
-      <div style="width: 794px; min-height: 1123px; padding: 22px 28px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-        <!-- B&W Header -->
-        <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 8px;">
-          <div style="font-size: 10pt; font-weight: 800;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ (Reg. MH/0000555/2026)</div>
-          <div style="font-size: 16pt; font-weight: 900; margin: 2px 0;">॥ महाराष्ट्र राज्य संघटनात्मक सद्यस्थिती अहवाल ॥</div>
-          <div style="font-size: 9.5pt; font-weight: 700;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
+      <div style="width: 794px; min-height: 1123px; padding: 20px 24px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
+        <!-- Vibrant Royal Navy & Gold Status Header -->
+        <div style="background: linear-gradient(135deg, #0b1e33 0%, #1e3a8a 100%); border-radius: 8px; border: 2px solid #d4af37; padding: 10px 14px; text-align: center; color: #ffffff; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+          <div style="font-size: 11pt; font-weight: 800; color: #fde047;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+          <div style="font-size: 17pt; font-weight: 900; margin: 3px 0; color: #ffffff;">॥ महाराष्ट्र राज्य संघटनात्मक सद्यस्थिती अहवाल ॥</div>
+          <div style="font-size: 9.5pt; font-weight: 700; color: #e2e8f0;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
-          <div>विषय: सर्व 34 जिल्ह्यांतील पदाधिकारी व सभासद संख्यात्मक स्थिती</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10pt; font-weight: 900; padding: 5px 10px; border: 1.5px solid #d4af37; border-radius: 6px; margin-bottom: 8px; background: #fffdf5; color: #851216;">
+          <div>विषय: सर्व 34 जिल्ह्यांतील पदाधिकारी व सभासद संख्यात्मक स्थिती (व्हाट्सॲप स्टेटस प्रत)</div>
           <div>दिनांक: ${todayFormatted}</div>
         </div>
 
-        <!-- B&W Matrix Table -->
-        <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
-          <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; text-align: center; box-sizing: border-box;">
-            <div style="width: 44px; border-right: 1.2px solid #000; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">अनु.</div>
-            <div style="width: 150px; border-right: 1.2px solid #000; padding: 4px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">जिल्ह्याचे नाव</div>
-            <div style="width: 95px; border-right: 1.2px solid #000; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">राज्य प्रतिनिधी</div>
-            <div style="width: 100px; border-right: 1.2px solid #000; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">विभागीय प्रतिनिधी</div>
-            <div style="width: 110px; border-right: 1.2px solid #000; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">जिल्हा पदाधिकारी</div>
-            <div style="width: 110px; border-right: 1.2px solid #000; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">तालुका पदाधिकारी</div>
-            <div style="flex: 1; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">सदस्य (नोंदणी)</div>
+        <!-- Designer Matrix Table with Horizontal & Vertical Totals -->
+        <div style="width: 100%; border: 1.8px solid #1e293b; border-bottom: none; box-sizing: border-box; border-radius: 4px; overflow: hidden;">
+          <!-- Table Header -->
+          <div style="display: flex; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); color: #ffffff; border-bottom: 1.8px solid #d4af37; font-weight: 900; text-align: center; box-sizing: border-box;">
+            <div style="width: 36px; border-right: 1.2px solid #475569; padding: 4px 2px; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">अनु.</div>
+            <div style="width: 125px; border-right: 1.2px solid #475569; padding: 4px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">जिल्ह्याचे नाव</div>
+            <div style="width: 80px; border-right: 1.2px solid #475569; padding: 4px 2px; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">राज्य प्रतिनिधी</div>
+            <div style="width: 85px; border-right: 1.2px solid #475569; padding: 4px 2px; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">विभागीय प्रतिनिधी</div>
+            <div style="width: 95px; border-right: 1.2px solid #475569; padding: 4px 2px; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">जिल्हा पदाधिकारी</div>
+            <div style="width: 95px; border-right: 1.2px solid #475569; padding: 4px 2px; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">तालुका पदाधिकारी</div>
+            <div style="width: 85px; border-right: 1.2px solid #475569; padding: 4px 2px; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">सदस्य (नोंदणी)</div>
+            <div style="flex: 1; padding: 4px 2px; font-size: 9.5pt; color: #fde047; display: flex; align-items: center; justify-content: center; white-space: nowrap;">एकूण (Total)</div>
           </div>
 
           ${stats
-            .map(
-              (st, idx) => `
-            <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 24px; box-sizing: border-box; text-align: center;">
-              <div style="width: 44px; border-right: 1px solid #000; padding: 2px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${idx + 1}</div>
-              <div style="width: 150px; border-right: 1px solid #000; padding: 2px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start;">${st.district}</div>
-              <div style="width: 95px; border-right: 1px solid #000; padding: 2px; font-weight: 700; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(st.stateRep)}</div>
-              <div style="width: 100px; border-right: 1px solid #000; padding: 2px; font-weight: 700; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(st.divRep)}</div>
-              <div style="width: 110px; border-right: 1px solid #000; padding: 2px; font-weight: 700; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(st.distOfficial)}</div>
-              <div style="width: 110px; border-right: 1px solid #000; padding: 2px; font-weight: 700; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(st.talukaOfficial)}</div>
-              <div style="flex: 1; padding: 2px; font-weight: 900; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(st.members)}</div>
-            </div>
-          `
-            )
+            .map((st, idx) => {
+              const rowSum = st.stateRep + st.divRep + st.distOfficial + st.talukaOfficial + st.members;
+              const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+              return `
+                <div style="display: flex; align-items: stretch; border-bottom: 1px solid #cbd5e1; background: ${bg}; min-height: 22px; box-sizing: border-box; text-align: center;">
+                  <div style="width: 36px; border-right: 1px solid #e2e8f0; padding: 2px; font-weight: 800; font-size: 8.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${idx + 1}</div>
+                  <div style="width: 125px; border-right: 1px solid #e2e8f0; padding: 2px 4px; font-weight: 800; font-size: 9pt; color: #0f172a; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${st.district}</div>
+                  <div style="width: 80px; border-right: 1px solid #e2e8f0; padding: 2px; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(st.stateRep)}</div>
+                  <div style="width: 85px; border-right: 1px solid #e2e8f0; padding: 2px; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(st.divRep)}</div>
+                  <div style="width: 95px; border-right: 1px solid #e2e8f0; padding: 2px; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(st.distOfficial)}</div>
+                  <div style="width: 95px; border-right: 1px solid #e2e8f0; padding: 2px; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(st.talukaOfficial)}</div>
+                  <div style="width: 85px; border-right: 1px solid #e2e8f0; padding: 2px; font-weight: 700; font-size: 9pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(st.members)}</div>
+                  <div style="flex: 1; padding: 2px; font-weight: 900; font-size: 9.5pt; color: #851216; background: #fffdf5; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(rowSum)}</div>
+                </div>
+              `;
+            })
             .join('')}
 
-          <!-- Totals Row -->
-          <div style="display: flex; align-items: stretch; border-bottom: 2px solid #000000; background: #e2e8f0; min-height: 28px; box-sizing: border-box; font-weight: 900; text-align: center;">
-            <div style="width: 194px; border-right: 1.5px solid #000; padding: 4px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">एकूण (Total)</div>
-            <div style="width: 95px; border-right: 1.5px solid #000; padding: 4px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(totals.stateRep)}</div>
-            <div style="width: 100px; border-right: 1.5px solid #000; padding: 4px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(totals.divRep)}</div>
-            <div style="width: 110px; border-right: 1.5px solid #000; padding: 4px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(totals.distOfficial)}</div>
-            <div style="width: 110px; border-right: 1.5px solid #000; padding: 4px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(totals.talukaOfficial)}</div>
-            <div style="flex: 1; padding: 4px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(totals.members)}</div>
+          <!-- Grand Totals Row (Matching Vertical & Horizontal Sums) -->
+          <div style="display: flex; align-items: stretch; border-bottom: 2px solid #851216; background: linear-gradient(135deg, #851216 0%, #991b1b 100%); color: #ffffff; min-height: 28px; box-sizing: border-box; font-weight: 900; text-align: center;">
+            <div style="width: 161px; border-right: 1.5px solid #d4af37; padding: 3px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">सर्व बेरीज (Grand Total)</div>
+            <div style="width: 80px; border-right: 1.5px solid #d4af37; padding: 3px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(totals.stateRep)}</div>
+            <div style="width: 85px; border-right: 1.5px solid #d4af37; padding: 3px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(totals.divRep)}</div>
+            <div style="width: 95px; border-right: 1.5px solid #d4af37; padding: 3px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(totals.distOfficial)}</div>
+            <div style="width: 95px; border-right: 1.5px solid #d4af37; padding: 3px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(totals.talukaOfficial)}</div>
+            <div style="width: 85px; border-right: 1.5px solid #d4af37; padding: 3px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; white-space: nowrap;">${toEnglishDigits(totals.members)}</div>
+            <div style="flex: 1; padding: 3px 2px; font-size: 11pt; color: #fde047; font-weight: 900; display: flex; align-items: center; justify-content: center; white-space: nowrap; background: rgba(0,0,0,0.25);">⭐ ${toEnglishDigits(totals.grandTotal)} ⭐</div>
           </div>
         </div>
 
         <!-- Footer -->
-        <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center; font-size: 9pt; font-weight: 700; border-top: 1px solid #000; padding-top: 4px;">
+        <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 9pt; font-weight: 800; color: #1e293b; border-top: 1.5px solid #851216; padding-top: 4px;">
           <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div>राज्याध्यक्ष अधिकृत अहवाल प्रत</div>
+          <div>संस्थापक राज्याध्यक्ष अधिकृत अहवाल प्रत</div>
         </div>
       </div>
     `;
@@ -879,7 +871,7 @@ export async function generateOrganizationStatusPdf(
     await new Promise((r) => setTimeout(r, 50));
 
     const canvas = await html2canvas(wrapper, {
-      scale: 1.75,
+      scale: 1.80,
       useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -943,24 +935,24 @@ export async function generateDistrictPresidentsPdf(
 
         <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
           <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; text-align: center; box-sizing: border-box;">
-            <div style="width: 44px; border-right: 1.2px solid #000; padding: 5px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">अनु.</div>
-            <div style="width: 130px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">जिल्ह्याचे नाव</div>
-            <div style="flex: 1; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">पदाधिकाऱ्याचे नाव</div>
-            <div style="width: 170px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">सध्याचे पद व कार्यक्षेत्र</div>
-            <div style="width: 140px; border-right: 1.2px solid #000; padding: 5px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">संघटनेतील पद</div>
-            <div style="width: 110px; padding: 5px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">मोबाईल क्रमांक</div>
+            <div style="width: 44px; border-right: 1.2px solid #000; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">अनु.</div>
+            <div style="width: 120px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">जिल्ह्याचे नाव</div>
+            <div style="flex: 1; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: center; text-align: center;">पदाधिकाऱ्याचे नाव</div>
+            <div style="width: 160px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">सध्याचे पद व कार्यक्षेत्र</div>
+            <div style="width: 130px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">संघटनेतील पद</div>
+            <div style="width: 110px; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">मोबाईल क्रमांक</div>
           </div>
 
           ${list
             .map(
               (item, idx) => `
-            <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 26px; box-sizing: border-box; text-align: center;">
-              <div style="width: 44px; border-right: 1px solid #000; padding: 4px 2px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${idx + 1}</div>
-              <div style="width: 130px; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start;">${item.district}</div>
-              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 10pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${item.name}</div>
-              <div style="width: 170px; border-right: 1px solid #000; padding: 4px 6px; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${item.cadre}</div>
-              <div style="width: 140px; border-right: 1px solid #000; padding: 4px 4px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${item.post}</div>
-              <div style="width: 110px; padding: 4px 4px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(item.mobile)}</div>
+            <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 28px; box-sizing: border-box; text-align: center;">
+              <div style="width: 44px; border-right: 1px solid #000; padding: 4px 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">${idx + 1}</div>
+              <div style="width: 120px; border-right: 1px solid #000; padding: 4px 4px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center; text-align: center; word-break: break-word; white-space: normal;">${item.district}</div>
+              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${item.name}</div>
+              <div style="width: 160px; border-right: 1px solid #000; padding: 4px 4px; font-size: 8.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">${item.cadre}</div>
+              <div style="width: 130px; border-right: 1px solid #000; padding: 4px 4px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center; text-align: center;">${item.post}</div>
+              <div style="width: 110px; padding: 4px 4px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center;">${toEnglishDigits(item.mobile)}</div>
             </div>
           `
             )
@@ -998,6 +990,7 @@ export async function generateDistrictPresidentsPdf(
 /**
  * 7. Taluka Presidents List PDF (तालुका अध्यक्ष यादी)
  * Columns: अनुक्रमांक, जिल्ह्याचे नाव, सध्याचे पद, संघटनेतील पद, मोबाईल क्रमांक
+ * Exactly 16 items per page, no name wrapping, centered horizontally and vertically
  */
 export async function generateTalukaPresidentsPdf(
   list: Array<{
@@ -1021,72 +1014,88 @@ export async function generateTalukaPresidentsPdf(
   document.body.appendChild(wrapper);
 
   try {
-    if (onProgress) onProgress('तालुका अध्यक्ष यादी तयार होत आहे...');
+    const itemsPerPage = 16;
+    const totalPages = Math.ceil(list.length / itemsPerPage) || 1;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
 
-    const pageHTML = `
-      <div style="width: 794px; min-height: 1123px; padding: 22px 28px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-        <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 8px;">
-          <div style="font-size: 10pt; font-weight: 800;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div style="font-size: 16pt; font-weight: 900; margin: 2px 0;">॥ महाराष्ट्र राज्य तालुका अध्यक्ष अधिकृत सूची ॥</div>
-          <div style="font-size: 9.5pt; font-weight: 700;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
-        </div>
+    for (let p = 0; p < totalPages; p++) {
+      if (onProgress) onProgress(`तालुका अध्यक्ष यादी तयार होत आहे... (पान ${p + 1} पैकी ${totalPages})`);
 
-        <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
-          <div>एकूण तालुका अध्यक्ष: ${toEnglishDigits(list.length)}</div>
-          <div>दिनांक: ${todayFormatted}</div>
-        </div>
+      const pageItems = list.slice(p * itemsPerPage, (p + 1) * itemsPerPage);
 
-        <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
-          <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; text-align: center; box-sizing: border-box;">
-            <div style="width: 44px; border-right: 1.2px solid #000; padding: 5px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">अनु.</div>
-            <div style="width: 140px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">जिल्हा व तालुका</div>
-            <div style="flex: 1; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: center;">पदाधिकाऱ्याचे नाव</div>
-            <div style="width: 160px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">सध्याचे पद व कार्यक्षेत्र</div>
-            <div style="width: 140px; border-right: 1.2px solid #000; padding: 5px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">संघटनेतील पद</div>
-            <div style="width: 110px; padding: 5px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">मोबाईल क्रमांक</div>
+      const pageHTML = `
+        <div style="width: 794px; height: 1123px; padding: 22px 28px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 8px;">
+              <div style="font-size: 10pt; font-weight: 800;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+              <div style="font-size: 16pt; font-weight: 900; margin: 2px 0;">॥ महाराष्ट्र राज्य तालुका अध्यक्ष अधिकृत सूची ॥</div>
+              <div style="font-size: 9.5pt; font-weight: 700;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
+              <div>एकूण तालुका अध्यक्ष: ${toEnglishDigits(list.length)} (पान ${toEnglishDigits(p + 1)}/ ${toEnglishDigits(totalPages)})</div>
+              <div>दिनांक: ${todayFormatted}</div>
+            </div>
+
+            <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
+              <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; text-align: center; box-sizing: border-box;">
+                <div style="width: 44px; border-right: 1.2px solid #000; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">अनु.</div>
+                <div style="width: 150px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">जिल्हा व तालुका</div>
+                <div style="flex: 1; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">पदाधिकाऱ्याचे नाव</div>
+                <div style="width: 150px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">सध्याचे पद व कार्यक्षेत्र</div>
+                <div style="width: 130px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">संघटनेतील पद</div>
+                <div style="width: 110px; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">मोबाईल क्रमांक</div>
+              </div>
+
+              ${pageItems
+                .map(
+                  (item, idx) => `
+                <div style="display: flex; align-items: center; border-bottom: 1px solid #000000; height: 38px; box-sizing: border-box; text-align: center;">
+                  <div style="width: 44px; border-right: 1px solid #000; padding: 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${p * itemsPerPage + idx + 1}</div>
+                  <div style="width: 150px; border-right: 1px solid #000; padding: 2px 4px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">
+                    ${item.district}${item.taluka ? ` (${item.taluka})` : ''}
+                  </div>
+                  <div style="flex: 1; border-right: 1px solid #000; padding: 2px 4px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${item.name}</div>
+                  <div style="width: 150px; border-right: 1px solid #000; padding: 2px 4px; font-size: 8.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${item.cadre}</div>
+                  <div style="width: 130px; border-right: 1px solid #000; padding: 2px 4px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${item.post}</div>
+                  <div style="width: 110px; padding: 2px 4px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(item.mobile)}</div>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
           </div>
 
-          ${list
-            .map(
-              (item, idx) => `
-            <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 26px; box-sizing: border-box; text-align: center;">
-              <div style="width: 44px; border-right: 1px solid #000; padding: 4px 2px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${idx + 1}</div>
-              <div style="width: 140px; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9pt; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; text-align: left;">
-                <span>${item.district}</span>
-                ${item.taluka ? `<span style="font-size: 8.5pt; color: #334155;">ता. ${item.taluka}</span>` : ''}
-              </div>
-              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 10pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${item.name}</div>
-              <div style="width: 160px; border-right: 1px solid #000; padding: 4px 6px; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${item.cadre}</div>
-              <div style="width: 140px; border-right: 1px solid #000; padding: 4px 4px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${item.post}</div>
-              <div style="width: 110px; padding: 4px 4px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(item.mobile)}</div>
-            </div>
-          `
-            )
-            .join('')}
+          <!-- Page Footer -->
+          <div style="border-top: 1px solid #000000; padding-top: 4px; display: flex; justify-content: space-between; font-size: 8.5pt; font-weight: 700;">
+            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ — तालुका अध्यक्ष सूची</div>
+            <div>पान ${toEnglishDigits(p + 1)} पैकी ${toEnglishDigits(totalPages)}</div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    wrapper.innerHTML = pageHTML;
-    await new Promise((r) => setTimeout(r, 50));
+      wrapper.innerHTML = pageHTML;
+      await new Promise((r) => setTimeout(r, 60));
 
-    const canvas = await html2canvas(wrapper, {
-      scale: 1.75,
-      useCORS: false,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      x: 0,
-      y: 0,
-      width: 794,
-      windowWidth: 794,
-      logging: false
-    });
+      const canvas = await html2canvas(wrapper, {
+        scale: 1.75,
+        useCORS: false,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        width: 794,
+        windowWidth: 794,
+        logging: false
+      });
 
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-    const imgData = canvas.toDataURL('image/jpeg', 0.90);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      const imgData = canvas.toDataURL('image/jpeg', 0.90);
+      if (p > 0) pdf.addPage('a4', 'portrait');
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    }
+
     pdf.save('सर्व_तालुका_अध्यक्ष_यादी.pdf');
   } finally {
     document.body.removeChild(wrapper);
@@ -1143,7 +1152,7 @@ export async function generateRegisteredMembersPdf(
             <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 26px; box-sizing: border-box; text-align: center;">
               <div style="width: 44px; border-right: 1px solid #000; padding: 4px 2px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${idx + 1}</div>
               <div style="width: 135px; border-right: 1px solid #000; padding: 4px 4px; font-family: monospace; font-weight: 900; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${m.memberNumber || '-'}</div>
-              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${m.salutation} ${m.fullName}</div>
+              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.salutation} ${m.fullName}</div>
               <div style="width: 140px; border-right: 1px solid #000; padding: 4px 4px; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${m.professional || '-'}</div>
               <div style="width: 110px; border-right: 1px solid #000; padding: 4px 4px; font-size: 9pt; display: flex; align-items: center; justify-content: center;">${m.district}</div>
               <div style="width: 105px; padding: 4px 4px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center;">${toEnglishDigits(m.phone)}</div>
