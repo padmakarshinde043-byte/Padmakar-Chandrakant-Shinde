@@ -16,11 +16,15 @@ import { fetchOfficials } from '../services/rkFirebaseService';
 import { OfficialMember, DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { generateMembershipCertificatePdf } from '../services/rkPdfGenerator';
 import { RegisteredMembersDirectory } from './RegisteredMembersDirectory';
-import { allocateNextMemberNumber, addApprovedMemberToCache } from '../firebase';
+import {
+  allocateNextMemberNumber,
+  addApprovedMemberToCache,
+  findExistingApplicationInFirestore,
+} from '../firebase';
 import { initiateRazorpayPayment, fetchRazorpayPublicConfig } from '../utils/razorpay';
 
 interface MembershipTabProps {
-  onAddApplication: (app: MembershipApplication) => void;
+  onAddApplication: (app: MembershipApplication) => Promise<void> | void;
   applications: MembershipApplication[];
   onTrackRemote?: (query: string) => Promise<MembershipApplication | null>;
 }
@@ -77,6 +81,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [razorpayError, setRazorpayError] = useState<string>('');
   const [isCheckingPaymentStatus, setIsCheckingPaymentStatus] = useState<boolean>(false);
   const [paymentStatusNotice, setPaymentStatusNotice] = useState<string>('');
+  const [isSubmittingForm, setIsSubmittingForm] = useState<boolean>(false);
+  const [existingPendingMatch, setExistingPendingMatch] = useState<{
+    app: MembershipApplication;
+    matchedBy: 'phone' | 'email' | 'name';
+  } | null>(null);
 
   const handleStartRazorpayCheckout = (app: MembershipApplication) => {
     setIsRazorpayLoading(true);
@@ -272,9 +281,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingForm) return;
     setFormAlert('');
+    setExistingPendingMatch(null);
 
     if (!salutation || !fullName.trim() || !phone.trim() || !address.trim() || !education.trim() || !professionalQualification.trim() || !professional.trim() || !district || !taluka || (taluka && !centerName.trim())) {
       setFormAlert('कृपया सर्व आवश्यक (*) माहिती (जिल्हा, तालुका व कार्यरत केंद्राच्या नावासह) अचूकपणे निवडा व भरा.');
@@ -289,90 +300,132 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       return;
     }
 
-    const cleanEmail = email.trim().toLowerCase() || `${cleanPhone}@mahasangh.in`;
+    const normalizedName = fullName.trim().replace(/\s+/g, ' ');
+    const normalizedNameLower = normalizedName.toLowerCase();
+    const userEnteredEmail = email.trim().toLowerCase();
+    const cleanEmail = userEnteredEmail || `${cleanPhone}@mahasangh.in`;
 
-    // Check duplicate by phone number (last 10 digits comparison)
-    const existingMatch = applications.find(
-      (a) => a.phone && a.phone.replace(/\D/g, '').slice(-10) === cleanPhone
-    );
+    setIsSubmittingForm(true);
+    try {
+      // 1. Check duplicate in local cache first (phone, email, or exact full name)
+      let matchedApp: MembershipApplication | null = null;
+      let matchedBy: 'phone' | 'email' | 'name' = 'phone';
 
-    if (existingMatch) {
-      if (existingMatch.status === 'approved') {
-        setFormAlert(`हा मोबाईल नंबर (${cleanPhone}) आधीच नोंदणीकृत असून सदस्यत्व मंजूर आहे (सदस्य क्र. ${existingMatch.memberNumber || ''}). आपण वरील 'अर्जाची स्थिती तपासा' मधून आय-कार्ड डाऊनलोड करू शकता.`);
-        window.scrollTo({ top: 380, behavior: 'smooth' });
-        return;
-      } else {
-        // Pending application already exists - update it seamlessly and take user directly to payment!
-        const updatedPending: MembershipApplication = {
-          ...existingMatch,
-          salutation,
-          fullName: fullName.trim(),
-          phone: cleanPhone,
-          email: cleanEmail,
-          address: address.trim(),
-          district: district,
-          taluka: taluka,
-          centerName: centerName.trim(),
-          familyMembers: toEnglishDigits(familyMembers.trim()),
-          hobby: hobby.trim(),
-          education,
-          professionalQualification,
-          professional,
-          photo: photoDataUrl || existingMatch.photo,
-          isOfficial,
-          officialPost: isOfficial ? officialPost : undefined,
-          officialDistrict: isOfficial ? officialDistrict : undefined,
-          officialTaluka: isOfficial ? officialTaluka : undefined,
-        };
-        onAddApplication(updatedPending);
-        setPendingApp(updatedPending);
-        setShowPaymentModal(true);
+      const localPhoneMatch = applications.find(
+        (a) => a.phone && a.phone.replace(/\D/g, '').slice(-10) === cleanPhone
+      );
+      if (localPhoneMatch) {
+        matchedApp = localPhoneMatch;
+        matchedBy = 'phone';
+      }
+
+      if (!matchedApp && userEnteredEmail && !userEnteredEmail.endsWith('@mahasangh.in')) {
+        const localEmailMatch = applications.find(
+          (a) => a.email && a.email.trim().toLowerCase() === userEnteredEmail
+        );
+        if (localEmailMatch) {
+          matchedApp = localEmailMatch;
+          matchedBy = 'email';
+        }
+      }
+
+      if (!matchedApp && normalizedNameLower.length >= 3) {
+        const localNameMatch = applications.find(
+          (a) =>
+            a.fullName &&
+            a.fullName.trim().replace(/\s+/g, ' ').toLowerCase() === normalizedNameLower
+        );
+        if (localNameMatch) {
+          matchedApp = localNameMatch;
+          matchedBy = 'name';
+        }
+      }
+
+      // 2. Always verify against live Firestore (catches Pending applications not in public cache!)
+      const remoteDuplicate = await findExistingApplicationInFirestore({
+        phone: cleanPhone,
+        email: userEnteredEmail,
+        fullName: normalizedName,
+      });
+      if (remoteDuplicate) {
+        // Prefer approved over pending, or live Firestore record if not found locally
+        if (!matchedApp || remoteDuplicate.app.status === 'approved') {
+          matchedApp = remoteDuplicate.app;
+          matchedBy = remoteDuplicate.matchedBy;
+        }
+      }
+
+      if (matchedApp) {
+        const matchLabel =
+          matchedBy === 'phone'
+            ? `हा मोबाईल नंबर (${cleanPhone})`
+            : matchedBy === 'email'
+              ? `हा ई-मेल (${userEnteredEmail})`
+              : `हे नाव (${normalizedName})`;
+
+        if (matchedApp.status === 'approved') {
+          setFormAlert(
+            `${matchLabel} वापरून आपला फॉर्म यापूर्वीच भरलेला असून सदस्यत्व मंजूर आहे (सदस्य क्र.: ${matchedApp.memberNumber || ''}). नवीन फॉर्म भरण्याची आवश्यकता नाही — आपण वरील 'अर्जाची स्थिती तपासा' मधून आपले आय-कार्ड डाऊनलोड करू शकता.`
+          );
+          window.scrollTo({ top: 380, behavior: 'smooth' });
+          return;
+        } else {
+          // Pending application already exists: block duplicate creation and let user pay for existing app
+          setExistingPendingMatch({ app: matchedApp, matchedBy });
+          setFormAlert(
+            `${matchLabel} वापरून आपला फॉर्म यापूर्वीच भरलेला आहे (अर्ज संदर्भ क्र.: ${matchedApp.applicationNumber}, नाव: ${matchedApp.fullName}), परंतु ₹220 पेमेंट अद्याप पूर्ण झालेले नाही. कृपया नवीन फॉर्म न भरता या अर्जाचे पेमेंट पूर्ण करा.`
+          );
+          setPendingApp(matchedApp);
+          setShowPaymentModal(true);
+          return;
+        }
+      }
+
+      if (!photoDataUrl) {
+        setFormAlert('कृपया आपला पासपोर्ट आकाराचा फोटो निवडा.');
+        window.scrollTo({ top: 420, behavior: 'smooth' });
         return;
       }
+
+      if (!declarationAccepted) {
+        setFormAlert('कृपया खालील "सदस्यत्व स्वयंघोषणापत्र" या चौकटीवर (Checkbox) टिक करा.');
+        return;
+      }
+
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const newApp: MembershipApplication = {
+        id: `app-${Date.now()}`,
+        applicationNumber: `MS-2026-${randomSuffix}`,
+        salutation,
+        fullName: normalizedName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        address: address.trim(),
+        district: district,
+        taluka: taluka,
+        centerName: centerName.trim(),
+        familyMembers: toEnglishDigits(familyMembers.trim()),
+        hobby: hobby.trim(),
+        education,
+        professionalQualification,
+        professional,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        photo: photoDataUrl,
+        isOfficial,
+        officialPost: isOfficial ? officialPost : undefined,
+        officialDistrict: isOfficial ? officialDistrict : undefined,
+        officialTaluka: isOfficial ? officialTaluka : undefined,
+        paymentConfirmed: false,
+      };
+
+      // Await Firestore save BEFORE opening Razorpay payment modal so record is guaranteed saved
+      await onAddApplication(newApp);
+      setPendingApp(newApp);
+      setShowPaymentModal(true);
+    } finally {
+      setIsSubmittingForm(false);
     }
-
-    if (!photoDataUrl) {
-      setFormAlert('कृपया आपला पासपोर्ट आकाराचा फोटो निवडा.');
-      window.scrollTo({ top: 420, behavior: 'smooth' });
-      return;
-    }
-
-    if (!declarationAccepted) {
-      setFormAlert('कृपया खालील "सदस्यत्व स्वयंघोषणापत्र" या चौकटीवर (Checkbox) टिक करा.');
-      return;
-    }
-
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const newApp: MembershipApplication = {
-      id: `app-${Date.now()}`,
-      applicationNumber: `MS-2026-${randomSuffix}`,
-      salutation,
-      fullName: fullName.trim(),
-      phone: cleanPhone,
-      email: cleanEmail,
-      address: address.trim(),
-      district: district,
-      taluka: taluka,
-      centerName: centerName.trim(),
-      familyMembers: toEnglishDigits(familyMembers.trim()),
-      hobby: hobby.trim(),
-      education,
-      professionalQualification,
-      professional,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      photo: photoDataUrl,
-      isOfficial,
-      officialPost: isOfficial ? officialPost : undefined,
-      officialDistrict: isOfficial ? officialDistrict : undefined,
-      officialTaluka: isOfficial ? officialTaluka : undefined,
-      paymentConfirmed: false,
-    };
-
-    // Save application instantly to Firebase & local storage so user data is NEVER lost
-    onAddApplication(newApp);
-    setPendingApp(newApp);
-    setShowPaymentModal(true);
   };
 
   const handleConfirmPaymentCompleted = async (
@@ -1116,17 +1169,17 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   <div className="flex items-start gap-2">
                     <span className="font-extrabold text-[#193568] shrink-0">२.</span>
                     <p>
-                      काही सदस्यांचा अर्ज जर पेमेंट पूर्ण न करता मंजूर झाला असेल आणि त्यांना आय-कार्ड मिळाले असेल, तर त्यांनी या थेट पेमेंट लिंकवर{' '}
+                      काही सदस्यांचा अर्ज जर पेमेंट पूर्ण न करता मंजूर झाला असेल आणि त्यांना आय-कार्ड मिळाले असेल, तर त्यांनी पेमेंट पूर्ण करण्यासाठी{' '}
+                      <strong>श्री. ज्ञानेश्वर नंदनवार सर</strong> (मोबाईल / WhatsApp:{' '}
                       <a
-                        href="https://rzp.io/rzp/Us7q4y7"
+                        href="https://wa.me/919423484305"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white font-mono font-bold px-2.5 py-0.5 rounded-md text-[11px] shadow-2xs transition-colors align-middle break-all"
+                        className="font-mono font-extrabold text-emerald-700 underline hover:text-emerald-900"
                       >
-                        <span>https://rzp.io/rzp/Us7q4y7</span>
-                        <ExternalLink className="w-3 h-3 shrink-0" />
+                        9423484305
                       </a>{' '}
-                      क्लिक करून आपले ₹220 पेमेंट पूर्ण करावे.
+                      / 8208494368) यांना संपर्क करावा.
                     </p>
                   </div>
 
@@ -1175,11 +1228,39 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </label>
           </div>
 
+          {/* Existing Pending Form Recovery Banner (if user re-entered same phone/email/name) */}
+          {existingPendingMatch && (
+            <div className="bg-amber-50 border-2 border-[#df6b16] rounded-xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="text-xs text-amber-950 space-y-1">
+                <div className="font-extrabold text-sm text-[#b34904] flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-[#df6b16] shrink-0" />
+                  <span>आपला फॉर्म यापूर्वीच भरलेला आहे! (नवीन फॉर्म भरण्याची गरज नाही)</span>
+                </div>
+                <p className="font-medium leading-relaxed">
+                  अर्जदार: <strong>{existingPendingMatch.app.salutation} {existingPendingMatch.app.fullName}</strong> | संदर्भ क्र.:{' '}
+                  <strong className="font-mono">{existingPendingMatch.app.applicationNumber}</strong> | मोबाईल: <strong>{existingPendingMatch.app.phone}</strong>.
+                  कृपया या जुन्या अर्जाचे ₹220 पेमेंट पूर्ण करा.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingApp(existingPendingMatch.app);
+                  setShowPaymentModal(true);
+                }}
+                className="w-full sm:w-auto bg-[#193568] hover:bg-[#11254a] text-white font-bold px-5 py-3 rounded-lg text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              >
+                <span>💳</span>
+                <span>या अर्जाचे पेमेंट पूर्ण करा (₹220)</span>
+              </button>
+            </div>
+          )}
+
           {/* Submit Button Section */}
           <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-xs text-[#63708a] max-w-md space-y-1.5">
               {formAlert && (
-                <div className="text-xs font-bold text-rose-700 bg-rose-50 p-2.5 rounded-lg border border-rose-200 flex items-center gap-1.5 animate-pulse">
+                <div className="text-xs font-bold text-rose-700 bg-rose-50 p-2.5 rounded-lg border border-rose-200 flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{formAlert}</span>
                 </div>
@@ -1190,10 +1271,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
             <button
               type="submit"
-              className="w-full sm:w-auto bg-gradient-to-r from-[#df6b16] to-[#b34f07] hover:from-[#c85c0e] hover:to-[#964004] text-white font-bold px-8 py-3.5 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0 cursor-pointer"
+              disabled={isSubmittingForm}
+              className="w-full sm:w-auto bg-gradient-to-r from-[#df6b16] to-[#b34f07] hover:from-[#c85c0e] hover:to-[#964004] disabled:opacity-65 text-white font-bold px-8 py-3.5 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0 cursor-pointer"
             >
               <UserCheck className="w-4 h-4" />
-              अर्ज जतन करा व पेमेंटकडे जा (Proceed to Pay ₹220)
+              {isSubmittingForm ? 'अर्ज सुरक्षित जतन होत आहे...' : 'अर्ज जतन करा व पेमेंटकडे जा (Proceed to Pay ₹220)'}
             </button>
           </div>
         </form>
@@ -1311,6 +1393,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 {paymentStatusNotice && (
                   <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-xl font-semibold leading-relaxed">
                     ⏳ {paymentStatusNotice}
+                  </div>
+                )}
+
+                {existingPendingMatch && existingPendingMatch.app.id === pendingApp.id && (
+                  <div className="p-3.5 bg-amber-50 border-2 border-[#df6b16]/60 text-amber-950 text-xs rounded-xl font-semibold leading-relaxed">
+                    ℹ️ <strong>आपला फॉर्म यापूर्वीच भरलेला आहे!</strong> (नाव: {pendingApp.fullName}, संदर्भ क्र.:{' '}
+                    <span className="font-mono font-bold">{pendingApp.applicationNumber}</span>). नवीन फॉर्म न भरता खालील बटनावर क्लिक करून या अर्जाचे ₹220 पेमेंट पूर्ण करा.
                   </div>
                 )}
 

@@ -411,6 +411,65 @@ export async function trackSingleApplicationInFirestore(
   }
 }
 
+// Check Firestore for existing application by phone, email, or exact fullName (prevents duplicate Pending/Approved apps)
+export async function findExistingApplicationInFirestore(params: {
+  phone?: string;
+  email?: string;
+  fullName?: string;
+}): Promise<{ app: MembershipApplication; matchedBy: 'phone' | 'email' | 'name' } | null> {
+  const pickBest = (docs: any[]): MembershipApplication | null => {
+    if (!docs || docs.length === 0) return null;
+    const mapped = docs.map((d) => ({
+      ...(d.data() as MembershipApplication),
+      id: (d.data() as MembershipApplication).id || d.id,
+    }));
+    return (
+      mapped.find((m) => m.status === 'approved') ||
+      mapped.find((m) => m.status === 'pending') ||
+      mapped[0]
+    );
+  };
+
+  try {
+    const appsCol = collection(db, 'applications');
+
+    // 1. Check by 10-digit phone
+    const cleanPhone = toEnglishDigits(params.phone || '').replace(/\D/g, '').slice(-10);
+    if (cleanPhone.length === 10) {
+      const snapPhone = await getDocs(query(appsCol, where('phone', '==', cleanPhone), limit(5)));
+      if (!snapPhone.empty) {
+        const best = pickBest(snapPhone.docs);
+        if (best) return { app: best, matchedBy: 'phone' };
+      }
+    }
+
+    // 2. Check by user-provided email (skip synthetic @mahasangh.in fallback)
+    const cleanEmail = (params.email || '').trim().toLowerCase();
+    if (cleanEmail && !cleanEmail.endsWith('@mahasangh.in')) {
+      const snapEmail = await getDocs(query(appsCol, where('email', '==', cleanEmail), limit(5)));
+      if (!snapEmail.empty) {
+        const best = pickBest(snapEmail.docs);
+        if (best) return { app: best, matchedBy: 'email' };
+      }
+    }
+
+    // 3. Check by normalized fullName
+    const normalizedName = (params.fullName || '').trim().replace(/\s+/g, ' ');
+    if (normalizedName.length >= 3) {
+      const snapName = await getDocs(query(appsCol, where('fullName', '==', normalizedName), limit(5)));
+      if (!snapName.empty) {
+        const best = pickBest(snapName.docs);
+        if (best) return { app: best, matchedBy: 'name' };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('Duplicate check Firestore query error:', error);
+    return null;
+  }
+}
+
 // Admin only: On-demand applications fetch
 export async function fetchApplicationsForAdmin(): Promise<MembershipApplication[]> {
   try {
