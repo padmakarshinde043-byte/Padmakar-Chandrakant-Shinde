@@ -13,6 +13,8 @@
         "email": { "type": "string", "maxLength": 128 },
         "address": { "type": "string", "maxLength": 500 },
         "district": { "type": "string", "maxLength": 64 },
+        "taluka": { "type": "string", "maxLength": 64 },
+        "centerName": { "type": "string", "maxLength": 128 },
         "familyMembers": { "type": "string", "maxLength": 16 },
         "hobby": { "type": "string", "maxLength": 128 },
         "education": { "type": "string", "maxLength": 128 },
@@ -57,6 +59,17 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["name", "phone", "message", "createdAt"]
+    },
+    "SystemSetting": {
+      "title": "SystemSetting",
+      "description": "System settings including atomic counters and authentication settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "lastMemberNumber": { "type": "number" },
+        "totalApproved": { "type": "number" },
+        "lastUpdated": { "type": "string", "maxLength": 64 }
+      }
     }
   },
   "firestore": {
@@ -71,6 +84,10 @@
     "/contacts/{contactId}": {
       "schema": { "$ref": "ContactMessage" },
       "description": "Inquiries, grievances and messages submitted by visitors and officers"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "SystemSetting" },
+      "description": "Central atomic counters and administrative configuration settings"
     }
   }
 }

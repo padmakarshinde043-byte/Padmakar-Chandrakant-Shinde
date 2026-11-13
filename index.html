@@ -9,14 +9,24 @@
     <meta property="og:title" content="महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" />
     <meta property="og:description" content="महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ — संघटन, सन्मान, समर्पण आणि शैक्षणिक गुणवत्ता." />
     <meta property="og:type" content="website" />
+    <link rel="canonical" href="https://mahasangh.in/" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="shortcut icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
+
+    <script>
+      // www व non-www एकसंध ठेवण्यासाठी ऑटोमॅटिक कॅनॉनिकल रिडायरेक्ट
+      if (window.location.hostname === 'www.mahasangh.in') {
+        window.location.replace('https://mahasangh.in' + window.location.pathname + window.location.search + window.location.hash);
+      }
+    </script>
 
     <!-- Preconnect for fast fonts connection -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Yatra+One&family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap" />
+    <!-- Razorpay Checkout Script -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   </head>
   <body class="bg-slate-50 text-slate-900 font-devanagari antialiased selection:bg-amber-200" oncontextmenu="return false;">
     <div id="root"></div>

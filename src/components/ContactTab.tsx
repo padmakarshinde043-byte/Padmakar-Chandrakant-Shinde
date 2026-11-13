@@ -97,70 +97,27 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                 <div className="flex items-start gap-3">
                   <Phone className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
                   <div className="w-full min-w-0">
-                    <strong className="text-white block text-sm mb-2 font-bold tracking-wide">
+                    <strong className="text-amber-300 block text-base sm:text-lg mb-2.5 font-black tracking-wide">
                       Grievance Redressal Committee :
                     </strong>
                     {/* तीन सदस्यांची एकाखाली एक रचना (मोबाईलवर सुटसुटीत, डेस्कटॉपवर ३ कॉलम) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {/* 1. श्री. राजेंद्र खैरनार */}
-                      <div className="p-2.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
-                        <div>
-                          <span className="text-white text-xs font-bold block" title="श्री. राजेंद्र खैरनार">
-                            श्री. राजेंद्र खैरनार
-                          </span>
-                          <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
-                            संस्थापक राज्याध्यक्ष
-                          </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                      {ORG_DETAILS.directContacts.map((contact, idx) => (
+                        <div key={idx} className="p-3 sm:p-3.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400 transition-colors flex flex-col justify-between text-center shadow-xs">
+                          <div>
+                            <span className="text-white text-base sm:text-lg font-black block tracking-wide leading-tight font-serifDevanagari" title={contact.name}>
+                              {contact.name}
+                            </span>
+                            <span className="text-xs sm:text-sm text-amber-400 font-bold block mt-1">
+                              {contact.designation}
+                            </span>
+                          </div>
+                          <div className="mt-2.5 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-slate-900/80 text-amber-300 font-mono text-xs sm:text-sm font-bold border border-slate-700/80">
+                            <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>{contact.phone}</span>
+                          </div>
                         </div>
-                        <a
-                          href="tel:9860704098"
-                          className="mt-2 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
-                          title="कॉल करा"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span>9860704098</span>
-                        </a>
-                      </div>
-
-                      {/* 2. श्री. निलेश पाटील */}
-                      <div className="p-2.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
-                        <div>
-                          <span className="text-white text-xs font-bold block" title="श्री. निलेश पाटील">
-                            श्री. निलेश पाटील
-                          </span>
-                          <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
-                            राज्य पदाधिकारी
-                          </span>
-                        </div>
-                        <a
-                          href="tel:9421385165"
-                          className="mt-2 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
-                          title="कॉल करा"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span>9421385165</span>
-                        </a>
-                      </div>
-
-                      {/* 3. श्री. नितीन शिंदे */}
-                      <div className="p-2.5 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400/60 transition-colors flex flex-col justify-between text-center shadow-xs">
-                        <div>
-                          <span className="text-white text-xs font-bold block" title="श्री. नितीन शिंदे">
-                            श्री. नितीन शिंदे
-                          </span>
-                          <span className="text-[11px] text-amber-400 font-semibold block mt-0.5">
-                            राज्य पदाधिकारी
-                          </span>
-                        </div>
-                        <a
-                          href="tel:9763099698"
-                          className="mt-2 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-amber-500/15 text-amber-300 hover:bg-amber-500 hover:text-[#0b1e36] font-mono text-xs font-bold transition-all"
-                          title="कॉल करा"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <span>9763099698</span>
-                        </a>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -368,7 +325,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                           श्री. पदमाकर चंद्रकांत शिंदे
                         </strong>
                         <span className="text-amber-300 font-semibold text-xs sm:text-sm block mt-0.5 font-sans">
-                          (केंद्रप्रमुख माजलगाव जिल्हा बीड)
+                          केंद्रप्रमुख माजलगाव बीड
                         </span>
                       </div>
                     </div>

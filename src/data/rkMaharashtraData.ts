@@ -17,7 +17,7 @@ export const DISTRICT_TALUKAS_MAP: Record<string, string[]> = {
     "तिवसा", "धारणी", "चिखलदरा"
   ],
   "छत्रपती संभाजीनगर": [
-    "छत्रपती संभाजीनगर", "कन्नड", "सोयगाव", "सिल्लोड", "फुलंब्री", "बीड", "पैठण", "गंगापूर", "वैजापूर", "खुलताबाद"
+    "छत्रपती संभाजीनगर", "कन्नड", "सोयगाव", "सिल्लोड", "फुलंब्री", "पैठण", "गंगापूर", "वैजापूर", "खुलताबाद"
   ],
   "भंडारा": [
     "भंडारा", "साकोली", "लाखांदूर", "लाखनी", "पवनी", "मोहाडी", "तुमसर"
@@ -103,8 +103,11 @@ export const DISTRICT_TALUKAS_MAP: Record<string, string[]> = {
   "वर्धा": [
     "वर्धा", "सेलू", "देवळी", "हिंगणघाट", "समुद्रपूर", "आर्वी", "आष्टी", "कारंजा"
   ],
+  "वाशीम": [
+    "वाशीम", "मालेगाव", "रिसोड", "मंगरूळपीर", "कारंजा (लाड)", "मानोरा"
+  ],
   "वाशिम": [
-    "वाशिम", "मालेगाव", "रिसोड", "मंगरूळपीर", "कारंजा", "मानोरा"
+    "वाशिम", "मालेगाव", "रिसोड", "मंगरूळपीर", "कारंजा (लाड)", "मानोरा"
   ],
   "यवतमाळ": [
     "यवतमाळ", "दारव्हा", "दिग्रस", "नेर", "पुसद", "उमरखेड", "महागाव", "पांढरकवडा (केळापूर)", "राळेगाव", "वणी", "मारेगाव", "झरी जामणी", "बाभूळगाव", "कळंब", "आर्णी", "घाटंजी"
@@ -159,3 +162,37 @@ export interface OfficialMember {
   appointedDate?: string;
   orderNumber?: string;
 }
+
+/**
+ * Determines whether an appointed post is specifically at the taluka level.
+ * State, division, or district posts must NEVER be classified as taluka level.
+ */
+export function isTalukaLevelPost(postName?: string): boolean {
+  if (!postName) return false;
+  const p = postName.trim();
+  if (p.includes('राज्य') || p.includes('विभाग') || p.includes('जिल्हा')) {
+    return false;
+  }
+  return p.includes('तालुका');
+}
+
+/**
+ * Formats an appointed post with its taluka jurisdiction.
+ * If the post is state, division, or district level, it returns ONLY the post name.
+ * Taluka is ONLY appended when the post is explicitly a taluka-level post and a taluka is provided.
+ */
+export function formatAppointedPostWithTaluka(postName?: string, taluka?: string): string {
+  if (!postName) return '';
+  const cleanPost = postName.trim();
+  const cleanTaluka = taluka ? taluka.trim() : '';
+
+  if (isTalukaLevelPost(cleanPost) && cleanTaluka) {
+    if (cleanPost.includes(cleanTaluka)) {
+      return cleanPost;
+    }
+    return `${cleanPost} (${cleanTaluka} तालुका)`;
+  }
+
+  return cleanPost;
+}
+

@@ -8,7 +8,7 @@ export interface Leader {
   email?: string;
   photo?: string;
   isKey?: boolean;
-  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'विभागीय कार्यकारिणी' | 'जिल्हा अध्यक्ष' | 'सल्लागार';
+  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'विभागीय कार्यकारिणी' | 'जिल्हा अध्यक्ष' | 'सल्लागार';
 }
 
 export interface NewsItem {
@@ -35,6 +35,7 @@ export interface MembershipApplication {
   address: string;
   district: string;
   taluka?: string;
+  centerName?: string; // कार्यरत केंद्राचे नाव
   familyMembers?: string;
   hobby?: string;
   education: string;
@@ -50,15 +51,17 @@ export interface MembershipApplication {
   officialPost?: string; // संघटनेतील पद
   officialDistrict?: string;
   officialTaluka?: string;
-  paymentConfirmed?: boolean; // ₹500 payment verified by admin
+  paymentConfirmed?: boolean; // ₹220 payment verified by Razorpay or admin
+  razorpayPaymentId?: string;
+  razorpayOrderId?: string;
+  approvedBy?: string;
 }
 
-// अधिकृत पद / संवर्ग (केवळ विचारलेले ४ पर्याय)
+// अधिकृत पद / संवर्ग (केवळ ३ अधिकृत पर्याय)
 export const OFFICIAL_CADRES = [
   "केंद्रप्रमुख",
   "शिक्षण विस्तार अधिकारी",
-  "गटशिक्षणाधिकारी",
-  "इतर स्वतः टाईप करा"
+  "गटशिक्षणाधिकारी"
 ] as const;
 
 // शिक्षक पदाला लागू असणाऱ्या सर्व व्यावसायिक पात्रता (Professional Qualifications)
@@ -145,9 +148,9 @@ export const ORG_DETAILS = {
   email: "mahasangh2026@gmail.com",
   officeHours: "सोमवार ते शनिवार: सकाळी 10 ते सायंकाळी 5",
   directContacts: [
-    { name: "श्री. राजेंद्र खैरनार", phone: "9860704098", designation: "संस्थापक राज्याध्यक्ष" },
-    { name: "श्री. निलेश पाटील", phone: "9421385165", designation: "राज्य पदाधिकारी" },
-    { name: "श्री. नितीन शिंदे", phone: "9763099698", designation: "राज्य पदाधिकारी" },
+    { name: "श्री श्रीकांत माधवराव गौंड", phone: "8007726641", designation: "राज्य पदाधिकारी" },
+    { name: "श्री ज्ञानेश्वर तुळशीराम नंदनवार", phone: "9423484305", designation: "राज्य पदाधिकारी" },
+    { name: "श्री गणेश रघुनाथ राऊत", phone: "9604898527", designation: "राज्य पदाधिकारी" },
   ],
   membershipFee: "₹220 (आजीवन सदस्यत्व ₹१०० + वार्षिक वर्गणी ₹१२०)",
   founderPresident: {
@@ -315,11 +318,44 @@ export const DISTRICT_PRESIDENTS: Leader[] = [
 ];
 
 export const ADVISORY_BOARD: Leader[] = [
-  { name: "डॉ. सुरेश पाटील", role: "वरिष्ठ सल्लागार", region: "पुणे विभाग", education: "पीएच.डी., एम.एड.", phone: "9800000061" },
-  { name: "प्रा. मीना देशमुख", role: "सल्लागार", region: "नागपूर विभाग", education: "एम.ए., एम.एड.", phone: "9800000062" },
-  { name: "श्री. रामचंद्र जोशी", role: "सल्लागार", region: "नाशिक विभाग", education: "एम.ए., बी.एड.", phone: "9800000063" },
-  { name: "श्रीमती. कल्पना शर्मा", role: "सल्लागार", region: "औरंगाबाद विभाग", education: "एम.एस.सी., बी.एड.", phone: "9800000064" }
+  {
+    id: "ldr-1794299282004",
+    name: "श्री. निशांत काटनेश्वर",
+    role: "कायदेविषयक सल्लागार",
+    region: "सर्वोच्च न्यायालय, दिल्ली",
+    education: "",
+    phone: "-",
+    photo: "https://res.cloudinary.com/fdrjsgjy/image/upload/v1794299176/ndijznapakkgr9nlcae0.jpg",
+    category: "सल्लागार"
+  },
+  {
+    id: "ldr-1794299133349",
+    name: "श्री. एम. ए. मानव",
+    role: "कायदेविषयक सल्लागार",
+    region: "सर्वोच्च न्यायालय, दिल्ली",
+    education: "",
+    phone: "-",
+    photo: "https://res.cloudinary.com/fdrjsgjy/image/upload/v1794299131/jlq3xxwoynv8z7h3umvj.jpg",
+    category: "सल्लागार"
+  },
+  { id: "ab-0", name: "डॉ. सुरेश पाटील", role: "वरिष्ठ सल्लागार", region: "पुणे विभाग", education: "पीएच.डी., एम.एड.", phone: "9800000061", category: "सल्लागार" },
+  { id: "ab-1", name: "प्रा. मीना देशमुख", role: "सल्लागार", region: "नागपूर विभाग", education: "एम.ए., एम.एड.", phone: "9800000062", category: "सल्लागार" },
+  { id: "ab-2", name: "श्री. रामचंद्र जोशी", role: "सल्लागार", region: "नाशिक विभाग", education: "एम.ए., बी.एड.", phone: "9800000063", category: "सल्लागार" },
+  { id: "ab-3", name: "श्रीमती. कल्पना शर्मा", role: "सल्लागार", region: "औरंगाबाद विभाग", education: "एम.एस.सी., बी.एड.", phone: "9800000064", category: "सल्लागार" }
 ];
+
+import liveLeadersSnapshot from './live_leaders_snapshot.json';
+
+export const DEFAULT_AUTHORITATIVE_LEADERS: Leader[] =
+  Array.isArray(liveLeadersSnapshot) && liveLeadersSnapshot.length > 0
+    ? (liveLeadersSnapshot as Leader[])
+    : [
+        ...ADVISORY_BOARD,
+        ...STATE_EXECUTIVE.map((l, i) => ({ ...l, id: l.id || `se-${i}`, category: 'राज्य कार्यकारिणी' as const })),
+        ...DIVISIONAL_COORDINATORS.map((l, i) => ({ ...l, id: l.id || `dc-${i}`, category: 'विभागीय समन्वयक' as const })),
+        ...DISTRICT_PRESIDENTS.map((l, i) => ({ ...l, id: l.id || `dp-${i}`, category: 'जिल्हा अध्यक्ष' as const }))
+      ];
+
 
 export const INITIAL_NEWS: NewsItem[] = [
   {
@@ -381,66 +417,7 @@ export const INITIAL_NEWS: NewsItem[] = [
   }
 ];
 
-export const INITIAL_APPLICATIONS: MembershipApplication[] = [
-  {
-    id: "app-1",
-    applicationNumber: "MS-2026-1001",
-    salutation: "श्री",
-    fullName: "अमोल राजेश पाटील",
-    phone: "9822334455",
-    email: "amol.patil@example.com",
-    address: "घर क्र. 45, शिवाजी चौक, नाशिक रोड, नाशिक - 422001",
-    district: "नाशिक",
-    familyMembers: "4",
-    hobby: "वाचन, शैक्षणिक संशोधन",
-    education: "पदव्युत्तर पदवी (M.A.)",
-    professionalQualification: "एम.एड. (M.Ed.)",
-    professional: "केंद्रप्रमुख",
-    status: "approved",
-    memberNumber: "MS-2026-0842",
-    createdAt: "2026-10-28T10:30:00Z",
-    approvedAt: "2026-10-29T14:20:00Z",
-    paymentRef: "UPI-9527254652-948271"
-  },
-  {
-    id: "app-2",
-    applicationNumber: "MS-2026-1002",
-    salutation: "सौ",
-    fullName: "सुवर्णा भास्कर बोरसे",
-    phone: "9423112233",
-    email: "suvarna.borse@example.com",
-    address: "प्लॉट नं. 12, शिक्षक कॉलनी, देवपूर, धुळे - 424002",
-    district: "धुळे",
-    familyMembers: "3",
-    hobby: "विद्यार्थी समुपदेशन",
-    education: "पदवी (B.Sc.)",
-    professionalQualification: "बी.एड. (B.Ed.)",
-    professional: "ज्येष्ठ शिक्षण विस्तार अधिकारी",
-    status: "approved",
-    memberNumber: "MS-2026-0843",
-    createdAt: "2026-11-01T09:15:00Z",
-    approvedAt: "2026-11-02T11:00:00Z",
-    paymentRef: "UPI-9527254652-192837"
-  },
-  {
-    id: "app-3",
-    applicationNumber: "MS-2026-1003",
-    salutation: "श्री",
-    fullName: "ज्ञानेश्वर विठ्ठल गायकवाड",
-    phone: "9765443322",
-    email: "dnyaneshwar.g@example.com",
-    address: "रा. पो. कोरेगाव, ता. कोरेगाव, जि. सातारा - 415501",
-    district: "सातारा",
-    familyMembers: "5",
-    hobby: "वृक्षारोपण, क्रीडा",
-    education: "पदव्युत्तर पदवी (M.Sc.)",
-    professionalQualification: "नेट / सेट (NET/SET)",
-    professional: "गटशिक्षणाधिकारी",
-    status: "pending",
-    createdAt: "2026-11-03T16:45:00Z",
-    paymentRef: "UPI-9527254652-654321"
-  }
-];
+export const INITIAL_APPLICATIONS: MembershipApplication[] = [];
 
 export interface GovOrder {
   id: string;
@@ -459,16 +436,40 @@ export const INITIAL_GOV_ORDERS: GovOrder[] = [
     title: "शिक्षण विभाग नवीन भरती प्रक्रिया नियमावली",
     date: "2026-11-05",
     type: "शासन निर्णय",
-    summary: "शिक्षण विभागांतर्गत नवीन शिक्षक व केंद्रप्रमुख भरतीबाबतचे शासन निर्णय",
+    summary: "शिक्षण विभागांतर्गत नवीन शिक्षक व केंद्रप्रमुख भरतीबाबतचे शासन निर्णय व मार्गदर्शक तत्त्वे.",
     createdAt: "2026-11-05T10:00:00Z"
+  },
+  {
+    id: "go-2",
+    title: "केंद्रप्रमुख पदोन्नती व सेवाविषयक अटींबाबत नवीन शासन निर्णय",
+    date: "2026-10-25",
+    type: "शासन निर्णय",
+    summary: "शिक्षण विभागांतर्गत कार्यरत केंद्रप्रमुखांच्या सेवाज्येष्ठता आणि पदोन्नती प्रशिक्षणविषयक नवीन शासन निर्णय.",
+    createdAt: "2026-10-25T10:00:00Z"
+  },
+  {
+    id: "go-3",
+    title: "प्राथमिक शिक्षण संवर्ग पुनर्रचना व केंद्रप्रमुख पदे सक्षमीकरण शासन निर्णय",
+    date: "2026-10-18",
+    type: "शासन निर्णय",
+    summary: "शासकीय आदेशानुसार राज्यातील केंद्रप्रमुख पदांचे कार्यक्षेत्र व प्रशासकीय अधिकारांचे सुसूत्रीकरण.",
+    createdAt: "2026-10-18T10:00:00Z"
+  },
+  {
+    id: "go-4",
+    title: "केंद्रप्रमुख प्रवास भत्ता व साधनसामग्री तरतूद मंजुरी परिपत्रक",
+    date: "2026-10-05",
+    type: "परिपत्रक",
+    summary: "विस्तार अधिकारी व केंद्रप्रमुखांच्या क्षेत्रीय भेटींसाठी प्रवास भत्ता व तांत्रिक सुविधा निधी मंजुरी परिपत्रक.",
+    createdAt: "2026-10-05T10:00:00Z"
   }
 ];
 
 export const MAHARASHTRA_DISTRICTS = [
   "पुणे", "सातारा", "सांगली", "कोल्हापूर", "सोलापूर",
   "ठाणे", "पालघर", "रायगड", "रत्नागिरी", "सिंधुदुर्ग",
-  "नाशिक", "धुळे", "नंदुरबार", "जळगाव", "अहमदनगर",
-  "औरंगाबाद (छत्रपती संभाजीनगर)", "जालना", "बीड", "लातूर", "उस्मानाबाद (धाराशिव)", "नांदेड", "परभणी", "हिंगोली",
+  "नाशिक", "धुळे", "नंदुरबार", "जळगाव", "अहिल्यानगर",
+  "छत्रपती संभाजीनगर", "जालना", "बीड", "लातूर", "धाराशिव", "नांदेड", "परभणी", "हिंगोली",
   "नागपूर", "वर्धा", "भंडारा", "गोंदिया", "गडचिरोली", "चंद्रपूर",
   "अमरावती", "अकोला", "वाशीम", "बुलढाणा", "यवतमाळ"
 ];

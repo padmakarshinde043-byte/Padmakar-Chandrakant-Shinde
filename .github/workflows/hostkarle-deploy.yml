@@ -1,0 +1,58 @@
+name: Build & Deploy to HostKarle (Node.js)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run lint
+
+      - name: Build frontend and Node server bundle
+        run: |
+          npx vite build
+          node scripts/build-server.mjs
+
+      - name: Prepare HostKarle Node.js deployment bundle
+        run: |
+          mkdir -p deploy_bundle/tmp
+          cp -r dist deploy_bundle/dist
+          rm -rf deploy_bundle/dist/assets/aistudio deploy_bundle/dist/dist.zip
+          cp server.cjs deploy_bundle/server.cjs
+          cp package.json deploy_bundle/package.json
+          cp package-lock.json deploy_bundle/package-lock.json
+          cp firebase-applet-config.json deploy_bundle/firebase-applet-config.json
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy_bundle/tmp/restart.txt
+
+      - name: Deploy files via FTP to HostKarle
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftp
+          local-dir: ./deploy_bundle/
+          server-dir: ${{ secrets.FTP_SERVER_DIR || '/' }}
+          dangerous-clean-slate: false
+          exclude: |
+            node_modules/**
+            razorpay-config.json
+            .env*
+            .git*/**

@@ -7,7 +7,7 @@ import {
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
   SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
-  DEFAULT_APPOINTED_POSTS
+  DEFAULT_APPOINTED_POSTS, formatAppointedPostWithTaluka, isTalukaLevelPost
 } from '../data/rkMaharashtraData';
 import {
   fetchOfficials, saveOfficialToRtdb, deleteOfficialFromRtdb,
@@ -24,8 +24,8 @@ import {
   generateRegisteredMembersPdf
 } from '../services/rkPdfGenerator';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
-import { ORG_DETAILS, MembershipApplication, INITIAL_APPLICATIONS } from '../data/mahasanghData';
-import { fetchApplicationsForAdmin } from '../firebase';
+import { ORG_DETAILS, MembershipApplication } from '../data/mahasanghData';
+import { fetchApplicationsForAdmin, subscribeToApplicationsForAdmin } from '../firebase';
 
 export const AppointmentsTab: React.FC = () => {
   // Main data state from Firebase Realtime Database
@@ -81,7 +81,7 @@ export const AppointmentsTab: React.FC = () => {
 
   // Status Matrix & Registered Members Modal states (Points 8, 9, 10)
   const [showStatusMatrixModal, setShowStatusMatrixModal] = useState<boolean>(false);
-  const [registeredApplications, setRegisteredApplications] = useState<MembershipApplication[]>(INITIAL_APPLICATIONS);
+  const [registeredApplications, setRegisteredApplications] = useState<MembershipApplication[]>([]);
 
   // Add / Edit Member Modal
   const [isMemberModalOpen, setIsMemberModalOpen] = useState<boolean>(false);
@@ -119,9 +119,20 @@ export const AppointmentsTab: React.FC = () => {
     }, 3500);
   };
 
-  // Load Initial Data on Mount (On-demand)
+  // Load Initial Data on Mount & Subscribe to Live Applications
   useEffect(() => {
     loadData(false);
+
+    // Live realtime listener for applications in Firestore
+    const unsubscribe = subscribeToApplicationsForAdmin((apps) => {
+      if (Array.isArray(apps)) {
+        setRegisteredApplications(apps);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const loadData = async (force: boolean) => {
@@ -131,7 +142,7 @@ export const AppointmentsTab: React.FC = () => {
         fetchOfficials(force),
         fetchAppointedPosts(),
         fetchDistrictPasswords(),
-        fetchApplicationsForAdmin().catch(() => INITIAL_APPLICATIONS),
+        fetchApplicationsForAdmin().catch(() => []),
         fetchPresidentPasswordFromFirebase()
       ]);
       setOfficials(officialsData);
@@ -140,7 +151,7 @@ export const AppointmentsTab: React.FC = () => {
       if (presPass) {
         setPresidentSavedPassword(presPass);
       }
-      if (appsData && appsData.length > 0) {
+      if (Array.isArray(appsData)) {
         setRegisteredApplications(appsData);
       }
       setLastRefreshedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
@@ -154,18 +165,33 @@ export const AppointmentsTab: React.FC = () => {
 
   // Available talukas for current district
   const availableTalukas = useMemo(() => {
-    return DISTRICT_TALUKAS_MAP[currentDistrict] || [];
+    if (!currentDistrict) return [];
+    return (
+      DISTRICT_TALUKAS_MAP[currentDistrict] ||
+      DISTRICT_TALUKAS_MAP[currentDistrict.replace('शी', 'शि')] ||
+      DISTRICT_TALUKAS_MAP[currentDistrict.replace('शि', 'शी')] ||
+      []
+    );
   }, [currentDistrict]);
 
   const formAvailableTalukas = useMemo(() => {
-    return DISTRICT_TALUKAS_MAP[formDistrict] || [];
+    if (!formDistrict) return [];
+    return (
+      DISTRICT_TALUKAS_MAP[formDistrict] ||
+      DISTRICT_TALUKAS_MAP[formDistrict.replace('शी', 'शि')] ||
+      DISTRICT_TALUKAS_MAP[formDistrict.replace('शि', 'शी')] ||
+      []
+    );
   }, [formDistrict]);
 
-  // Is selected post a taluka-level post?
+  // Is selected post a taluka-level post? (State, Division, or District posts NEVER take a taluka)
   const isPostNeedsTaluka = useMemo(() => {
+    if (formPost.includes('राज्य') || formPost.includes('विभाग') || formPost.includes('जिल्हा')) {
+      return false;
+    }
     const found = postsList.find((p) => p.name === formPost);
-    if (found) return found.isTaluka;
-    return formPost.includes('तालुका');
+    if (found) return Boolean(found.isTaluka);
+    return isTalukaLevelPost(formPost);
   }, [postsList, formPost]);
 
   // District Filtered & Rank-Sorted Officials List (Sorted by Dropdown Post Hierarchy)
@@ -505,12 +531,12 @@ export const AppointmentsTab: React.FC = () => {
     setFormPost(m.appointedPost || '');
     setFormDistrict(m.district);
     setFormTaluka(m.taluka || '');
-    if (['केंद्रप्रमुख', 'विस्तार अधिकारी'].includes(m.currentCadre)) {
+    if (['केंद्रप्रमुख', 'शिक्षण विस्तार अधिकारी', 'गटशिक्षणाधिकारी'].includes(m.currentCadre)) {
       setFormCadre(m.currentCadre);
       setCustomCadreInput('');
     } else {
-      setFormCadre('इतर');
-      setCustomCadreInput(m.currentCadre || '');
+      setFormCadre('केंद्रप्रमुख');
+      setCustomCadreInput('');
     }
     setFormWorkingPlace(m.workingPlace || '');
     setFormWorkingTaluka(m.taluka || '');
@@ -527,8 +553,14 @@ export const AppointmentsTab: React.FC = () => {
       return;
     }
 
-    const finalCadre = (formCadre === 'इतर' || formCadre === 'इतर स्वतः टाईप करा') ? (customCadreInput.trim() || 'इतर') : formCadre;
-    const finalTaluka = isPostNeedsTaluka ? formTaluka : (formWorkingTaluka || formTaluka);
+    if (isPostNeedsTaluka && !formTaluka.trim()) {
+      setFormError('कृपया बहाल केलेल्या तालुक्याचे नाव निवडा.');
+      return;
+    }
+
+    const finalCadre = formCadre;
+    // CRITICAL: Only taluka-level posts have an appointed taluka! State, Division, and District posts MUST have an empty taluka!
+    const finalTaluka = isPostNeedsTaluka ? formTaluka.trim() : '';
 
     const memberId = editingMemberId || String(Date.now());
     const memberObj: OfficialMember = {
@@ -656,22 +688,47 @@ export const AppointmentsTab: React.FC = () => {
   const districtMatrixStats = useMemo(() => {
     return MAHARASHTRA_36_DISTRICTS.map((dist) => {
       const distOfficials = officials.filter((o) => {
-        if (o.district === dist) return true;
-        if (dist === 'अहिल्यानगर' && o.district === 'अहमदनगर') return true;
-        if (dist === 'अहमदनगर' && o.district === 'अहिल्यानगर') return true;
+        if (!o || !o.district) return false;
+        const d = o.district.trim();
+        if (d === dist) return true;
+        if (dist === 'अहिल्यानगर' && (d === 'अहमदनगर' || d.toLowerCase().includes('ahmed'))) return true;
+        if (dist === 'अहमदनगर' && (d === 'अहिल्यानगर' || d.toLowerCase().includes('ahmed'))) return true;
+        if (dist.includes('संभाजीनगर') && (d.includes('संभाजीनगर') || d.includes('औरंगाबाद'))) return true;
+        if (dist.includes('धाराशिव') && (d.includes('धाराशिव') || d.includes('उस्मानाबाद'))) return true;
         return false;
       });
 
-      const stateRep = distOfficials.filter((o) => (o.appointedPost || '').includes('राज्य')).length;
-      const divRep = distOfficials.filter((o) => (o.appointedPost || '').includes('विभागीय')).length;
-      const distOfficial = distOfficials.filter((o) => (o.appointedPost || '').includes('जिल्हा')).length;
-      const talukaOfficial = distOfficials.filter((o) => (o.appointedPost || '').includes('तालुका') || !!o.taluka).length;
+      let stateRep = 0;
+      let divRep = 0;
+      let distOfficial = 0;
+      let talukaOfficial = 0;
+
+      distOfficials.forEach((o) => {
+        const p = (o.appointedPost || '').trim();
+        const t = (o.taluka || '').trim();
+        if (p.includes('राज्य')) {
+          stateRep++;
+        } else if (p.includes('विभागीय')) {
+          divRep++;
+        } else if (p.includes('तालुका') || Boolean(t)) {
+          talukaOfficial++;
+        } else {
+          distOfficial++;
+        }
+      });
 
       const members = registeredApplications.filter((a) => {
-        if (a.district === dist && a.status === 'approved') return true;
-        if (dist === 'अहिल्यानगर' && a.district === 'अहमदनगर' && a.status === 'approved') return true;
+        if (!a || a.status !== 'approved') return false;
+        const d = (a.district || '').trim();
+        if (d === dist) return true;
+        if (dist === 'अहिल्यानगर' && (d === 'अहमदनगर' || d.toLowerCase().includes('ahmed'))) return true;
+        if (dist.includes('संभाजीनगर') && (d.includes('संभाजीनगर') || d.includes('औरंगाबाद'))) return true;
+        if (dist.includes('धाराशिव') && (d.includes('धाराशिव') || d.includes('उस्मानाबाद'))) return true;
         return false;
       }).length;
+
+      const officialsTotal = stateRep + divRep + distOfficial + talukaOfficial;
+      const rowTotal = officialsTotal + members;
 
       return {
         district: dist,
@@ -679,7 +736,9 @@ export const AppointmentsTab: React.FC = () => {
         divRep,
         distOfficial,
         talukaOfficial,
-        members
+        officialsTotal,
+        members,
+        rowTotal
       };
     });
   }, [officials, registeredApplications]);
@@ -691,9 +750,11 @@ export const AppointmentsTab: React.FC = () => {
         divRep: acc.divRep + curr.divRep,
         distOfficial: acc.distOfficial + curr.distOfficial,
         talukaOfficial: acc.talukaOfficial + curr.talukaOfficial,
-        members: acc.members + curr.members
+        officialsTotal: acc.officialsTotal + curr.officialsTotal,
+        members: acc.members + curr.members,
+        grandTotal: acc.grandTotal + curr.rowTotal
       }),
-      { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, members: 0 }
+      { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, officialsTotal: 0, members: 0, grandTotal: 0 }
     );
   }, [districtMatrixStats]);
 
@@ -782,7 +843,7 @@ export const AppointmentsTab: React.FC = () => {
     const serial = statewideSerialMap.get(m.id) || 1;
     const serialPadded = String(serial).padStart(2, '0');
     const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`;
-    const place = m.taluka ? `${m.taluka}, जिल्हा - ${m.district}` : `जिल्हा - ${m.district}`;
+    const place = isTalukaLevelPost(m.appointedPost) && m.taluka ? `${m.taluka}, जिल्हा - ${m.district}` : `जिल्हा - ${m.district}`;
 
     const text = `*महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ*\n\n` +
       `॥ *अधिकृत नियुक्ती पत्र* ॥\n` +
@@ -791,7 +852,7 @@ export const AppointmentsTab: React.FC = () => {
       `*${fullName}*\n` +
       `कार्यक्षेत्र: ${place}\n\n` +
       `आपली महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या कार्यकारिणीवर:\n` +
-      `⭐ *« ${m.appointedPost} »* ⭐\n` +
+      `⭐ *« ${formatAppointedPostWithTaluka(m.appointedPost, m.taluka)} »* ⭐\n` +
       `या अत्यंत सन्मानाच्या व जबाबदारीच्या पदावर गौरवपूर्ण नियुक्ती करण्यात आली आहे.\n\n` +
       `आपणास मनःपूर्वक शुभेच्छा!\n` +
       `- संस्थापक राज्याध्यक्ष: श्री. राजेंद्र शिवाजी खैरनार`;
@@ -878,7 +939,7 @@ export const AppointmentsTab: React.FC = () => {
             पदाधिकारी सूची
           </button>
 
-          {/* TAB 2: जिल्हा पदाधिकारी व्यवस्थापन */}
+          {/* TAB 2: जिल्हाध्यक्ष */}
           <button
             onClick={handleTabClickManage}
             className={`py-2.5 px-3 rounded-full text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs ${
@@ -888,7 +949,7 @@ export const AppointmentsTab: React.FC = () => {
             }`}
           >
             <Building className="w-4 h-4" />
-            <span className="truncate">जिल्हा पदाधिकारी व्यवस्थापन</span>
+            <span className="truncate">जिल्हाध्यक्ष</span>
             {!isManageUnlocked && !isSuperAdmin && (
               <span className="bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] shrink-0">
                 <Lock className="w-2.5 h-2.5" />
@@ -896,7 +957,7 @@ export const AppointmentsTab: React.FC = () => {
             )}
           </button>
 
-          {/* TAB 3: राज्याध्यक्ष लॉगिन (नियुक्ती पत्रे व WhatsApp) */}
+          {/* TAB 3: राज्याध्यक्ष */}
           <button
             onClick={handleTabClickLetters}
             className={`col-span-2 md:col-span-1 py-2.5 px-3 rounded-full text-xs sm:text-sm font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-xs ${
@@ -906,7 +967,7 @@ export const AppointmentsTab: React.FC = () => {
             }`}
           >
             <Award className="w-4 h-4 text-amber-500" />
-            <span className="truncate">राज्याध्यक्ष लॉगिन (नियुक्ती पत्रे व WhatsApp)</span>
+            <span className="truncate">राज्याध्यक्ष</span>
             {!isLettersUnlocked && !isSuperAdmin && (
               <span className="bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] shrink-0">
                 <Lock className="w-2.5 h-2.5" />
@@ -960,9 +1021,9 @@ export const AppointmentsTab: React.FC = () => {
                 {/* Mobile App Cards View */}
                 <div className="flex flex-col gap-2.5 sm:hidden">
                   {searchedOfficials.map((m, idx) => {
-                    const displayPost = m.taluka ? `${m.appointedPost} (${m.taluka} तालुका)` : m.appointedPost;
+                    const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
                     const cadre = m.currentCadre || 'केंद्रप्रमुख';
-                    const details = [m.workingPlace, m.taluka ? `ता. ${m.taluka}` : ''].filter(Boolean).join(', ');
+                    const details = m.workingPlace || '';
 
                     return (
                       <div
@@ -1008,9 +1069,9 @@ export const AppointmentsTab: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {searchedOfficials.map((m, idx) => {
-                        const displayPost = m.taluka ? `${m.appointedPost} (${m.taluka} तालुका)` : m.appointedPost;
+                        const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
                         const cadre = m.currentCadre || 'केंद्रप्रमुख';
-                        const details = [m.workingPlace, m.taluka ? `ता. ${m.taluka}` : ''].filter(Boolean).join(', ');
+                        const details = m.workingPlace || '';
 
                         return (
                           <tr key={m.id} className="hover:bg-amber-50/30 transition-colors">
@@ -1051,7 +1112,7 @@ export const AppointmentsTab: React.FC = () => {
             <div className="bg-white p-4 rounded-xl border border-[#e2e8f0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-extrabold text-base text-[#09243f]">
-                  जिल्हा पदाधिकारी व्यवस्थापन: <span className="text-[#df6b16]">{currentDistrict}</span>
+                  जिल्हाध्यक्ष: <span className="text-[#df6b16]">{currentDistrict}</span>
                 </h3>
                 <small className="text-emerald-700 font-bold block mt-0.5">
                   {isSuperAdmin ? '(राज्याध्यक्ष - सर्व 34 जिल्हे संपादन अधिकार)' : `(फक्त '${currentDistrict}' जिल्हा संपादन अधिकार लॉक)`}
@@ -1094,9 +1155,9 @@ export const AppointmentsTab: React.FC = () => {
                   </div>
                 ) : (
                   districtOfficials.map((m, idx) => {
-                    const displayPost = m.taluka ? `${m.appointedPost} (${m.taluka} तालुका)` : m.appointedPost;
+                    const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
                     const cadre = m.currentCadre || 'केंद्रप्रमुख';
-                    const details = [m.workingPlace, m.taluka ? `ता. ${m.taluka}` : ''].filter(Boolean).join(', ');
+                    const details = m.workingPlace || '';
 
                     return (
                       <div
@@ -1170,7 +1231,7 @@ export const AppointmentsTab: React.FC = () => {
                       </tr>
                     ) : (
                       districtOfficials.map((m, idx) => {
-                        const displayPost = m.taluka ? `${m.appointedPost} (${m.taluka} तालुका)` : m.appointedPost;
+                        const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
                         return (
                           <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                             <td className="py-3 px-4 text-center font-bold text-slate-500 font-serif">
@@ -1334,7 +1395,7 @@ export const AppointmentsTab: React.FC = () => {
               <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-3 text-xs font-bold flex items-center gap-2 shadow-xs animate-pulse">
                 <RefreshCw className="w-4 h-4 animate-spin text-amber-600 shrink-0" />
                 <span>
-                  {pdfProgressStatus || 'PDF तयार होत आहे...'} (सर्व माहिती फोन मेमरीमध्ये उपलब्ध असून हाय-डेफिनिशन 300 DPI फाईल थेट बनवली जात आहे.)
+                  {pdfProgressStatus || 'कृपया वाट पहा, PDF तयार होत आहे...'}
                 </span>
               </div>
             )}
@@ -1349,7 +1410,7 @@ export const AppointmentsTab: React.FC = () => {
                   </div>
                 ) : (
                   districtOfficials.map((m, idx) => {
-                    const displayPost = m.taluka ? `${m.appointedPost} (${m.taluka} तालुका)` : m.appointedPost;
+                    const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
 
                     return (
                       <div
@@ -1438,7 +1499,7 @@ export const AppointmentsTab: React.FC = () => {
                         </td>
                         <td className="py-3 px-4">
                           <span className="font-extrabold text-[#df6b16]">
-                            {m.appointedPost} {m.taluka ? `(${m.taluka})` : ''}
+                            {formatAppointedPostWithTaluka(m.appointedPost, m.taluka)}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -1969,7 +2030,7 @@ export const AppointmentsTab: React.FC = () => {
                   </p>
 
                   <div className="my-2 inline-block font-serifDevanagari text-xl sm:text-2xl font-black text-[#851216] tracking-wide">
-                    ⭐ « {selectedOfficialForLetter.taluka ? `${selectedOfficialForLetter.appointedPost} (${selectedOfficialForLetter.taluka} तालुका)` : selectedOfficialForLetter.appointedPost} » ⭐
+                    ⭐ « {formatAppointedPostWithTaluka(selectedOfficialForLetter.appointedPost, selectedOfficialForLetter.taluka)} » ⭐
                   </div>
 
                   <p className="text-xs sm:text-sm font-bold text-[#851216]">
@@ -2105,39 +2166,23 @@ export const AppointmentsTab: React.FC = () => {
               </div>
 
               {/* सध्याचे संवर्ग पद */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="font-bold block mb-1">सध्याचे संवर्ग पद *</label>
-                  <select
-                    value={formCadre}
-                    onChange={(e) => setFormCadre(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg bg-white"
-                  >
-                    <option value="केंद्रप्रमुख">केंद्रप्रमुख</option>
-                    <option value="शिक्षण विस्तार अधिकारी">शिक्षण विस्तार अधिकारी</option>
-                    <option value="गटशिक्षणाधिकारी">गटशिक्षणाधिकारी</option>
-                    <option value="इतर स्वतः टाईप करा">इतर स्वतः टाईप करा</option>
-                  </select>
-                </div>
-                {(formCadre === 'इतर' || formCadre === 'इतर स्वतः टाईप करा') && (
-                  <div>
-                    <label className="font-bold block mb-1">सध्याचे पद टाईप करा *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="उदा. विशेष शिक्षक"
-                      value={customCadreInput}
-                      onChange={(e) => setCustomCadreInput(e.target.value)}
-                      className="w-full p-2 border border-slate-300 rounded-lg"
-                    />
-                  </div>
-                )}
+              <div>
+                <label className="font-bold block mb-1">सध्याचे संवर्ग पद *</label>
+                <select
+                  value={formCadre}
+                  onChange={(e) => setFormCadre(e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white font-medium"
+                >
+                  <option value="केंद्रप्रमुख">केंद्रप्रमुख</option>
+                  <option value="शिक्षण विस्तार अधिकारी">शिक्षण विस्तार अधिकारी</option>
+                  <option value="गटशिक्षणाधिकारी">गटशिक्षणाधिकारी</option>
+                </select>
               </div>
 
-              {/* मूळ केंद्र/बीट आणि कार्यक्षेत्र तालुका */}
+              {/* मूळ कार्यरत केंद्र/बीट */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <label className="font-bold block mb-1">मूळ केंद्र / बीट *</label>
+                  <label className="font-bold block mb-1">मूळ कार्यरत केंद्र / शाळा / बीट *</label>
                   <input
                     type="text"
                     required
@@ -2148,14 +2193,13 @@ export const AppointmentsTab: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="font-bold block mb-1">कार्यक्षेत्र तालुका निवडा *</label>
+                  <label className="font-bold block mb-1">शाळा / नोकरीचा तालुका (ऐच्छिक)</label>
                   <select
                     value={formWorkingTaluka}
                     onChange={(e) => setFormWorkingTaluka(e.target.value)}
-                    required
                     className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                   >
-                    <option value="">-- कार्यक्षेत्र तालुका निवडा --</option>
+                    <option value="">-- शाळा / नोकरीचा तालुका --</option>
                     {formAvailableTalukas.map((t) => (
                       <option key={t} value={t}>
                         {t}
@@ -2167,11 +2211,16 @@ export const AppointmentsTab: React.FC = () => {
 
               {/* बहाल करण्यात येणारे पद आणि तालुका */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
+                <div className={isPostNeedsTaluka ? '' : 'sm:col-span-2'}>
                   <label className="font-bold block mb-1">बहाल करण्यात येणारे पद *</label>
                   <select
                     value={formPost}
-                    onChange={(e) => setFormPost(e.target.value)}
+                    onChange={(e) => {
+                      setFormPost(e.target.value);
+                      if (!isTalukaLevelPost(e.target.value)) {
+                        setFormTaluka('');
+                      }
+                    }}
                     className="w-full p-2 border border-slate-300 rounded-lg bg-white font-semibold"
                   >
                     {postsList.map((p) => (
@@ -2184,12 +2233,12 @@ export const AppointmentsTab: React.FC = () => {
 
                 {isPostNeedsTaluka && (
                   <div>
-                    <label className="font-bold block mb-1">बहाल पदाचा तालुका निवडा *</label>
+                    <label className="font-bold block mb-1 text-amber-900">बहाल केलेल्या पदाचा तालुका निवडा *</label>
                     <select
                       value={formTaluka}
                       onChange={(e) => setFormTaluka(e.target.value)}
                       required
-                      className="w-full p-2 border border-slate-300 rounded-lg bg-white"
+                      className="w-full p-2 border-2 border-amber-400 bg-amber-50/50 rounded-lg font-bold text-slate-800"
                     >
                       <option value="">-- बहाल पदाचा तालुका निवडा --</option>
                       {formAvailableTalukas.map((t) => (
@@ -2379,7 +2428,9 @@ export const AppointmentsTab: React.FC = () => {
                     <th className="py-2.5 px-3 text-center border-r border-slate-700">विभागीय प्रतिनिधी</th>
                     <th className="py-2.5 px-3 text-center border-r border-slate-700">जिल्हा पदाधिकारी</th>
                     <th className="py-2.5 px-3 text-center border-r border-slate-700">तालुका पदाधिकारी</th>
-                    <th className="py-2.5 px-3 text-center">सदस्य (नोंदणी)</th>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700 font-extrabold text-[#efb24b]">एकूण पदाधिकारी</th>
+                    <th className="py-2.5 px-3 text-center border-r border-slate-700">सदस्य (नोंदणी)</th>
+                    <th className="py-2.5 px-3 text-center font-extrabold text-amber-300">एकूण बेरीज</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -2403,32 +2454,44 @@ export const AppointmentsTab: React.FC = () => {
                       <td className="py-2 px-3 text-center font-semibold text-slate-700 border-r border-slate-200">
                         {toEnglishDigits(st.talukaOfficial)}
                       </td>
-                      <td className="py-2 px-3 text-center font-bold text-[#df6b16]">
+                      <td className="py-2 px-3 text-center font-extrabold text-[#09243f] bg-slate-50 border-r border-slate-200">
+                        {toEnglishDigits(st.officialsTotal)}
+                      </td>
+                      <td className="py-2 px-3 text-center font-bold text-[#df6b16] border-r border-slate-200">
                         {toEnglishDigits(st.members)}
+                      </td>
+                      <td className="py-2 px-3 text-center font-black text-[#851216] bg-amber-50/80">
+                        {toEnglishDigits(st.rowTotal)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 {/* Total Row as per requirement */}
-                <tfoot className="bg-[#e2e8f0] text-slate-900 font-extrabold border-t-2 border-slate-400 sticky bottom-0 z-10">
+                <tfoot className="bg-[#0f172a] text-white font-extrabold border-t-2 border-slate-400 sticky bottom-0 z-10">
                   <tr>
-                    <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-300 text-sm">
-                      एकूण
+                    <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-black">
+                      सर्व बेरीज (Grand Total)
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold text-slate-200">
                       {toEnglishDigits(matrixTotals.stateRep)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold text-slate-200">
                       {toEnglishDigits(matrixTotals.divRep)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold text-slate-200">
                       {toEnglishDigits(matrixTotals.distOfficial)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-300 text-sm text-[#09243f]">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold text-slate-200">
                       {toEnglishDigits(matrixTotals.talukaOfficial)}
                     </td>
-                    <td className="py-3 px-3 text-center text-sm text-[#df6b16]">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-black text-[#efb24b] bg-slate-800">
+                      {toEnglishDigits(matrixTotals.officialsTotal)}
+                    </td>
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-black text-amber-400">
                       {toEnglishDigits(matrixTotals.members)}
+                    </td>
+                    <td className="py-3 px-3 text-center text-xs sm:text-sm font-black text-amber-300 bg-amber-950/80">
+                      ⭐ {toEnglishDigits(matrixTotals.grandTotal)} ⭐
                     </td>
                   </tr>
                 </tfoot>

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRight, ShieldCheck, Users, School, Award, ChevronRight,
-  FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle
+  FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle,
+  X
 } from 'lucide-react';
 import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
@@ -13,6 +14,23 @@ interface HomeTabProps {
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList }) => {
+  const [fullScreenPhoto, setFullScreenPhoto] = useState<string | null>(null);
+
+  // Close full-screen photo modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setFullScreenPhoto(null);
+      }
+    };
+    if (fullScreenPhoto) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [fullScreenPhoto]);
+
   const list = newsList && newsList.length > 0 ? newsList : INITIAL_NEWS;
   const recentNews = list.slice(0, 6);
 
@@ -347,76 +365,103 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
         </div>
       </section>
 
-      {/* Section 4: Latest News & Circulars Gazette */}
-      <section className="py-8 sm:py-10 max-w-[1240px] mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between gap-4 mb-5 pb-3 border-b border-slate-200">
-          <div>
-            <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-              अधिकृत प्रसिद्धी
-            </span>
-            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-              ताज्या घडामोडी व परिपत्रके
-            </h3>
-          </div>
-          <button
-            onClick={() => {
-              setCurrentTab('news');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            className="text-xs sm:text-sm font-bold text-amber-800 hover:text-amber-900 flex items-center gap-1"
-          >
-            <span>सर्व बातम्या पहा</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+      {/* Section 4: Latest News / Tagline Photo Spotlight */}
+      <section className="py-6 sm:py-10 max-w-[1240px] mx-auto px-4 sm:px-6">
+        <div className="mb-4 pb-2 border-b border-slate-200">
+          <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
+            अधिकृत प्रसिद्धी
+          </span>
+          <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
+            ताज्या घडामोडी
+          </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {recentNews.map((news, index) => {
-            const imgUrl = news.imageUrl || news.image;
-            const isPhotoOnly = !news.content || news.content.trim() === '';
+        {(() => {
+          // Identify Tagline Photo: either category is 'टॅगलाईन फोटो', or featured is true, or fallback to newest photo/item
+          const taglinePhotoItem =
+            list.find((item) => (item.category || '').includes('टॅगलाईन') && (item.imageUrl || item.image)) ||
+            list.find((item) => item.featured && (item.imageUrl || item.image)) ||
+            list.find((item) => Boolean(item.imageUrl || item.image)) ||
+            list[0];
+
+          const imgUrl = taglinePhotoItem?.imageUrl || taglinePhotoItem?.image;
+
+          if (imgUrl) {
             return (
-              <article
-                key={news.id ? `${news.id}-${index}` : `recent-news-${index}`}
-                onClick={() => onSelectNews(news)}
-                className="bg-white rounded-xl border border-slate-200 hover:border-amber-500 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between overflow-hidden group"
-              >
-                <div>
-                  {imgUrl && (
-                    <div className="w-full h-36 sm:h-40 bg-slate-900/5 relative overflow-hidden border-b border-slate-100">
-                      <img
-                        src={imgUrl}
-                        alt={news.title}
-                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    </div>
-                  )}
+              <div className="w-full bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div
+                  onClick={() => setFullScreenPhoto(imgUrl)}
+                  className="w-full bg-slate-100 flex items-center justify-center cursor-pointer transition-opacity hover:opacity-95"
+                >
+                  <img
+                    src={imgUrl}
+                    alt={taglinePhotoItem?.title || 'ताज्या घडामोडी'}
+                    className="w-full h-auto block object-contain mx-auto"
+                    loading="eager"
+                  />
+                </div>
 
-                  <div className="p-4 sm:p-4.5">
-                    <div className="flex items-center justify-between gap-2 text-xs text-slate-500 mb-2">
-                      <span className="font-semibold text-amber-700">{news.category}</span>
-                      <span className="font-mono">{toEnglishDigits(news.date)}</span>
-                    </div>
-                    <h4 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] line-clamp-2 hover:text-amber-800 transition-colors">
-                      {toEnglishDigits(news.title)}
-                    </h4>
-                    {news.summary && (
-                      <p className="text-xs sm:text-sm text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">
-                        {toEnglishDigits(news.summary)}
-                      </p>
-                    )}
+                {taglinePhotoItem?.title && (
+                  <div className="py-2.5 px-3 sm:px-4 bg-slate-50 border-t border-slate-200 text-center">
+                    <p
+                      className="text-xs sm:text-sm md:text-base font-bold text-[#0b1e36] truncate"
+                      title={taglinePhotoItem.title}
+                    >
+                      {toEnglishDigits(taglinePhotoItem.title)}
+                    </p>
                   </div>
-                </div>
-
-                <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-amber-800">
-                  <span>{isPhotoOnly ? '📷 फोटो पहा' : 'सविस्तर वाचा'}</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </article>
+                )}
+              </div>
             );
-          })}
-        </div>
+          }
+
+          return (
+            <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500">
+              <p className="font-bold text-sm text-slate-700">सध्या कोणताही टॅगलाईन फोटो उपलब्ध नाही.</p>
+              <p className="text-xs text-slate-500 mt-1">
+                ॲडमिन पॅनलमध्ये बातम्या व परिपत्रके सेक्शनमध्ये 'Tagline Photo' जोडा.
+              </p>
+            </div>
+          );
+        })()}
       </section>
+
+      {/* Full-Screen Original Size Photo Lightbox Modal */}
+      {fullScreenPhoto && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 select-none"
+          onClick={() => setFullScreenPhoto(null)}
+        >
+          {/* Top-Right CLOSE Button (उजव्या वरच्या कोपर्यात CLOSE बटन) */}
+          <button
+            type="button"
+            onClick={() => setFullScreenPhoto(null)}
+            className="fixed top-3 right-3 sm:top-5 sm:right-5 z-[110] flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-full font-bold text-xs sm:text-sm shadow-2xl transition-all cursor-pointer border border-white/30"
+            title="CLOSE"
+          >
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>CLOSE</span>
+          </button>
+
+          {/* Original full size photo display without any text, names or icons */}
+          <div
+            className="w-full h-full flex items-center justify-center overflow-auto p-1 sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setFullScreenPhoto(null);
+              }
+            }}
+          >
+            <img
+              src={fullScreenPhoto}
+              alt="Full Size View"
+              className="max-w-[96vw] max-h-[92vh] w-auto h-auto object-contain rounded-lg shadow-2xl mx-auto"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+

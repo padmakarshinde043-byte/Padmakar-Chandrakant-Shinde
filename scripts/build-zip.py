@@ -2,11 +2,18 @@ import os
 import zipfile
 
 dist_dir = 'dist'
-zip_filename = 'public/dist.zip'
+zip_filename = 'dist/dist.zip'
+public_zip = 'public/dist.zip'
 
 if not os.path.exists(dist_dir):
     print("dist directory not found, cannot create zip.")
     exit(1)
+
+if os.path.exists(public_zip):
+    try:
+        os.remove(public_zip)
+    except Exception:
+        pass
 
 if os.path.exists(zip_filename):
     os.remove(zip_filename)

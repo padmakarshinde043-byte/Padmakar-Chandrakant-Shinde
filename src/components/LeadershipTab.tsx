@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, Search, ShieldCheck, UserCheck, Image as ImageIcon } from 'lucide-react';
+import { Phone, Search, ShieldCheck, UserCheck, Image as ImageIcon, RotateCw } from 'lucide-react';
 import {
   ORG_DETAILS,
-  STATE_EXECUTIVE,
-  DIVISIONAL_COORDINATORS,
-  DISTRICT_PRESIDENTS,
-  ADVISORY_BOARD,
-  Leader
+  Leader,
+  DEFAULT_AUTHORITATIVE_LEADERS
 } from '../data/mahasanghData';
 import { fetchDynamicLeaders } from '../services/rkFirebaseService';
 
@@ -18,47 +15,47 @@ const DYNAMIC_LEADERSHIP_STORAGE_KEY = 'mahasangh_dynamic_leadership_v1';
 
 export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) => {
   const [districtSearch, setDistrictSearch] = useState('');
-  const [allLeaders, setAllLeaders] = useState<Leader[]>([]);
+  const [allLeaders, setAllLeaders] = useState<Leader[]>(() => {
+    try {
+      const stored = localStorage.getItem(DYNAMIC_LEADERSHIP_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+    return DEFAULT_AUTHORITATIVE_LEADERS;
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Load dynamic leaders with Smart Zero-Quota Cache
+  const loadLeaders = async (force = false) => {
+    setIsRefreshing(true);
+    try {
+      // Fetch authoritative live data directly from Firebase (RTDB & Firestore)
+      const remoteLeaders = await fetchDynamicLeaders(force);
+      if (remoteLeaders && remoteLeaders.length > 0) {
+        setAllLeaders(remoteLeaders);
+        localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(remoteLeaders));
+      }
+    } catch (e) {
+      console.warn('Error loading leaders from Firebase:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    const loadLeaders = async () => {
-      // 1. Instant render from local browser cache (0ms, 0 bytes Firebase quota)
-      try {
-        const stored = localStorage.getItem(DYNAMIC_LEADERSHIP_STORAGE_KEY);
-        if (stored) {
-          setAllLeaders(JSON.parse(stored));
-        } else {
-          const initialCombined: Leader[] = [
-            ...STATE_EXECUTIVE.map((l, i) => ({ ...l, id: `se-${i}`, category: 'राज्य कार्यकारिणी' as const })),
-            ...DIVISIONAL_COORDINATORS.map((l, i) => ({ ...l, id: `dc-${i}`, category: 'विभागीय समन्वयक' as const })),
-            ...DISTRICT_PRESIDENTS.map((l, i) => ({ ...l, id: `dp-${i}`, category: 'जिल्हा अध्यक्ष' as const })),
-            ...ADVISORY_BOARD.map((l, i) => ({ ...l, id: `ab-${i}`, category: 'सल्लागार' as const })),
-          ];
-          setAllLeaders(initialCombined);
-          localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(initialCombined));
-        }
-      } catch (e) {
-        console.warn(e);
-      }
+    // Background live fetch ensures any fresh modifications are updated seamlessly with zero flicker
+    loadLeaders(false);
 
-      // 2. Background check for remote updates (only fetches if version changed)
-      try {
-        const remoteLeaders = await fetchDynamicLeaders();
-        if (remoteLeaders && remoteLeaders.length > 0) {
-          setAllLeaders(remoteLeaders);
-        }
-      } catch (e) {
-        // Safe offline/cached fallback
-      }
-    };
-
-    loadLeaders();
-    window.addEventListener('mahasangh_leadership_updated', loadLeaders);
-    return () => window.removeEventListener('mahasangh_leadership_updated', loadLeaders);
+    const onUpdated = () => loadLeaders(false);
+    window.addEventListener('mahasangh_leadership_updated', onUpdated);
+    return () => window.removeEventListener('mahasangh_leadership_updated', onUpdated);
   }, []);
 
   const stateExecutive = allLeaders.filter((l) => l.category === 'राज्य कार्यकारिणी' || l.category === 'state' || !l.category);
+  const womenExecutive = allLeaders.filter((l) => l.category === 'महिला आघाडी राज्य कार्यकारिणी');
   const divisional = allLeaders.filter((l) => l.category === 'विभागीय समन्वयक' || l.category === 'विभागीय कार्यकारिणी' || l.category === 'division');
   const districtPresidents = allLeaders.filter((l) => l.category === 'जिल्हा अध्यक्ष' || l.category === 'district');
   const advisory = allLeaders.filter((l) => l.category === 'सल्लागार' || l.category === 'advisory');
@@ -113,13 +110,15 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
     <div className="bg-slate-50 py-10 md:py-16 text-slate-800">
       {/* Page Header */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-10">
-        <div className="border-b-2 border-[#102a43] pb-6">
-          <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
-            नेतृत्व व पदाधिकारी सूची
-          </span>
-          <h1 className="font-serifDevanagari text-3xl sm:text-4xl font-extrabold text-[#0b1e36] mt-1">
-            महासंघाची राज्य, विभागीय व जिल्हा कार्यकारिणी
-          </h1>
+        <div className="border-b-2 border-[#102a43] pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+              नेतृत्व व पदाधिकारी सूची
+            </span>
+            <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
+              महासंघाची राज्य, विभागीय व जिल्हा कार्यकारिणी
+            </h1>
+          </div>
         </div>
       </div>
 
@@ -179,6 +178,27 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {stateExecutive.map((leader) => renderLeaderCard(leader, 'राज्य कार्यकारिणी'))}
+          </div>
+        </section>
+
+        {/* Section 2.5: महिला आघाडी राज्य कार्यकारिणी */}
+        <section className="bg-white p-6 rounded-2xl border-l-8 border-rose-500 shadow-sm">
+          <div className="mb-8 flex items-center justify-between">
+            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+              महिला आघाडी राज्य कार्यकारिणी
+            </h3>
+            <span className="text-xs text-slate-500 font-medium bg-rose-50 px-3 py-1 rounded-full">
+              एकूण: <strong className="font-mono text-[#0b1e36]">{womenExecutive.length}</strong>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            {womenExecutive.length > 0 ? (
+              womenExecutive.map((leader) => renderLeaderCard(leader, 'महिला आघाडी राज्य कार्यकारिणी'))
+            ) : (
+              <div className="col-span-full py-8 text-center text-xs text-slate-400">
+                महिला आघाडी राज्य कार्यकारिणीचे पदाधिकारी लवकरच जोडले जातील. (आपण ॲडमिन पॅनलमधून नवीन पदाधिकारी जोडू शकता)
+              </div>
+            )}
           </div>
         </section>
 

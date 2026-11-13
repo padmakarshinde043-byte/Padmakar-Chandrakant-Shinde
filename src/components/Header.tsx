@@ -12,7 +12,6 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
   const navItems = [
     { id: 'home', label: 'मुख्यपृष्ठ' },
     { id: 'about', label: 'आमच्याबद्दल' },
-    { id: 'objectives', label: 'उद्दिष्टे व कार्य' },
     { id: 'leadership', label: 'राज्य व जिल्हा नेतृत्व' },
     { id: 'appointments', label: 'पदाधिकारी' },
     { id: 'news', label: 'बातम्या आणि परिपत्रके' },
@@ -90,33 +89,27 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
       <div className="bg-[#0b1e36] border-y border-amber-500/60 shadow-inner">
         <div className="max-w-[1240px] mx-auto px-2 sm:px-6">
           {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex items-center justify-between py-1.5" aria-label="मुख्य नेव्हिगेशन">
-            <div className="flex items-center gap-1 xl:gap-2">
-              {navItems.map((item) => {
-                const isActive = currentTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavClick(item.id)}
-                    className={`text-xs xl:text-sm px-3.5 py-1.5 rounded-lg font-bold transition-all ${
-                      isActive
-                        ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
-                        : 'text-slate-200 hover:text-amber-300 hover:bg-white/10'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="text-[11px] text-amber-300/80 font-semibold tracking-wider font-mono">
-              नोंदणी क्र. {ORG_DETAILS.registrationNo}
-            </div>
+          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2.5 py-2" aria-label="मुख्य नेव्हिगेशन">
+            {navItems.map((item) => {
+              const isActive = currentTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavClick(item.id)}
+                  className={`text-sm xl:text-[15px] px-3.5 xl:px-4 py-2 rounded-lg transition-all ${
+                    isActive
+                      ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
+                      : 'text-slate-100 hover:text-white hover:bg-white/10 font-bold'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
 
-          {/* Mobile Submenu Scrolling Ribbon: Large, Bold, Attractive Colorful Capsules */}
-          <div className="lg:hidden py-2">
+          {/* Mobile Submenu Scrolling Ribbon: Calm, elegant, theme-harmonized tabs with larger readable font */}
+          <div className="lg:hidden py-2.5">
             <div
               ref={scrollNavRef}
               className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth px-1"
@@ -129,16 +122,13 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
                     key={item.id}
                     data-active={isActive ? 'true' : 'false'}
                     onClick={() => handleNavClick(item.id)}
-                    className={`shrink-0 text-xs sm:text-sm font-extrabold px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full transition-all whitespace-nowrap flex items-center gap-1.5 active:scale-95 ${
+                    className={`shrink-0 text-sm sm:text-base px-3.5 py-2 rounded-lg transition-all whitespace-nowrap active:scale-98 ${
                       isActive
-                        ? 'bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-[#0b1e36] font-black border-2 border-white shadow-md shadow-amber-950/40 ring-2 ring-amber-400'
-                        : 'bg-white text-[#0b1e36] border-2 border-amber-300/90 hover:border-amber-400 hover:bg-amber-50/80 shadow-xs'
+                        ? 'bg-amber-500 text-[#0b1e36] font-black shadow-sm'
+                        : 'text-slate-100 hover:text-white bg-white/10 hover:bg-white/15 border border-white/15 font-bold'
                     }`}
                   >
-                    {isActive && (
-                      <span className="w-2 h-2 rounded-full bg-[#0b1e36] shrink-0" />
-                    )}
-                    <span>{item.label}</span>
+                    {item.label}
                   </button>
                 );
               })}

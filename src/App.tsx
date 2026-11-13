@@ -3,7 +3,6 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeTab } from './components/HomeTab';
 import { AboutTab } from './components/AboutTab';
-import { ObjectivesTab } from './components/ObjectivesTab';
 import { LeadershipTab } from './components/LeadershipTab';
 import { NewsTab } from './components/NewsTab';
 import { MembershipTab } from './components/MembershipTab';
@@ -26,13 +25,19 @@ import {
   saveApplicationToFirestore,
   trackSingleApplicationInFirestore,
   fetchApplicationsForAdmin,
+  subscribeToApplicationsForAdmin,
+  fetchApprovedMembersCached,
+  safeCacheApplications,
+  safeStorageGet,
   approveApplicationInFirestore,
   rejectApplicationInFirestore,
   deleteApplicationFromFirestore,
+  updateMemberInFirestore,
   saveContactToFirestore,
   deleteNewsFromFirestore,
   sortNewsDescending,
 } from './firebase';
+import { fetchDynamicLeaders } from './services/rkFirebaseService';
 
 function isPathAdminRoute(): boolean {
   if (typeof window === 'undefined') return false;
@@ -47,15 +52,15 @@ export function App() {
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
   const [isLoadingAdminApps, setIsLoadingAdminApps] = useState(false);
 
-  // Applications state (Starts from local storage to prevent unnecessary reads)
+  // Applications state (Starts from local storage, defaults to empty array)
   const [applications, setApplications] = useState<MembershipApplication[]>(() => {
     try {
-      const saved = localStorage.getItem('mahasangh_applications');
+      const saved = safeStorageGet('mahasangh_applications');
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_APPLICATIONS;
+    return [];
   });
 
   const [govOrders, setGovOrders] = useState<GovOrder[]>([]);
@@ -113,6 +118,10 @@ export function App() {
         setNewsList(news);
         const govOrders = await fetchGovOrders();
         setGovOrders(govOrders);
+        // 3. Seamlessly prefetch leadership data in background without blocking UI
+        fetchDynamicLeaders(false).catch((err) => {
+          console.warn('Dynamic leaders prefetch warning:', err);
+        });
       } catch (err) {
         console.warn('Data init error:', err);
       }
@@ -132,6 +141,42 @@ export function App() {
       window.removeEventListener('mahasangh_news_updated', handleNewsSync);
     };
   }, []);
+
+  // Applications loading:
+  // For public visitors: Smart Cache of approved members (0 reads if cached!)
+  // Applications loading:
+  // For public visitors: Smart Cache of approved members (0 reads if cached!)
+  // For Admin only: Real-time listener for pending/approved applications
+  useEffect(() => {
+    if (currentTab === 'admin') {
+      // Admin Mode: Live listener for instant approval & real-time sync
+      fetchApplicationsForAdmin()
+        .then((apps) => {
+          if (apps && apps.length > 0) {
+            setApplications(apps);
+            safeCacheApplications(apps);
+          }
+        })
+        .catch((err) => console.warn('Admin fetch applications error:', err));
+
+      const unsubscribe = subscribeToApplicationsForAdmin((liveApps) => {
+        setApplications(liveApps);
+        safeCacheApplications(liveApps);
+      });
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
+    } else {
+      // Public Visitor Mode: Smart Cache of approved members (ZERO reads if valid cache exists!)
+      fetchApprovedMembersCached(false)
+        .then((approved) => {
+          if (approved && approved.length > 0) {
+            setApplications(approved);
+          }
+        })
+        .catch((err) => console.warn('Public approved members cache load notice:', err));
+    }
+  }, [currentTab]);
 
   // Exit Admin to Main Public Website
   const handleExitAdmin = () => {
@@ -157,13 +202,13 @@ export function App() {
     }
   };
 
-  // Add application (Single write, 0 reads)
+  // Add application
   const handleAddApplication = async (newApp: MembershipApplication) => {
-    setApplications((prev) => [newApp, ...prev]);
-    localStorage.setItem(
-      'mahasangh_applications',
-      JSON.stringify([newApp, ...applications])
-    );
+    setApplications((prev) => {
+      const updated = [newApp, ...prev.filter((a) => a.id !== newApp.id)];
+      safeCacheApplications(updated);
+      return updated;
+    });
 
     try {
       await saveApplicationToFirestore(newApp);
@@ -172,15 +217,19 @@ export function App() {
     }
   };
 
-  // Single-document tracking (At most 1 read)
+  // Single-document tracking (At most a few targeted reads)
   const handleTrackRemote = async (queryTerm: string): Promise<MembershipApplication | null> => {
     try {
       const found = await trackSingleApplicationInFirestore(queryTerm);
       if (found) {
-        // Cache found app locally
+        // Update or insert found app locally so edited details / photos reflect immediately
         setApplications((prev) => {
-          if (prev.some((a) => a.id === found.id)) return prev;
-          return [found, ...prev];
+          const exists = prev.some((a) => a.id === found.id);
+          const updated = exists
+            ? prev.map((a) => (a.id === found.id ? found : a))
+            : [found, ...prev];
+          safeCacheApplications(updated);
+          return updated;
         });
       }
       return found;
@@ -190,13 +239,13 @@ export function App() {
     }
   };
 
-  // Admin: Fetch applications on demand (Only reads when admin logs in or clicks refresh)
+  // Admin: Fetch applications on demand
   const handleFetchAdminApplications = async () => {
     setIsLoadingAdminApps(true);
     try {
       const list = await fetchApplicationsForAdmin();
       setApplications(list);
-      localStorage.setItem('mahasangh_applications', JSON.stringify(list));
+      safeCacheApplications(list);
     } catch (err) {
       console.warn('Fetch admin applications error:', err);
     } finally {
@@ -204,20 +253,22 @@ export function App() {
     }
   };
 
-  // Admin: Approve application (Single write)
+  // Admin: Approve application (Single write, syncs state & localStorage & Firestore)
   const handleApproveApplication = async (id: string, memberNumber: string) => {
-    setApplications((prev) =>
-      prev.map((app) =>
+    setApplications((prev) => {
+      const updated = prev.map((app) =>
         app.id === id
           ? {
               ...app,
-              status: 'approved',
+              status: 'approved' as const,
               memberNumber,
               approvedAt: new Date().toISOString(),
             }
           : app
-      )
-    );
+      );
+      safeCacheApplications(updated);
+      return updated;
+    });
 
     try {
       await approveApplicationInFirestore(id, memberNumber);
@@ -226,20 +277,22 @@ export function App() {
     }
   };
 
-  // Admin: Reject application (Single write)
+  // Admin: Reject application (Single write, syncs state & localStorage & Firestore)
   const handleRejectApplication = async (id: string, reason: string) => {
-    setApplications((prev) =>
-      prev.map((app) =>
+    setApplications((prev) => {
+      const updated = prev.map((app) =>
         app.id === id
           ? {
               ...app,
-              status: 'rejected',
+              status: 'rejected' as const,
               rejectReason: reason,
               rejectedAt: new Date().toISOString(),
             }
           : app
-      )
-    );
+      );
+      safeCacheApplications(updated);
+      return updated;
+    });
 
     try {
       await rejectApplicationInFirestore(id, reason);
@@ -248,15 +301,33 @@ export function App() {
     }
   };
 
-  // Admin: Delete application permanently
+  // Admin: Delete application permanently (syncs state & localStorage & Firestore)
   const handleDeleteApplication = async (id: string) => {
-    setApplications((prev) => prev.filter((app) => app.id !== id));
+    setApplications((prev) => {
+      const updated = prev.filter((app) => app.id !== id);
+      safeCacheApplications(updated);
+      return updated;
+    });
 
     try {
       await deleteApplicationFromFirestore(id);
     } catch (err) {
       console.warn('Deleted locally, Firestore sync error:', err);
     }
+  };
+
+  // Admin: Full Member Edit / Update (memberNumber & all fields, syncs state, cache & Firestore)
+  const handleUpdateMember = async (updatedMember: MembershipApplication) => {
+    setApplications((prev) => {
+      const exists = prev.some((app) => app.id === updatedMember.id);
+      const updated = exists
+        ? prev.map((app) => (app.id === updatedMember.id ? updatedMember : app))
+        : [updatedMember, ...prev];
+      safeCacheApplications(updated);
+      return updated;
+    });
+
+    await updateMemberInFirestore(updatedMember);
   };
 
   // Admin: Add news (Single write, sorted newest first)
@@ -333,6 +404,7 @@ export function App() {
         onApproveApplication={handleApproveApplication}
         onRejectApplication={handleRejectApplication}
         onDeleteApplication={handleDeleteApplication}
+        onUpdateMember={handleUpdateMember}
         onAddNews={handleAddNews}
         onUpdateNews={handleUpdateNews}
         onDeleteNews={handleDeleteNews}
@@ -361,9 +433,8 @@ export function App() {
             newsList={newsList}
           />
         )}
-        {currentTab === 'about' && <AboutTab setCurrentTab={setCurrentTab} />}
-        {currentTab === 'objectives' && (
-          <ObjectivesTab setCurrentTab={setCurrentTab} />
+        {(currentTab === 'about' || currentTab === 'objectives') && (
+          <AboutTab setCurrentTab={setCurrentTab} />
         )}
         {currentTab === 'leadership' && (
           <LeadershipTab setCurrentTab={setCurrentTab} />

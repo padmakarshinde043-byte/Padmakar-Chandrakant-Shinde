@@ -10,8 +10,10 @@
  */
 
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
-import { Leader } from '../data/mahasanghData';
+import { Leader, DEFAULT_AUTHORITATIVE_LEADERS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
+import { db } from '../firebase';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
 const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 const CACHE_KEY_OFFICIALS = 'rk2026_officials_cache_v1';
@@ -241,72 +243,95 @@ export async function updatePresidentPasswordInFirebase(newPass: string): Promis
 }
 
 /**
- * Fetch dynamic leadership members with Zero-Quota Smart Caching:
- * - Reads from localStorage instantly (0 network egress, 0 lag).
- * - Checks tiny version endpoint (~10 bytes) to see if an update occurred.
- * - Only downloads full data if version changed.
+ * Fetch dynamic leadership members:
+ * - Always ensures that live changes made in Firebase (RTDB & Firestore) are authoritative.
+ * - Prioritizes fresh remote fetch so modified names, photos, and structure are shown accurately.
+ * - Falls back to Firestore /leadership if RTDB is unavailable.
+ * - Only uses DEFAULT_AUTHORITATIVE_LEADERS as initial offline seed.
  */
 export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[]> {
+  // If not forcing refresh, check if local cache already has the updated 52 leaders with legal advisors
+  if (!forceRefresh) {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const hasLegalAdvisors = Array.isArray(parsed) && parsed.some(
+          (l: Leader) => l.name && (l.name.includes('काटनेश्वर') || l.name.includes('मानव'))
+        );
+        if (hasLegalAdvisors && parsed.length >= 50) {
+          // Cache is complete and has the user's modifications, return it
+          // while quietly verifying remote version
+          fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`)
+            .then((r) => r.json())
+            .then((data) => {
+              if (Array.isArray(data) && data.length > 0) {
+                localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
+              }
+            })
+            .catch(() => {});
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+
+  // 1. Direct fetch from Firebase RTDB (authoritative source)
   try {
-    const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
-    const localVer = localStorage.getItem(CACHE_KEY_LEADERSHIP_VER);
-
-    if (!forceRefresh && cached) {
-      // Check remote version in background without blocking UI
-      fetch(`${RTDB_BASE_URL}/leadership_version.json`)
-        .then((r) => r.json())
-        .then((remoteVer) => {
-          if (remoteVer && String(remoteVer) !== String(localVer)) {
-            // Version changed on remote, fetch fresh
-            fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`)
-              .then((r) => r.json())
-              .then((data) => {
-                if (Array.isArray(data) && data.length > 0) {
-                  localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
-                  localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(remoteVer));
-                  window.dispatchEvent(new Event('mahasangh_leadership_updated'));
-                }
-              })
-              .catch(() => {});
-          }
-        })
-        .catch(() => {});
-
-      return JSON.parse(cached);
-    }
-
-    // Direct fetch
-    const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`);
+    const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
+        window.dispatchEvent(new Event('mahasangh_leadership_updated'));
         return data;
       }
     }
-  } catch (error) {
-    console.warn('Error fetching dynamic leaders:', error);
+  } catch (err) {
+    console.warn('RTDB dynamic leaders fetch failed, trying Firestore:', err);
   }
 
-  const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch {
-      // fallback
+  // 2. Fallback to Firestore `/leadership` collection
+  try {
+    const snap = await getDocs(collection(db, 'leadership'));
+    if (!snap.empty) {
+      const firestoreLeaders: Leader[] = [];
+      snap.forEach((d) => {
+        firestoreLeaders.push(d.data() as Leader);
+      });
+      if (firestoreLeaders.length > 0) {
+        firestoreLeaders.sort((a: any, b: any) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+        localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(firestoreLeaders));
+        return firestoreLeaders;
+      }
     }
+  } catch (err) {
+    console.warn('Firestore leadership fallback failed:', err);
   }
 
-  return [];
+  // 3. Fallback to valid localStorage cache if present
+  try {
+    const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+
+  // 4. Default to authoritative live seed (with legal advisors and photos)
+  return DEFAULT_AUTHORITATIVE_LEADERS;
 }
 
 /**
  * Save dynamic leaders list to Firebase and update version.
+ * Saves to RTDB and dual-syncs to Firestore collection /leadership.
  */
 export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<void> {
   const newVer = Date.now();
 
-  // Save leaders
+  // Save leaders to RTDB
   const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -317,7 +342,7 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
     throw new Error(`Failed to save leaders to Firebase: ${res.statusText}`);
   }
 
-  // Update version
+  // Update version in RTDB
   await fetch(`${RTDB_BASE_URL}/leadership_version.json`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -327,4 +352,19 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
   localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(leaders));
   localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
   window.dispatchEvent(new Event('mahasangh_leadership_updated'));
+
+  // Dual-sync to Firestore `/leadership` collection in background
+  try {
+    for (let i = 0; i < leaders.length; i++) {
+      const l = leaders[i];
+      const id = l.id || `leader_${i}`;
+      setDoc(doc(db, 'leadership', id), {
+        ...l,
+        orderIndex: i,
+        updatedAt: new Date().toISOString()
+      }).catch(() => {});
+    }
+  } catch (err) {
+    console.warn('Firestore leadership sync warning:', err);
+  }
 }

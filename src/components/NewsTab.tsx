@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Calendar, Tag, ArrowRight, X, Search, FileText, RefreshCw, ChevronRight, ShieldCheck, Megaphone, Image as ImageIcon, ExternalLink } from 'lucide-react';
-import { NewsItem, GovOrder } from '../data/mahasanghData';
+import { NewsItem, GovOrder, INITIAL_GOV_ORDERS, INITIAL_NEWS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 
 interface NewsTabProps {
@@ -26,8 +26,13 @@ export const NewsTab: React.FC<NewsTabProps> = ({
   const section1Categories = ['सर्व', 'अधिकृत घोषणा', 'अधिकृत वृत्त', 'संघटना घडामोडी', 'संघटना वृत्त', 'अभिनंदन', 'टॅगलाईन फोटो'];
   const [sec1Category, setSec1Category] = useState('सर्व');
 
+  // Ensure newsList is never empty by falling back to INITIAL_NEWS
+  const safeNewsList = useMemo(() => {
+    return newsList && newsList.length > 0 ? newsList : INITIAL_NEWS;
+  }, [newsList]);
+
   // पहिला विभाग: बातम्या, अधिकृत घोषणा व संघटना घडामोडी
-  const section1Items = (newsList || []).filter((item) => {
+  const section1Items = safeNewsList.filter((item) => {
     if (!item) return false;
     if (item.category === 'शासन निर्णय') return false; // belongs to Section 2
 
@@ -41,15 +46,43 @@ export const NewsTab: React.FC<NewsTabProps> = ({
     return matchesCat && (title.includes(term) || summary.includes(term) || content.includes(term));
   });
 
-  // दुसरा विभाग: अधिकृत शासन निर्णय व परिपत्रके
-  const section2Items = (govOrders || []).filter((item) => {
-    if (!item) return false;
-    const term = (searchTerm || '').trim().toLowerCase();
-    if (!term) return true;
-    const title = (item.title || '').toLowerCase();
-    const summary = (item.summary || '').toLowerCase();
-    return title.includes(term) || summary.includes(term);
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // दुसरा विभाग: अधिकृत शासन निर्णय व परिपत्रके (govOrders + newsList चे शासन निर्णय + defaults)
+  const combinedGovOrders = useMemo(() => {
+    const list: GovOrder[] = [...(govOrders && govOrders.length > 0 ? govOrders : INITIAL_GOV_ORDERS)];
+    const existingTitles = new Set(list.map((g) => g.title.trim().toLowerCase()));
+
+    // Incorporate any news items with category 'शासन निर्णय'
+    safeNewsList.forEach((news) => {
+      if (news && news.category === 'शासन निर्णय') {
+        const cleanTitle = (news.title || '').trim().toLowerCase();
+        if (!existingTitles.has(cleanTitle)) {
+          list.push({
+            id: news.id,
+            title: news.title,
+            date: news.publishDate || news.date || '2026-11-01',
+            type: 'शासन निर्णय',
+            summary: news.summary || news.content,
+            fileUrl: news.imageUrl,
+            createdAt: news.createdAt || new Date().toISOString(),
+          });
+          existingTitles.add(cleanTitle);
+        }
+      }
+    });
+
+    return list;
+  }, [govOrders, safeNewsList]);
+
+  const section2Items = combinedGovOrders
+    .filter((item) => {
+      if (!item) return false;
+      const term = (searchTerm || '').trim().toLowerCase();
+      if (!term) return true;
+      const title = (item.title || '').toLowerCase();
+      const summary = (item.summary || '').toLowerCase();
+      return title.includes(term) || summary.includes(term);
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div className="bg-slate-50 py-6 sm:py-10 text-slate-800">

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Lock, LogOut, Award, Printer, PlusCircle, Search,
   UserCheck, ShieldAlert, KeyRound, CheckCircle2, ArrowLeft, Eye, EyeOff,
   Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download, List,
   UserPlus, Shield, CheckSquare, Square, MessageSquare, Mail, PhoneCall, RefreshCw,
-  Cloud, CloudUpload, ExternalLink, AlertCircle, Settings, RotateCcw, Calendar
+  Cloud, CloudUpload, ExternalLink, AlertCircle, Settings, RotateCcw, Calendar,
+  ArrowUp, ArrowDown, ChevronUp, ChevronDown
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -13,10 +15,7 @@ import {
   INITIAL_GOV_ORDERS,
   ORG_DETAILS,
   Leader,
-  STATE_EXECUTIVE,
-  DIVISIONAL_COORDINATORS,
-  DISTRICT_PRESIDENTS,
-  ADVISORY_BOARD,
+  DEFAULT_AUTHORITATIVE_LEADERS,
   formatSequentialMemberNumber,
   MAHARASHTRA_DISTRICTS
 } from '../data/mahasanghData';
@@ -35,9 +34,11 @@ import {
   AdminPermissions,
   ContactMessage,
   fetchContactsForAdmin,
-  deleteContactMessageFromFirestore
+  deleteContactMessageFromFirestore,
+  allocateNextMemberNumber,
+  addApprovedMemberToCache
 } from '../firebase';
-import { generateMembershipCertificatePdf } from '../services/rkPdfGenerator';
+import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
 import { saveDynamicLeadersToFirebase, fetchDynamicLeaders } from '../services/rkFirebaseService';
 import {
@@ -50,12 +51,14 @@ import {
     saveGovOrderToFirestore,
     deleteGovOrderFromFirestore
 } from '../firebase';
+import { MemberEditManager } from './MemberEditManager';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
   onApproveApplication: (id: string, memberNumber: string) => void;
   onRejectApplication: (id: string, reason: string) => void;
   onDeleteApplication: (id: string) => void;
+  onUpdateMember?: (member: MembershipApplication) => Promise<void> | void;
   onAddNews: (news: NewsItem) => void;
   onUpdateNews?: (news: NewsItem) => void;
   onDeleteNews?: (id: string) => void;
@@ -74,6 +77,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   onApproveApplication,
   onRejectApplication,
   onDeleteApplication,
+  onUpdateMember,
   onAddNews,
   onUpdateNews,
   onDeleteNews,
@@ -105,7 +109,84 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Active view inside Admin Dashboard
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'leadership' | 'add_news' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary'>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
+
+  // Razorpay & Webhook Settings State
+  const [razorpayKeyId, setRazorpayKeyId] = useState('');
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState('');
+  const [razorpayWebhookSecret, setRazorpayWebhookSecret] = useState('');
+  const [razorpayEnabled, setRazorpayEnabled] = useState(true);
+  const [razorpayWebhookUrl, setRazorpayWebhookUrl] = useState('');
+  const [razorpayStatusMsg, setRazorpayStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isLoadingRazorpayConfig, setIsLoadingRazorpayConfig] = useState(false);
+  const [isSavingRazorpayConfig, setIsSavingRazorpayConfig] = useState(false);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+
+  const loadRazorpayAdminConfig = async () => {
+    setIsLoadingRazorpayConfig(true);
+    try {
+      const res = await fetch('/api/razorpay/admin-config');
+      if (res.ok) {
+        const data = await res.json();
+        setRazorpayKeyId(data.keyId || '');
+        setRazorpayKeySecret(data.keySecret || '');
+        setRazorpayWebhookSecret(data.webhookSecret || '');
+        setRazorpayEnabled(data.enabled ?? true);
+        setRazorpayWebhookUrl(data.webhookUrl || `${window.location.origin}/api/razorpay/webhook`);
+      }
+    } catch (e) {
+      console.warn('Could not load razorpay admin config:', e);
+    } finally {
+      setIsLoadingRazorpayConfig(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn && activeAdminSubTab === 'razorpay') {
+      loadRazorpayAdminConfig();
+    }
+  }, [isLoggedIn, activeAdminSubTab]);
+
+  const handleSaveRazorpayConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingRazorpayConfig(true);
+    setRazorpayStatusMsg(null);
+    try {
+      const res = await fetch('/api/razorpay/admin-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          keyId: razorpayKeyId.trim(),
+          keySecret: razorpayKeySecret.trim(),
+          webhookSecret: razorpayWebhookSecret.trim(),
+          enabled: razorpayEnabled
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRazorpayStatusMsg({
+          text: '✓ Razorpay API व Webhook सेटिंग्ज यशस्वीरीत्या सेव्ह झाल्या! आता ऑटोमॅटिक पेमेंट गेटवे आणि वेबहूक पूर्णपणे ऑनलाइन सक्रिय आहे.',
+          type: 'success'
+        });
+      } else {
+        throw new Error(data.message || 'सेटिंग्ज सेव्ह करता आल्या नाहीत.');
+      }
+    } catch (err: any) {
+      setRazorpayStatusMsg({
+        text: 'सेटिंग्ज सेव्ह करताना त्रुटी: ' + (err.message || 'Error'),
+        type: 'error'
+      });
+    } finally {
+      setIsSavingRazorpayConfig(false);
+    }
+  };
+
+  const handleCopyWebhookUrl = () => {
+    if (!razorpayWebhookUrl) return;
+    navigator.clipboard.writeText(razorpayWebhookUrl);
+    setCopiedWebhookUrl(true);
+    setTimeout(() => setCopiedWebhookUrl(false), 2500);
+  };
 
   // Contact Inquiries (प्राप्त संदेश / विचारणा)
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
@@ -164,8 +245,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setCloudinaryConfig(updated);
     setCloudinaryStatusMsg({
       text: updated.enabled
-        ? '✓ Cloudinary सेटिंग्ज यशस्वीरीत्या सेव्ह झाली! आता सर्व फोटो मोफत Cloudinary CDN वर सेव्ह होतील.'
-        : 'Cloudinary सेटिंग्ज जतन करण्यात आली (सध्या पर्याय निष्क्रिय आहे).',
+        ? '✓ सर्व्हर मिडिया स्टोरेज सेटिंग्ज यशस्वीरीत्या सेव्ह झाली! आता सर्व फोटो थेट क्लाउड सर्व्हरवर सेव्ह होतील.'
+        : 'सर्व्हर मिडिया स्टोरेज सेटिंग्ज जतन करण्यात आली (सध्या पर्याय निष्क्रिय आहे).',
       type: 'success'
     });
   };
@@ -198,12 +279,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       });
 
       setCloudinaryStatusMsg({
-        text: `✓ Cloudinary कनेक्शन यशस्वी झाले! चाचणी फोटो अपलोड झाला: ${result.url}`,
+        text: `✓ सर्व्हर फोटो साठवणूक कनेक्शन यशस्वी झाले! चाचणी फोटो अपलोड झाला: ${result.url}`,
         type: 'success'
       });
     } catch (err: any) {
       setCloudinaryStatusMsg({
-        text: 'Cloudinary चाचणी अयशस्वी: ' + (err.message || 'कृपया नाव व Preset तपासा'),
+        text: 'फोटो सर्व्हर चाचणी अयशस्वी: ' + (err.message || 'कृपया नाव व Preset तपासा'),
         type: 'error'
       });
     } finally {
@@ -293,7 +374,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         try {
           const { base64 } = await compressImageFile(file, 800, 600, 0.7);
           setNewsImageUrl(base64);
-          setNewsError('Cloudinary त्रुटी (' + (err.message || '') + '), म्हणून स्थानिक कॉम्प्रेस केलेली इमेज वापरली.');
+          setNewsError('सर्व्हर अपलोड त्रुटी (' + (err.message || '') + '), म्हणून स्थानिक कॉम्प्रेस केलेली इमेज वापरली.');
         } catch {
           setNewsError('फोटो कॉम्प्रेस करताना अडचण आली.');
         } finally {
@@ -330,7 +411,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         try {
           const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
           setPhotoOnlyImageUrl(base64);
-          setNewsError('Cloudinary त्रुटी (' + (err.message || '') + '), स्थानिक इमेज निवडली.');
+          setNewsError('सर्व्हर अपलोड त्रुटी (' + (err.message || '') + '), स्थानिक इमेज निवडली.');
         } catch {
           setNewsError('फोटो कॉम्प्रेस करताना अडचण आली.');
         }
@@ -363,14 +444,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setIsUploadingGoFile(false);
       }
     } else {
-      setGoError('कृपया Admin पॅनलमध्ये Cloudinary सेटिंग्ज तपासा.');
+      setGoError('कृपया Admin पॅनलमध्ये सर्व्हर मिडिया स्टोरेज सेटिंग्ज तपासा.');
     }
   };
 
   // ==========================================
   // Leadership Management State (Point 7)
   // ==========================================
-  const [leaderCategory, setLeaderCategory] = useState<'राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'सल्लागार'>('राज्य कार्यकारिणी');
+  const [leaderCategory, setLeaderCategory] = useState<'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'सल्लागार'>('राज्य कार्यकारिणी');
   const [dynamicLeaders, setDynamicLeaders] = useState<Leader[]>([]);
   const [editingLeaderId, setEditingLeaderId] = useState<string | null>(null);
   const [leaderName, setLeaderName] = useState('');
@@ -384,30 +465,30 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [leaderFormMsg, setLeaderFormMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const leaderPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Initialize Dynamic Leadership from LocalStorage or Defaults and sync with Firebase
+  // Initialize Dynamic Leadership from Firebase / LocalStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem(DYNAMIC_LEADERSHIP_STORAGE_KEY);
       if (stored) {
-        setDynamicLeaders(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length >= 50) {
+          setDynamicLeaders(parsed);
+        } else {
+          setDynamicLeaders(DEFAULT_AUTHORITATIVE_LEADERS);
+        }
       } else {
-        const initialCombined: Leader[] = [
-          ...STATE_EXECUTIVE.map((l, i) => ({ ...l, id: `se-${i}`, category: 'राज्य कार्यकारिणी' as const })),
-          ...DIVISIONAL_COORDINATORS.map((l, i) => ({ ...l, id: `dc-${i}`, category: 'विभागीय समन्वयक' as const })),
-          ...DISTRICT_PRESIDENTS.map((l, i) => ({ ...l, id: `dp-${i}`, category: 'जिल्हा अध्यक्ष' as const })),
-          ...ADVISORY_BOARD.map((l, i) => ({ ...l, id: `ab-${i}`, category: 'सल्लागार' as const })),
-        ];
-        setDynamicLeaders(initialCombined);
-        localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(initialCombined));
+        setDynamicLeaders(DEFAULT_AUTHORITATIVE_LEADERS);
       }
     } catch (e) {
       console.warn('Could not read dynamic leaders:', e);
+      setDynamicLeaders(DEFAULT_AUTHORITATIVE_LEADERS);
     }
 
-    // Sync remote leaders from Firebase in background
-    fetchDynamicLeaders().then((remote) => {
+    // Always sync authoritative remote leaders from Firebase (RTDB & Firestore)
+    fetchDynamicLeaders(true).then((remote) => {
       if (remote && remote.length > 0) {
         setDynamicLeaders(remote);
+        localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(remote));
       }
     }).catch(() => {});
   }, []);
@@ -430,6 +511,73 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   // Filter leaders by active category
   const categoryLeaders = dynamicLeaders.filter((l) => (l.category || 'राज्य कार्यकारिणी') === leaderCategory);
+
+  // Selected leader ID for prominent reordering
+  const [selectedLeaderIdForReorder, setSelectedLeaderIdForReorder] = useState<string | null>(null);
+
+  // Auto-select first leader when category changes or when current selection is lost
+  useEffect(() => {
+    if (categoryLeaders.length > 0) {
+      if (!selectedLeaderIdForReorder || !categoryLeaders.some((l) => (l.id || l.name) === selectedLeaderIdForReorder)) {
+        setSelectedLeaderIdForReorder(categoryLeaders[0].id || categoryLeaders[0].name);
+      }
+    } else {
+      setSelectedLeaderIdForReorder(null);
+    }
+  }, [leaderCategory, categoryLeaders.length]);
+
+  // Safe category-specific Move Up
+  const handleMoveLeaderUp = (leaderId?: string) => {
+    const targetId = leaderId || selectedLeaderIdForReorder;
+    if (!targetId) return;
+
+    const catIndex = categoryLeaders.findIndex((l) => (l.id || l.name) === targetId);
+    if (catIndex <= 0) return; // Already at top of category
+
+    const currentLeader = categoryLeaders[catIndex];
+    const leaderAbove = categoryLeaders[catIndex - 1];
+
+    // Swap positions inside dynamicLeaders
+    const newLeaders = [...dynamicLeaders];
+    const posCurrent = newLeaders.findIndex((l) => (l.id || l.name) === (currentLeader.id || currentLeader.name));
+    const posAbove = newLeaders.findIndex((l) => (l.id || l.name) === (leaderAbove.id || leaderAbove.name));
+
+    if (posCurrent !== -1 && posAbove !== -1) {
+      const temp = newLeaders[posCurrent];
+      newLeaders[posCurrent] = newLeaders[posAbove];
+      newLeaders[posAbove] = temp;
+      saveLeadersToStorage(newLeaders);
+      setSelectedLeaderIdForReorder(targetId);
+    }
+  };
+
+  // Safe category-specific Move Down
+  const handleMoveLeaderDown = (leaderId?: string) => {
+    const targetId = leaderId || selectedLeaderIdForReorder;
+    if (!targetId) return;
+
+    const catIndex = categoryLeaders.findIndex((l) => (l.id || l.name) === targetId);
+    if (catIndex === -1 || catIndex >= categoryLeaders.length - 1) return; // Already at bottom of category
+
+    const currentLeader = categoryLeaders[catIndex];
+    const leaderBelow = categoryLeaders[catIndex + 1];
+
+    // Swap positions inside dynamicLeaders
+    const newLeaders = [...dynamicLeaders];
+    const posCurrent = newLeaders.findIndex((l) => (l.id || l.name) === (currentLeader.id || currentLeader.name));
+    const posBelow = newLeaders.findIndex((l) => (l.id || l.name) === (leaderBelow.id || leaderBelow.name));
+
+    if (posCurrent !== -1 && posBelow !== -1) {
+      const temp = newLeaders[posCurrent];
+      newLeaders[posCurrent] = newLeaders[posBelow];
+      newLeaders[posBelow] = temp;
+      saveLeadersToStorage(newLeaders);
+      setSelectedLeaderIdForReorder(targetId);
+    }
+  };
+
+  const selectedLeaderIndex = categoryLeaders.findIndex((l) => (l.id || l.name) === selectedLeaderIdForReorder);
+  const selectedLeader = selectedLeaderIndex >= 0 ? categoryLeaders[selectedLeaderIndex] : null;
 
   // Load admin credentials and sub-admin list on mount
   useEffect(() => {
@@ -792,20 +940,32 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setRejectReason('');
   };
 
-  // Approve Application with Sequential Number Generation: MS/वर्ष/जिल्ह्याचे पहिले चार अक्षरे इंग्रजीमध्ये/0000
-  const handleApproveVerified = () => {
+  // Approve Application with Sequential Number Generation via Central Counter
+  const handleApproveVerified = async () => {
     if (!selectedAppForVerification) return;
     if (!paymentConfirmedChecked) {
       alert('कृपया सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री करणारा टिक बॉक्स निवडा.');
       return;
     }
 
-    // Determine continuous sequence number across all approved applications
-    const currentApprovedCount = applications.filter((a) => a.status === 'approved').length;
-    const nextSeqNumber = currentApprovedCount + 1;
-    const newMemberNumber = formatSequentialMemberNumber(selectedAppForVerification.district, nextSeqNumber);
+    // Determine continuous sequence number across all approved applications using Central Counter
+    let newMemberNumber = '';
+    try {
+      const counterResult = await allocateNextMemberNumber(selectedAppForVerification.district);
+      newMemberNumber = counterResult.memberNumber;
+    } catch (e) {
+      const currentApprovedCount = applications.filter((a) => a.status === 'approved').length;
+      newMemberNumber = formatSequentialMemberNumber(selectedAppForVerification.district, currentApprovedCount + 1);
+    }
 
     onApproveApplication(selectedAppForVerification.id, newMemberNumber);
+    addApprovedMemberToCache({
+      ...selectedAppForVerification,
+      status: 'approved',
+      memberNumber: newMemberNumber,
+      approvedAt: new Date().toISOString(),
+      paymentConfirmed: true
+    });
     setSelectedAppForVerification(null);
   };
 
@@ -840,7 +1000,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setLeaderPhoto(result.url);
         setLeaderPhotoUrl(result.url);
         setLeaderPhotoSizeKb(0);
-        setLeaderFormMsg({ text: '✓ फोटो Cloudinary वर थेट सेव्ह झाला (0% Firebase कोटा खर्च)!', type: 'success' });
+        setLeaderFormMsg({ text: '✓ फोटो थेट हाय-स्पीड मिडिया सर्व्हरवर सेव्ह झाला!', type: 'success' });
       } catch (err: any) {
         console.warn('Cloudinary leader upload error, falling back to local compression:', err);
         try {
@@ -848,7 +1008,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           setLeaderPhoto(base64);
           setLeaderPhotoSizeKb(sizeKb);
           setLeaderPhotoUrl('');
-          setLeaderFormMsg({ text: 'Cloudinary त्रुटी, स्थानिक कॉम्प्रेस केलेला फोटो वापरला (' + sizeKb + ' KB).', type: 'error' });
+          setLeaderFormMsg({ text: 'सर्व्हर त्रुटी, स्थानिक कॉम्प्रेस केलेला फोटो वापरला (' + sizeKb + ' KB).', type: 'error' });
         } catch {
           setLeaderFormMsg({ text: 'फोटो अपलोड करताना अडचण आली.', type: 'error' });
         }
@@ -1448,18 +1608,32 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                 {currentUser?.permissions.approveMembers && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('applications')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'applications'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Users className="w-4 h-4" />
-                    <span>सदस्यत्व अर्ज ({totalCount})</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('applications')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'applications'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>सदस्यत्व अर्ज ({totalCount})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('edit_members')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'edit_members'
+                          ? 'bg-indigo-700 text-white shadow-xs'
+                          : 'text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200'
+                      }`}
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      <span>सदस्य एडिट</span>
+                    </button>
+                  </>
                 )}
 
                 {currentUser?.permissions.manageLeadership && (
@@ -1507,18 +1681,32 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 )}
 
                 {currentUser?.isSuperAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('manage_admins')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'manage_admins'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Shield className="w-4 h-4" />
-                    <span>व्यवस्थापक (Admins)</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('manage_admins')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'manage_admins'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Shield className="w-4 h-4" />
+                      <span>व्यवस्थापक (Admins)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('razorpay')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'razorpay'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <KeyRound className="w-4 h-4 text-emerald-400" />
+                      <span>Razorpay व वेबहूक (Webhook)</span>
+                    </button>
+                  </>
                 )}
 
                 <button
@@ -1631,15 +1819,63 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     ))}
                   </div>
 
-                  <div className="relative w-full sm:w-64">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="नाव, अर्ज क्र., मोबाईल किंवा जिल्हा शोधा..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        placeholder="नाव, अर्ज क्र., मोबाईल किंवा जिल्हा शोधा..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const excelData = filteredApps.map((a, idx) => ({
+                          'अनुक्रमांक': idx + 1,
+                          'सदस्य क्रमांक': a.memberNumber || '-',
+                          'अर्ज क्रमांक': a.applicationNumber || '-',
+                          'पूर्ण नाव': a.fullName || '-',
+                          'पद / संवर्ग': a.professional || '-',
+                          'जिल्हा': a.district || '-',
+                          'तालुका': a.taluka || '-',
+                          'कार्यरत केंद्र': a.centerName || '-',
+                          'मोबाईल नंबर': a.phone || '-',
+                          'ई-मेल पत्ता': a.email || '-',
+                          'अर्जाची स्थिती': a.status === 'approved' ? 'मंजूर' : a.status === 'rejected' ? 'नाकारले' : 'प्रलंबित',
+                          'नोंदणी दिनांक': formatDateWithEnglishDigits(a.createdAt || '')
+                        }));
+
+                        const worksheet = XLSX.utils.json_to_sheet(excelData);
+                        worksheet['!cols'] = [
+                          { wch: 10 }, // अनुक्रमांक
+                          { wch: 22 }, // सदस्य क्रमांक
+                          { wch: 18 }, // अर्ज क्रमांक
+                          { wch: 32 }, // पूर्ण नाव
+                          { wch: 22 }, // पद
+                          { wch: 16 }, // जिल्हा
+                          { wch: 16 }, // तालुका
+                          { wch: 22 }, // केंद्र
+                          { wch: 16 }, // मोबाईल
+                          { wch: 26 }, // ईमेल
+                          { wch: 14 }, // स्थिती
+                          { wch: 16 }, // दिनांक
+                        ];
+
+                        const workbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(workbook, worksheet, 'सदस्य माहिती');
+                        
+                        const fileName = `mahasangh_members_${filterStatus}_${new Date().toISOString().split('T')[0]}.xlsx`;
+                        XLSX.writeFile(workbook, fileName);
+                      }}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
+                      title="सर्व सदस्य माहिती मूळ एक्सेल (.XLSX) फॉरमॅटमध्ये डाऊनलोड करा"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>XLSX डाऊनलोड</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1700,7 +1936,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 {app.fullName}
                                 {app.isOfficial && (
                                   <span className="block text-[10px] text-[#df6b16] font-semibold">
-                                    ⭐ {app.officialPost}
+                                    {app.officialPost}
                                   </span>
                                 )}
                               </button>
@@ -1761,14 +1997,26 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   </button>
                                 </div>
                               ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setCertModalApp(app)}
-                                  className="bg-[#17366d] hover:bg-[#0f244c] text-white font-bold px-3 py-1.5 rounded text-xs flex items-center gap-1 mx-auto transition-colors shadow-xs"
-                                >
-                                  <Printer className="w-3 h-3" />
-                                  प्रमाणपत्र
-                                </button>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCertModalApp(app)}
+                                    className="bg-[#17366d] hover:bg-[#0f244c] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs"
+                                    title="आय-कार्ड पहा"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    आय-कार्ड पहा
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => generateMembershipIdCardPdf(app)}
+                                    className="bg-[#047857] hover:bg-[#065f46] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs"
+                                    title="आय-कार्ड PDF डाऊनलोड करा"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    PDF
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -1778,6 +2026,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </table>
                 </div>
               </div>
+            )}
+
+            {/* Sub-tab 1B: Dedicated Member Edit & Duplicate Cleanup (सदस्य एडिट) */}
+            {activeAdminSubTab === 'edit_members' && (
+              <MemberEditManager
+                applications={applications}
+                onUpdateMember={async (updated) => {
+                  if (onUpdateMember) {
+                    await onUpdateMember(updated);
+                  }
+                }}
+                onDeleteApplication={onDeleteApplication}
+                onFetchApplications={onFetchApplications}
+                isLoadingApps={isLoadingApps}
+              />
             )}
 
             {/* Sub-tab 2: Leadership Management (Point 7) */}
@@ -1803,104 +2066,202 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     className="p-2.5 bg-white border border-[#c8d2e2] text-xs font-bold text-[#193568] rounded-lg focus:outline-none focus:border-[#df6b16] w-full sm:w-64"
                   >
                     <option value="राज्य कार्यकारिणी">1. राज्य कार्यकारिणी</option>
-                    <option value="विभागीय समन्वयक">2. विभागीय समन्वयक</option>
-                    <option value="जिल्हा अध्यक्ष">3. जिल्हा अध्यक्ष</option>
-                    <option value="सल्लागार">4. सल्लागार</option>
+                    <option value="महिला आघाडी राज्य कार्यकारिणी">2. महिला आघाडी राज्य कार्यकारिणी</option>
+                    <option value="विभागीय समन्वयक">3. विभागीय समन्वयक</option>
+                    <option value="जिल्हा अध्यक्ष">4. जिल्हा अध्यक्ष</option>
+                    <option value="सल्लागार">5. सल्लागार</option>
                   </select>
                   <span className="text-xs text-slate-500 font-medium">
                     या श्रेणीत एकूण: <strong>{categoryLeaders.length}</strong> पदाधिकारी
                   </span>
                 </div>
 
-                {/* Already Added Leaders Capsule Cards */}
-                <div>
-                  <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider mb-3">
-                    विद्यमान पदाधिकारी ({leaderCategory})
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {categoryLeaders.map((ldr, index) => (
-                      <div
-                        key={ldr.id || ldr.name}
-                        className="bg-white rounded-full p-2 pr-4 border border-[#e2e8f0] shadow-xs flex items-center justify-between gap-3 hover:border-[#df6b16] transition-all"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {ldr.photo ? (
-                            <img
-                              src={ldr.photo}
-                              alt={ldr.name}
-                              className="w-10 h-10 rounded-full object-cover border border-[#d4af37] shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
-                              <ImageIcon className="w-5 h-5" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <h5 className="font-bold text-xs text-[#09243f] truncate">
-                              {ldr.name}
-                            </h5>
-                            <span className="text-[11px] text-[#df6b16] font-semibold block truncate">
-                              {ldr.role} {ldr.region ? `(${ldr.region})` : ''}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Reordering Controls */}
-                        <div className="flex gap-0.5 shrink-0">
-                          <button
-                            type="button"
-                            disabled={index === 0}
-                            onClick={() => {
-                              const newLeaders = [...dynamicLeaders];
-                              const currentIndex = newLeaders.findIndex(l => l.id === ldr.id);
-                              if (currentIndex > 0) {
-                                [newLeaders[currentIndex], newLeaders[currentIndex - 1]] = [newLeaders[currentIndex - 1], newLeaders[currentIndex]];
-                                saveLeadersToStorage(newLeaders);
-                              }
-                            }}
-                            className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-[#df6b16] hover:text-white text-slate-400 disabled:opacity-30 transition-all text-[10px]"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            disabled={index === categoryLeaders.length - 1}
-                            onClick={() => {
-                              const newLeaders = [...dynamicLeaders];
-                              const currentIndex = newLeaders.findIndex(l => l.id === ldr.id);
-                              if (currentIndex < newLeaders.length - 1) {
-                                [newLeaders[currentIndex], newLeaders[currentIndex + 1]] = [newLeaders[currentIndex + 1], newLeaders[currentIndex]];
-                                saveLeadersToStorage(newLeaders);
-                              }
-                            }}
-                            className="w-5 h-5 flex items-center justify-center rounded-full bg-slate-100 hover:bg-[#df6b16] hover:text-white text-slate-400 disabled:opacity-30 transition-all text-[10px]"
-                          >
-                            ▼
-                          </button>
-                        </div>
-
-                        {/* Edit and Delete Actions */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleEditLeader(ldr)}
-                            className="p-1.5 hover:bg-amber-100 text-amber-700 rounded-full transition-colors"
-                            title="दुरुस्त करा (Edit)"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteLeader(ldr.id, ldr.name)}
-                            className="p-1.5 hover:bg-rose-100 text-rose-600 rounded-full transition-colors"
-                            title="वगळा (Delete)"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                {/* Reordering Control Toolbar & Selection Panel */}
+                <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 shadow-xs">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#df6b16] animate-pulse shrink-0"></span>
+                        <h4 className="font-serifDevanagari font-bold text-sm text-[#193568]">
+                          पदाधिकाऱ्यांचा क्रम ठरवा (नाव निवडून बाणाने वर-खाली करा)
+                        </h4>
                       </div>
-                    ))}
+                      <p className="text-xs text-slate-700 mt-1">
+                        {selectedLeader ? (
+                          <span className="inline-flex items-center gap-1.5 flex-wrap">
+                            <span>निवडलेले नाव:</span>
+                            <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-400 font-bold text-[#193568] shadow-2xs">
+                              #{selectedLeaderIndex + 1} {selectedLeader.name} ({selectedLeader.role})
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">
+                            खालील यादीतून ज्या पदाधिकाऱ्याचे स्थान बदलायचे आहे, त्या नावावर क्लिक करा.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Prominent Large Arrow Buttons on the side */}
+                    <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+                      <button
+                        type="button"
+                        disabled={!selectedLeader || selectedLeaderIndex <= 0}
+                        onClick={() => handleMoveLeaderUp()}
+                        className="flex-1 md:flex-none px-5 py-3 bg-[#17366d] hover:bg-[#12284c] text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-[#17366d]"
+                        title="निवडलेले नाव वर सरकवा"
+                      >
+                        <ArrowUp className="w-4 h-4 text-[#efb24b]" />
+                        <span>▲ वर हलवा</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!selectedLeader || selectedLeaderIndex === -1 || selectedLeaderIndex >= categoryLeaders.length - 1}
+                        onClick={() => handleMoveLeaderDown()}
+                        className="flex-1 md:flex-none px-5 py-3 bg-[#df6b16] hover:bg-[#b8540c] text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-[#df6b16]"
+                        title="निवडलेले नाव खाली सरकवा"
+                      >
+                        <ArrowDown className="w-4 h-4 text-white" />
+                        <span>▼ खाली हलवा</span>
+                      </button>
+                    </div>
                   </div>
+                </div>
+
+                {/* Already Added Leaders List with Clear Click-to-Select & Row Arrows */}
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
+                      विद्यमान पदाधिकारी ({leaderCategory}) — एकूण: {categoryLeaders.length}
+                    </h4>
+                    <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                      💡 नावावर क्लिक करून निवडा किंवा बाजूच्या बाणांवर क्लिक करा
+                    </span>
+                  </div>
+
+                  {categoryLeaders.length === 0 ? (
+                    <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500 text-xs">
+                      या श्रेणीत अद्याप कोणतेही पदाधिकारी जोडलेले नाहीत. खालील फॉर्मद्वारे नवीन पदाधिकारी जोडा.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {categoryLeaders.map((ldr, index) => {
+                        const isSelected = (ldr.id || ldr.name) === selectedLeaderIdForReorder;
+                        return (
+                          <div
+                            key={ldr.id || ldr.name}
+                            onClick={() => setSelectedLeaderIdForReorder(ldr.id || ldr.name)}
+                            className={`rounded-2xl p-3 border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                              isSelected
+                                ? 'bg-amber-50/90 border-2 border-[#df6b16] shadow-md ring-2 ring-[#df6b16]/20'
+                                : 'bg-white border-slate-200 shadow-2xs hover:border-amber-300 hover:bg-slate-50/70'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              {/* Sequence Position Badge */}
+                              <span
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold font-mono shrink-0 ${
+                                  isSelected
+                                    ? 'bg-[#df6b16] text-white shadow-2xs'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                                }`}
+                                title={`स्थान: #${index + 1}`}
+                              >
+                                {index + 1}
+                              </span>
+
+                              {/* Photo */}
+                              {ldr.photo ? (
+                                <img
+                                  src={ldr.photo}
+                                  alt={ldr.name}
+                                  className="w-11 h-11 rounded-full object-cover border-2 border-[#efb24b] shadow-2xs shrink-0"
+                                />
+                              ) : (
+                                <div className="w-11 h-11 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                                  <ImageIcon className="w-5 h-5" />
+                                </div>
+                              )}
+
+                              {/* Details */}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <h5 className={`font-serifDevanagari font-bold text-xs sm:text-sm truncate ${
+                                    isSelected ? 'text-[#193568]' : 'text-slate-900'
+                                  }`}>
+                                    {ldr.name}
+                                  </h5>
+                                  {isSelected && (
+                                    <span className="bg-[#df6b16] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                                      निवडलेले
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-[#df6b16] font-semibold block truncate">
+                                  {ldr.role} {ldr.region ? `• ${ldr.region}` : ''}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Controls: Comfortable Large Side Arrows + Actions */}
+                            <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              {/* Side Arrows for Direct Tap */}
+                              <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200">
+                                <button
+                                  type="button"
+                                  disabled={index === 0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMoveLeaderUp(ldr.id || ldr.name);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#17366d] hover:text-white text-slate-700 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-700 transition-colors shadow-2xs text-xs font-bold border border-slate-200 cursor-pointer"
+                                  title="वर हलवा (Move Up)"
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={index === categoryLeaders.length - 1}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleMoveLeaderDown(ldr.id || ldr.name);
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#df6b16] hover:text-white text-slate-700 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-700 transition-colors shadow-2xs text-xs font-bold border border-slate-200 cursor-pointer"
+                                  title="खाली हलवा (Move Down)"
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {/* Edit & Delete */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditLeader(ldr);
+                                }}
+                                className="p-2 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors cursor-pointer"
+                                title="दुरुस्त करा (Edit)"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteLeader(ldr.id, ldr.name);
+                                }}
+                                className="p-2 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
+                                title="वगळा (Delete)"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Form to Add / Edit Leader (Photo < 200KB) */}
@@ -2054,7 +2415,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 setLeaderPhotoSizeKb(0);
                               }
                             }}
-                            placeholder="https://... (गुगल ड्राईव्ह, Cloudinary किंवा मोफत इमेज URL)"
+                            placeholder="https://... (इमेज URL / डायरेक्ट सर्व्हर फोटो लिंक)"
                             className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] focus:outline-none focus:border-[#df6b16]"
                           />
                         </div>
@@ -2126,7 +2487,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <ImageIcon className="w-4 h-4" />
-                      <span>📷 केवळ फोटो अपलोड करा</span>
+                      <span>🖼️ Tagline Photo (टॅगलाईन फोटो)</span>
                     </button>
 
                     <button
@@ -2268,7 +2629,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            फोटो अपलोड (Direct Cloudinary Upload)
+                            फोटो अपलोड (Direct Server Upload)
                           </label>
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
@@ -2276,7 +2637,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <Upload className="w-3.5 h-3.5 text-[#df6b16]" />
                                 <span>
                                   {isUploadingNewsCloudinary
-                                    ? 'Cloudinary वर अपलोड होत आहे...'
+                                    ? 'सर्व्हरवर फोटो अपलोड होत आहे...'
                                     : isCompressingNewsImg
                                     ? 'प्रक्रिया सुरू आहे...'
                                     : 'फोटो निवडा (Upload Photo)'}
@@ -2390,10 +2751,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="pb-4 mb-5 border-b border-slate-100">
                       <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                         <ImageIcon className="w-5 h-5 text-[#df6b16]" />
-                        केवळ फोटो किंवा परिपत्रक अपलोड करा (Quick Photo Upload)
+                        Tagline Photo - मुख्यपृष्ठ ताज्या घडामोडी फोटो अपलोड
                       </h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        फक्त फोटोचे शीर्षक आणि फोटो निवडा. वेबसाईटवर बातमी ऐवजी <strong>'📷 फोटो पहा'</strong> असे बटण दिसेल.
+                        येथे अपलोड केलेला फोटो थेट हाय-स्पीड मिडिया सर्व्हरवर सेव्ह होतो आणि मुख्यपृष्ठावर <strong>'ताज्या घडामोडी'</strong> सेक्शनमध्ये मोठ्या आकारात स्क्रीनच्या पूर्ण रुंदीत दर्शविला जातो.
                       </p>
                     </div>
 
@@ -2450,14 +2811,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          ३. फोटो निवडा (Upload Photo to Cloudinary) <span className="text-rose-600">*</span>
+                          ३. फोटो निवडा (Direct Photo Upload) <span className="text-rose-600">*</span>
                         </label>
                         <div className="space-y-3">
                           <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold rounded-lg shadow-xs transition-colors">
                             <Upload className="w-4 h-4" />
                             <span>
                               {isUploadingPhotoOnly
-                                ? 'Cloudinary वर अपलोड होत आहे...'
+                                ? 'डायरेक्ट सर्व्हरवर अपलोड होत आहे...'
                                 : 'मोबाईल किंवा संगणकावरून फोटो निवडा'}
                             </span>
                             <input
@@ -3450,6 +3811,158 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </form>
               </div>
             )}
+
+            {/* Super Admin Only: Razorpay Payment Gateway & Webhook Config */}
+            {activeAdminSubTab === 'razorpay' && currentUser?.isSuperAdmin && (
+              <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-md space-y-6 max-w-2xl mx-auto">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      💳
+                    </div>
+                    <div>
+                      <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
+                        Razorpay ऑटोमॅटिक पेमेंट व वेबहूक (Webhook) गेटवे
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Razorpay API Keys आणि Webhook जोडून बनावट UTR/पेमेंट फसवणूक १००% रोखा
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('applications')}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    title="बंद करा"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Status Message */}
+                {razorpayStatusMsg && (
+                  <div
+                    className={`p-3.5 rounded-lg text-xs font-semibold flex items-center justify-between gap-2 ${
+                      razorpayStatusMsg.type === 'success'
+                        ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                        : 'bg-rose-50 border border-rose-300 text-rose-900'
+                    }`}
+                  >
+                    <span>{razorpayStatusMsg.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => setRazorpayStatusMsg(null)}
+                      className="text-slate-400 hover:text-slate-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Webhook Endpoint Display Box */}
+                <div className="bg-slate-900 text-slate-100 p-4 rounded-xl border border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4" />
+                      तुमचा ॲक्टिव्ह Razorpay Webhook URL Endpoint:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyWebhookUrl}
+                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1 rounded text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedWebhookUrl ? '✓ कॉपी झाला!' : 'URL कॉपी करा'}
+                    </button>
+                  </div>
+                  <div className="font-mono text-xs bg-slate-950 p-2.5 rounded border border-slate-800 text-emerald-400 break-all select-all">
+                    {razorpayWebhookUrl || `${window.location.origin}/api/razorpay/webhook`}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    👉 हा URL तुमच्या <a href="https://dashboard.razorpay.com/app/webhooks" target="_blank" rel="noreferrer" className="text-amber-300 underline font-bold">Razorpay Dashboard &gt; Settings &gt; Webhooks</a> मध्ये जोडा. 
+                    तिथे Active Events म्हणून <strong>payment.captured</strong> आणि <strong>order.paid</strong> निवडा.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSaveRazorpayConfig} className="space-y-4 text-xs">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Razorpay Key ID <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="rzp_live_... किंवा rzp_test_..."
+                      value={razorpayKeyId}
+                      onChange={(e) => setRazorpayKeyId(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Razorpay Key Secret <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Razorpay Secret Key प्रविष्ट करा"
+                      value={razorpayKeySecret}
+                      onChange={(e) => setRazorpayKeySecret(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      Razorpay Webhook Secret (ऐच्छिक परंतु अत्यंत सुरक्षित)
+                    </label>
+                    <input
+                      type="password"
+                      placeholder="Razorpay वेबहूक सिक्रेट कोड (उदा. Mahasangh@2026)"
+                      value={razorpayWebhookSecret}
+                      onChange={(e) => setRazorpayWebhookSecret(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:outline-none focus:border-[#df6b16]"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      हाच सेम कोड Razorpay वेबहूक तयार करताना 'Secret' मध्ये टाका.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="rzpEnabled"
+                      checked={razorpayEnabled}
+                      onChange={(e) => setRazorpayEnabled(e.target.checked)}
+                      className="w-4 h-4 text-[#df6b16] rounded border-slate-300 cursor-pointer"
+                    />
+                    <label htmlFor="rzpEnabled" className="font-bold text-slate-800 cursor-pointer">
+                      सदस्यत्व अर्जासाठी Razorpay ऑटोमॅटिक पेमेंट गेटवे पर्याय चालू ठेवा
+                    </label>
+                  </div>
+
+                  <div className="pt-3">
+                    <button
+                      type="submit"
+                      disabled={isSavingRazorpayConfig}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-lg transition-colors shadow-xs flex items-center justify-center gap-2 text-sm disabled:opacity-60 cursor-pointer"
+                    >
+                      {isSavingRazorpayConfig ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>सेव्ह होत आहे...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                          <span>Razorpay API व वेबहूक सेटिंग्ज जतन करा</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3652,120 +4165,134 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       )}
 
       {/* ============================================================== */}
-      {/* Royal Certificate Print Modal - Strictly '॥ आजीवन सदस्य प्रमाणपत्र ॥', '⭐ आजीवन सदस्य ⭐', Stamp Removed */}
+      {/* Official Lifetime Membership ID Card Modal Preview */}
       {/* ============================================================== */}
       {certModalApp && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 md:p-8 shadow-2xl relative border-4 border-[#d4af37] max-h-[90vh] overflow-y-auto">
-            <div className="border-4 border-double border-[#d4af37] p-6 rounded-xl text-center space-y-4 bg-gradient-to-b from-[#fbf8f2] via-white to-[#fbf8f2]">
-              {/* Header Banner Image */}
-              <div className="flex items-center justify-center">
-                <img
-                  src="/heding.jpg"
-                  alt="महासंघ हेडिंग"
-                  className="max-h-20 w-auto object-contain mx-auto"
-                />
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-4 md:p-6 shadow-2xl relative border-2 border-[#0b1e33] max-h-[90vh] overflow-y-auto space-y-4">
+            
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e33] flex items-center gap-2">
+                <span>🪪</span> अधिकृत आजीवन सदस्य आय-कार्ड (मंजूर सदस्य)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setCertModalApp(null)}
+                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg text-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* ID Card Box Container */}
+            <div className="border-2 border-[#0b1e33] rounded-xl overflow-hidden bg-gradient-to-b from-white to-[#fffdf8] shadow-md text-slate-800 font-serifDevanagari">
+              
+              {/* Glossy Navy Blue Header */}
+              <div className="bg-gradient-to-r from-[#0b1e33] via-[#1e3a8a] to-[#091d36] p-3 border-b-2 border-[#d4af37] flex items-center justify-between gap-3">
+                <div className="w-16 h-16 rounded-full border-2 border-[#d4af37] bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+                  <img src="/logo.png" alt="महासंघ लोगो" className="w-full h-full object-contain p-0.5" />
+                </div>
+                <div className="flex-1 text-center">
+                  <div className="text-[11px] font-extrabold text-yellow-300 tracking-wider uppercase">
+                    महाराष्ट्र राज्य
+                  </div>
+                  <div className="text-lg md:text-xl font-black text-white leading-tight drop-shadow-md">
+                    केंद्रप्रमुख व अधिकारी महासंघ
+                  </div>
+                  <div className="text-[9px] font-bold text-slate-200 mt-0.5">
+                    नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <span className="text-xs font-bold text-[#df6b16] tracking-widest block uppercase">
-                  महाराष्ट्र राज्य
-                </span>
-                <h2 className="font-serifDevanagari text-2xl md:text-3xl font-extrabold text-[#09243f]">
-                  केंद्रप्रमुख व अधिकारी महासंघ
-                </h2>
-                <p className="text-[11px] text-slate-600 mt-0.5">
-                  नोंदणी क्र. {ORG_DETAILS.registrationNo}
-                </p>
-              </div>
-
-              {/* Title centered properly */}
-              <div className="py-1 flex justify-center">
-                <span className="inline-flex items-center justify-center bg-[#851216] text-[#ffdd80] px-8 py-2 rounded-full text-xs font-bold tracking-widest shadow-xs">
-                  ॥ आजीवन सदस्य प्रमाणपत्र ॥
-                </span>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs text-slate-600">प्रमाणित करण्यात येते की,</p>
-                <h3 className="font-serifDevanagari text-xl md:text-2xl font-bold text-[#851216]">
-                  {certModalApp.fullName}
-                </h3>
-                <p className="text-xs font-semibold text-slate-700">
-                  {certModalApp.professional || 'केंद्रप्रमुख / अधिकारी'}
-                  {certModalApp.isOfficial && certModalApp.officialPost && (
-                    <span className="text-[#df6b16] block font-bold mt-0.5">
-                      {certModalApp.officialPost} {certModalApp.officialTaluka ? `(${certModalApp.officialTaluka})` : ''}
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-slate-600">
-                  (जिल्हा: {certModalApp.district})
-                </p>
-
-                {/* Badge between stars */}
-                <div className="py-1.5 flex justify-center">
-                  <span className="inline-flex items-center gap-1.5 bg-[#fbf3e4] border border-[#d4af37] text-[#851216] font-bold text-xs px-5 py-1 rounded-full shadow-xs">
-                    ⭐ आजीवन सदस्य ⭐
+              {/* Title Bar */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200">
+                <div className="w-20"></div>
+                <div className="flex-1 text-center">
+                  <span className="text-base font-black text-[#0b1e33] border-b-2 border-[#d4af37] pb-0.5 inline-block">
+                    आजीवन सदस्य
                   </span>
                 </div>
-
-                <p className="text-xs sm:text-sm text-slate-700 pt-3 max-w-lg mx-auto leading-loose">
-                  आपण महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे अधिकृत आजीवन सदस्यत्व स्वीकारले असून, संघटनेच्या संघटन, सन्मान, समर्पण व शैक्षणिक गुणवत्ता या चतुःसूत्रीशी कटिबद्ध राहून शिक्षण क्षेत्राच्या सर्वांगीण विकासासाठी कार्यरत राहाल, या विश्वासासह हे सन्मानपत्र प्रदान करण्यात येत आहे.
-                </p>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl max-w-sm mx-auto text-xs space-y-1">
-                <div className="font-bold text-[#09243f]">
-                  सदस्य क्रमांक: <span className="text-base text-[#df6b16] font-serif font-bold">{certModalApp.memberNumber}</span>
-                </div>
-                <div className="text-slate-600 text-[11px]">
-                  नोंदणी दिनांक: {formatDateWithEnglishDigits(certModalApp.createdAt)}
+                <div className="w-28 text-right font-mono font-black text-xs text-[#0b1e33]">
+                  सदस्य क्र: {certModalApp.memberNumber || 'MS/2026/0001'}
                 </div>
               </div>
 
-              {/* Signature Row: Stamp completely removed as requested! Left side has association info, Right side has Rajendra Khairnar signature */}
-              <div className="pt-6 flex justify-between items-end border-t border-slate-200 px-6 text-xs text-slate-700">
-                <div className="text-left text-[11px] text-slate-600 leading-tight">
-                  <p className="font-bold text-[#09243f]">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</p>
-                  <p className="mt-0.5">श्रमिक संघ / धर्मादाय आयुक्त नोंदणीकृत</p>
-                  <p>नोंदणी क्र. {ORG_DETAILS.registrationNo}</p>
+              {/* Main Content Row */}
+              <div className="p-4 flex items-center justify-between gap-4">
+                {/* Photo */}
+                <div className="w-24 h-28 border-2 border-[#d4af37] rounded-lg overflow-hidden bg-slate-100 shrink-0 shadow-xs flex items-center justify-center">
+                  {certModalApp.photo ? (
+                    <img src={certModalApp.photo} alt={certModalApp.fullName} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center text-slate-400 text-xs font-bold">फोटो</div>
+                  )}
                 </div>
 
+                {/* Details */}
+                <div className="flex-1 space-y-1.5 text-xs text-slate-800">
+                  <div className="text-lg font-black text-[#991b1b] leading-tight">
+                    {certModalApp.salutation} {certModalApp.fullName}
+                  </div>
+                  <div className="font-extrabold text-slate-700">
+                    <span className="text-slate-500 font-bold">पद:</span> <strong className="text-[#0b1e33]">{certModalApp.professional || 'केंद्रप्रमुख / विस्तार अधिकारी'}</strong>
+                  </div>
+                  <div className="font-extrabold text-slate-700">
+                    <span className="text-slate-500 font-bold">कार्यक्षेत्र:</span> <strong className="text-[#0b1e33]">{certModalApp.district}{certModalApp.taluka ? ` (ता. ${certModalApp.taluka})` : ''}</strong>
+                  </div>
+                  <div className="font-extrabold text-slate-700">
+                    <span className="text-slate-500 font-bold">मोबाईल:</span> <span className="font-mono font-black text-[#0b1e33]">{certModalApp.phone}</span>
+                  </div>
+                </div>
+
+                {/* QR Code */}
+                <div className="w-24 h-24 shrink-0 flex items-center justify-center bg-white p-1 rounded-lg">
+                  <img
+                    src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fmahasangh.in"
+                    alt="mahasangh.in QR Code"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-2 border-t border-slate-200 bg-white flex items-end justify-between text-[10px]">
+                <div className="font-bold text-slate-600 leading-tight">
+                  महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ<br />
+                  <span className="text-[#851216] font-extrabold">आजीवन डिजिटल आय-कार्ड</span>
+                </div>
                 <div className="text-center">
                   <img
                     src="/sign.jpg"
-                    alt="राजेंद्र खैरनार सही"
-                    className="h-10 mx-auto object-contain mb-1"
+                    alt="स्वाक्षरी"
+                    className="h-8 max-w-[110px] object-contain mx-auto mix-blend-multiply contrast-150 mb-0.5"
                   />
-                  <div className="font-bold text-sm text-[#09243f]">
-                    {ORG_DETAILS.founderPresident.name}
-                  </div>
-                  <div className="text-[11px] text-slate-500">
-                    संस्थापक राज्याध्यक्ष
-                  </div>
+                  <div className="font-black text-[#000000]">श्री. राजेंद्र खैरनार</div>
+                  <div className="text-slate-500 font-bold text-[9px]">(संस्थापक राज्याध्यक्ष)</div>
                 </div>
               </div>
 
-              {/* Modal Buttons */}
-              <div className="pt-6 flex justify-center gap-3 no-print">
-                <button
-                  type="button"
-                  onClick={() => generateMembershipCertificatePdf(certModalApp)}
-                  className="bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow"
-                >
-                  <Download className="w-4 h-4" />
-                  PDF डाऊनलोड करा
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCertModalApp(null)}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-5 py-2.5 rounded-lg"
-                >
-                  बंद करा
-                </button>
-              </div>
             </div>
+
+            {/* Modal Buttons */}
+            <div className="pt-2 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => generateMembershipIdCardPdf(certModalApp)}
+                className="bg-[#0b1e33] hover:bg-[#1e3a8a] text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all hover:scale-105"
+              >
+                <Download className="w-4 h-4" />
+                आय-कार्ड PDF डाऊनलोड करा
+              </button>
+              <button
+                type="button"
+                onClick={() => setCertModalApp(null)}
+                className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-4 py-2.5 rounded-xl"
+              >
+                बंद करा
+              </button>
+            </div>
+
           </div>
         </div>
       )}
