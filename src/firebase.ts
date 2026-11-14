@@ -979,6 +979,26 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
   return initData;
 }
 
+async function getTrueHighestApprovedSeqFromFirestore(): Promise<number> {
+  try {
+    const appsCol = collection(db, 'applications');
+    const snap = await getDocs(appsCol);
+    let highest = DEFAULT_COUNTER_BASELINE;
+    snap.forEach((d) => {
+      const app = d.data() as MembershipApplication;
+      if (app.status === 'approved' && app.memberNumber) {
+        const seq = parseMemberNumberSeq(app.memberNumber);
+        if (seq > highest) {
+          highest = seq;
+        }
+      }
+    });
+    return highest;
+  } catch {
+    return DEFAULT_COUNTER_BASELINE;
+  }
+}
+
 function getKnownHighestSeqFromStorage(knownRecords?: Array<{ memberNumber?: string | null }>): number {
   let highest = extractHighestMemberSeq(knownRecords);
   try {
@@ -1018,17 +1038,18 @@ export async function allocateNextMemberNumber(
   knownRecords?: Array<{ memberNumber?: string | null }>
 ): Promise<{ memberNumber: string; seqNumber: number }> {
   const counterDocRef = doc(db, 'settings', 'member_counter');
-  let floorSeq = getKnownHighestSeqFromStorage(knownRecords);
+  const trueHighest = await getTrueHighestApprovedSeqFromFirestore();
+  let floorSeq = Math.max(getKnownHighestSeqFromStorage(knownRecords), trueHighest);
 
   for (let attempt = 0; attempt < 15; attempt++) {
     const allocatedSeq = await runTransaction(db, async (tx) => {
       const snap = await tx.get(counterDocRef);
-      let currentSeq = 0;
+      let currentSeq = trueHighest;
       if (snap.exists()) {
         const data = snap.data();
         const rawLast = typeof data.lastMemberNumber === 'number' ? data.lastMemberNumber : 0;
         const rawTotal = typeof data.totalApproved === 'number' ? data.totalApproved : 0;
-        currentSeq = Math.max(rawLast, rawTotal);
+        currentSeq = Math.max(rawLast, rawTotal, trueHighest);
       }
 
       const nextSeq = computeNextSafeSeq({
@@ -1060,7 +1081,7 @@ export async function allocateNextMemberNumber(
       return { memberNumber: candidateNumber, seqNumber: allocatedSeq };
     }
 
-    // Existing member already owns this number (e.g., manual edit jumped ahead); skip past it
+    // Existing member already owns this number; skip past it
     floorSeq = Math.max(floorSeq, allocatedSeq);
   }
 
@@ -1087,7 +1108,8 @@ export async function approveApplicationAtomicInFirestore(params: {
   const { appId, district, extraUpdates = {}, knownRecords } = params;
   const appRef = doc(db, 'applications', appId);
   const counterDocRef = doc(db, 'settings', 'member_counter');
-  let floorSeq = getKnownHighestSeqFromStorage(knownRecords);
+  const trueHighest = await getTrueHighestApprovedSeqFromFirestore();
+  let floorSeq = Math.max(getKnownHighestSeqFromStorage(knownRecords), trueHighest);
 
   // Pre-scan past any manually-assigned future numbers before locking inside transaction
   try {
@@ -1095,9 +1117,10 @@ export async function approveApplicationAtomicInFirestore(params: {
     const preCounterVal = preCounterSnap.exists()
       ? Math.max(
           Number(preCounterSnap.data().lastMemberNumber || 0),
-          Number(preCounterSnap.data().totalApproved || 0)
+          Number(preCounterSnap.data().totalApproved || 0),
+          trueHighest
         )
-      : 0;
+      : trueHighest;
     let probeSeq = computeNextSafeSeq({
       counterSeq: preCounterVal,
       highestExistingSeq: floorSeq,
@@ -1135,7 +1158,6 @@ export async function approveApplicationAtomicInFirestore(params: {
         updatedAt: nowIso,
       }) as MembershipApplication;
 
-      // Only persist extra confirmation fields (e.g. paymentRef/paymentConfirmed) if needed
       if (Object.keys(extraUpdates).length > 0) {
         tx.set(appRef, mergedExisting, { merge: true });
       }
@@ -1148,12 +1170,13 @@ export async function approveApplicationAtomicInFirestore(params: {
       };
     }
 
-    let currentCounter = 0;
+    let currentCounter = trueHighest;
     if (counterSnap.exists()) {
       const cData = counterSnap.data();
       currentCounter = Math.max(
         typeof cData.lastMemberNumber === 'number' ? cData.lastMemberNumber : 0,
-        typeof cData.totalApproved === 'number' ? cData.totalApproved : 0
+        typeof cData.totalApproved === 'number' ? cData.totalApproved : 0,
+        trueHighest
       );
     }
 
