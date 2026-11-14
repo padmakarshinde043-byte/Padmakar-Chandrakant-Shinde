@@ -19,10 +19,14 @@ const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 const CACHE_KEY_OFFICIALS = 'rk2026_officials_cache_v1';
 const CACHE_KEY_OFFICIALS_TIMESTAMP = 'rk2026_officials_ts_v1';
 const CACHE_KEY_POSTS = 'rk2026_posts_cache_v1';
+const CACHE_KEY_POSTS_TIMESTAMP = 'rk2026_posts_ts_v1';
+const CACHE_KEY_DIST_PASSWORDS = 'rk2026_dist_passwords_cache_v1';
+const CACHE_KEY_DIST_PASSWORDS_TS = 'rk2026_dist_passwords_ts_v1';
 const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
 const CACHE_KEY_LEADERSHIP_VER = 'mahasangh_leadership_ver_v1';
+const CACHE_KEY_LEADERSHIP_TS = 'mahasangh_leadership_ts_v1';
 const CACHE_KEY_PRESIDENT_PASS = 'rk2026_president_password_cache';
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes smart cache TTL
 
 /**
  * Fetch all officials from the secondary Firebase RTDB.
@@ -142,14 +146,33 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
 /**
  * Fetch district passwords map from RTDB.
  */
-export async function fetchDistrictPasswords(): Promise<Record<string, string>> {
+export async function fetchDistrictPasswords(forceRefresh = false): Promise<Record<string, string>> {
   try {
+    if (!forceRefresh) {
+      const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
+      const ts = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS_TS);
+      if (cached && ts && Date.now() - Number(ts) < CACHE_TTL_MS) {
+        return JSON.parse(cached);
+      }
+    }
+
     const res = await fetch(`${RTDB_BASE_URL}/district_passwords.json`);
     if (!res.ok) return {};
     const data = await res.json();
-    return data || {};
+    const result = data || {};
+    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(result));
+    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
+    return result;
   } catch (error) {
     console.error('Error in fetchDistrictPasswords:', error);
+    const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        // fallback
+      }
+    }
     return {};
   }
 }
@@ -167,18 +190,37 @@ export async function updateDistrictPasswordInRtdb(district: string, newPass: st
   if (!res.ok) {
     throw new Error(`Failed to update password for ${district}: ${res.statusText}`);
   }
+
+  try {
+    const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
+    const map = cached ? JSON.parse(cached) : {};
+    map[district] = newPass;
+    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(map));
+    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
+  } catch {
+    // ignore cache update error
+  }
 }
 
 /**
- * Fetch dynamic appointed posts from RTDB.
+ * Fetch dynamic appointed posts from RTDB (30-minute cached).
  */
-export async function fetchAppointedPosts(): Promise<AppointedPostItem[]> {
+export async function fetchAppointedPosts(forceRefresh = false): Promise<AppointedPostItem[]> {
   try {
+    if (!forceRefresh) {
+      const cached = localStorage.getItem(CACHE_KEY_POSTS);
+      const ts = localStorage.getItem(CACHE_KEY_POSTS_TIMESTAMP);
+      if (cached && ts && Date.now() - Number(ts) < CACHE_TTL_MS) {
+        return JSON.parse(cached);
+      }
+    }
+
     const res = await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`);
     if (!res.ok) return DEFAULT_APPOINTED_POSTS;
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
       localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
+      localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
       return data;
     }
   } catch (error) {
@@ -250,39 +292,55 @@ export async function updatePresidentPasswordInFirebase(newPass: string): Promis
  * - Only uses DEFAULT_AUTHORITATIVE_LEADERS as initial offline seed.
  */
 export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[]> {
-  // If not forcing refresh, check if local cache already has the updated 52 leaders with legal advisors
+  // If not forcing refresh, check local cache first (30-min TTL + tiny ~13-byte version check)
   if (!forceRefresh) {
     try {
       const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+      const cachedTs = localStorage.getItem(CACHE_KEY_LEADERSHIP_TS);
+      const cachedVer = localStorage.getItem(CACHE_KEY_LEADERSHIP_VER);
+
       if (cached) {
         const parsed = JSON.parse(cached);
         const hasLegalAdvisors = Array.isArray(parsed) && parsed.some(
           (l: Leader) => l.name && (l.name.includes('काटनेश्वर') || l.name.includes('मानव'))
         );
+
         if (hasLegalAdvisors && parsed.length >= 50) {
-          // Cache is complete and has the user's modifications, return it
-          // while quietly verifying remote version
-          fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`)
-            .then((r) => r.json())
-            .then((data) => {
-              if (Array.isArray(data) && data.length > 0) {
-                localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
+          // Within 30-min TTL: ZERO network bandwidth used!
+          if (cachedTs && Date.now() - Number(cachedTs) < CACHE_TTL_MS) {
+            return parsed;
+          }
+
+          // Beyond 30-min TTL: check only tiny 13-byte leadership_version.json instead of downloading entire dynamic_leaders.json
+          try {
+            const verRes = await fetch(`${RTDB_BASE_URL}/leadership_version.json`, { cache: 'no-store' });
+            if (verRes.ok) {
+              const remoteVer = await verRes.json();
+              if (remoteVer && cachedVer && String(remoteVer) === String(cachedVer)) {
+                localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+                return parsed;
               }
-            })
-            .catch(() => {});
-          return parsed;
+              if (remoteVer) {
+                localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(remoteVer));
+              }
+            }
+          } catch {
+            // If version check fails offline, return cached safely
+            return parsed;
+          }
         }
       }
     } catch {}
   }
 
-  // 1. Direct fetch from Firebase RTDB (authoritative source)
+  // 1. Direct fetch from Firebase RTDB (only when cache missing, version changed, or forced refresh)
   try {
     const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, { cache: 'no-store' });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
+        localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
         window.dispatchEvent(new Event('mahasangh_leadership_updated'));
         return data;
       }
@@ -351,6 +409,7 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
 
   localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(leaders));
   localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
+  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(newVer));
   window.dispatchEvent(new Event('mahasangh_leadership_updated'));
 
   // Dual-sync to Firestore `/leadership` collection in background

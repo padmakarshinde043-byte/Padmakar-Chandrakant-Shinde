@@ -27,6 +27,7 @@ import html2canvas from 'html2canvas';
 import { OfficialMember, formatAppointedPostWithTaluka } from '../data/rkMaharashtraData';
 import { MembershipApplication, formatSequentialMemberNumber } from '../data/mahasanghData';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
+import { resolveImageUrlForPdf } from '../utils/cloudinary';
 
 let cachedHedingBase64: string | null = null;
 let cachedSignBase64: string | null = null;
@@ -652,10 +653,11 @@ export async function generateStatewideRegistryPdf(
 async function buildMembershipIdCardPdfDocument(
   app: MembershipApplication
 ): Promise<{ pdf: jsPDF; downloadFileName: string; emailFileName: string }> {
-  const [logoUrl, signUrl, qrUrl] = await Promise.all([
+  const [logoUrl, signUrl, qrUrl, safePhotoUrl] = await Promise.all([
     getLogoDataUrl(),
     getSignDataUrl(),
-    getQrCodeDataUrl()
+    getQrCodeDataUrl(),
+    resolveImageUrlForPdf(app.photo)
   ]);
 
   let memberNo = app.memberNumber?.trim();
@@ -723,8 +725,8 @@ async function buildMembershipIdCardPdfDocument(
           <!-- Left Column: Passport Photo -->
           <div style="width: 115px; height: 138px; border: 2.5px solid #d4af37; border-radius: 8px; overflow: hidden; background: #ffffff; flex-shrink: 0; box-shadow: 0 3px 8px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center;">
             ${
-              app.photo
-                ? `<img src="${app.photo}" alt="${app.fullName}" style="width: 100%; height: 100%; object-fit: cover; display: block;">`
+              safePhotoUrl
+                ? `<img src="${safePhotoUrl}" alt="${app.fullName}" style="width: 100%; height: 100%; object-fit: cover; display: block;">`
                 : `<div style="text-align: center; color: #94a3b8; font-size: 8.5pt; font-weight: 700; padding: 4px;">फोटो</div>`
             }
           </div>

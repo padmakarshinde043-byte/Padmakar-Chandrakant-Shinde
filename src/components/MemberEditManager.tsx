@@ -25,7 +25,7 @@ import {
 } from '../data/mahasanghData';
 import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatters';
-import { compressImageFile } from '../utils/imageCompressor';
+import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { syncMemberCounter } from '../firebase';
 
@@ -71,6 +71,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [statusBanner, setStatusBanner] = useState<{ text: string; type: 'success' | 'error'; member?: MembershipApplication } | null>(null);
   const [photoError, setPhotoError] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   // Safe Delete Modal State
@@ -238,11 +239,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       return;
     }
 
+    setIsUploadingPhoto(true);
     try {
-      const { base64 } = await compressImageFile(file, 360, 440, 0.78);
-      setEditingMember({ ...editingMember, photo: base64 });
+      const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.75);
+      setEditingMember({ ...editingMember, photo: urlOrBase64 });
     } catch (err: any) {
       setPhotoError('फोटो प्रोसेस करताना त्रुटी: ' + (err.message || 'Error'));
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -839,11 +843,12 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                     <button
                       type="button"
+                      disabled={isUploadingPhoto}
                       onClick={() => photoInputRef.current?.click()}
-                      className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer"
+                      className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                     >
                       <Upload className="w-3.5 h-3.5 text-[#df6b16]" />
-                      नवीन फोटो निवडा
+                      {isUploadingPhoto ? 'अपलोड होत आहे...' : 'नवीन फोटो निवडा'}
                     </button>
                     {editingMember.photo && (
                       <button

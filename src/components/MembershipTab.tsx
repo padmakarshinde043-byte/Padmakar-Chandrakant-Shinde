@@ -25,6 +25,7 @@ import {
   findExistingApplicationInFirestore,
 } from '../firebase';
 import { initiateRazorpayPayment } from '../utils/razorpay';
+import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 
 interface MembershipTabProps {
   onAddApplication: (app: MembershipApplication) => Promise<void> | void;
@@ -59,6 +60,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [photoDataUrl, setPhotoDataUrl] = useState<string>('');
   const [photoSizeKb, setPhotoSizeKb] = useState<number>(0);
   const [photoError, setPhotoError] = useState<string>('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Question: आपण सध्या संघटनेचे पदाधिकारी आहात काय?
@@ -209,8 +211,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     return /[a-zA-Z]/.test(val || '');
   };
 
-  // Handle Photo selection with client-side compression to ensure <200KB
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Photo selection: compress (<30KB) and upload to Cloudinary with automatic Base64 fallback
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhotoError('');
     const file = e.target.files?.[0];
     if (!file) return;
@@ -220,62 +222,16 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // Compress via canvas to standard passport aspect (approx 400x500 max)
-        const canvas = document.createElement('canvas');
-        const maxDim = 500;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height && width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Quality compression: target < 180KB safely
-        let quality = 0.82;
-        let compressed = canvas.toDataURL('image/jpeg', quality);
-        let sizeKb = Math.round((compressed.length * 3) / 4 / 1024);
-
-        while (sizeKb > 180 && quality > 0.25) {
-          quality -= 0.12;
-          compressed = canvas.toDataURL('image/jpeg', quality);
-          sizeKb = Math.round((compressed.length * 3) / 4 / 1024);
-        }
-
-        // If still > 180KB, downscale canvas size further so it NEVER fails for any smartphone photo
-        if (sizeKb > 180) {
-          const smallCanvas = document.createElement('canvas');
-          const targetW = 320;
-          const targetH = Math.round((height * 320) / width);
-          smallCanvas.width = targetW;
-          smallCanvas.height = targetH;
-          const sCtx = smallCanvas.getContext('2d');
-          if (sCtx) {
-            sCtx.drawImage(canvas, 0, 0, targetW, targetH);
-            compressed = smallCanvas.toDataURL('image/jpeg', 0.65);
-            sizeKb = Math.round((compressed.length * 3) / 4 / 1024);
-          }
-        }
-
-        setPhotoDataUrl(compressed);
-        setPhotoSizeKb(sizeKb);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingPhoto(true);
+    try {
+      const result = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.72);
+      setPhotoDataUrl(result.urlOrBase64);
+      setPhotoSizeKb(result.sizeKb);
+    } catch (err: any) {
+      setPhotoError(err?.message || 'फोटो प्रोसेस करताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   // When an official is selected from the dropdown, auto-fill details
@@ -408,6 +364,12 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           setShowPaymentModal(true);
           return;
         }
+      }
+
+      if (isUploadingPhoto) {
+        setFormAlert('फोटो अपलोड होत आहे, कृपया २ सेकंद थांबा आणि पुन्हा सबमिट करा.');
+        window.scrollTo({ top: 420, behavior: 'smooth' });
+        return;
       }
 
       if (!photoDataUrl) {
@@ -904,7 +866,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       फोटो निवडण्यासाठी येथे क्लिक करा
                     </p>
                     <p className="text-[10px] text-slate-400 mt-0.5">
-                      कमाल आकार: 200KB (स्वयंचलित ऑप्टिमाइझ केला जाईल)
+                      स्वयंचलित कॉम्प्रेस (&lt;30KB) व क्लाउड सेव्ह केले जाईल
                     </p>
                     <input
                       ref={fileInputRef}
@@ -915,12 +877,17 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     />
                   </div>
 
+                  {isUploadingPhoto && (
+                    <p className="text-xs text-[#193568] mt-2 font-semibold">
+                      फोटो ऑप्टिमाइझ व अपलोड होत आहे...
+                    </p>
+                  )}
                   {photoError && (
                     <p className="text-xs text-rose-600 mt-2 font-semibold">
                       ⚠️ {photoError}
                     </p>
                   )}
-                  {photoSizeKb > 0 && !photoError && (
+                  {photoSizeKb > 0 && !photoError && !isUploadingPhoto && (
                     <p className="text-xs text-emerald-700 mt-2 font-semibold flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" />
                       फोटो यशस्वीरित्या जोडला गेला (आकार: {photoSizeKb} KB)

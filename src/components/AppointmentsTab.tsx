@@ -129,8 +129,8 @@ export const AppointmentsTab: React.FC = () => {
     try {
       const [officialsData, postsData, passwordsData, appsData, presPass] = await Promise.all([
         fetchOfficials(force),
-        fetchAppointedPosts(),
-        fetchDistrictPasswords(),
+        fetchAppointedPosts(force),
+        fetchDistrictPasswords(force),
         fetchApprovedMembersCached(force).catch(() => []),
         fetchPresidentPasswordFromFirebase()
       ]);

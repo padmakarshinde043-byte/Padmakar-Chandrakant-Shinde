@@ -1,3 +1,5 @@
+import { compressImageFile } from './imageCompressor';
+
 /**
  * Cloudinary Image Upload & Free CDN Storage Utility
  * 
@@ -94,3 +96,94 @@ export async function uploadToCloudinary(
     format: data.format || ''
   };
 }
+
+function dataUrlToFile(dataUrl: string, fileName: string): File {
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0]?.match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1] || '');
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  const ext = mime.includes('webp') ? 'webp' : 'jpg';
+  return new File([u8arr], `${fileName}.${ext}`, { type: mime });
+}
+
+/**
+ * Compresses member passport photo to <30KB first, then uploads to Cloudinary.
+ * Automatically falls back to the tiny compressed Base64 if Cloudinary is disabled or offline,
+ * guaranteeing registration and member edits NEVER fail.
+ */
+export async function uploadCompressedPhotoToCloudinaryOrFallback(
+  file: File,
+  maxWidth = 360,
+  maxHeight = 440,
+  quality = 0.72
+): Promise<{ urlOrBase64: string; sizeKb: number; storageType: 'cloudinary' | 'fallback' }> {
+  const { base64, sizeKb } = await compressImageFile(file, maxWidth, maxHeight, quality);
+  const config = getCloudinaryConfig();
+
+  if (config.enabled && config.cloudName && config.uploadPreset) {
+    try {
+      const tinyFile = dataUrlToFile(base64, `member_${Date.now()}`);
+      const uploaded = await uploadToCloudinary(tinyFile, config);
+      return {
+        urlOrBase64: uploaded.url,
+        sizeKb,
+        storageType: 'cloudinary'
+      };
+    } catch (err) {
+      console.warn('Cloudinary member photo upload fallback to tiny Base64:', err);
+    }
+  }
+
+  return {
+    urlOrBase64: base64,
+    sizeKb,
+    storageType: 'fallback'
+  };
+}
+
+const pdfImageDataCache = new Map<string, string>();
+
+/**
+ * Converts remote Cloudinary/HTTP photo URLs into in-memory Base64 Data URLs
+ * before rendering html2canvas PDFs, completely preventing CORS/tainted-canvas errors.
+ */
+export async function resolveImageUrlForPdf(src?: string): Promise<string> {
+  if (!src || typeof src !== 'string') return '';
+  const trimmed = src.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.startsWith('data:') || trimmed.startsWith('/')) {
+    return trimmed;
+  }
+
+  if (pdfImageDataCache.has(trimmed)) {
+    return pdfImageDataCache.get(trimmed)!;
+  }
+
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const res = await fetch(trimmed, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('FileReader error'));
+        reader.readAsDataURL(blob);
+      });
+      pdfImageDataCache.set(trimmed, dataUrl);
+      return dataUrl;
+    } catch (err) {
+      console.warn('Could not inline remote photo for PDF, skipping image to avoid tainted canvas:', err);
+      return '';
+    }
+  }
+
+  return trimmed;
+}
+
