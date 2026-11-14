@@ -35,7 +35,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
 
   // Always sync with propApplications when provided by parent
   useEffect(() => {
-    if (propApplications && propApplications.length > 0) {
+    if (Array.isArray(propApplications)) {
       setLocalLiveApps(propApplications);
     }
   }, [propApplications]);
@@ -46,7 +46,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     const loadFirebaseApps = async () => {
       try {
         const fresh = await fetchApprovedMembersCached(false);
-        if (isMounted && fresh && fresh.length > 0) {
+        if (isMounted && Array.isArray(fresh)) {
           setLocalLiveApps(fresh);
         }
       } catch (err) {
@@ -68,7 +68,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
         await onRefreshFromFirebase();
       }
       const fresh = await fetchApprovedMembersCached(true);
-      if (fresh && fresh.length > 0) {
+      if (Array.isArray(fresh)) {
         setLocalLiveApps(fresh);
       }
     } catch (err) {

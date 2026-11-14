@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import * as XLSX from 'xlsx';
 import {
   Lock, LogOut, Award, Printer, PlusCircle, Search,
   UserCheck, ShieldAlert, KeyRound, CheckCircle2, ArrowLeft, Eye, EyeOff,
@@ -37,7 +36,8 @@ import {
   approveApplicationAtomicInFirestore,
   addApprovedMemberToCache,
   resequenceAllApprovedMembersInFirestore,
-  resetMemberCounterToActualHighest
+  resetMemberCounterToActualHighest,
+  purgeDeletedAndGhostApplicationsInFirestore
 } from '../firebase';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -62,7 +62,7 @@ interface AdminTabProps {
     options?: { skipFirestore?: boolean }
   ) => void;
   onRejectApplication: (id: string, reason: string) => void;
-  onDeleteApplication: (id: string) => void;
+  onDeleteApplication: (id: string) => Promise<void> | void;
   onUpdateMember?: (member: MembershipApplication) => Promise<void> | void;
   onAddNews: (news: NewsItem) => void;
   onUpdateNews?: (news: NewsItem) => void;
@@ -70,7 +70,7 @@ interface AdminTabProps {
   govOrders: GovOrder[];
   setGovOrders: React.Dispatch<React.SetStateAction<GovOrder[]>>;
   newsList?: NewsItem[];
-  onFetchApplications?: () => Promise<void>;
+  onFetchApplications?: (forceRefresh?: boolean) => Promise<void>;
   isLoadingApps?: boolean;
   onExitAdmin?: () => void;
 }
@@ -230,7 +230,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Certificate Modal (Point 5)
   const [certModalApp, setCertModalApp] = useState<MembershipApplication | null>(null);
 
-  // Resequencing state
+  // Resequencing & ghost cleanup state
   const [isResequencing, setIsResequencing] = useState(false);
   const handleResequence = async () => {
     if (!window.confirm('तुम्हाला नक्की सर्व मंजूर सदस्यांचे क्रमांक सेव्हिंग/मंजुरीच्या क्रमानुसार 1 पासून सलग रांगेत लावायचे आहेत का? यामुळे जुने गॅप निघून जातील.')) {
@@ -240,7 +240,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       const res = await resequenceAllApprovedMembersInFirestore();
       alert(res.message);
-      if (onFetchApplications) await onFetchApplications();
+      if (onFetchApplications) await onFetchApplications(true);
     } catch (err) {
       alert('पुनर्रचना करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
@@ -249,6 +249,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   const [isResettingCounter, setIsResettingCounter] = useState(false);
+  const [isPurgingGhosts, setIsPurgingGhosts] = useState(false);
   const [activeCircleAction, setActiveCircleAction] = useState<'resequence' | 'reset' | null>(null);
   const handleResetCounter = async () => {
     if (!window.confirm('तुम्हाला नक्की सदस्य क्रमांक काउंटर Firebase वरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा आहे का? यामुळे पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.')) {
@@ -258,11 +259,49 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       const res = await resetMemberCounterToActualHighest();
       alert(res.message);
-      if (onFetchApplications) await onFetchApplications();
+      if (onFetchApplications) await onFetchApplications(true);
     } catch (err) {
       alert('काउंटर रिसेट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsResettingCounter(false);
+    }
+  };
+
+  const handlePurgeDeletedGhosts = async () => {
+    if (
+      !window.confirm(
+        'पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा Firebase व कॅशमधून कायमचा काढून टाकायचा का? यामुळे त्या सदस्यांना पुन्हा अर्ज भरताना कोणतीही अडचण येणार नाही.'
+      )
+    ) {
+      return;
+    }
+    setIsPurgingGhosts(true);
+    try {
+      const res = await purgeDeletedAndGhostApplicationsInFirestore();
+      alert(res.message);
+      if (onFetchApplications) await onFetchApplications(true);
+    } catch (err) {
+      alert('जुना डाटा स्वच्छ करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsPurgingGhosts(false);
+    }
+  };
+
+  const handleDeleteWithFeedback = async (app: MembershipApplication) => {
+    if (
+      !window.confirm(
+        `${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone}) यांचा हा अर्ज Firebase आणि सर्व कॅशमधून कायमचा डिलीट करायचा का? डिलीट केल्यानंतर ते पुन्हा अर्ज भरू शकतील.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await onDeleteApplication(app.id);
+      if (selectedAppForVerification?.id === app.id) {
+        setSelectedAppForVerification(null);
+      }
+    } catch (err) {
+      alert('अर्ज डिलीट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -1034,8 +1073,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    // Mark as rejected in applications
-    selectedAppForVerification.status = 'rejected';
+    onRejectApplication(selectedAppForVerification.id, rejectReason || 'प्रशासनाकडून नाकारले');
     setSelectedAppForVerification(null);
   };
 
@@ -1884,12 +1922,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       )}
                     </div>
 
+                    <button
+                      type="button"
+                      onClick={handlePurgeDeletedGhosts}
+                      disabled={isPurgingGhosts}
+                      className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड Firebase मधून स्वच्छ करा"
+                    >
+                      <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
+                      <span>{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुने डिलीट डाटा स्वच्छ करा'}</span>
+                    </button>
+
                     {onFetchApplications && (
                       <button
                         type="button"
-                        onClick={() => onFetchApplications()}
+                        onClick={() => onFetchApplications(true)}
                         disabled={isLoadingApps}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors"
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
                         <span>{isLoadingApps ? 'लोड होत आहे...' : 'ताजे करा'}</span>
@@ -1953,7 +2002,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
+                        const XLSX = await import('xlsx');
                         const excelData = filteredApps.map((a, idx) => ({
                           'अनुक्रमांक': idx + 1,
                           'सदस्य क्रमांक': a.memberNumber || '-',
@@ -2109,10 +2159,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      if(window.confirm("हा अर्ज कायमचा डिलीट करायचा?")) onDeleteApplication(app.id);
-                                    }}
-                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
+                                    onClick={() => handleDeleteWithFeedback(app)}
+                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs cursor-pointer"
                                   >
                                     डिलीट
                                   </button>
@@ -2122,7 +2170,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => setCertModalApp(app)}
-                                    className="bg-[#17366d] hover:bg-[#0f244c] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs"
+                                    className="bg-[#17366d] hover:bg-[#0f244c] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
                                     title="आय-कार्ड पहा"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -2131,11 +2179,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => generateMembershipIdCardPdf(app)}
-                                    className="bg-[#047857] hover:bg-[#065f46] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs"
+                                    className="bg-[#047857] hover:bg-[#065f46] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
                                     title="आय-कार्ड PDF डाऊनलोड करा"
                                   >
                                     <Download className="w-3.5 h-3.5" />
                                     PDF
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteWithFeedback(app)}
+                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                    title="हा अर्ज Firebase मधून कायमचा डिलीट करा"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               )}
@@ -4269,11 +4325,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
                   )}
 
-                  <div className="flex justify-end">
+                  <div className="flex justify-between items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWithFeedback(selectedAppForVerification)}
+                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs shadow-xs flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>अर्ज कायमचा डिलीट करा</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSelectedAppForVerification(null)}
-                      className="bg-[#17366d] hover:bg-[#0b1e36] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-xs"
+                      className="bg-[#17366d] hover:bg-[#0b1e36] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-xs cursor-pointer"
                     >
                       बंद करा
                     </button>

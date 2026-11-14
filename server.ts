@@ -353,7 +353,8 @@ async function findApplicationForPayment(
         return (
           docs.find((d) => d.data.status === 'pending') ||
           docs.find((d) => d.data.status === 'approved' && !d.data.paymentConfirmed) ||
-          docs[0]
+          docs.find((d) => d.data.status === 'approved') ||
+          null
         );
       }
     }
@@ -368,7 +369,8 @@ async function findApplicationForPayment(
         return (
           docs.find((d) => d.data.status === 'pending') ||
           docs.find((d) => d.data.status === 'approved' && !d.data.paymentConfirmed) ||
-          docs[0]
+          docs.find((d) => d.data.status === 'approved') ||
+          null
         );
       }
     }

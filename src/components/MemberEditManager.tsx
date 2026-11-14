@@ -27,14 +27,14 @@ import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatters';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
-import { syncMemberCounter } from '../firebase';
+import { syncMemberCounter, purgeDeletedAndGhostApplicationsInFirestore } from '../firebase';
 import { parseMemberNumberSeq } from '../utils/memberNumberAllocator';
 
 interface MemberEditManagerProps {
   applications: MembershipApplication[];
   onUpdateMember: (member: MembershipApplication) => Promise<void> | void;
   onDeleteApplication: (id: string) => Promise<void> | void;
-  onFetchApplications?: () => Promise<void>;
+  onFetchApplications?: (forceRefresh?: boolean) => Promise<void>;
   isLoadingApps?: boolean;
 }
 
@@ -75,9 +75,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Safe Delete Modal State
+  // Safe Delete & Ghost Cleanup Modal State
   const [deletingMember, setDeletingMember] = useState<MembershipApplication | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isPurgingGhosts, setIsPurgingGhosts] = useState(false);
 
   // Analyze duplicates & 0001 issues across all applications
   const duplicateAnalysis = useMemo(() => {
@@ -332,6 +333,35 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     }
   };
 
+  const handlePurgeGhostRecords = async () => {
+    if (
+      !window.confirm(
+        'तुम्हाला नक्की पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा Firebase व कॅशमधून कायमचा स्वच्छ करायचा आहे का? (मंजूर सदस्य पूर्णपणे सुरक्षित राहतील.)'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsPurgingGhosts(true);
+      const res = await purgeDeletedAndGhostApplicationsInFirestore();
+      setStatusBanner({
+        text: res.message,
+        type: 'success',
+      });
+      if (onFetchApplications) {
+        await onFetchApplications(true);
+      }
+    } catch (err: any) {
+      setStatusBanner({
+        text: 'डाटा स्वच्छ करताना त्रुटी आली: ' + (err?.message || 'Error'),
+        type: 'error',
+      });
+    } finally {
+      setIsPurgingGhosts(false);
+    }
+  };
+
   return (
     <div className="bg-white p-4 sm:p-6 rounded-xl border-2 border-indigo-200 shadow-xs space-y-5">
       {/* Header Banner */}
@@ -348,17 +378,30 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             येथून सदस्याचे नाव किंवा मोबाईल नंबर शोधून त्यांचा <strong>सदस्य क्रमांक</strong> व <strong>संपूर्ण माहिती</strong> काळजीपूर्वक एडिट करा किंवा दुबार झालेली नोंदणी डिलीट करा.
           </p>
         </div>
-        {onFetchApplications && (
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
           <button
             type="button"
-            onClick={onFetchApplications}
-            disabled={isLoadingApps}
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
+            onClick={handlePurgeGhostRecords}
+            disabled={isPurgingGhosts}
+            className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड Firebase मधून कायमचे काढून टाका"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
-            <span>{isLoadingApps ? 'लोड होत आहे...' : 'यादी ताजी करा'}</span>
+            <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
+            <span>{isPurgingGhosts ? 'स्वच्छता सुरू आहे...' : 'जुने डिलीट / घोस्ट डाटा स्वच्छ करा'}</span>
           </button>
-        )}
+
+          {onFetchApplications && (
+            <button
+              type="button"
+              onClick={() => onFetchApplications(true)}
+              disabled={isLoadingApps}
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
+              <span>{isLoadingApps ? 'लोड होत आहे...' : 'यादी ताजी करा'}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Feedback Banner */}

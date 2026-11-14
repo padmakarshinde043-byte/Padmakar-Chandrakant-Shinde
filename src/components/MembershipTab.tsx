@@ -22,7 +22,12 @@ import {
   approveApplicationAtomicInFirestore,
   addApprovedMemberToCache,
   findExistingApplicationInFirestore,
+  purgeStaleApplicationFromCachesByContact,
 } from '../firebase';
+import {
+  isBlockingApplicationStatus,
+  pickActiveDuplicateMatch,
+} from '../utils/applicationCleanup';
 import { initiateRazorpayPayment } from '../utils/razorpay';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 
@@ -33,6 +38,7 @@ interface MembershipTabProps {
   ) => Promise<void> | void;
   applications: MembershipApplication[];
   onTrackRemote?: (query: string) => Promise<MembershipApplication | null>;
+  onPurgeLocalContact?: (params: { phone?: string; email?: string; queryTerm?: string }) => void;
   initialTrackQuery?: string;
 }
 
@@ -40,6 +46,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   onAddApplication,
   applications,
   onTrackRemote,
+  onPurgeLocalContact,
   initialTrackQuery,
 }) => {
   // Form fields
@@ -297,30 +304,30 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
     setIsSubmittingForm(true);
     try {
-      // 1. Verify against live Firestore first (absolute source of truth; ignores stale local cache)
-      const remoteDuplicate = await findExistingApplicationInFirestore({
+      // 1. Verify against live Firestore server first (absolute source of truth; ignores stale local cache & deleted/rejected docs)
+      const remoteResult = await findExistingApplicationInFirestore({
         phone: cleanPhone,
         email: userEnteredEmail,
         fullName: normalizedName,
       });
 
-      let matchedApp: MembershipApplication | null = remoteDuplicate ? remoteDuplicate.app : null;
-      let matchedBy: 'phone' | 'email' | 'name' = remoteDuplicate ? remoteDuplicate.matchedBy : 'phone';
+      let matchedApp: MembershipApplication | null = remoteResult.match ? remoteResult.match.app : null;
+      let matchedBy: 'phone' | 'email' | 'name' = remoteResult.match ? remoteResult.match.matchedBy : 'phone';
 
       if (!matchedApp) {
-        const localPhoneMatch = applications.find(
-          (a) => a.phone && a.phone.replace(/\D/g, '').slice(-10) === cleanPhone
-        );
-        if (localPhoneMatch) {
-          matchedApp = localPhoneMatch;
-          matchedBy = 'phone';
-        } else if (userEnteredEmail && !userEnteredEmail.endsWith('@mahasangh.in')) {
-          const localEmailMatch = applications.find(
-            (a) => a.email && a.email.trim().toLowerCase() === userEnteredEmail
-          );
-          if (localEmailMatch) {
-            matchedApp = localEmailMatch;
-            matchedBy = 'email';
+        if (remoteResult.verifiedFromServer) {
+          // Live Firestore confirmed zero active records -> self-heal any stale local cache/state for this contact
+          purgeStaleApplicationFromCachesByContact({ phone: cleanPhone, email: userEnteredEmail });
+          onPurgeLocalContact?.({ phone: cleanPhone, email: userEnteredEmail });
+        } else {
+          // Offline / network fallback only: check active local records without blocking on rejected/name-only
+          const localMatch = pickActiveDuplicateMatch(applications, {
+            phone: cleanPhone,
+            email: userEnteredEmail,
+          });
+          if (localMatch) {
+            matchedApp = localMatch.app;
+            matchedBy = localMatch.matchedBy;
           }
         }
       }
@@ -546,17 +553,28 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     setIsTrackingStatus(true);
 
     try {
-      // 1. Always check Firestore targeted query first so admin-edited details & new memberNumber are live!
+      const isExactIdentifierQuery =
+        queryDigits.length >= 10 ||
+        /^ms[\/-]/i.test(rawTrimmed) ||
+        /^app-/i.test(rawTrimmed);
+
+      // 1. Always check Firestore targeted query first so admin-edited / deleted details are authoritative!
       if (onTrackRemote) {
         const foundRemote = await onTrackRemote(rawTrimmed);
         if (foundRemote) {
           setSearchResult(foundRemote);
           return;
         }
+        // If remote check returned null for an exact ID / phone / memberNumber, never resurrect from stale local closure
+        if (isExactIdentifierQuery) {
+          setSearchResult('not_found');
+          return;
+        }
       }
 
-      // 2. Fallback to local cache (handles partial name search or offline mode; prefer approved records)
+      // 2. Fallback to local active records (handles partial Marathi name search or offline mode)
       const localMatches = applications.filter((a) => {
+        if (!isBlockingApplicationStatus(a.status)) return false;
         const appNoMatch = a.applicationNumber && a.applicationNumber.toLowerCase() === query;
         const memberNoMatch = a.memberNumber && a.memberNumber.toLowerCase() === query;
         const phoneClean = a.phone ? a.phone.replace(/\D/g, '') : '';

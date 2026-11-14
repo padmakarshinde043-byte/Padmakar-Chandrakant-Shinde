@@ -22,9 +22,16 @@
  *    Uses in-memory loaded data only. Reports live page-by-page progress callback.
  */
 
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+import type { jsPDF as JsPdfType } from 'jspdf';
 import { OfficialMember, formatAppointedPostWithTaluka } from '../data/rkMaharashtraData';
+
+async function loadPdfEngines() {
+  const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas'),
+  ]);
+  return { jsPDF, html2canvas };
+}
 import { MembershipApplication, formatSequentialMemberNumber } from '../data/mahasanghData';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { resolveImageUrlForPdf } from '../utils/cloudinary';
@@ -280,6 +287,7 @@ async function renderStandardPaginatedTablePdf(params: {
       trailingReserveHeight: trailingH > 0 ? Math.ceil(trailingH) + 8 : 0,
     });
 
+    const { jsPDF, html2canvas } = await loadPdfEngines();
     const totalPages = pagesIndices.length;
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
 
@@ -375,6 +383,7 @@ export async function generateSingleLetterPdf(
 
   try {
     await waitForFontsAndImages(wrapper);
+    const { jsPDF, html2canvas } = await loadPdfEngines();
 
     const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
       scale: 1.75,
@@ -527,7 +536,7 @@ export async function generateStatewideRegistryPdf(
  */
 async function buildMembershipIdCardPdfDocument(
   app: MembershipApplication
-): Promise<{ pdf: jsPDF; downloadFileName: string; emailFileName: string }> {
+): Promise<{ pdf: JsPdfType; downloadFileName: string; emailFileName: string }> {
   const [logoUrl, signUrl, qrUrl, safePhotoUrl] = await Promise.all([
     getLogoDataUrl(),
     getSignDataUrl(),
@@ -652,6 +661,7 @@ async function buildMembershipIdCardPdfDocument(
   await new Promise((r) => setTimeout(r, 60));
 
   try {
+    const { jsPDF, html2canvas } = await loadPdfEngines();
     const canvas = await html2canvas(wrapper, {
       scale: 2.0, // High definition 300 DPI canvas
       useCORS: false,

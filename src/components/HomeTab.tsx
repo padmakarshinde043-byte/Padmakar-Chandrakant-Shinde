@@ -129,6 +129,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <img
                   src="/president.jpg"
                   alt={ORG_DETAILS.founderPresident.name}
+                  loading="eager"
+                  decoding="async"
+                  {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
                   className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover object-center ring-2 ring-amber-500 shadow-md shrink-0 bg-white"
                 />
                 <div>
@@ -188,7 +191,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               setCurrentTab('membership');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-amber-500 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="mhs-card-interactive mhs-stagger-1 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-amber-500 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
           >
             <div>
               <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-white transition-colors">
@@ -213,7 +216,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               setCurrentTab('appointments');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-blue-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="mhs-card-interactive mhs-stagger-2 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-blue-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
           >
             <div>
               <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-800 flex items-center justify-center mb-3 group-hover:bg-[#0b1e36] group-hover:text-white transition-colors">
@@ -238,7 +241,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               setCurrentTab('news');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-emerald-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="mhs-card-interactive mhs-stagger-3 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-emerald-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
           >
             <div>
               <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
@@ -263,7 +266,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               setCurrentTab('leadership');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-purple-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="mhs-card-interactive mhs-stagger-4 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-purple-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
           >
             <div>
               <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-800 flex items-center justify-center mb-3 group-hover:bg-purple-700 group-hover:text-white transition-colors">
@@ -429,7 +432,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
       {/* Full-Screen Original Size Photo Lightbox Modal */}
       {fullScreenPhoto && (
         <div
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 select-none"
+          className="mhs-modal-enter fixed inset-0 z-[100] bg-black/95 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 select-none"
           onClick={() => setFullScreenPhoto(null)}
         >
           {/* Top-Right CLOSE Button (उजव्या वरच्या कोपर्यात CLOSE बटन) */}

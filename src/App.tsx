@@ -1,14 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeTab } from './components/HomeTab';
-import { AboutTab } from './components/AboutTab';
-import { LeadershipTab } from './components/LeadershipTab';
-import { NewsTab } from './components/NewsTab';
-import { MembershipTab } from './components/MembershipTab';
-import { ContactTab } from './components/ContactTab';
-import { AdminTab } from './components/AdminTab';
-import { AppointmentsTab } from './components/AppointmentsTab';
+
+const loadAboutTab = () => import('./components/AboutTab');
+const loadLeadershipTab = () => import('./components/LeadershipTab');
+const loadNewsTab = () => import('./components/NewsTab');
+const loadMembershipTab = () => import('./components/MembershipTab');
+const loadContactTab = () => import('./components/ContactTab');
+const loadAdminTab = () => import('./components/AdminTab');
+const loadAppointmentsTab = () => import('./components/AppointmentsTab');
+
+const AboutTab = lazy(() => loadAboutTab().then((m) => ({ default: m.AboutTab })));
+const LeadershipTab = lazy(() => loadLeadershipTab().then((m) => ({ default: m.LeadershipTab })));
+const NewsTab = lazy(() => loadNewsTab().then((m) => ({ default: m.NewsTab })));
+const MembershipTab = lazy(() => loadMembershipTab().then((m) => ({ default: m.MembershipTab })));
+const ContactTab = lazy(() => loadContactTab().then((m) => ({ default: m.ContactTab })));
+const AdminTab = lazy(() => loadAdminTab().then((m) => ({ default: m.AdminTab })));
+const AppointmentsTab = lazy(() => loadAppointmentsTab().then((m) => ({ default: m.AppointmentsTab })));
+
+const prefetchTabChunk = (tabId: string) => {
+  switch (tabId) {
+    case 'about':
+    case 'objectives':
+      loadAboutTab();
+      break;
+    case 'leadership':
+      loadLeadershipTab();
+      break;
+    case 'appointments':
+      loadAppointmentsTab();
+      break;
+    case 'news':
+      loadNewsTab();
+      break;
+    case 'membership':
+      loadMembershipTab();
+      break;
+    case 'contact':
+      loadContactTab();
+      break;
+    case 'admin':
+      loadAdminTab();
+      break;
+    default:
+      break;
+  }
+};
+
+const TabLoadingFallback: React.FC = () => (
+  <div className="min-h-[52vh] flex flex-col items-center justify-center py-16 px-4 bg-[#fbf8f2] text-[#0b1e36]">
+    <div className="w-9 h-9 rounded-full border-[3px] border-amber-500/30 border-t-[#df6b16] animate-spin mb-3" />
+    <p className="text-sm font-bold text-[#0b1e36]/80">विभाग उघडत आहे...</p>
+  </div>
+);
 import {
   INITIAL_NEWS,
   INITIAL_APPLICATIONS,
@@ -23,7 +68,8 @@ import {
   fetchGovOrders,
   saveNewsToFirestore,
   saveApplicationToFirestore,
-  trackSingleApplicationInFirestore,
+  trackSingleApplicationDetailed,
+  purgeStaleApplicationFromCachesByContact,
   fetchApplicationsForAdmin,
   fetchApprovedMembersCached,
   safeCacheApplications,
@@ -36,6 +82,10 @@ import {
   deleteNewsFromFirestore,
   sortNewsDescending,
 } from './firebase';
+import {
+  shouldRemoveFromCacheOnDelete,
+  normalizePhone10,
+} from './utils/applicationCleanup';
 import { fetchDynamicLeaders, fetchOfficials, fetchAppointedPosts } from './services/rkFirebaseService';
 
 function isPathAdminRoute(): boolean {
@@ -47,9 +97,18 @@ function isPathAdminRoute(): boolean {
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<string>(() => (isPathAdminRoute() ? 'admin' : 'home'));
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => ({
+    [isPathAdminRoute() ? 'admin' : 'home']: true,
+  }));
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
   const [isLoadingAdminApps, setIsLoadingAdminApps] = useState(false);
+
+  // Track visited tabs so only active/visited tabs mount on mobile (eliminates heavy startup DOM & network burst)
+  useEffect(() => {
+    const normalized = currentTab === 'objectives' ? 'about' : currentTab;
+    setVisitedTabs((prev) => (prev[normalized] ? prev : { ...prev, [normalized]: true }));
+  }, [currentTab]);
 
   // Applications state (Starts from local storage, defaults to empty array)
   const [applications, setApplications] = useState<MembershipApplication[]>(() => {
@@ -145,30 +204,42 @@ export function App() {
     };
   }, []);
 
-  // On initial mount: test connection once per session & load cached news (0 reads if cached!)
+  // On initial mount: load cached news & circulars immediately without blocking UI, then idle-prefetch directories
   useEffect(() => {
-    const initApp = async () => {
-      // 1. Session-level connection test (max 1 read per user session)
-      await testConnectionOncePerSession();
+    // 1. Session-level connection check runs asynchronously without blocking data or paint
+    testConnectionOncePerSession().catch(() => {});
 
-      // 2. Load news with 30-minute cache (0 reads if valid cache exists)
-      try {
-        const news = await fetchNewsCached(false);
-        setNewsList(news);
-        const govOrders = await fetchGovOrders();
-        setGovOrders(govOrders);
-        // 3. Seamlessly prefetch leadership & officials data in background without blocking UI
-        fetchDynamicLeaders(false).catch((err) => {
-          console.warn('Dynamic leaders prefetch warning:', err);
-        });
-        fetchOfficials(false).catch(() => {});
-        fetchAppointedPosts(false).catch(() => {});
-      } catch (err) {
+    // 2. Load news & gov orders in parallel (0 Firestore reads if valid cache exists)
+    Promise.allSettled([fetchNewsCached(false), fetchGovOrders()])
+      .then(([newsRes, govRes]) => {
+        if (newsRes.status === 'fulfilled') setNewsList(newsRes.value);
+        if (govRes.status === 'fulfilled') setGovOrders(govRes.value);
+      })
+      .catch((err) => {
         console.warn('Data init error:', err);
-      }
+      });
+
+    // 3. Defer secondary leadership/officials prefetch until browser is idle after first paint
+    const runIdlePrefetch = () => {
+      fetchDynamicLeaders(false).catch((err) => {
+        console.warn('Dynamic leaders prefetch warning:', err);
+      });
+      fetchOfficials(false).catch(() => {});
+      fetchAppointedPosts(false).catch(() => {});
     };
 
-    initApp();
+    const win = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+
+    let idleId: number | undefined;
+    let timerId: number | undefined;
+    if (typeof win.requestIdleCallback === 'function') {
+      idleId = win.requestIdleCallback(runIdlePrefetch, { timeout: 2500 });
+    } else {
+      timerId = window.setTimeout(runIdlePrefetch, 1500);
+    }
 
     // Instant local synchronization when admin publishes news or circulars
     const handleNewsSync = (e: Event) => {
@@ -180,6 +251,12 @@ export function App() {
     window.addEventListener('mahasangh_news_updated', handleNewsSync);
     return () => {
       window.removeEventListener('mahasangh_news_updated', handleNewsSync);
+      if (idleId !== undefined && typeof win.cancelIdleCallback === 'function') {
+        win.cancelIdleCallback(idleId);
+      }
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId);
+      }
     };
   }, []);
 
@@ -190,7 +267,7 @@ export function App() {
     if (currentTab === 'membership') {
       fetchApprovedMembersCached(false)
         .then((approved) => {
-          if (approved && approved.length > 0) {
+          if (Array.isArray(approved)) {
             setApplications(approved);
           }
         })
@@ -242,10 +319,43 @@ export function App() {
     }
   };
 
+  // Self-heal stale local caches & React state when Firestore confirms a record was deleted
+  const handlePurgeLocalContact = (params: { phone?: string; email?: string; queryTerm?: string }) => {
+    purgeStaleApplicationFromCachesByContact({ phone: params.phone, email: params.email });
+    setApplications((prev) => {
+      const q = (params.queryTerm || '').trim().toLowerCase();
+      const qDigits = q.replace(/\D/g, '');
+      const filtered = prev.filter((a) => {
+        if (params.phone || params.email) {
+          if (
+            shouldRemoveFromCacheOnDelete(
+              a,
+              { id: '', phone: params.phone, email: params.email },
+              { removeAllMatchingPhone: true }
+            )
+          ) {
+            return false;
+          }
+        }
+        if (q) {
+          const sameAppNo = a.applicationNumber && a.applicationNumber.toLowerCase() === q;
+          const sameMemberNo = a.memberNumber && a.memberNumber.toLowerCase() === q;
+          const samePhone = qDigits.length >= 10 && normalizePhone10(a.phone) === qDigits.slice(-10);
+          if (sameAppNo || sameMemberNo || samePhone) {
+            return false;
+          }
+        }
+        return true;
+      });
+      safeCacheApplications(filtered);
+      return filtered;
+    });
+  };
+
   // Single-document tracking (At most a few targeted reads)
   const handleTrackRemote = async (queryTerm: string): Promise<MembershipApplication | null> => {
     try {
-      const found = await trackSingleApplicationInFirestore(queryTerm);
+      const { app: found, verifiedFromServer } = await trackSingleApplicationDetailed(queryTerm);
       if (found) {
         // Update or insert found app locally so edited details / photos reflect immediately
         setApplications((prev) => {
@@ -256,6 +366,13 @@ export function App() {
           safeCacheApplications(updated);
           return updated;
         });
+      } else if (verifiedFromServer) {
+        // Firestore confirmed this exact identifier does not exist (deleted) -> clean stale local copies
+        const digits = queryTerm.replace(/\D/g, '');
+        handlePurgeLocalContact({
+          phone: digits.length >= 10 ? digits.slice(-10) : undefined,
+          queryTerm,
+        });
       }
       return found;
     } catch (err) {
@@ -264,11 +381,11 @@ export function App() {
     }
   };
 
-  // Admin: Fetch applications on demand
-  const handleFetchAdminApplications = async () => {
+  // Admin: Fetch applications on demand (pass forceRefresh=true for manual Refresh / after cleanup)
+  const handleFetchAdminApplications = async (forceRefresh = false) => {
     setIsLoadingAdminApps(true);
     try {
-      const list = await fetchApplicationsForAdmin();
+      const list = await fetchApplicationsForAdmin(forceRefresh);
       setApplications(list);
       safeCacheApplications(list);
     } catch (err) {
@@ -333,19 +450,29 @@ export function App() {
     }
   };
 
-  // Admin: Delete application permanently (syncs state & localStorage & Firestore)
+  // Admin: Delete application permanently (deletes Firestore doc + duplicates/ghosts, then purges state & all caches)
   const handleDeleteApplication = async (id: string) => {
+    const targetApp = applications.find((app) => app.id === id);
+    const res = await deleteApplicationFromFirestore(id, targetApp);
+
     setApplications((prev) => {
-      const updated = prev.filter((app) => app.id !== id);
+      const targetMeta = {
+        id,
+        applicationNumber: targetApp?.applicationNumber,
+        phone: targetApp?.phone,
+        email: targetApp?.email,
+        status: targetApp?.status,
+      };
+      const updated = prev.filter(
+        (app) =>
+          !res.deletedDocIds.includes(app.id) &&
+          !shouldRemoveFromCacheOnDelete(app, targetMeta, {
+            removeAllMatchingPhone: res.removedAllForPhone,
+          })
+      );
       safeCacheApplications(updated);
       return updated;
     });
-
-    try {
-      await deleteApplicationFromFirestore(id);
-    } catch (err) {
-      console.warn('Deleted locally, Firestore sync error:', err);
-    }
   };
 
   // Admin: Full Member Edit / Update (memberNumber & all fields, syncs state, cache & Firestore)
@@ -431,22 +558,24 @@ export function App() {
   // =========================================================================
   if (currentTab === 'admin') {
     return (
-      <AdminTab
-        applications={applications}
-        onApproveApplication={handleApproveApplication}
-        onRejectApplication={handleRejectApplication}
-        onDeleteApplication={handleDeleteApplication}
-        onUpdateMember={handleUpdateMember}
-        onAddNews={handleAddNews}
-        onUpdateNews={handleUpdateNews}
-        onDeleteNews={handleDeleteNews}
-        govOrders={govOrders}
-        setGovOrders={setGovOrders}
-        newsList={newsList}
-        onFetchApplications={handleFetchAdminApplications}
-        isLoadingApps={isLoadingAdminApps}
-        onExitAdmin={handleExitAdmin}
-      />
+      <Suspense fallback={<TabLoadingFallback />}>
+        <AdminTab
+          applications={applications}
+          onApproveApplication={handleApproveApplication}
+          onRejectApplication={handleRejectApplication}
+          onDeleteApplication={handleDeleteApplication}
+          onUpdateMember={handleUpdateMember}
+          onAddNews={handleAddNews}
+          onUpdateNews={handleUpdateNews}
+          onDeleteNews={handleDeleteNews}
+          govOrders={govOrders}
+          setGovOrders={setGovOrders}
+          newsList={newsList}
+          onFetchApplications={handleFetchAdminApplications}
+          isLoadingApps={isLoadingAdminApps}
+          onExitAdmin={handleExitAdmin}
+        />
+      </Suspense>
     );
   }
 
@@ -455,45 +584,67 @@ export function App() {
   // =========================================================================
   return (
     <div className="min-h-screen flex flex-col bg-[#fbf8f2] text-[#102a43]">
-      <Header currentTab={currentTab} setCurrentTab={setCurrentTab} />
+      <Header
+        currentTab={currentTab}
+        setCurrentTab={setCurrentTab}
+        onPrefetchTab={prefetchTabChunk}
+      />
 
       <main className="flex-1">
-        <div className={currentTab === 'home' ? 'block' : 'hidden'}>
-          <HomeTab
-            setCurrentTab={setCurrentTab}
-            onSelectNews={handleSelectNews}
-            newsList={newsList}
-          />
-        </div>
-        <div className={currentTab === 'about' || currentTab === 'objectives' ? 'block' : 'hidden'}>
-          <AboutTab setCurrentTab={setCurrentTab} />
-        </div>
-        <div className={currentTab === 'leadership' ? 'block' : 'hidden'}>
-          <LeadershipTab setCurrentTab={setCurrentTab} />
-        </div>
-        <div className={currentTab === 'appointments' ? 'block' : 'hidden'}>
-          <AppointmentsTab />
-        </div>
-        <div className={currentTab === 'news' ? 'block' : 'hidden'}>
-          <NewsTab
-            newsList={newsList}
-            govOrders={govOrders}
-            selectedNews={selectedNews}
-            setSelectedNews={setSelectedNews}
-            onRefreshNews={handleRefreshNews}
-            isRefreshing={isRefreshingNews}
-          />
-        </div>
-        <div className={currentTab === 'membership' ? 'block' : 'hidden'}>
-          <MembershipTab
-            applications={applications}
-            onAddApplication={handleAddApplication}
-            onTrackRemote={handleTrackRemote}
-          />
-        </div>
-        <div className={currentTab === 'contact' ? 'block' : 'hidden'}>
-          <ContactTab onSaveContact={handleSaveContact} />
-        </div>
+        {(visitedTabs.home || currentTab === 'home') && (
+          <div className={currentTab === 'home' ? 'block mhs-tab-enter' : 'hidden'}>
+            <HomeTab
+              setCurrentTab={setCurrentTab}
+              onSelectNews={handleSelectNews}
+              newsList={newsList}
+            />
+          </div>
+        )}
+
+        <Suspense fallback={<TabLoadingFallback />}>
+          {(visitedTabs.about || currentTab === 'about' || currentTab === 'objectives') && (
+            <div className={currentTab === 'about' || currentTab === 'objectives' ? 'block mhs-tab-enter' : 'hidden'}>
+              <AboutTab setCurrentTab={setCurrentTab} />
+            </div>
+          )}
+          {(visitedTabs.leadership || currentTab === 'leadership') && (
+            <div className={currentTab === 'leadership' ? 'block mhs-tab-enter' : 'hidden'}>
+              <LeadershipTab setCurrentTab={setCurrentTab} />
+            </div>
+          )}
+          {(visitedTabs.appointments || currentTab === 'appointments') && (
+            <div className={currentTab === 'appointments' ? 'block mhs-tab-enter' : 'hidden'}>
+              <AppointmentsTab />
+            </div>
+          )}
+          {(visitedTabs.news || currentTab === 'news') && (
+            <div className={currentTab === 'news' ? 'block mhs-tab-enter' : 'hidden'}>
+              <NewsTab
+                newsList={newsList}
+                govOrders={govOrders}
+                selectedNews={selectedNews}
+                setSelectedNews={setSelectedNews}
+                onRefreshNews={handleRefreshNews}
+                isRefreshing={isRefreshingNews}
+              />
+            </div>
+          )}
+          {(visitedTabs.membership || currentTab === 'membership') && (
+            <div className={currentTab === 'membership' ? 'block mhs-tab-enter' : 'hidden'}>
+              <MembershipTab
+                applications={applications}
+                onAddApplication={handleAddApplication}
+                onTrackRemote={handleTrackRemote}
+                onPurgeLocalContact={handlePurgeLocalContact}
+              />
+            </div>
+          )}
+          {(visitedTabs.contact || currentTab === 'contact') && (
+            <div className={currentTab === 'contact' ? 'block mhs-tab-enter' : 'hidden'}>
+              <ContactTab onSaveContact={handleSaveContact} />
+            </div>
+          )}
+        </Suspense>
       </main>
 
       <Footer setCurrentTab={setCurrentTab} />

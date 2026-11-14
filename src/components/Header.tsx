@@ -4,9 +4,10 @@ import { ORG_DETAILS } from '../data/mahasanghData';
 interface HeaderProps {
   currentTab: string;
   setCurrentTab: (tab: string) => void;
+  onPrefetchTab?: (tabId: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => {
+export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPrefetchTab }) => {
   const scrollNavRef = useRef<HTMLDivElement | null>(null);
 
   const navItems = [
@@ -50,7 +51,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
               alt="महासंघ अधिकृत मानचिन्ह"
               width="72"
               height="72"
+              loading="eager"
               decoding="async"
+              {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
               className="w-12 h-12 min-[380px]:w-14 min-[380px]:h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 object-contain rounded-full ring-2 ring-amber-500 shadow-md group-hover:scale-105 transition-transform bg-white"
             />
             <span
@@ -95,8 +98,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
               return (
                 <button
                   key={item.id}
+                  onMouseEnter={() => onPrefetchTab?.(item.id)}
+                  onFocus={() => onPrefetchTab?.(item.id)}
                   onClick={() => handleNavClick(item.id)}
-                  className={`text-sm xl:text-[15px] px-3.5 xl:px-4 py-2 rounded-lg transition-all ${
+                  className={`mhs-btn-press text-sm xl:text-[15px] px-3.5 xl:px-4 py-2 rounded-lg transition-all ${
                     isActive
                       ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
                       : 'text-slate-100 hover:text-white hover:bg-white/10 font-bold'
@@ -121,8 +126,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab }) => 
                   <button
                     key={item.id}
                     data-active={isActive ? 'true' : 'false'}
+                    onTouchStart={() => onPrefetchTab?.(item.id)}
                     onClick={() => handleNavClick(item.id)}
-                    className={`shrink-0 text-sm sm:text-base px-3.5 py-2 rounded-lg transition-all whitespace-nowrap active:scale-98 ${
+                    className={`mhs-btn-press shrink-0 text-sm sm:text-base px-3.5 py-2 rounded-lg transition-all whitespace-nowrap active:scale-98 ${
                       isActive
                         ? 'bg-amber-500 text-[#0b1e36] font-black shadow-sm'
                         : 'text-slate-100 hover:text-white bg-white/10 hover:bg-white/15 border border-white/15 font-bold'

@@ -36,6 +36,16 @@ import {
   computeNextSafeSeq,
   buildSequentialMemberNumber,
 } from './utils/memberNumberAllocator';
+import {
+  normalizePhone10,
+  normalizeEmail,
+  isSyntheticMahasanghEmail,
+  pickBestActiveApplication,
+  pickActiveDuplicateMatch,
+  shouldRemoveFromCacheOnDelete,
+  classifyGhostApplicationsToPurge,
+  DeleteTargetMeta,
+} from './utils/applicationCleanup';
 
 const app = initializeApp(firebaseConfig);
 
@@ -398,29 +408,51 @@ export async function saveApplicationToFirestore(app: MembershipApplication): Pr
 }
 
 // Targeted single-document search for status tracking (Consumes minimal reads, NOT the entire collection!)
-export async function trackSingleApplicationInFirestore(
+export async function trackSingleApplicationDetailed(
   identifier: string
-): Promise<MembershipApplication | null> {
+): Promise<{ app: MembershipApplication | null; verifiedFromServer: boolean }> {
   const queryTerm = toEnglishDigits(identifier.trim());
-  if (!queryTerm) return null;
+  if (!queryTerm) return { app: null, verifiedFromServer: false };
+
+  let verifiedFromServer = false;
+
+  const getDocServerFirst = async (ref: ReturnType<typeof doc>) => {
+    try {
+      const snap = await getDocFromServer(ref);
+      verifiedFromServer = true;
+      return snap;
+    } catch {
+      return getDoc(ref);
+    }
+  };
+
+  const getDocsServerFirst = async (q: ReturnType<typeof query>) => {
+    try {
+      const snap = await getDocsFromServer(q);
+      verifiedFromServer = true;
+      return snap;
+    } catch {
+      return getDocs(q);
+    }
+  };
 
   const pickBestMatch = (docs: any[]): MembershipApplication | null => {
     if (!docs || docs.length === 0) return null;
     const mapped = docs.map((d) => ({
       ...(d.data() as MembershipApplication),
-      id: (d.data() as MembershipApplication).id || d.id,
+      id: d.id,
     }));
-    const approved = mapped.find((m) => m.status === 'approved');
-    return approved || mapped[0];
+    return pickBestActiveApplication(mapped);
   };
 
   try {
     // 1. Try by document ID
     const docRef = doc(db, 'applications', queryTerm);
-    const docSnap = await getDoc(docRef);
+    const docSnap = await getDocServerFirst(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data() as MembershipApplication;
-      return { ...data, id: data.id || docSnap.id };
+      const active = pickBestActiveApplication([{ ...data, id: docSnap.id }]);
+      if (active) return { app: active, verifiedFromServer };
     }
 
     const appsCol = collection(db, 'applications');
@@ -428,23 +460,26 @@ export async function trackSingleApplicationInFirestore(
     // 2. Try by memberNumber (exact or uppercase)
     const upperTerm = queryTerm.toUpperCase();
     const qMember = query(appsCol, where('memberNumber', '==', upperTerm), limit(5));
-    const snapMember = await getDocs(qMember);
+    const snapMember = await getDocsServerFirst(qMember);
     if (!snapMember.empty) {
-      return pickBestMatch(snapMember.docs);
+      const best = pickBestMatch(snapMember.docs);
+      if (best) return { app: best, verifiedFromServer };
     }
     if (upperTerm !== queryTerm) {
       const qMemberExact = query(appsCol, where('memberNumber', '==', queryTerm), limit(5));
-      const snapMemberExact = await getDocs(qMemberExact);
+      const snapMemberExact = await getDocsServerFirst(qMemberExact);
       if (!snapMemberExact.empty) {
-        return pickBestMatch(snapMemberExact.docs);
+        const best = pickBestMatch(snapMemberExact.docs);
+        if (best) return { app: best, verifiedFromServer };
       }
     }
 
     // 3. Try by applicationNumber (exact or uppercase)
     const qApp = query(appsCol, where('applicationNumber', '==', upperTerm), limit(5));
-    const snapApp = await getDocs(qApp);
+    const snapApp = await getDocsServerFirst(qApp);
     if (!snapApp.empty) {
-      return pickBestMatch(snapApp.docs);
+      const best = pickBestMatch(snapApp.docs);
+      if (best) return { app: best, verifiedFromServer };
     }
 
     // 4. Try by phone (exact and normalized last-10 digits)
@@ -454,85 +489,131 @@ export async function trackSingleApplicationInFirestore(
     );
     for (const candidate of phoneCandidates) {
       const qPhone = query(appsCol, where('phone', '==', candidate), limit(5));
-      const snapPhone = await getDocs(qPhone);
+      const snapPhone = await getDocsServerFirst(qPhone);
       if (!snapPhone.empty) {
-        return pickBestMatch(snapPhone.docs);
+        const best = pickBestMatch(snapPhone.docs);
+        if (best) return { app: best, verifiedFromServer };
       }
     }
 
-    return null;
+    return { app: null, verifiedFromServer };
   } catch (error) {
     console.warn('Track query error:', error);
-    return null;
+    return { app: null, verifiedFromServer: false };
   }
 }
 
-// Check Firestore for existing application by phone, email, or exact fullName (prevents duplicate Pending/Approved apps)
+export async function trackSingleApplicationInFirestore(
+  identifier: string
+): Promise<MembershipApplication | null> {
+  const res = await trackSingleApplicationDetailed(identifier);
+  return res.app;
+}
+
+// Check live Firestore server for existing active (approved/pending) application by phone or email.
+// Never blocks on rejected/deleted docs or standalone Marathi fullName matches.
 export async function findExistingApplicationInFirestore(params: {
   phone?: string;
   email?: string;
   fullName?: string;
-}): Promise<{ app: MembershipApplication; matchedBy: 'phone' | 'email' | 'name' } | null> {
-  const pickBest = (docs: any[]): MembershipApplication | null => {
-    if (!docs || docs.length === 0) return null;
-    const mapped = docs.map((d) => ({
-      ...(d.data() as MembershipApplication),
-      id: (d.data() as MembershipApplication).id || d.id,
-    }));
-    return (
-      mapped.find((m) => m.status === 'approved') ||
-      mapped.find((m) => m.status === 'pending') ||
-      mapped[0]
-    );
+}): Promise<{
+  match: { app: MembershipApplication; matchedBy: 'phone' | 'email' } | null;
+  verifiedFromServer: boolean;
+}> {
+  let verifiedFromServer = false;
+
+  const getDocsServerFirst = async (q: ReturnType<typeof query>) => {
+    try {
+      const snap = await getDocsFromServer(q);
+      verifiedFromServer = true;
+      return snap;
+    } catch {
+      return getDocs(q);
+    }
   };
 
   try {
     const appsCol = collection(db, 'applications');
+    const collectedDocs: MembershipApplication[] = [];
+    const seenDocIds = new Set<string>();
 
-    // 1. Check by 10-digit phone
-    const cleanPhone = toEnglishDigits(params.phone || '').replace(/\D/g, '').slice(-10);
+    const collectSnap = (snap: any) => {
+      if (!snap || snap.empty) return;
+      snap.docs.forEach((d: any) => {
+        if (seenDocIds.has(d.id)) return;
+        seenDocIds.add(d.id);
+        collectedDocs.push({
+          ...(d.data() as MembershipApplication),
+          id: d.id,
+        });
+      });
+    };
+
+    // 1. Check by 10-digit phone (and raw phone variant if any legacy doc exists)
+    const cleanPhone = normalizePhone10(params.phone);
     if (cleanPhone.length === 10) {
-      const snapPhone = await getDocs(query(appsCol, where('phone', '==', cleanPhone), limit(5)));
-      if (!snapPhone.empty) {
-        const best = pickBest(snapPhone.docs);
-        if (best) return { app: best, matchedBy: 'phone' };
+      const snapPhone = await getDocsServerFirst(
+        query(appsCol, where('phone', '==', cleanPhone), limit(10))
+      );
+      collectSnap(snapPhone);
+
+      const rawTrimmedPhone = toEnglishDigits((params.phone || '').trim());
+      if (rawTrimmedPhone && rawTrimmedPhone !== cleanPhone) {
+        const snapRawPhone = await getDocsServerFirst(
+          query(appsCol, where('phone', '==', rawTrimmedPhone), limit(5))
+        );
+        collectSnap(snapRawPhone);
       }
     }
 
     // 2. Check by user-provided email (skip synthetic @mahasangh.in fallback)
-    const cleanEmail = (params.email || '').trim().toLowerCase();
-    if (cleanEmail && !cleanEmail.endsWith('@mahasangh.in')) {
-      const snapEmail = await getDocs(query(appsCol, where('email', '==', cleanEmail), limit(5)));
-      if (!snapEmail.empty) {
-        const best = pickBest(snapEmail.docs);
-        if (best) return { app: best, matchedBy: 'email' };
-      }
+    const cleanEmail = normalizeEmail(params.email);
+    if (cleanEmail && !isSyntheticMahasanghEmail(cleanEmail)) {
+      const snapEmail = await getDocsServerFirst(
+        query(appsCol, where('email', '==', cleanEmail), limit(10))
+      );
+      collectSnap(snapEmail);
     }
 
-    // 3. Check by normalized fullName
-    const normalizedName = (params.fullName || '').trim().replace(/\s+/g, ' ');
-    if (normalizedName.length >= 3) {
-      const snapName = await getDocs(query(appsCol, where('fullName', '==', normalizedName), limit(5)));
-      if (!snapName.empty) {
-        const best = pickBest(snapName.docs);
-        if (best) return { app: best, matchedBy: 'name' };
-      }
-    }
+    const activeMatch = pickActiveDuplicateMatch(collectedDocs, {
+      phone: cleanPhone,
+      email: cleanEmail,
+    });
 
-    return null;
+    return {
+      match: activeMatch,
+      verifiedFromServer,
+    };
   } catch (error) {
     console.warn('Duplicate check Firestore query error:', error);
-    return null;
+    return {
+      match: null,
+      verifiedFromServer: false,
+    };
   }
 }
 
-// Admin only: On-demand applications fetch with 60s smart cache for lightning-fast load
+// Admin only: On-demand applications fetch with 60s smart cache (memory + lightweight localStorage)
 const ADMIN_APPS_CACHE_KEY = 'mahasangh_admin_apps_cache_v2';
 const ADMIN_APPS_TIME_KEY = 'mahasangh_admin_apps_time_v2';
+let adminAppsMemoryCache: { list: MembershipApplication[]; timestamp: number } | null = null;
+
+function stripHeavyPhotosForStorage(apps: MembershipApplication[]): MembershipApplication[] {
+  return apps.map((item) => {
+    if (item.photo && item.photo.length > 2000 && item.photo.startsWith('data:image')) {
+      const { photo, ...rest } = item;
+      return rest;
+    }
+    return item;
+  });
+}
 
 export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<MembershipApplication[]> {
   try {
     if (!forceRefresh) {
+      if (adminAppsMemoryCache && Date.now() - adminAppsMemoryCache.timestamp < 60000) {
+        return adminAppsMemoryCache.list;
+      }
       const cached = safeStorageGet(ADMIN_APPS_CACHE_KEY);
       const cachedTime = safeStorageGet(ADMIN_APPS_TIME_KEY);
       if (cached && cachedTime && Date.now() - Number(cachedTime) < 60000) {
@@ -546,25 +627,40 @@ export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<M
     }
 
     const appsCol = collection(db, 'applications');
-    const snap = await getDocs(appsCol);
+    let snap;
+    if (forceRefresh) {
+      try {
+        snap = await getDocsFromServer(appsCol);
+      } catch {
+        snap = await getDocs(appsCol);
+      }
+    } else {
+      snap = await getDocs(appsCol);
+    }
+
     if (snap.empty) {
+      adminAppsMemoryCache = { list: [], timestamp: Date.now() };
+      safeStorageSet(ADMIN_APPS_CACHE_KEY, JSON.stringify([]));
+      safeStorageSet(ADMIN_APPS_TIME_KEY, Date.now().toString());
       return [];
     }
     const list: MembershipApplication[] = [];
     snap.forEach((d) => {
       const data = d.data() as MembershipApplication;
-      list.push({ ...data, id: d.id || data.id });
+      list.push({ ...data, id: d.id });
     });
     list.sort(
       (a, b) =>
         new Date(b.createdAt || '').getTime() -
         new Date(a.createdAt || '').getTime()
     );
-    safeStorageSet(ADMIN_APPS_CACHE_KEY, JSON.stringify(list));
+    adminAppsMemoryCache = { list, timestamp: Date.now() };
+    safeStorageSet(ADMIN_APPS_CACHE_KEY, JSON.stringify(stripHeavyPhotosForStorage(list)));
     safeStorageSet(ADMIN_APPS_TIME_KEY, Date.now().toString());
     return list;
   } catch (error) {
     console.warn('Admin fetch applications error:', error);
+    if (adminAppsMemoryCache) return adminAppsMemoryCache.list;
     const cached = safeStorageGet(ADMIN_APPS_CACHE_KEY);
     if (cached) {
       try { return JSON.parse(cached); } catch {}
@@ -666,28 +762,139 @@ export async function rejectApplicationInFirestore(
   }
 }
 
-// Admin only: Delete application permanently from Firestore + local caches
-export async function deleteApplicationFromFirestore(appId: string): Promise<void> {
+// Admin only: Delete application permanently from Firestore (including mismatched IDs & non-approved ghosts) + all local caches
+export async function deleteApplicationFromFirestore(
+  appId: string,
+  targetMeta?: Partial<DeleteTargetMeta>
+): Promise<{ deletedDocIds: string[]; removedAllForPhone: boolean }> {
   const path = `applications/${appId}`;
   try {
-    await deleteDoc(doc(db, 'applications', appId));
-    removeMemberFromCaches(appId);
-    if (typeof localStorage !== 'undefined') {
-      for (const key of ['mahasangh_applications', APPROVED_MEMBERS_CACHE_KEY, 'mahasangh_applications_v1', 'mahasangh_approved_cache_v1']) {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          try {
-            const list = JSON.parse(raw);
-            if (Array.isArray(list)) {
-              const filtered = list.filter((x: any) => x.id !== appId);
-              localStorage.setItem(key, JSON.stringify(filtered));
-            }
-          } catch {}
-        }
+    const appsCol = collection(db, 'applications');
+    let resolvedMeta: DeleteTargetMeta = {
+      id: appId,
+      applicationNumber: targetMeta?.applicationNumber,
+      phone: targetMeta?.phone,
+      email: targetMeta?.email,
+      status: targetMeta?.status,
+    };
+
+    // Fetch live document before deleting so we always have full contact/appNumber metadata
+    try {
+      let existingSnap;
+      try {
+        existingSnap = await getDocFromServer(doc(db, 'applications', appId));
+      } catch {
+        existingSnap = await getDoc(doc(db, 'applications', appId));
+      }
+      if (existingSnap && existingSnap.exists()) {
+        const data = existingSnap.data() as MembershipApplication;
+        resolvedMeta = {
+          id: appId,
+          applicationNumber: resolvedMeta.applicationNumber || data.applicationNumber,
+          phone: resolvedMeta.phone || data.phone,
+          email: resolvedMeta.email || data.email,
+          status: resolvedMeta.status || data.status,
+        };
+      }
+    } catch {
+      // Proceed using targetMeta
+    }
+
+    const docIdsToDelete = new Set<string>([appId]);
+    let otherApprovedForSamePhone = false;
+
+    // 1. Catch any doc whose stored `.id` field matches appId even if Firestore doc key differed
+    try {
+      const idSnap = await getDocsFromServer(query(appsCol, where('id', '==', appId), limit(10)));
+      idSnap.forEach((d) => docIdsToDelete.add(d.id));
+    } catch {
+      // Ignore query failure
+    }
+
+    // 2. Catch any ghost/duplicate docs sharing the same 10-digit phone
+    const cleanPhone = normalizePhone10(resolvedMeta.phone);
+    if (cleanPhone.length === 10) {
+      try {
+        const phoneSnap = await getDocsFromServer(
+          query(appsCol, where('phone', '==', cleanPhone), limit(15))
+        );
+        phoneSnap.forEach((d) => {
+          if (d.id === appId) {
+            docIdsToDelete.add(d.id);
+            return;
+          }
+          const data = d.data() as MembershipApplication;
+          const st = String(data.status || '').toLowerCase();
+          if (st === 'approved') {
+            otherApprovedForSamePhone = true;
+          } else {
+            // Pending, rejected, deleted, or empty-status ghosts for this phone must be wiped
+            docIdsToDelete.add(d.id);
+          }
+        });
+      } catch {
+        // Ignore query failure
       }
     }
+
+    // 3. Catch any non-approved ghosts sharing the same real email
+    const cleanEmail = normalizeEmail(resolvedMeta.email);
+    if (cleanEmail && !isSyntheticMahasanghEmail(cleanEmail)) {
+      try {
+        const emailSnap = await getDocsFromServer(
+          query(appsCol, where('email', '==', cleanEmail), limit(15))
+        );
+        emailSnap.forEach((d) => {
+          if (d.id === appId) {
+            docIdsToDelete.add(d.id);
+            return;
+          }
+          const data = d.data() as MembershipApplication;
+          const st = String(data.status || '').toLowerCase();
+          if (st !== 'approved') {
+            docIdsToDelete.add(d.id);
+          }
+        });
+      } catch {
+        // Ignore query failure
+      }
+    }
+
+    // 4. Catch exact applicationNumber duplicates (only if not another unrelated approved record)
+    const appNo = toEnglishDigits(String(resolvedMeta.applicationNumber || '')).trim().toUpperCase();
+    if (appNo) {
+      try {
+        const appNoSnap = await getDocsFromServer(
+          query(appsCol, where('applicationNumber', '==', appNo), limit(10))
+        );
+        appNoSnap.forEach((d) => {
+          if (d.id === appId) {
+            docIdsToDelete.add(d.id);
+            return;
+          }
+          const data = d.data() as MembershipApplication;
+          if (normalizePhone10(data.phone) === cleanPhone || String(data.status || '').toLowerCase() !== 'approved') {
+            docIdsToDelete.add(d.id);
+          }
+        });
+      } catch {
+        // Ignore query failure
+      }
+    }
+
+    const deletedDocIds = Array.from(docIdsToDelete).filter(Boolean);
+    await Promise.all(deletedDocIds.map((docId) => deleteDoc(doc(db, 'applications', docId))));
+
+    const removeAllMatchingPhone = !otherApprovedForSamePhone;
+    removeMemberFromCaches(appId, resolvedMeta, { removeAllMatchingPhone });
+
+    return {
+      deletedDocIds,
+      removedAllForPhone: removeAllMatchingPhone,
+    };
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+    throw error;
   }
 }
 
@@ -1085,7 +1292,7 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
         if (isApproved) {
           list.push({
             ...item,
-            id: item.id || d.id
+            id: d.id
           });
         }
       });
@@ -1181,30 +1388,78 @@ export function syncSingleMemberInCaches(app: MembershipApplication): void {
 }
 
 /**
- * Removes a deleted member from all local caches immediately.
+ * Removes a deleted member (and any matching non-approved duplicate/ghost entries)
+ * from ALL local caches and invalidates cache timestamps immediately.
  */
-export function removeMemberFromCaches(appId: string): void {
+export function removeMemberFromCaches(
+  appId: string,
+  targetMeta?: Partial<DeleteTargetMeta>,
+  options?: { removeAllMatchingPhone?: boolean }
+): void {
+  const target: DeleteTargetMeta = {
+    id: appId,
+    applicationNumber: targetMeta?.applicationNumber,
+    phone: targetMeta?.phone,
+    email: targetMeta?.email,
+    status: targetMeta?.status,
+  };
+
   try {
-    const rawApproved = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
-    if (rawApproved) {
-      const currentApproved: MembershipApplication[] = JSON.parse(rawApproved);
-      safeStorageSet(
-        APPROVED_MEMBERS_CACHE_KEY,
-        JSON.stringify(currentApproved.filter((x) => x.id !== appId))
-      );
+    adminAppsMemoryCache = null;
+    if (typeof localStorage === 'undefined') return;
+    const arrayCacheKeys = [
+      APPROVED_MEMBERS_CACHE_KEY,
+      'mahasangh_applications',
+      'mahasangh_applications_v1',
+      'mahasangh_approved_cache_v1',
+      ADMIN_APPS_CACHE_KEY,
+    ];
+
+    for (const key of arrayCacheKeys) {
+      const raw = safeStorageGet(key);
+      if (!raw) continue;
+      try {
+        const current = JSON.parse(raw);
+        if (Array.isArray(current)) {
+          const filtered = current.filter(
+            (x: any) => !shouldRemoveFromCacheOnDelete(x, target, options)
+          );
+          safeStorageSet(key, JSON.stringify(filtered));
+        }
+      } catch {
+        // ignore malformed cache
+      }
     }
 
-    const rawApps = safeStorageGet('mahasangh_applications');
-    if (rawApps) {
-      const currentApps: MembershipApplication[] = JSON.parse(rawApps);
-      safeStorageSet(
-        'mahasangh_applications',
-        JSON.stringify(currentApps.filter((x) => x.id !== appId))
-      );
-    }
+    localStorage.removeItem(ADMIN_APPS_TIME_KEY);
+    localStorage.removeItem(APPROVED_MEMBERS_CACHE_TIME_KEY);
+    localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
   } catch (err) {
     console.warn('removeMemberFromCaches warning:', err);
   }
+}
+
+/**
+ * Self-heals browser caches for a specific phone/email when live Firestore confirms
+ * that no active application exists (e.g., member was deleted by Admin on another device).
+ */
+export function purgeStaleApplicationFromCachesByContact(params: {
+  phone?: string;
+  email?: string;
+}): void {
+  const cleanPhone = normalizePhone10(params.phone);
+  const cleanEmail = normalizeEmail(params.email);
+  if (cleanPhone.length !== 10 && (!cleanEmail || isSyntheticMahasanghEmail(cleanEmail))) return;
+
+  removeMemberFromCaches(
+    '',
+    {
+      id: '',
+      phone: cleanPhone,
+      email: cleanEmail,
+    },
+    { removeAllMatchingPhone: true }
+  );
 }
 
 // ==========================================
@@ -1742,6 +1997,87 @@ export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq:
     throw error;
   }
 }
+
+/**
+ * Purges ALL previously deleted/rejected/corrupt/duplicate-pending ghost records
+ * from live Firestore `applications` and clears every local cache across browsers.
+ */
+export async function purgeDeletedAndGhostApplicationsInFirestore(): Promise<{
+  totalDeleted: number;
+  rejectedOrDeletedCount: number;
+  corruptCount: number;
+  duplicateGhostCount: number;
+  remainingCount: number;
+  message: string;
+}> {
+  try {
+    const appsCol = collection(db, 'applications');
+    let snap;
+    try {
+      snap = await getDocsFromServer(appsCol);
+    } catch {
+      snap = await getDocs(appsCol);
+    }
+
+    const allDocs: Array<MembershipApplication & { docId: string }> = [];
+    snap.forEach((d) => {
+      const data = d.data() as MembershipApplication;
+      allDocs.push({
+        ...data,
+        id: d.id,
+        docId: d.id,
+      });
+    });
+
+    const classification = classifyGhostApplicationsToPurge(allDocs);
+
+    // Delete identified ghost/rejected/corrupt docs in chunks of 20
+    const docIdsToDelete = classification.toDelete.map((item) => item.docId);
+    for (let i = 0; i < docIdsToDelete.length; i += 20) {
+      const chunk = docIdsToDelete.slice(i, i + 20);
+      await Promise.all(chunk.map((docId) => deleteDoc(doc(db, 'applications', docId))));
+    }
+
+    // Clear ALL application & counter caches so Admin and Member browsers start completely fresh
+    adminAppsMemoryCache = null;
+    if (typeof localStorage !== 'undefined') {
+      const keysToClear = [
+        APPROVED_MEMBERS_CACHE_KEY,
+        APPROVED_MEMBERS_CACHE_TIME_KEY,
+        'mahasangh_applications',
+        'mahasangh_applications_v1',
+        'mahasangh_approved_cache_v1',
+        ADMIN_APPS_CACHE_KEY,
+        ADMIN_APPS_TIME_KEY,
+        MEMBER_COUNTER_CACHE_KEY,
+      ];
+      for (const k of keysToClear) {
+        localStorage.removeItem(k);
+      }
+    }
+
+    const totalDeleted = docIdsToDelete.length;
+    const remainingCount = classification.keptIds.size;
+
+    const message =
+      totalDeleted > 0
+        ? `✓ स्वच्छता पूर्ण! Firebase मधून एकूण ${totalDeleted} जुने/नाकारलेले/दुबार घोस्ट अर्ज कायमचे काढून टाकले गेले (नाकारलेले/डिलीट: ${classification.rejectedOrDeletedCount}, दुबार प्रलंबित: ${classification.duplicateGhostCount}, अपूर्ण: ${classification.corruptCount}). आता सर्व डिलीट झालेले सदस्य पुन्हा अर्ज भरू शकतात!`
+        : '✓ Firebase मध्ये कोणतेही नाकारलेले, अपूर्ण किंवा दुबार घोस्ट रेकॉर्ड शिल्लक नाहीत; स्थानिक कॅश पूर्णपणे स्वच्छ केला आहे.';
+
+    return {
+      totalDeleted,
+      rejectedOrDeletedCount: classification.rejectedOrDeletedCount,
+      corruptCount: classification.corruptCount,
+      duplicateGhostCount: classification.duplicateGhostCount,
+      remainingCount,
+      message,
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, 'applications');
+    throw error;
+  }
+}
+
 
 
 

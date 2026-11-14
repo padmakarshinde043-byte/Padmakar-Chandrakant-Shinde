@@ -30,17 +30,22 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
 
   useEffect(() => {
     let isMounted = true;
-    // Fetches ONLY once per user session, zero continuous background polling (Firebase quota safe)
-    getVisitorCountsOncePerSession().then((stats) => {
-      if (isMounted) {
-        setVisitorStats(stats);
-      }
-    }).catch((err) => {
-      console.warn('Visitor counter init error:', err);
-    });
+    // Fetches ONLY once per user session, deferred slightly so it never blocks first paint
+    const timer = window.setTimeout(() => {
+      getVisitorCountsOncePerSession()
+        .then((stats) => {
+          if (isMounted) {
+            setVisitorStats(stats);
+          }
+        })
+        .catch((err) => {
+          console.warn('Visitor counter init error:', err);
+        });
+    }, 500);
 
     return () => {
       isMounted = false;
+      window.clearTimeout(timer);
     };
   }, []);
 

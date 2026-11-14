@@ -21,15 +21,87 @@
       }
     </script>
 
-    <!-- Preconnect for fast fonts connection -->
+    <!-- Preconnect & non-blocking Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Yatra+One&family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap" />
-    <!-- Razorpay Checkout Script -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
+    <link rel="preload" as="image" href="/logo.png" fetchpriority="high" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Yatra+One&family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Yatra+One&family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap"
+      />
+    </noscript>
+    <style>
+      #mhs-boot-shell {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #fbf8f2;
+        color: #0b1e36;
+        padding: 24px;
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      #mhs-boot-logo {
+        width: 72px;
+        height: 72px;
+        border-radius: 9999px;
+        border: 2px solid #f59e0b;
+        background: #ffffff;
+        object-fit: contain;
+        box-shadow: 0 6px 18px rgba(11, 30, 54, 0.12);
+      }
+      #mhs-boot-title {
+        margin: 14px 0 4px;
+        font-size: 18px;
+        font-weight: 800;
+        color: #0b1e36;
+      }
+      #mhs-boot-sub {
+        margin: 0 0 16px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #b45309;
+      }
+      #mhs-boot-bar {
+        width: 140px;
+        height: 3px;
+        background: #e2e8f0;
+        border-radius: 9999px;
+        overflow: hidden;
+      }
+      #mhs-boot-bar > span {
+        display: block;
+        width: 48%;
+        height: 100%;
+        background: linear-gradient(90deg, #0b1e36, #df6b16);
+        border-radius: 9999px;
+        animation: mhsBootSlide 1s ease-in-out infinite alternate;
+      }
+      @keyframes mhsBootSlide {
+        from { transform: translateX(-20%); }
+        to { transform: translateX(130%); }
+      }
+    </style>
   </head>
   <body class="bg-slate-50 text-slate-900 font-devanagari antialiased selection:bg-amber-200" oncontextmenu="return false;">
-    <div id="root"></div>
+    <div id="root">
+      <div id="mhs-boot-shell" aria-label="वेबसाईट लोड होत आहे">
+        <img id="mhs-boot-logo" src="/logo.png" alt="महासंघ मानचिन्ह" width="72" height="72" />
+        <p id="mhs-boot-title">केंद्रप्रमुख व अधिकारी महासंघ</p>
+        <p id="mhs-boot-sub">महाराष्ट्र राज्य</p>
+        <div id="mhs-boot-bar"><span></span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

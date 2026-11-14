@@ -92,3 +92,85 @@ h1, h2, h3, .serif-marathi {
     padding: 25px !important;
   }
 }
+
+/* Professional lightweight GPU-composited animations (transform & opacity only) */
+@keyframes mhsFadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes mhsFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mhs-tab-enter {
+  animation: mhsFadeSlideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.mhs-modal-enter {
+  animation: mhsFadeIn 0.18s ease-out both;
+}
+
+.mhs-stagger-1 {
+  animation: mhsFadeSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.03s both;
+}
+.mhs-stagger-2 {
+  animation: mhsFadeSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.07s both;
+}
+.mhs-stagger-3 {
+  animation: mhsFadeSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.11s both;
+}
+.mhs-stagger-4 {
+  animation: mhsFadeSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+.mhs-card-interactive {
+  transition:
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+  will-change: transform;
+}
+
+.mhs-card-interactive:hover {
+  transform: translate3d(0, -3px, 0);
+}
+
+.mhs-card-interactive:active {
+  transform: translate3d(0, 0, 0) scale(0.99);
+}
+
+.mhs-btn-press {
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mhs-btn-press:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mhs-tab-enter,
+  .mhs-modal-enter,
+  .mhs-stagger-1,
+  .mhs-stagger-2,
+  .mhs-stagger-3,
+  .mhs-stagger-4 {
+    animation: none !important;
+  }
+  .mhs-card-interactive,
+  .mhs-btn-press {
+    transition: none !important;
+    transform: none !important;
+  }
+}
