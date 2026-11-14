@@ -36,7 +36,7 @@ import {
   deleteNewsFromFirestore,
   sortNewsDescending,
 } from './firebase';
-import { fetchDynamicLeaders } from './services/rkFirebaseService';
+import { fetchDynamicLeaders, fetchOfficials, fetchAppointedPosts } from './services/rkFirebaseService';
 
 function isPathAdminRoute(): boolean {
   if (typeof window === 'undefined') return false;
@@ -157,10 +157,12 @@ export function App() {
         setNewsList(news);
         const govOrders = await fetchGovOrders();
         setGovOrders(govOrders);
-        // 3. Seamlessly prefetch leadership data in background without blocking UI
+        // 3. Seamlessly prefetch leadership & officials data in background without blocking UI
         fetchDynamicLeaders(false).catch((err) => {
           console.warn('Dynamic leaders prefetch warning:', err);
         });
+        fetchOfficials(false).catch(() => {});
+        fetchAppointedPosts(false).catch(() => {});
       } catch (err) {
         console.warn('Data init error:', err);
       }

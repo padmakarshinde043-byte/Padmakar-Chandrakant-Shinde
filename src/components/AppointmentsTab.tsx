@@ -26,15 +26,26 @@ import {
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { ORG_DETAILS, MembershipApplication } from '../data/mahasanghData';
 import { fetchApprovedMembersCached } from '../firebase';
+import {
+  getOfficialsFromStorageSync,
+  getPostsFromStorageSync,
+  getDistrictPasswordsFromStorageSync,
+  getPresidentPasswordFromStorageSync,
+  filterAndSortDistrictOfficials,
+} from '../utils/officialsCache';
 
 export const AppointmentsTab: React.FC = () => {
-  // Main data state from Firebase Realtime Database
-  const [officials, setOfficials] = useState<OfficialMember[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Hydrate synchronously from localStorage for instant 0ms tab render
+  const [officials, setOfficials] = useState<OfficialMember[]>(() => getOfficialsFromStorageSync());
+  const [isLoading, setIsLoading] = useState<boolean>(() => getOfficialsFromStorageSync().length === 0);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string>('');
-  const [postsList, setPostsList] = useState<Array<{ name: string; isTaluka: boolean }>>([]);
-  const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>({});
+  const [postsList, setPostsList] = useState<Array<{ name: string; isTaluka: boolean }>>(() =>
+    getPostsFromStorageSync()
+  );
+  const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>(() =>
+    getDistrictPasswordsFromStorageSync()
+  );
 
   // Active sub-tab matching greetings.mahasangh.in
   const [activeSubTab, setActiveSubTab] = useState<'directory' | 'manage' | 'letters'>('directory');
@@ -60,7 +71,9 @@ export const AppointmentsTab: React.FC = () => {
   const [showPresidentLoginModal, setShowPresidentLoginModal] = useState<boolean>(false);
   const [presidentPasswordInput, setPresidentPasswordInput] = useState<string>('');
   const [presidentLoginError, setPresidentLoginError] = useState<string>('');
-  const [presidentSavedPassword, setPresidentSavedPassword] = useState<string>(SUPER_ADMIN_PASSWORD);
+  const [presidentSavedPassword, setPresidentSavedPassword] = useState<string>(() =>
+    getPresidentPasswordFromStorageSync(SUPER_ADMIN_PASSWORD)
+  );
   const [isSettingPresidentInitialPassword, setIsSettingPresidentInitialPassword] = useState<boolean>(false);
   const [newPresidentPass1, setNewPresidentPass1] = useState<string>('');
   const [newPresidentPass2, setNewPresidentPass2] = useState<string>('');
@@ -119,31 +132,56 @@ export const AppointmentsTab: React.FC = () => {
     }, 3500);
   };
 
-  // Load Initial Data on Mount (Cache-first, zero background live listeners to protect Firestore quota)
+  // Load Initial Data on Mount (Cache-first, non-blocking: public list never waits on Firestore or passwords)
   useEffect(() => {
     loadData(false);
   }, []);
 
+  // Lazy-load approved registered members ONLY when President Letters / Status Matrix is opened
+  useEffect(() => {
+    if ((activeSubTab === 'letters' || showStatusMatrixModal) && registeredApplications.length === 0) {
+      fetchApprovedMembersCached(false)
+        .then((appsData) => {
+          if (Array.isArray(appsData)) {
+            setRegisteredApplications(appsData);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeSubTab, showStatusMatrixModal, registeredApplications.length]);
+
   const loadData = async (force: boolean) => {
     setIsRefreshing(true);
     try {
-      const [officialsData, postsData, passwordsData, appsData, presPass] = await Promise.all([
+      // 1. Primary public directory data (RTDB cached; unblocks UI immediately)
+      const [officialsData, postsData] = await Promise.all([
         fetchOfficials(force),
         fetchAppointedPosts(force),
-        fetchDistrictPasswords(force),
-        fetchApprovedMembersCached(force).catch(() => []),
-        fetchPresidentPasswordFromFirebase()
       ]);
       setOfficials(officialsData);
-      setPostsList(postsData);
-      setDistrictPasswords(passwordsData);
-      if (presPass) {
-        setPresidentSavedPassword(presPass);
+      if (postsData && postsData.length > 0) {
+        setPostsList(postsData);
       }
-      if (Array.isArray(appsData)) {
-        setRegisteredApplications(appsData);
-      }
+      setIsLoading(false);
       setLastRefreshedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
+
+      // 2. Non-blocking background sync for admin passwords (and approved members only if letters tab active)
+      fetchDistrictPasswords(force)
+        .then((passwordsData) => setDistrictPasswords(passwordsData))
+        .catch(() => {});
+      fetchPresidentPasswordFromFirebase()
+        .then((presPass) => {
+          if (presPass) setPresidentSavedPassword(presPass);
+        })
+        .catch(() => {});
+
+      if (activeSubTab === 'letters' || showStatusMatrixModal) {
+        fetchApprovedMembersCached(force)
+          .then((appsData) => {
+            if (Array.isArray(appsData)) setRegisteredApplications(appsData);
+          })
+          .catch(() => {});
+      }
     } catch (err) {
       console.error('Error loading RTDB data:', err);
     } finally {
@@ -185,40 +223,7 @@ export const AppointmentsTab: React.FC = () => {
 
   // District Filtered & Rank-Sorted Officials List (Sorted by Dropdown Post Hierarchy)
   const districtOfficials = useMemo(() => {
-    const list = officials.filter((m) => {
-      if (m.district === currentDistrict) return true;
-      // Handle Ahilyanagar / Ahmadnagar alias
-      if (
-        (currentDistrict === 'अहिल्यानगर' && m.district === 'अहमदनगर') ||
-        (currentDistrict === 'अहमदनगर' && m.district === 'अहिल्यानगर')
-      ) {
-        return true;
-      }
-      return false;
-    });
-
-    const rankList = (postsList && postsList.length > 0)
-      ? postsList.map((p) => p.name)
-      : DEFAULT_APPOINTED_POSTS.map((p) => p.name);
-
-    const getRank = (postName: string) => {
-      if (!postName) return 999;
-      const cleanPost = postName.trim();
-      const exactIdx = rankList.findIndex((p) => p === cleanPost);
-      if (exactIdx !== -1) return exactIdx;
-      const partialIdx = rankList.findIndex((p) => cleanPost.includes(p) || p.includes(cleanPost));
-      if (partialIdx !== -1) return partialIdx;
-      return 999;
-    };
-
-    return [...list].sort((a, b) => {
-      const rankA = getRank(a.appointedPost);
-      const rankB = getRank(b.appointedPost);
-      if (rankA !== rankB) return rankA - rankB;
-      const nameA = `${a.firstName} ${a.lastName}`;
-      const nameB = `${b.firstName} ${b.lastName}`;
-      return nameA.localeCompare(nameB, 'mr');
-    });
+    return filterAndSortDistrictOfficials(officials, currentDistrict, postsList);
   }, [officials, currentDistrict, postsList]);
 
   // Searched Officials

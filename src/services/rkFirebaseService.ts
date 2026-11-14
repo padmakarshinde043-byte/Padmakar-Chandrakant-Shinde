@@ -15,73 +15,91 @@ import { toEnglishDigits } from '../utils/formatters';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 
+import {
+  CACHE_KEY_OFFICIALS,
+  CACHE_KEY_OFFICIALS_TIMESTAMP,
+  CACHE_KEY_POSTS,
+  CACHE_KEY_POSTS_TIMESTAMP,
+  CACHE_KEY_DIST_PASSWORDS,
+  CACHE_KEY_DIST_PASSWORDS_TS,
+  CACHE_KEY_PRESIDENT_PASS,
+} from '../utils/officialsCache';
+
 const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
-const CACHE_KEY_OFFICIALS = 'rk2026_officials_cache_v1';
-const CACHE_KEY_OFFICIALS_TIMESTAMP = 'rk2026_officials_ts_v1';
-const CACHE_KEY_POSTS = 'rk2026_posts_cache_v1';
-const CACHE_KEY_POSTS_TIMESTAMP = 'rk2026_posts_ts_v1';
-const CACHE_KEY_DIST_PASSWORDS = 'rk2026_dist_passwords_cache_v1';
-const CACHE_KEY_DIST_PASSWORDS_TS = 'rk2026_dist_passwords_ts_v1';
 const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
 const CACHE_KEY_LEADERSHIP_VER = 'mahasangh_leadership_ver_v1';
 const CACHE_KEY_LEADERSHIP_TS = 'mahasangh_leadership_ts_v1';
-const CACHE_KEY_PRESIDENT_PASS = 'rk2026_president_password_cache';
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes smart cache TTL
+
+let officialsInFlight: Promise<OfficialMember[]> | null = null;
+let postsInFlight: Promise<AppointedPostItem[]> | null = null;
 
 /**
  * Fetch all officials from the secondary Firebase RTDB.
  * Uses local cache first if fresh.
  */
 export async function fetchOfficials(forceRefresh = false): Promise<OfficialMember[]> {
-  try {
-    if (!forceRefresh) {
-      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-      const timestamp = localStorage.getItem(CACHE_KEY_OFFICIALS_TIMESTAMP);
-      if (cached && timestamp && Date.now() - Number(timestamp) < CACHE_TTL_MS) {
-        return JSON.parse(cached);
-      }
-    }
-
-    const res = await fetch(`${RTDB_BASE_URL}/officials.json`);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch officials: ${res.statusText}`);
-    }
-    const data = await res.json();
-    if (!data) return [];
-
-    const list: OfficialMember[] = Object.keys(data).map((key) => {
-      const item = data[key];
-      return {
-        id: key,
-        salutation: item.salutation || 'श्री.',
-        firstName: item.firstName || '',
-        middleName: item.middleName || '',
-        lastName: item.lastName || '',
-        appointedPost: item.appointedPost || '',
-        district: item.district || '',
-        taluka: item.taluka || '',
-        currentCadre: item.currentCadre || '',
-        workingPlace: item.workingPlace || '',
-        mobile: toEnglishDigits(item.mobile || ''),
-        updatedAt: item.updatedAt || new Date().toISOString(),
-        photo: item.photo || '',
-        appointedDate: item.appointedDate || '',
-        orderNumber: item.orderNumber || ''
-      };
-    });
-
-    // Save to cache
-    localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-    localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
-
-    return list;
-  } catch (error) {
-    console.error('Error in fetchOfficials:', error);
-    // Fallback to cache even if stale
+  if (!forceRefresh) {
     const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-    if (cached) return JSON.parse(cached);
-    return [];
+    const timestamp = localStorage.getItem(CACHE_KEY_OFFICIALS_TIMESTAMP);
+    if (cached && timestamp && Date.now() - Number(timestamp) < CACHE_TTL_MS) {
+      return JSON.parse(cached);
+    }
+    if (officialsInFlight) {
+      return officialsInFlight;
+    }
   }
+
+  const runFetch = (async (): Promise<OfficialMember[]> => {
+    try {
+      const res = await fetch(`${RTDB_BASE_URL}/officials.json`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch officials: ${res.statusText}`);
+      }
+      const data = await res.json();
+      if (!data) return [];
+
+      const list: OfficialMember[] = Object.keys(data).map((key) => {
+        const item = data[key];
+        return {
+          id: key,
+          salutation: item.salutation || 'श्री.',
+          firstName: item.firstName || '',
+          middleName: item.middleName || '',
+          lastName: item.lastName || '',
+          appointedPost: item.appointedPost || '',
+          district: item.district || '',
+          taluka: item.taluka || '',
+          currentCadre: item.currentCadre || '',
+          workingPlace: item.workingPlace || '',
+          mobile: toEnglishDigits(item.mobile || ''),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+          photo: item.photo || '',
+          appointedDate: item.appointedDate || '',
+          orderNumber: item.orderNumber || ''
+        };
+      });
+
+      // Save to cache
+      localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
+      localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+
+      return list;
+    } catch (error) {
+      console.error('Error in fetchOfficials:', error);
+      // Fallback to cache even if stale
+      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+      if (cached) return JSON.parse(cached);
+      return [];
+    } finally {
+      officialsInFlight = null;
+    }
+  })();
+
+  if (!forceRefresh) {
+    officialsInFlight = runFetch;
+  }
+  return runFetch;
 }
 
 /**
@@ -206,37 +224,49 @@ export async function updateDistrictPasswordInRtdb(district: string, newPass: st
  * Fetch dynamic appointed posts from RTDB (30-minute cached).
  */
 export async function fetchAppointedPosts(forceRefresh = false): Promise<AppointedPostItem[]> {
-  try {
-    if (!forceRefresh) {
-      const cached = localStorage.getItem(CACHE_KEY_POSTS);
-      const ts = localStorage.getItem(CACHE_KEY_POSTS_TIMESTAMP);
-      if (cached && ts && Date.now() - Number(ts) < CACHE_TTL_MS) {
+  if (!forceRefresh) {
+    const cached = localStorage.getItem(CACHE_KEY_POSTS);
+    const ts = localStorage.getItem(CACHE_KEY_POSTS_TIMESTAMP);
+    if (cached && ts && Date.now() - Number(ts) < CACHE_TTL_MS) {
+      return JSON.parse(cached);
+    }
+    if (postsInFlight) {
+      return postsInFlight;
+    }
+  }
+
+  const runFetch = (async (): Promise<AppointedPostItem[]> => {
+    try {
+      const res = await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`);
+      if (!res.ok) return DEFAULT_APPOINTED_POSTS;
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
+        localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
+        return data;
+      }
+    } catch (error) {
+      console.warn('Error fetching custom posts, using defaults:', error);
+    } finally {
+      postsInFlight = null;
+    }
+
+    const cached = localStorage.getItem(CACHE_KEY_POSTS);
+    if (cached) {
+      try {
         return JSON.parse(cached);
+      } catch {
+        // fallback
       }
     }
 
-    const res = await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`);
-    if (!res.ok) return DEFAULT_APPOINTED_POSTS;
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
-      localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
-      return data;
-    }
-  } catch (error) {
-    console.warn('Error fetching custom posts, using defaults:', error);
-  }
+    return DEFAULT_APPOINTED_POSTS;
+  })();
 
-  const cached = localStorage.getItem(CACHE_KEY_POSTS);
-  if (cached) {
-    try {
-      return JSON.parse(cached);
-    } catch {
-      // fallback
-    }
+  if (!forceRefresh) {
+    postsInFlight = runFetch;
   }
-
-  return DEFAULT_APPOINTED_POSTS;
+  return runFetch;
 }
 
 /**

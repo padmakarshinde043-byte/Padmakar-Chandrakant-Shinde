@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  UserCheck, ShieldCheck, CheckCircle2, AlertCircle, Phone, Printer, Download, Search,
-  Upload, Image as ImageIcon, Check, Sparkles, Award, ExternalLink, Mail
+  UserCheck, ShieldCheck, CheckCircle2, AlertCircle, Phone, Download, Search,
+  Upload, Image as ImageIcon, Check, ExternalLink, Mail, CreditCard
 } from 'lucide-react';
 import {
   ORG_DETAILS,
@@ -95,7 +95,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   } | null>(null);
   const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'skipped'>('idle');
   const [emailDeliveryAddress, setEmailDeliveryAddress] = useState<string>('');
+  const directorySectionRef = useRef<HTMLDivElement | null>(null);
   const trackSectionRef = useRef<HTMLDivElement | null>(null);
+  const formSectionRef = useRef<HTMLDivElement | null>(null);
+  const [activeJumpTab, setActiveJumpTab] = useState<'directory' | 'track' | 'register'>('directory');
   const initialTrackRanRef = useRef<boolean>(false);
 
   const handleStartRazorpayCheckout = (app: MembershipApplication) => {
@@ -606,73 +609,111 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   };
 
   return (
-    <div className="bg-[#f7f9fc] py-6 sm:py-10">
+    <div className="bg-[#f5f7fa] py-6 sm:py-8">
       <div className="max-w-[1000px] mx-auto px-4">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white rounded-2xl p-5 sm:p-8 mb-6 shadow-md border-t-4 border-[#efb24b]">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#f8d39b] mb-2 uppercase tracking-wider">
-            <UserCheck className="w-4 h-4 text-[#efb24b]" />
-            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+        {/* Institutional Page Masthead & Standard Portal Navigation Tabs */}
+        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-6 overflow-hidden">
+          <div className="px-5 py-5 sm:px-6 sm:py-6">
+            <div className="text-xs font-semibold text-slate-600 mb-1">
+              {ORG_DETAILS.name} · आजीवन सभासद कक्ष
+            </div>
+            <h1 className="font-serifDevanagari text-xl sm:text-2xl md:text-[26px] font-bold text-[#193568] leading-snug">
+              सदस्यत्व नोंदणी व अधिकृत सभासद यादी
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed max-w-3xl">
+              नोंदणीकृत सभासद यादी, अर्जाची स्थिती व आय-कार्ड डाऊनलोड आणि नवीन आजीवन सदस्यत्व अर्जाची अधिकृत सुविधा.
+            </p>
           </div>
-          <h1 className="font-serifDevanagari text-2xl sm:text-3xl font-bold mb-2">
-            सदस्यत्व नोंदणी व अधिकृत सभासद यादी
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed max-w-2xl">
-            महासंघाची अधिकृत नोंदणीकृत सदस्य यादी खालील चौकटीत उपलब्ध आहे. यानंतर आपण आपल्या अर्जाची स्थिती तपासू शकता व नवीन सदस्यत्व नोंदणी करू शकता.
-          </p>
+
+          {/* Standard Horizontal Portal Section Tabs */}
+          <div className="border-t border-slate-200 bg-slate-50 px-2 sm:px-6 flex items-center gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveJumpTab('directory');
+                directorySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className={`px-2.5 sm:px-4 py-2.5 text-[11.5px] sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                activeJumpTab === 'directory'
+                  ? 'border-[#193568] text-[#193568] bg-white'
+                  : 'border-transparent text-slate-600 hover:text-[#193568]'
+              }`}
+            >
+              १. सदस्य यादी
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveJumpTab('track');
+                trackSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className={`px-2.5 sm:px-4 py-2.5 text-[11.5px] sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                activeJumpTab === 'track'
+                  ? 'border-[#193568] text-[#193568] bg-white'
+                  : 'border-transparent text-slate-600 hover:text-[#193568]'
+              }`}
+            >
+              २. अर्जाची स्थिती
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveJumpTab('register');
+                formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className={`px-2.5 sm:px-4 py-2.5 text-[11.5px] sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                activeJumpTab === 'register'
+                  ? 'border-[#193568] text-[#193568] bg-white'
+                  : 'border-transparent text-slate-600 hover:text-[#193568]'
+              }`}
+            >
+              ३. नवीन सदस्यत्व अर्ज
+            </button>
+          </div>
         </div>
 
-        {/* 1. अधिकृत नोंदणीकृत सदस्य यादी (सगळ्यात वर - Top-most Section as requested) */}
-        <RegisteredMembersDirectory applications={applications} />
+        {/* 1. अधिकृत नोंदणीकृत सदस्य यादी */}
+        <div ref={directorySectionRef}>
+          <RegisteredMembersDirectory applications={applications} />
+        </div>
 
-        {/* 2. अर्जाची स्थिती तपासा (त्यानंतर - Middle Section, exact same position, high-visibility design) */}
-        <div ref={trackSectionRef} className="bg-gradient-to-br from-[#fff9f2] via-white to-[#fffbeb] rounded-2xl border-2 border-[#df6b16] mb-8 shadow-lg overflow-hidden ring-4 ring-[#df6b16]/10">
-          {/* Bold High-Contrast Saffron Header */}
-          <div className="bg-gradient-to-r from-[#df6b16] via-[#d15c0c] to-[#b34904] px-5 py-3.5 sm:px-6 sm:py-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white text-[#df6b16] flex items-center justify-center shadow-md shrink-0">
-                <Search className="w-5 h-5 stroke-[2.5]" />
-              </div>
-              <div>
-                <h3 className="font-serifDevanagari font-extrabold text-lg sm:text-xl text-white leading-tight">
-                  अर्जाची स्थिती तपासा व आय-कार्ड मिळवा
-                </h3>
-                <p className="text-xs text-amber-100 font-semibold mt-0.5">
-                  Track Application Status & Download Official ID Card
-                </p>
-              </div>
+        {/* 2. अर्जाची स्थिती तपासा */}
+        <div ref={trackSectionRef} className="bg-white rounded-md border border-slate-300 mb-8 overflow-hidden">
+          <div className="bg-[#f8fafc] border-b border-slate-200 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <Search className="w-4 h-4 text-[#193568] shrink-0" />
+              <h3 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#193568] leading-tight">
+                अर्जाची स्थिती तपासा व आय-कार्ड मिळवा
+              </h3>
             </div>
-            <span className="self-start sm:self-auto bg-[#193568] text-amber-200 border border-amber-300/40 text-[11px] font-bold px-3 py-1 rounded-full shadow-xs shrink-0">
-              ★ तात्काळ आय-कार्ड डाऊनलोड
+            <span className="text-[11px] font-medium text-slate-500">
+              मोबाईल क्र. · सदस्य क्र. · अर्ज क्र.
             </span>
           </div>
 
           <div className="p-5 sm:p-6">
-            <div className="flex flex-col gap-4">
-              <p className="text-xs sm:text-sm text-[#193568] font-bold flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#df6b16] shrink-0"></span>
-                <span>
-                  आपला <span className="text-[#df6b16] underline decoration-[#df6b16]/40">१० अंकी मोबाईल नंबर</span>, <span className="text-[#df6b16] underline decoration-[#df6b16]/40">सदस्य क्रमांक</span> किंवा <span className="text-[#df6b16] underline decoration-[#df6b16]/40">अर्ज क्रमांक</span> खालील बॉक्समध्ये टाका:
-                </span>
+            <div className="flex flex-col gap-3">
+              <p className="text-xs sm:text-sm text-slate-700 font-medium">
+                आपला १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज संदर्भ क्रमांक खालील रकान्यात प्रविष्ट करा:
               </p>
 
-              <form onSubmit={handleTrackStatus} className="flex flex-col sm:flex-row gap-3 w-full">
+              <form onSubmit={handleTrackStatus} className="flex flex-col sm:flex-row gap-2.5 w-full">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-[#df6b16] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="येथे मोबाईल नंबर (उदा. 9876543210) किंवा MS/2026/... टाका"
+                    placeholder="उदा. 9876543210 किंवा MS/2026/..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full text-sm font-semibold text-[#193568] bg-white border-2 border-[#df6b16]/60 focus:border-[#df6b16] focus:ring-2 focus:ring-[#df6b16]/20 rounded-xl pl-10 pr-4 py-3 focus:outline-none shadow-xs"
+                    className="w-full text-sm text-slate-900 bg-white border border-slate-300 focus:border-[#193568] rounded-md pl-10 pr-4 py-2.5 focus:outline-none"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isTrackingStatus}
-                  className="bg-gradient-to-r from-[#193568] to-[#12284c] hover:from-[#12284c] hover:to-[#0a1833] disabled:opacity-70 text-white text-sm font-extrabold px-6 py-3 rounded-xl shrink-0 flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
+                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-70 text-white text-sm font-semibold px-6 py-2.5 rounded-md shrink-0 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Search className="w-4 h-4 text-[#efb24b]" />
+                  <Search className="w-4 h-4" />
                   <span>{isTrackingStatus ? 'तपासत आहे...' : 'स्थिती तपासा'}</span>
                 </button>
               </form>
@@ -680,58 +721,58 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
           {/* Search Result Card */}
           {searchResult && searchResult !== 'not_found' && (
-            <div className={`mt-4 p-5 rounded-xl border ${
+            <div className={`mt-4 p-4 sm:p-5 rounded-md border ${
               searchResult.status === 'approved'
-                ? 'bg-gradient-to-r from-[#f0fdf4] via-[#f7fee7] to-[#ecfdf5] border-emerald-300 shadow-sm'
-                : 'bg-amber-50/70 border-amber-200'
+                ? 'bg-emerald-50/40 border-emerald-300'
+                : 'bg-amber-50/50 border-amber-300'
             }`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-200/60">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
                 <div className="flex items-center gap-3">
                   {searchResult.photo ? (
                     <img
                       src={searchResult.photo}
                       alt={searchResult.fullName}
-                      className="w-12 h-14 object-cover rounded border-2 border-emerald-600 shadow-xs shrink-0"
+                      className="w-12 h-14 object-cover rounded border border-slate-300 shrink-0"
                     />
                   ) : (
-                    <div className="w-12 h-14 bg-slate-200 rounded border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
-                      <ImageIcon className="w-6 h-6" />
+                    <div className="w-12 h-14 bg-slate-100 rounded border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                      <ImageIcon className="w-5 h-5" />
                     </div>
                   )}
                   <div>
-                    <span className="font-serifDevanagari font-bold text-[#193568] text-base sm:text-lg block">
+                    <span className="font-serifDevanagari font-bold text-[#193568] text-base block">
                       {searchResult.salutation} {searchResult.fullName}
                     </span>
                     <span className="text-xs text-slate-600">
-                      कार्यक्षेत्र / जिल्हा: <strong>{searchResult.district}</strong>
-                      {searchResult.professional && ` | पद: ${searchResult.professional}`}
+                      जिल्हा: <strong>{searchResult.district}</strong>
+                      {searchResult.professional && ` · संवर्ग: ${searchResult.professional}`}
                     </span>
                   </div>
                 </div>
 
                 <span
-                  className={`px-3 py-1 rounded-full font-bold text-xs uppercase self-start sm:self-auto ${
+                  className={`px-2.5 py-1 rounded text-xs font-semibold self-start sm:self-auto border ${
                     searchResult.status === 'approved'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                      ? 'bg-emerald-700 text-white border-emerald-800'
+                      : 'bg-amber-100 text-amber-900 border-amber-300'
                   }`}
                 >
-                  {searchResult.status === 'approved' ? '✓ मंजूर (Approved)' : 'प्रलंबित (Pending)'}
+                  {searchResult.status === 'approved' ? 'मंजूर (Approved)' : 'प्रलंबित (Pending)'}
                 </span>
               </div>
 
               {/* Approved View with Direct PDF Download */}
               {searchResult.status === 'approved' ? (
-                <div className="mt-4 pt-1 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-800 text-xs sm:text-sm font-bold">
-                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>अभिनंदन! आपले सदस्यत्व यशस्वीरित्या मंजूर करण्यात आले आहे.</span>
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-emerald-800 text-xs sm:text-sm font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>अभिनंदन, आपले आजीवन सदस्यत्व मंजूर करण्यात आले आहे.</span>
                   </div>
 
-                  <div className="bg-white p-3 rounded-lg border border-emerald-200 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-3">
+                  <div className="bg-white p-3.5 rounded-md border border-slate-300 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <span className="text-slate-500 block text-[11px]">अधिकृत आजीवन सदस्य क्रमांक:</span>
-                      <strong className="text-base text-[#193568] font-serif tracking-wider">
+                      <strong className="text-base text-[#193568] font-mono tabular-nums">
                         {searchResult.memberNumber || 'MS/2026/MAHA/0001'}
                       </strong>
                     </div>
@@ -739,7 +780,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     {searchResult.isOfficial && searchResult.officialPost && (
                       <div>
                         <span className="text-slate-500 block text-[11px]">संघटनेतील पद:</span>
-                        <strong className="text-xs text-[#df6b16] font-bold">
+                        <strong className="text-xs text-slate-900 font-bold">
                           {searchResult.officialPost} {searchResult.officialTaluka ? `(${searchResult.officialTaluka})` : ''}
                         </strong>
                       </div>
@@ -749,17 +790,17 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       type="button"
                       onClick={() => handleDownloadApprovedCertificate(searchResult)}
                       disabled={isDownloadingCert}
-                      className="bg-gradient-to-r from-[#df6b16] to-[#b34f07] hover:from-[#c85c0e] hover:to-[#964004] text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-xs px-4 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       <Download className={`w-4 h-4 ${isDownloadingCert ? 'animate-spin' : ''}`} />
-                      {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'आय-कार्ड डाऊनलोड करा (PDF ID Card)'}
+                      {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'अधिकृत आय-कार्ड डाऊनलोड (PDF)'}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">
-                  <div className="text-xs text-amber-900 font-medium bg-amber-50 p-3 rounded-lg border border-amber-200">
-                    आपला अर्ज सुरक्षित जतन आहे, परंतु <strong>₹220</strong> पेमेंटची खात्री अद्याप झालेली नाही. खालील बटनावरून पेमेंट पूर्ण करा; पेमेंट झाल्यावर त्वरित आपले अधिकृत आय-कार्ड तयार होईल.
+                  <div className="text-xs text-amber-950 font-medium bg-amber-50 p-3 rounded-md border border-amber-200">
+                    आपला अर्ज जतन आहे, परंतु <strong>₹220</strong> सदस्यत्व शुल्क अद्याप प्रलंबित आहे. पेमेंट पूर्ण करताच आपले अधिकृत आय-कार्ड उपलब्ध होईल.
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
@@ -770,9 +811,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                         handleStartRazorpayCheckout(searchResult as MembershipApplication);
                       }}
                       disabled={isRazorpayLoading}
-                      className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer"
+                      className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white text-xs font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <span>💳</span> {isRazorpayLoading ? 'पेमेंट उघडत आहे...' : 'Razorpay ने ₹220 भरा (तात्काळ आय-कार्ड)'}
+                      <CreditCard className="w-4 h-4" />
+                      <span>{isRazorpayLoading ? 'पेमेंट खिडकी उघडत आहे...' : 'Razorpay ने ₹220 भरा'}</span>
                     </button>
                     <button
                       type="button"
@@ -780,10 +822,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                         setPendingApp(searchResult as MembershipApplication);
                         setShowPaymentModal(true);
                       }}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
+                      className="bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
-                      पेमेंट पर्याय / स्थिती तपासा
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                      <span>पेमेंट पर्याय व स्थिती तपासा</span>
                     </button>
                   </div>
                 </div>
@@ -792,66 +834,51 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           )}
 
           {searchResult === 'not_found' && (
-            <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+            <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium rounded-md flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              कोणताही अर्ज आढळला नाही. कृपया अचूक १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज क्रमांक प्रविष्ट करा.
+              <span>कोणताही अर्ज आढळला नाही. कृपया अचूक १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज क्रमांक तपासून पुन्हा प्रयत्न करा.</span>
             </div>
           )}
           </div>
         </div>
 
-
-
-        {/* 3. नवीन नोंदणी अर्ज (Bottom Section as requested) */}
-        <div className="bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white p-4 sm:p-5 rounded-2xl shadow-xs mb-6 border-l-4 border-[#df6b16] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#df6b16] text-white flex items-center justify-center font-bold text-lg shadow-xs shrink-0">
-              ✍️
-            </div>
-            <div>
-              <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-                <span>नवीन सदस्यत्व नोंदणी अर्ज</span>
-                <span className="text-xs font-mono font-semibold px-2 py-0.5 bg-[#df6b16] text-white rounded-md">
-                  नोंदणी करा
-                </span>
-              </h2>
-              <p className="text-xs text-amber-200 mt-0.5">
-                महासंघाचे अधिकृत आजीवन सभासदत्व मिळवण्यासाठी खालील माहिती अचूक भरा.
-              </p>
-            </div>
-          </div>
+        {/* 3. नवीन सदस्यत्व नोंदणी अर्ज Header */}
+        <div ref={formSectionRef} className="bg-white border border-slate-300 border-t-4 border-t-[#df6b16] rounded-md p-4 sm:p-5 mb-5">
+          <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568]">
+            नवीन आजीवन सदस्यत्व नोंदणी अर्ज
+          </h2>
+          <p className="text-xs text-slate-600 mt-1">
+            महासंघाचे अधिकृत आजीवन सभासदत्व मिळवण्यासाठी खालील सर्व आवश्यक माहिती अचूक भरा.
+          </p>
         </div>
 
         {/* Main Application Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {formAlert && (
-            <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-lg flex items-center gap-2">
+            <div className="p-3.5 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-md flex items-center gap-2 font-medium">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              {formAlert}
+              <span>{formAlert}</span>
             </div>
           )}
 
           {/* Section 1: Personal Details & Passport Photo Upload with Live Preview */}
-          <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
-            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              1. वैयक्तिक माहिती व पासपोर्ट फोटो
+          <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 space-y-4">
+            <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#193568] pb-2.5 border-b border-slate-200">
+              १. वैयक्तिक माहिती व पासपोर्ट फोटो
             </h2>
 
             {/* Marathi Language Notice */}
-            <div className="bg-[#fff8e6] border-l-4 border-[#df6b16] p-3 rounded-r-lg text-xs text-[#851216] font-semibold flex items-center gap-2">
-              <span className="text-sm">✍️</span>
-              <span>
-                <strong>सूचना:</strong> सदस्यत्व फॉर्ममधील सर्व वैयक्तिक माहिती (नाव, पत्ता, तालुका, छंद) <strong>फक्त मराठी भाषेतच</strong> भरावी. इंग्रजी अक्षरात माहिती भरल्यास अर्ज सबमिट होणार नाही.
-              </span>
+            <div className="bg-amber-50/70 border border-amber-300 px-3.5 py-2.5 rounded-md text-xs text-slate-800">
+              <strong>सूचना:</strong> अर्जातील वैयक्तिक माहिती (नाव, पत्ता, केंद्राचे नाव व छंद) <strong>फक्त मराठी भाषेतच</strong> भरावी.
             </div>
 
             {/* Passport Photo Upload & Live Preview Section */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5">
+            <div className="bg-slate-50 border border-slate-200 rounded-md p-4 sm:p-5">
               <label className="font-bold text-[#193568] block mb-1 text-xs sm:text-sm">
-                पासपोर्ट फोटो अपलोड करा (कमाल 200 KB) <span className="text-[#df6b16]">*</span>
+                पासपोर्ट फोटो अपलोड करा <span className="text-[#df6b16]">*</span>
               </label>
-              <p className="text-[11px] text-slate-500 mb-3">
-                आपला रंगीत पासपोर्ट फोटो अपलोड करा. तो तात्काळ उजव्या बाजूला दिसू लागेल. (JPG, JPEG, PNG फॉरमॅट)
+              <p className="text-[11px] text-slate-600 mb-3">
+                अधिकृत ओळखपत्रासाठी रंगीत पासपोर्ट फोटो (JPG / PNG) निवडा; निवडताच उजवीकडे पूर्वावलोकन दिसेल.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -859,14 +886,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 <div className="flex-1 w-full">
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#193568]/30 hover:border-[#df6b16] bg-white rounded-xl p-5 text-center cursor-pointer transition-all hover:bg-amber-50/20"
+                    className="border border-dashed border-slate-400 hover:border-[#193568] bg-white rounded-md p-5 text-center cursor-pointer transition-colors hover:bg-slate-50"
                   >
-                    <Upload className="w-8 h-8 text-[#df6b16] mx-auto mb-2" />
-                    <p className="text-xs font-bold text-[#193568]">
-                      फोटो निवडण्यासाठी येथे क्लिक करा
+                    <Upload className="w-7 h-7 text-[#193568] mx-auto mb-1.5" />
+                    <p className="text-xs font-semibold text-[#193568]">
+                      फोटो फाईल निवडण्यासाठी येथे क्लिक करा
                     </p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      स्वयंचलित कॉम्प्रेस (&lt;30KB) व क्लाउड सेव्ह केले जाईल
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      फोटो आकार स्वयंचलित ऑप्टिमाइझ करून सुरक्षित जतन केला जाईल
                     </p>
                     <input
                       ref={fileInputRef}
@@ -879,25 +906,25 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
                   {isUploadingPhoto && (
                     <p className="text-xs text-[#193568] mt-2 font-semibold">
-                      फोटो ऑप्टिमाइझ व अपलोड होत आहे...
+                      फोटो प्रक्रिया सुरू आहे...
                     </p>
                   )}
                   {photoError && (
-                    <p className="text-xs text-rose-600 mt-2 font-semibold">
-                      ⚠️ {photoError}
+                    <p className="text-xs text-rose-700 mt-2 font-semibold">
+                      {photoError}
                     </p>
                   )}
                   {photoSizeKb > 0 && !photoError && !isUploadingPhoto && (
                     <p className="text-xs text-emerald-700 mt-2 font-semibold flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" />
-                      फोटो यशस्वीरित्या जोडला गेला (आकार: {photoSizeKb} KB)
+                      फोटो जोडला गेला (आकार: {photoSizeKb} KB)
                     </p>
                   )}
                 </div>
 
                 {/* Live Preview Box on the Right */}
                 <div className="shrink-0 flex flex-col items-center">
-                  <div className="w-32 h-40 bg-white border-2 border-[#d4af37] rounded-lg shadow-sm overflow-hidden flex items-center justify-center relative">
+                  <div className="w-32 h-40 bg-white border border-slate-300 rounded-md overflow-hidden flex items-center justify-center relative">
                     {photoDataUrl ? (
                       <img
                         src={photoDataUrl}
@@ -906,15 +933,15 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       />
                     ) : (
                       <div className="text-center p-2 text-slate-400">
-                        <ImageIcon className="w-8 h-8 mx-auto mb-1 opacity-50" />
-                        <span className="text-[10px] block leading-tight font-medium">
+                        <ImageIcon className="w-7 h-7 mx-auto mb-1 opacity-50" />
+                        <span className="text-[11px] block leading-tight font-medium">
                           पासपोर्ट फोटो पूर्वावलोकन
                         </span>
                       </div>
                     )}
                   </div>
-                  <span className="text-[10px] font-bold text-slate-600 mt-1.5 uppercase tracking-wider">
-                    फोटो पूर्वावलोकन (Preview)
+                  <span className="text-[11px] font-medium text-slate-600 mt-1.5">
+                    फोटो पूर्वावलोकन
                   </span>
                 </div>
               </div>
@@ -930,7 +957,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   value={salutation}
                   onChange={(e) => setSalutation(e.target.value)}
                   required
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 >
                   <option value="श्री">श्री</option>
                   <option value="सौ">सौ</option>
@@ -949,7 +976,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="उदा. अमोल राजेश पाटील"
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#df6b16] rounded-lg focus:outline-none transition-colors"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#193568] rounded-md focus:outline-none transition-colors"
                 />
               </div>
 
@@ -966,7 +993,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     setPhone(clean);
                   }}
                   placeholder="10 अंकी मोबाईल नंबर (उदा. 9822123456)"
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
               </div>
 
@@ -980,7 +1007,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="उदा. amol@gmail.com (आय-कार्ड ई-मेलवर मिळेल)"
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
                 <p className="text-[10.5px] text-slate-500 mt-1">
                   पेमेंट पूर्ण झाल्यावर आपले अधिकृत PDF आय-कार्ड थेट या ई-मेलवर पाठवले जाईल.
@@ -999,7 +1026,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     setCenterName('');
                   }}
                   required
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 >
                   <option value="">-- सध्या आपण कार्यरत असणारा जिल्हा निवडा --</option>
                   {MAHARASHTRA_DISTRICTS.map((d) => (
@@ -1019,7 +1046,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   onChange={(e) => setTaluka(e.target.value)}
                   required
                   disabled={!district}
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16] disabled:bg-slate-100 disabled:cursor-not-allowed font-medium text-[#172033]"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568] disabled:bg-slate-100 disabled:cursor-not-allowed font-medium text-[#172033]"
                 >
                   <option value="">{district ? '-- सध्या आपण कार्यरत असलेला तालुका निवडा --' : '-- आधी जिल्हा निवडा --'}</option>
                   {availableTalukas.map((t) => (
@@ -1032,10 +1059,9 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
               {/* तालुका निवडल्यास कार्यरत केंद्राचे नाव प्रविष्ट करण्याचा बॉक्स */}
               {taluka && (
-                <div className="sm:col-span-2 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-blue-50/80 p-4 rounded-xl border-2 border-[#193568]/30 space-y-1.5 transition-all shadow-2xs">
-                  <label className="font-bold text-[#193568] flex items-center gap-1.5 text-xs sm:text-sm">
-                    <span className="text-base">🏫</span>
-                    <span>कार्यरत केंद्राचे नाव लिहा <span className="text-[#df6b16]">*</span></span>
+                <div className="sm:col-span-2 bg-slate-50 p-4 rounded-md border border-slate-300 space-y-1.5">
+                  <label className="font-bold text-[#193568] block text-xs sm:text-sm">
+                    कार्यरत केंद्राचे नाव लिहा <span className="text-[#df6b16]">*</span>
                   </label>
                   <input
                     type="text"
@@ -1043,10 +1069,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     value={centerName}
                     onChange={(e) => setCenterName(e.target.value)}
                     placeholder="उदा. कें. शा. उंबर्डा बाजार / केंद्र - मालेगाव"
-                    className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#df6b16] rounded-lg focus:outline-none transition-colors text-xs font-bold text-[#193568] shadow-2xs"
+                    className="w-full p-2.5 bg-white border border-slate-300 focus:border-[#193568] rounded-md focus:outline-none text-xs font-semibold text-slate-900"
                   />
-                  <p className="text-[11px] text-slate-600 font-medium">
-                    सूचना: आपण ज्या बीट / शिक्षण केंद्रामध्ये कार्यरत आहात त्या केंद्राचे नाव मराठीत टाईप करा.
+                  <p className="text-[11px] text-slate-600">
+                    आपण ज्या बीट / शिक्षण केंद्रामध्ये कार्यरत आहात त्या केंद्राचे नाव मराठीत प्रविष्ट करा.
                   </p>
                 </div>
               )}
@@ -1061,7 +1087,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   value={familyMembers}
                   onChange={(e) => setFamilyMembers(e.target.value)}
                   placeholder="उदा. 4"
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
               </div>
 
@@ -1074,7 +1100,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   value={hobby}
                   onChange={(e) => setHobby(e.target.value)}
                   placeholder="उदा. वाचन, शैक्षणिक संशोधन, वृक्षारोपण, क्रीडा"
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#df6b16] rounded-lg focus:outline-none transition-colors"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#193568] rounded-md focus:outline-none transition-colors"
                 />
               </div>
 
@@ -1088,16 +1114,16 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="घर/फ्लॅट क्र., शाळा/कार्यालय, गाव/शहर, तालुका, जिल्हा व पिनकोड"
-                  className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#df6b16] rounded-lg focus:outline-none transition-colors"
+                  className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#193568] rounded-md focus:outline-none transition-colors"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 2: Educational & Professional Qualifications */}
-          <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs space-y-4">
-            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              2. शैक्षणिक व व्यावसायिक माहिती
+          <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 space-y-4">
+            <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#193568] pb-2.5 border-b border-slate-200">
+              २. शैक्षणिक व व्यावसायिक माहिती
             </h2>
 
             <div className="space-y-4 text-xs">
@@ -1111,7 +1137,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     value={education}
                     onChange={(e) => setEducation(e.target.value)}
                     required
-                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                   >
                     <option value="">शैक्षणिक पात्रता निवडा</option>
                     <option value="बारावी (12th)">बारावी (12th)</option>
@@ -1133,7 +1159,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     value={professionalQualification}
                     onChange={(e) => setProfessionalQualification(e.target.value)}
                     required
-                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                   >
                     <option value="">व्यावसायिक पात्रता निवडा</option>
                     {TEACHER_PROFESSIONAL_QUALIFICATIONS.map((qual) => (
@@ -1155,7 +1181,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     value={professional}
                     onChange={(e) => setProfessional(e.target.value)}
                     required
-                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
+                    className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                   >
                     <option value="">सध्याचे पद / संवर्ग निवडा</option>
                     {OFFICIAL_CADRES.map((cadre) => (
@@ -1169,97 +1195,77 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Membership Fee & Razorpay Payment Info */}
-          <div className="bg-white rounded-xl border-2 border-[#df6b16]/40 p-6 shadow-xs space-y-4">
-            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2 border-b border-[#dbe3ef]">
-              3. सदस्यत्व आणि वर्गणी फी तपशील (₹220)
+          {/* Section 3: Membership Fee & Consolidated Official Support Notice */}
+          <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 space-y-4">
+            <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#193568] pb-2.5 border-b border-slate-200">
+              ३. सदस्यत्व शुल्क तपशील व पेमेंट सूचना
             </h2>
 
-            <div className="bg-[#fff7f0] border-l-4 border-[#df6b16] p-4 sm:p-5 rounded-r-xl text-xs leading-relaxed text-[#102a43] space-y-3">
-              <p className="font-bold text-sm text-[#09243f]">
-                "महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" या संघटनेसाठी आजीवन सदस्यत्व आणि वार्षिक वर्गणीचे नियम खालीलप्रमाणे आहेत:
-              </p>
+            {/* Official Fee Structure Table */}
+            <div className="border border-slate-300 rounded-md overflow-hidden">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-100 text-[#193568] border-b border-slate-300">
+                  <tr>
+                    <th className="py-2.5 px-4 font-bold">शुल्काचा तपशील</th>
+                    <th className="py-2.5 px-4 font-bold text-right w-36">रक्कम (INR)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-800">
+                  <tr>
+                    <td className="py-2.5 px-4">आजीवन सदस्यत्व शुल्क (एकदाच देय)</td>
+                    <td className="py-2.5 px-4 text-right font-mono tabular-nums font-semibold">₹ 100.00</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4">वार्षिक वर्गणी (प्रति वर्ष)</td>
+                    <td className="py-2.5 px-4 text-right font-mono tabular-nums font-semibold">₹ 120.00</td>
+                  </tr>
+                  <tr className="bg-slate-50 font-bold text-[#193568]">
+                    <td className="py-2.5 px-4">एकूण ऑनलाईन देय रक्कम</td>
+                    <td className="py-2.5 px-4 text-right font-mono tabular-nums text-sm">₹ 220.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-              <div className="bg-white p-4 rounded-xl border border-amber-200 shadow-xs space-y-2">
-                <div className="font-bold text-sm text-[#851216] flex items-center gap-1.5">
-                  💰 सदस्यत्व आणि वर्गणी फी तपशील:
-                </div>
-                <ul className="space-y-1.5 text-xs text-slate-800 font-semibold pl-1">
-                  <li>• <strong>आजीवन सदस्यत्व:</strong> 100 रुपये (एकदाच भरायची फी).</li>
-                  <li>• <strong>वार्षिक वर्गणी:</strong> 120 रुपये (दरवर्षी भरायची वर्गणी).</li>
-                  <li>• <strong>एकूण ऑनलाईन देय रक्कम:</strong> ₹220 (दोनशे वीस रुपये).</li>
-                </ul>
+            <div className="bg-slate-50 border border-slate-200 rounded-md px-4 py-3 text-xs text-slate-700 leading-relaxed flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-[#193568] shrink-0 mt-0.5" />
+              <span>
+                अर्ज सबमिट केल्यानंतर सुरक्षित <strong>Razorpay Payment Window</strong> उघडेल. त्याद्वारे UPI (PhonePe / GPay / Paytm) किंवा डेबिट/क्रेडिट कार्डने ₹220 शुल्क भरता येईल.
+              </span>
+            </div>
+
+            {/* Single Consolidated Support & Instruction Notice (Nandanwar Sir cited ONLY ONCE) */}
+            <div className="bg-amber-50/70 border border-amber-300 rounded-md p-4 text-xs text-slate-800 space-y-2 leading-relaxed">
+              <div className="font-bold text-[#193568] flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-[#df6b16] shrink-0" />
+                <span>महत्त्वाची सूचना व पेमेंट साहाय्य</span>
               </div>
-
-              {/* Razorpay Online Payment Box */}
-              <div className="bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white p-4 sm:p-5 rounded-xl shadow-xs space-y-2 border border-[#efb24b]/40">
-                <div className="text-xs font-bold text-[#efb24b] uppercase tracking-wider flex items-center gap-1.5">
-                  💳 ऑनलाईन Razorpay पेमेंट सुविधा
-                </div>
-                <p className="text-xs text-slate-200 leading-relaxed">
-                  खालील अर्ज सबमिट बटणावर क्लिक केल्यास मूळ वेबसाईट बंद न होता थेट सुरक्षित <strong>Razorpay Payment Popup Window</strong> उघडेल. त्यात आपण UPI, GPay, PhonePe किंवा Card द्वारे <strong>₹220</strong> शुल्क भरू शकता.
-                </p>
-              </div>
-
-              {/* Payment Support Helpline Note & Important Member Instructions */}
-              <div className="bg-[#fff3cd] border border-amber-300 rounded-xl p-3.5 sm:p-4 text-xs text-[#7c5503] font-medium space-y-3 shadow-2xs">
-                <div className="flex items-center gap-2 font-bold text-[#664300]">
-                  <Phone className="w-4 h-4 text-[#df6b16] shrink-0" />
-                  <span>
-                    <strong>टीप:</strong> पेमेंट संबंधी काही अडचण उद्भवल्यास संपर्क: <strong>ज्ञानेश्वर नंदनवार - 8208494368</strong>
-                  </span>
-                </div>
-
-                <div className="bg-white/85 border border-amber-200 rounded-lg p-3 sm:p-3.5 space-y-2.5 text-slate-800 leading-relaxed">
-                  <div className="flex items-start gap-2">
-                    <span className="font-extrabold text-[#193568] shrink-0">१.</span>
-                    <p>
-                      सर्व सदस्यांना विनंती आहे की, आपले पेमेंट प्राप्त झाल्यानंतर आपले सदस्य आय-कार्ड जनरेट होण्यास <strong>५ मिनिटे</strong> वेळ लागू शकतो. ५ मिनिटांनंतर आपण वर दिलेल्या <strong>"अर्जाची स्थिती तपासा"</strong> मध्ये जाऊन आपले आय-कार्ड मिळवू शकता.
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <span className="font-extrabold text-[#193568] shrink-0">२.</span>
-                    <p>
-                      काही सदस्यांचा अर्ज जर पेमेंट पूर्ण न करता मंजूर झाला असेल आणि त्यांना आय-कार्ड मिळाले असेल, तर त्यांनी पेमेंट पूर्ण करण्यासाठी{' '}
-                      <strong>श्री. ज्ञानेश्वर नंदनवार सर</strong> (मोबाईल / WhatsApp:{' '}
-                      <a
-                        href="https://wa.me/919423484305"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono font-extrabold text-emerald-700 underline hover:text-emerald-900"
-                      >
-                        9423484305
-                      </a>{' '}
-                      / 8208494368) यांना संपर्क करावा.
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <span className="font-extrabold text-[#193568] shrink-0">३.</span>
-                    <p>
-                      जर आपले पेमेंट यशस्वी होऊनही आणि <strong>१० मिनिटांनंतरही</strong> आपला अर्ज मंजूर झालेला नसेल, तर <strong>श्री. ज्ञानेश्वर नंदनवार सर</strong>, WhatsApp मोबाईल क्रमांक{' '}
-                      <a
-                        href="https://wa.me/919423484305"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-mono font-extrabold text-emerald-700 underline hover:text-emerald-900"
-                      >
-                        9423484305
-                      </a>{' '}
-                      यांना पेमेंटचा स्क्रीनशॉट शेअर करावा. पेमेंट Confirm करून आपले सदस्यत्व तत्काळ मंजूर करण्यात येईल.
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <ol className="list-decimal pl-5 space-y-1.5 text-slate-700">
+                <li>
+                  पेमेंट पूर्ण झाल्यानंतर आपले अधिकृत PDF आय-कार्ड तयार होण्यास सुमारे <strong>५ मिनिटे</strong> लागू शकतात; त्यानंतर वरील <strong>"अर्जाची स्थिती तपासा"</strong> विभागातून आय-कार्ड डाऊनलोड करता येईल.
+                </li>
+                <li>
+                  पेमेंट कट होऊनही १० मिनिटांनंतर अर्ज मंजूर न झाल्यास अथवा पेमेंट पूर्ण करण्यासंदर्भात काही तांत्रिक अडचण असल्यास{' '}
+                  <strong>श्री. ज्ञानेश्वर नंदनवार सर</strong> (मोबाईल / WhatsApp:{' '}
+                  <a
+                    href="https://wa.me/919423484305"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono font-bold text-[#193568] underline hover:text-[#df6b16]"
+                  >
+                    9423484305
+                  </a>{' '}
+                  / <span className="font-mono font-bold text-[#193568]">8208494368</span>) यांना पेमेंटचा स्क्रीनशॉट शेअर करावा.
+                </li>
+              </ol>
             </div>
           </div>
 
           {/* Section 4: Mandatory Applicant Declaration */}
-          <div className={`rounded-xl border-2 p-5 shadow-xs transition-all ${
+          <div className={`rounded-md border p-4 sm:p-5 transition-colors ${
             declarationAccepted
               ? 'bg-emerald-50/40 border-emerald-400'
-              : 'bg-white border-[#df6b16]/50'
+              : 'bg-white border-slate-300'
           }`}>
             <label className="flex items-start gap-3 cursor-pointer select-none">
               <input
@@ -1269,29 +1275,28 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   setDeclarationAccepted(e.target.checked);
                   if (formAlert) setFormAlert('');
                 }}
-                className="w-5 h-5 mt-0.5 text-[#df6b16] rounded border-slate-300 focus:ring-[#df6b16] shrink-0 cursor-pointer"
+                className="w-4 h-4 mt-1 text-[#193568] rounded border-slate-400 focus:ring-[#193568] shrink-0 cursor-pointer"
               />
               <div className="text-xs text-slate-800 leading-relaxed">
-                <strong className="block text-sm text-[#09243f] font-serifDevanagari mb-1">
-                  सदस्यत्व स्वयंघोषणापत्र <span className="text-rose-600">*</span>
+                <strong className="block text-sm text-[#193568] font-serifDevanagari mb-1">
+                  ४. सदस्यत्व स्वयंघोषणापत्र <span className="text-rose-600">*</span>
                 </strong>
                 "मी याद्वारे घोषित करतो/करते की, मी शिक्षण विभागातील कार्यरत अधिकारी / केंद्रप्रमुख असून महासंघाच्या सदस्यत्वासाठी पात्र आहे. माझ्याद्वारे अर्जात भरलेली सर्व वैयक्तिक व कार्यालयीन माहिती पूर्णपणे सत्य आणि अचूक आहे. मी संघटनेचे नियम व उद्दिष्टे वाचली असून मला महासंघाच्या सर्व अटी व शर्ती पूर्णपणे मान्य आहेत."
               </div>
             </label>
           </div>
 
-          {/* Existing Pending Form Recovery Banner (if user re-entered same phone/email/name) */}
+          {/* Existing Pending Form Recovery Banner */}
           {existingPendingMatch && (
-            <div className="bg-amber-50 border-2 border-[#df6b16] rounded-xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="text-xs text-amber-950 space-y-1">
-                <div className="font-extrabold text-sm text-[#b34904] flex items-center gap-1.5">
+            <div className="bg-amber-50 border border-amber-400 rounded-md p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="text-xs text-slate-800 space-y-1">
+                <div className="font-bold text-sm text-[#193568] flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-[#df6b16] shrink-0" />
-                  <span>आपला फॉर्म यापूर्वीच भरलेला आहे! (नवीन फॉर्म भरण्याची गरज नाही)</span>
+                  <span>आपला अर्ज यापूर्वीच जतन आहे (नवीन फॉर्म भरण्याची आवश्यकता नाही)</span>
                 </div>
-                <p className="font-medium leading-relaxed">
-                  अर्जदार: <strong>{existingPendingMatch.app.salutation} {existingPendingMatch.app.fullName}</strong> | संदर्भ क्र.:{' '}
-                  <strong className="font-mono">{existingPendingMatch.app.applicationNumber}</strong> | मोबाईल: <strong>{existingPendingMatch.app.phone}</strong>.
-                  कृपया या जुन्या अर्जाचे ₹220 पेमेंट पूर्ण करा.
+                <p className="leading-relaxed">
+                  अर्जदार: <strong>{existingPendingMatch.app.salutation} {existingPendingMatch.app.fullName}</strong> · संदर्भ क्र.:{' '}
+                  <strong className="font-mono">{existingPendingMatch.app.applicationNumber}</strong> · मोबाईल: <strong>{existingPendingMatch.app.phone}</strong>. कृपया या अर्जाचे ₹220 पेमेंट पूर्ण करा.
                 </p>
               </div>
               <button
@@ -1300,96 +1305,96 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   setPendingApp(existingPendingMatch.app);
                   setShowPaymentModal(true);
                 }}
-                className="w-full sm:w-auto bg-[#193568] hover:bg-[#11254a] text-white font-bold px-5 py-3 rounded-lg text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                className="w-full sm:w-auto bg-[#193568] hover:bg-[#11254a] text-white font-semibold px-5 py-2.5 rounded-md text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 cursor-pointer"
               >
-                <span>💳</span>
+                <CreditCard className="w-4 h-4" />
                 <span>या अर्जाचे पेमेंट पूर्ण करा (₹220)</span>
               </button>
             </div>
           )}
 
           {/* Submit Button Section */}
-          <div className="bg-white rounded-xl border border-[#dbe3ef] p-6 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-[#63708a] max-w-md space-y-1.5">
+          <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="text-xs text-slate-600 max-w-md space-y-1.5">
               {formAlert && (
-                <div className="text-xs font-bold text-rose-700 bg-rose-50 p-2.5 rounded-lg border border-rose-200 flex items-center gap-1.5">
+                <div className="text-xs font-semibold text-rose-700 bg-rose-50 p-2.5 rounded-md border border-rose-200 flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{formAlert}</span>
                 </div>
               )}
               <p>
-                माहिती भरून घोषणापत्रावर टिक करा. खालील बटनावर क्लिक करताच अर्ज सुरक्षित जतन होईल आणि थेट सुरक्षित Razorpay पेमेंट विंडो उघडेल.
+                सर्व माहिती तपासून वरील घोषणापत्रावर टिक करा. अर्ज जतन केल्यानंतर सुरक्षित पेमेंट खिडकी उघडेल.
               </p>
             </div>
             <button
               type="submit"
               disabled={isSubmittingForm}
-              className="w-full sm:w-auto bg-gradient-to-r from-[#df6b16] to-[#b34f07] hover:from-[#c85c0e] hover:to-[#964004] disabled:opacity-65 text-white font-bold px-8 py-3.5 rounded-lg text-sm transition-all shadow-md flex items-center justify-center gap-2 active:scale-95 shrink-0 cursor-pointer"
+              className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-65 text-white font-semibold px-7 py-3 rounded-md text-sm transition-colors flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
               <UserCheck className="w-4 h-4" />
-              {isSubmittingForm ? 'अर्ज सुरक्षित जतन होत आहे...' : 'अर्ज जतन करा व पेमेंटकडे जा (Proceed to Pay ₹220)'}
+              <span>{isSubmittingForm ? 'अर्ज जतन होत आहे...' : 'अर्ज जतन करा व ₹220 पेमेंट करा'}</span>
             </button>
           </div>
         </form>
 
-        {/* Success Banner After Submission (Displayed at Bottom of Form) */}
+        {/* Success Banner After Submission */}
         {submittedApp && (
-          <div ref={submittedAppRef} className="mt-8 bg-gradient-to-r from-[#f0fdf4] via-[#f7fee7] to-[#ecfdf5] border-2 border-[#a7e5bd] text-[#14532d] rounded-2xl p-6 shadow-md transition-all">
-            <div className="flex items-start gap-3.5">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0 mt-0.5" />
+          <div ref={submittedAppRef} className="mt-8 bg-white border border-emerald-400 border-t-4 border-t-emerald-700 text-slate-800 rounded-md p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="w-7 h-7 text-emerald-700 shrink-0 mt-0.5" />
               <div className="space-y-3 flex-1">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/80 pb-2.5">
-                  <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-emerald-950">
-                    🎉 आपले सदस्यत्व मंजूर झाले आहे. आपण या महासंघाचे आता अधिकृत सदस्य आहात, अभिनंदन!
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568]">
+                    आपले आजीवन सदस्यत्व यशस्वीरित्या मंजूर झाले आहे
                   </h3>
-                  <span className="px-3 py-1 rounded-full bg-emerald-600 text-white font-bold text-xs shadow-2xs">
-                    ✓ मंजूर (Approved)
+                  <span className="px-2.5 py-1 rounded bg-emerald-700 text-white font-semibold text-xs">
+                    मंजूर (Approved)
                   </span>
                 </div>
 
-                <div className="bg-white p-4 rounded-xl border border-emerald-300 shadow-2xs space-y-2 text-xs">
+                <div className="bg-slate-50 p-4 rounded-md border border-slate-200 space-y-2.5 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <span className="text-slate-500 block text-[11px]">अधिकृत आजीवन सदस्य क्रमांक (Member ID):</span>
-                      <strong className="text-lg text-[#193568] font-serif tracking-wider font-extrabold">
+                      <span className="text-slate-500 block text-[11px]">अधिकृत आजीवन सदस्य क्रमांक:</span>
+                      <strong className="text-base text-[#193568] font-mono tabular-nums font-bold">
                         {submittedApp.memberNumber || 'MS/2026/MAHA/0001'}
                       </strong>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">अर्ज संदर्भ क्रमांक (Ref No):</span>
-                      <strong className="text-xs text-slate-800 font-mono bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      <span className="text-slate-500 block text-[11px]">अर्ज संदर्भ क्रमांक:</span>
+                      <strong className="text-xs text-slate-800 font-mono">
                         {submittedApp.applicationNumber}
                       </strong>
                     </div>
                   </div>
 
-                  <p className="text-xs text-emerald-900 font-medium pt-1">
-                    महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाशी जोडल्याबद्दल आपले मनःपूर्वक अभिनंदन! आपले अधिकृत आय-कार्ड तयार झाले आहे.
+                  <p className="text-xs text-slate-700">
+                    {ORG_DETAILS.name} मध्ये आपले स्वागत आहे. आपले अधिकृत सदस्यत्व ओळखपत्र (ID Card) डाऊनलोडसाठी तयार आहे.
                   </p>
 
                   {emailDeliveryStatus === 'sending' && (
-                    <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-blue-600 animate-pulse shrink-0" />
+                    <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 text-xs font-medium flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-blue-700 shrink-0" />
                       <span>आपले PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले जात आहे...</span>
                     </div>
                   )}
 
                   {emailDeliveryStatus === 'sent' && (
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>आपले अधिकृत PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर यशस्वीरीत्या पाठवले आहे! (कृपया Inbox / Spam तपासा.)</span>
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md px-3 py-2 text-xs font-medium flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
+                      <span>आपले अधिकृत PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले आहे (कृपया Inbox / Spam तपासा).</span>
                     </div>
                   )}
 
-                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                  <div className="pt-1 flex flex-wrap items-center gap-3">
                     <button
                       type="button"
                       onClick={() => handleDownloadApprovedCertificate(submittedApp)}
                       disabled={isDownloadingCert}
-                      className="bg-gradient-to-r from-[#df6b16] to-[#b34f07] hover:from-[#c85c0e] hover:to-[#964004] text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-xs px-5 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       <Download className={`w-4 h-4 ${isDownloadingCert ? 'animate-spin' : ''}`} />
-                      {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'आय-कार्ड डाऊनलोड करा (PDF ID Card)'}
+                      {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'अधिकृत आय-कार्ड डाऊनलोड (PDF)'}
                     </button>
 
                     <button
@@ -1398,7 +1403,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                         setSubmittedApp(null);
                         window.scrollTo({ top: 380, behavior: 'smooth' });
                       }}
-                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold px-4 py-2.5 rounded-lg transition-colors cursor-pointer"
+                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold px-4 py-2.5 rounded-md transition-colors cursor-pointer"
                     >
                       नवीन अर्ज भरा
                     </button>
@@ -1409,24 +1414,19 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           </div>
         )}
 
-        {/* Razorpay Online Payment Modal Popup (Strict Verification Required) */}
+        {/* Razorpay Online Payment Modal Popup (Standard Institutional Checkout) */}
         {showPaymentModal && pendingApp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-slate-900/80 backdrop-blur-xs animate-fadeIn">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[95vh] flex flex-col overflow-y-auto relative">
-              {/* Modal Header (Sticky) */}
-              <div className="sticky top-0 z-30 bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white px-4 sm:px-6 py-4 flex items-center justify-between shrink-0 border-b border-[#efb24b]/40 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#df6b16] flex items-center justify-center text-white font-bold text-base shadow-xs shrink-0">
-                    ₹
-                  </div>
-                  <div>
-                    <h3 className="font-serifDevanagari font-bold text-base sm:text-lg leading-tight text-white">
-                      सुरक्षित Razorpay ऑनलाईन पेमेंट — ₹220
-                    </h3>
-                    <p className="text-[11px] text-amber-200 font-medium mt-0.5">
-                      अर्जदार: {pendingApp.salutation} {pendingApp.fullName} | संदर्भ क्र.: {pendingApp.applicationNumber}
-                    </p>
-                  </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/75">
+            <div className="bg-white rounded-md shadow-xl border border-slate-300 w-full max-w-xl max-h-[95vh] flex flex-col overflow-y-auto relative">
+              {/* Modal Header */}
+              <div className="sticky top-0 z-30 bg-[#193568] text-white px-5 py-4 flex items-center justify-between shrink-0 border-b-2 border-[#efb24b]">
+                <div>
+                  <h3 className="font-serifDevanagari font-bold text-base sm:text-lg leading-tight text-white">
+                    अधिकृत सदस्यत्व शुल्क पेमेंट — ₹220
+                  </h3>
+                  <p className="text-[11px] text-slate-200 mt-0.5">
+                    {ORG_DETAILS.name}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -1434,22 +1434,23 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     setShowPaymentModal(false);
                     setPaymentStatusNotice('');
                   }}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-lg font-bold transition-colors shrink-0 cursor-pointer"
+                  className="px-2.5 py-1 rounded border border-white/25 hover:bg-white/10 text-white text-xs font-semibold transition-colors shrink-0 cursor-pointer"
                   title="बंद करा"
+                  aria-label="पेमेंट खिडकी बंद करा"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* Primary Verified Razorpay Checkout Section */}
-              <div className="p-5 sm:p-6 space-y-5">
+              {/* Checkout Summary & Payment Action */}
+              <div className="p-5 sm:p-6 space-y-4">
                 {razorpayError && (
-                  <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-xl flex items-center justify-between gap-2 font-semibold">
-                    <span>⚠️ {razorpayError}</span>
+                  <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-md flex items-center justify-between gap-2 font-medium">
+                    <span>{razorpayError}</span>
                     <button
                       type="button"
                       onClick={() => setRazorpayError('')}
-                      className="text-slate-500 hover:text-slate-800 font-bold"
+                      className="text-slate-600 hover:text-slate-900 font-bold"
                     >
                       ✕
                     </button>
@@ -1457,113 +1458,119 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 )}
 
                 {paymentStatusNotice && (
-                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-xl font-semibold leading-relaxed">
-                    ⏳ {paymentStatusNotice}
+                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-md font-medium leading-relaxed">
+                    {paymentStatusNotice}
                   </div>
                 )}
 
                 {existingPendingMatch && existingPendingMatch.app.id === pendingApp.id && (
-                  <div className="p-3.5 bg-amber-50 border-2 border-[#df6b16]/60 text-amber-950 text-xs rounded-xl font-semibold leading-relaxed">
-                    ℹ️ <strong>आपला फॉर्म यापूर्वीच भरलेला आहे!</strong> (नाव: {pendingApp.fullName}, संदर्भ क्र.:{' '}
-                    <span className="font-mono font-bold">{pendingApp.applicationNumber}</span>). नवीन फॉर्म न भरता खालील बटनावर क्लिक करून या अर्जाचे ₹220 पेमेंट पूर्ण करा.
+                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-md font-medium leading-relaxed">
+                    <strong>टीप:</strong> आपला अर्ज यापूर्वीच जतन केलेला आहे (संदर्भ क्र.: <span className="font-mono font-bold">{pendingApp.applicationNumber}</span>). नवीन फॉर्म न भरता या अर्जाचे ₹220 शुल्क पूर्ण करा.
                   </div>
                 )}
 
-                <div className="bg-gradient-to-br from-[#eef4ff] via-white to-[#f0fdf4] border-2 border-[#193568]/20 rounded-2xl p-5 text-center space-y-4 shadow-xs">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 text-[11px] font-bold">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>अर्ज जतन झाला आहे — आता सदस्यत्व सक्रिय करण्यासाठी पेमेंट पूर्ण करा</span>
+                {/* Order Summary Table */}
+                <div className="border border-slate-300 rounded-md overflow-hidden text-xs">
+                  <div className="bg-slate-100 px-4 py-2 border-b border-slate-300 font-bold text-[#193568]">
+                    अर्ज व देय रकमेचा तपशील
                   </div>
+                  <div className="divide-y divide-slate-200 bg-white">
+                    <div className="px-4 py-2 flex justify-between gap-2">
+                      <span className="text-slate-600">अर्जदाराचे नाव</span>
+                      <span className="font-bold text-slate-900 text-right">{pendingApp.salutation} {pendingApp.fullName}</span>
+                    </div>
+                    <div className="px-4 py-2 flex justify-between gap-2">
+                      <span className="text-slate-600">अर्ज संदर्भ क्रमांक</span>
+                      <span className="font-mono font-semibold text-slate-900">{pendingApp.applicationNumber}</span>
+                    </div>
+                    <div className="px-4 py-2 flex justify-between gap-2">
+                      <span className="text-slate-600">शुल्क विवरण (आजीवन ₹100 + वार्षिक ₹120)</span>
+                      <span className="font-mono tabular-nums font-bold text-[#193568] text-sm">₹ 220.00</span>
+                    </div>
+                  </div>
+                </div>
 
-                  <div>
-                    <p className="text-sm sm:text-base font-extrabold text-[#09243f] font-serifDevanagari">
-                      आजीवन सदस्यत्व ₹100 + वार्षिक वर्गणी ₹120 = एकूण ₹220
-                    </p>
-                    <p className="text-xs text-slate-600 mt-1">
-                      खालील निळ्या बटनावर क्लिक करून UPI (PhonePe / GPay / Paytm) किंवा Card द्वारे पेमेंट पूर्ण करा. पेमेंट पडताळणी होताच <strong>त्वरित</strong> आपले अधिकृत आय-कार्ड तयार होईल.
-                    </p>
-                  </div>
+                {/* Primary Verified Payment Button */}
+                <div className="bg-slate-50 border border-slate-200 rounded-md p-4 text-center space-y-3">
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    UPI (PhonePe / GPay / Paytm) किंवा कार्डद्वारे पेमेंट पूर्ण करा. पेमेंट पडताळणी होताच आपले अधिकृत आय-कार्ड तात्काळ तयार होईल.
+                  </p>
 
                   <button
                     type="button"
                     onClick={() => handleStartRazorpayCheckout(pendingApp)}
                     disabled={isRazorpayLoading}
-                    className="w-full sm:w-auto mx-auto px-7 py-3.5 bg-gradient-to-r from-[#193568] to-[#12284c] hover:from-[#11254a] hover:to-[#0a1833] text-white font-extrabold text-sm sm:text-base rounded-xl flex items-center justify-center gap-2.5 shadow-lg active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+                    className="w-full px-6 py-3 bg-[#193568] hover:bg-[#11254a] text-white font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
                   >
-                    <span>💳</span>
-                    <span>{isRazorpayLoading ? 'Razorpay पेमेंट खिडकी उघडत आहे...' : 'Razorpay ने सुरक्षित ₹220 भरा (तात्काळ आय-कार्ड)'}</span>
+                    <ShieldCheck className="w-4 h-4 text-[#efb24b]" />
+                    <span>{isRazorpayLoading ? 'Razorpay पेमेंट खिडकी उघडत आहे...' : 'Razorpay द्वारे सुरक्षित ₹220 भरा'}</span>
                   </button>
 
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    🔒 Razorpay कडून पेमेंटची अचूक खात्री (Verify) झाल्याशिवाय सदस्यत्व मंजूर होणार नाही.
+                  <p className="text-[11px] text-slate-500">
+                    अधिकृत पेमेंट पडताळणीनंतरच सदस्यत्व क्रमांक व आय-कार्ड जारी केले जाते.
                   </p>
                 </div>
 
                 {/* Secondary Direct Payment Page + Live Webhook Status Checker */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="text-xs text-slate-700 leading-relaxed">
-                      <strong className="text-[#09243f] block">जर पॉपअप खिडकी उघडत नसेल तर पर्यायी मार्ग:</strong>
-                      पर्यायी पेमेंट लिंकद्वारे पेमेंट केल्यास Razorpay Webhook द्वारे २–५ मिनिटांत अर्ज आपोआप मंजूर होईल. त्यानंतर खालील <em>"पेमेंट स्थिती तपासा"</em> बटनावर क्लिक करा.
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <a
-                        href={`https://rzp.io/rzp/Us7q4y7?name=${encodeURIComponent(pendingApp.fullName)}&email=${encodeURIComponent(pendingApp.email)}&phone=${encodeURIComponent(pendingApp.phone)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-400 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-2xs transition-colors"
-                      >
-                        <span>पर्यायी Razorpay लिंक</span>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        disabled={isCheckingPaymentStatus}
-                        onClick={async () => {
-                          if (!pendingApp) return;
-                          setIsCheckingPaymentStatus(true);
-                          setPaymentStatusNotice('');
-                          try {
-                            const remoteApp = onTrackRemote
-                              ? await onTrackRemote(pendingApp.id) || await onTrackRemote(pendingApp.phone)
-                              : null;
-                            if (remoteApp && remoteApp.status === 'approved' && remoteApp.paymentConfirmed) {
-                              await handleConfirmPaymentCompleted(pendingApp, {
-                                paymentId: remoteApp.paymentRef || remoteApp.razorpayPaymentId || 'webhook_verified',
-                                orderId: remoteApp.razorpayOrderId || '',
-                                approvedFromServer: remoteApp,
-                              });
-                            } else {
-                              setPaymentStatusNotice(
-                                'Razorpay कडून अद्याप पेमेंट कन्फर्मेशन प्राप्त झालेले नाही (स्थिती: Pending). कृपया वरील निळ्या बटनावरून पेमेंट पूर्ण करा; किंवा पैसे कट झाले असल्यास २–५ मिनिटांनंतर पुन्हा तपासा.'
-                              );
-                            }
-                          } finally {
-                            setIsCheckingPaymentStatus(false);
+                <div className="bg-white border border-slate-200 rounded-md p-3.5 space-y-2.5">
+                  <div className="text-xs text-slate-700 leading-relaxed">
+                    <strong className="text-[#193568] block mb-0.5">पॉपअप खिडकी न उघडल्यास पर्यायी सुविधा:</strong>
+                    पर्यायी लिंकवरून पेमेंट केल्यास २–५ मिनिटांत अर्ज आपोआप मंजूर होतो. त्यानंतर खालील <em>"पेमेंट स्थिती तपासा"</em> बटनावर क्लिक करा.
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a
+                      href={`https://rzp.io/rzp/Us7q4y7?name=${encodeURIComponent(pendingApp.fullName)}&email=${encodeURIComponent(pendingApp.email)}&phone=${encodeURIComponent(pendingApp.phone)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 font-semibold text-xs rounded-md flex items-center gap-1.5 transition-colors"
+                    >
+                      <span>पर्यायी Razorpay लिंक</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      disabled={isCheckingPaymentStatus}
+                      onClick={async () => {
+                        if (!pendingApp) return;
+                        setIsCheckingPaymentStatus(true);
+                        setPaymentStatusNotice('');
+                        try {
+                          const remoteApp = onTrackRemote
+                            ? await onTrackRemote(pendingApp.id) || await onTrackRemote(pendingApp.phone)
+                            : null;
+                          if (remoteApp && remoteApp.status === 'approved' && remoteApp.paymentConfirmed) {
+                            await handleConfirmPaymentCompleted(pendingApp, {
+                              paymentId: remoteApp.paymentRef || remoteApp.razorpayPaymentId || 'webhook_verified',
+                              orderId: remoteApp.razorpayOrderId || '',
+                              approvedFromServer: remoteApp,
+                            });
+                          } else {
+                            setPaymentStatusNotice(
+                              'Razorpay कडून अद्याप पेमेंट कन्फर्मेशन प्राप्त झालेले नाही (स्थिती: Pending). कृपया वरील बटनावरून पेमेंट पूर्ण करा; किंवा रक्कम कट झाली असल्यास २–५ मिनिटांनंतर पुन्हा तपासा.'
+                            );
                           }
-                        }}
-                        className="px-3.5 py-2 bg-[#df6b16] hover:bg-[#b34f07] disabled:opacity-60 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{isCheckingPaymentStatus ? 'तपासत आहे...' : 'पेमेंट स्थिती तपासा'}</span>
-                      </button>
-                    </div>
+                        } finally {
+                          setIsCheckingPaymentStatus(false);
+                        }
+                      }}
+                      className="px-3.5 py-2 bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-60 text-white font-semibold text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>{isCheckingPaymentStatus ? 'तपासत आहे...' : 'पेमेंट स्थिती तपासा'}</span>
+                    </button>
                   </div>
                 </div>
 
-                {/* Helpline Note */}
-                <div className="text-[#856404] font-semibold flex items-center justify-between flex-wrap gap-2 text-xs bg-amber-50 px-3.5 py-2.5 rounded-xl border border-amber-200">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-[#df6b16] shrink-0" />
-                    <span>पेमेंट कट होऊनही ५-१० मिनिटांत मंजूर न झाल्यास WhatsApp करा: <strong>ज्ञानेश्वर नंदनवार — 9423484305</strong> (अथवा कॉल: 8208494368)</span>
-                  </div>
+                {/* Clean Modal Footer */}
+                <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-600 pt-2 border-t border-slate-200">
+                  <span>तांत्रिक मदतीसाठी मुख्य पानावरील पेमेंट साहाय्य कक्षाशी संपर्क साधावा.</span>
                   <button
                     type="button"
                     onClick={() => {
                       setShowPaymentModal(false);
                       setPaymentStatusNotice('');
                     }}
-                    className="px-3 py-1 bg-white border border-amber-300 hover:bg-amber-100 text-slate-700 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                    className="px-3 py-1.5 bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded transition-colors cursor-pointer"
                   >
                     बंद करा
                   </button>

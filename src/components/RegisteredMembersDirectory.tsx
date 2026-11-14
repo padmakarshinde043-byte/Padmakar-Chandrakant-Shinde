@@ -211,37 +211,36 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
   }, [allRegisteredMembers, selectedDistrict, selectedTaluka, searchTerm]);
 
   return (
-    <div className="bg-white rounded-2xl border-2 border-[#193568]/20 shadow-sm overflow-hidden mb-8 transition-all">
-      {/* Header Bar */}
-      <div className="bg-gradient-to-r from-[#193568] via-[#1f3f78] to-[#12284c] text-white p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#efb24b]/40">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#df6b16] text-white flex items-center justify-center shadow-xs shrink-0">
-            <Users className="w-5 h-5" />
-          </div>
+    <div className="bg-white rounded-md border border-slate-300 overflow-hidden mb-8">
+      {/* Institutional Header Bar */}
+      <div className="bg-[#193568] text-white px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b-2 border-[#efb24b]">
+        <div className="flex items-center gap-2.5">
+          <Users className="w-5 h-5 text-[#efb24b] shrink-0" />
           <div>
-            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white">
+            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-snug">
               नोंदणीकृत अधिकृत सदस्य यादी
             </h2>
           </div>
         </div>
 
-        {/* Total Count Badge & Manual Live Refresh */}
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
-          <div className="bg-white/10 backdrop-blur-xs px-3.5 py-1.5 rounded-xl border border-white/20 text-xs font-semibold flex items-center gap-2">
-            <span className="text-slate-200">एकूण मंजूर सदस्य:</span>
-            <span className="bg-[#efb24b] text-[#102a43] font-bold font-mono px-2 py-0.5 rounded-md text-xs">
+        {/* Total Count Metadata & Manual Refresh */}
+        <div className="flex items-center gap-3 self-start md:self-auto text-xs">
+          <div className="text-slate-100 font-medium tabular-nums">
+            एकूण मंजूर सदस्य:{' '}
+            <strong className="text-[#efb24b] font-mono text-sm font-bold">
               {allRegisteredMembers.length}
-            </span>
+            </strong>
           </div>
+          <span className="text-white/30" aria-hidden="true">|</span>
           <button
             type="button"
             onClick={handleManualRefresh}
             disabled={isRefreshing}
-            title="एडमिन पॅनेल मधील ताजी मंजूर आकडेवारी लोड करा"
-            className="bg-[#df6b16] hover:bg-[#c85a0d] active:scale-95 transition-all text-white px-3 py-1.5 rounded-xl border border-orange-300/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-60"
+            title="ताजी मंजूर आकडेवारी लोड करा"
+            className="bg-white/10 hover:bg-white/20 transition-colors text-white px-3 py-1.5 rounded border border-white/25 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? 'रिफ्रेश होत आहे...' : 'रिअल-टाईम रिफ्रेश'}</span>
+            <span>{isRefreshing ? 'अद्ययावत होत आहे...' : 'यादी ताजी करा'}</span>
           </button>
         </div>
       </div>
@@ -256,13 +255,14 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
             placeholder="सदस्य नाव, सदस्य क्र. किंवा तालुक्याने शोधा..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-xs pl-9 pr-8 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] transition-colors"
+            className="w-full text-xs pl-9 pr-8 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] transition-colors"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
+              aria-label="शोध रिकामा करा"
             >
               ✕
             </button>
@@ -280,7 +280,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
                 setSelectedDistrict(e.target.value);
                 setSelectedTaluka('');
               }}
-              className="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] appearance-none cursor-pointer"
+              className="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] appearance-none cursor-pointer"
             >
               <option value="">सर्व जिल्हे ({allRegisteredMembers.length})</option>
               {MAHARASHTRA_DISTRICTS.map((d) => (
@@ -298,7 +298,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               value={selectedTaluka}
               disabled={!selectedDistrict}
               onChange={(e) => setSelectedTaluka(e.target.value)}
-              className={`w-full text-xs pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:border-[#df6b16] appearance-none transition-colors ${
+              className={`w-full text-xs pl-8 pr-3 py-2 border rounded focus:outline-none focus:border-[#193568] appearance-none transition-colors ${
                 selectedDistrict
                   ? 'bg-white border-slate-300 text-slate-800 cursor-pointer'
                   : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
@@ -318,123 +318,111 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
       </div>
 
       {/* Visible Vertical & Horizontal Scrollbars, Smooth 2D Touch-Scroll on Mobile */}
-      <div
-        tabIndex={0}
-        aria-label="नोंदणीकृत सदस्य यादी उभी व आडवी स्क्रोल करा"
-        className="max-h-[440px] overflow-x-scroll overflow-y-scroll relative bg-white focus:outline-none focus:ring-1 focus:ring-[#df6b16]/30 touch-auto"
-        style={{
-          scrollbarGutter: 'stable',
-          touchAction: 'pan-x pan-y',
-          WebkitOverflowScrolling: 'touch'
-        }}
-      >
-        <table className="w-full text-left border-collapse min-w-[680px]">
-          {/* Sticky Header */}
-          <thead className="sticky top-0 z-10 bg-[#193568] text-white shadow-xs">
-            <tr className="border-b border-[#efb24b]/40 text-xs uppercase tracking-wider font-bold">
-              <th scope="col" className="py-3 px-3 text-center w-16 bg-[#193568]">
-                अनु. क्र.
-              </th>
-              <th scope="col" className="py-3 px-4 w-44 bg-[#193568]">
-                सदस्य क्रमांक
-              </th>
-              <th scope="col" className="py-3 px-4 bg-[#193568]">
-                सदस्य नाव
-              </th>
-              <th scope="col" className="py-3 px-3 w-32 bg-[#193568]">
-                तालुका
-              </th>
-              <th scope="col" className="py-3 px-4 w-36 bg-[#193568]">
-                जिल्हा
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-xs text-slate-800">
-            {filteredMembers.length > 0 ? (
-              filteredMembers.map((member, idx) => (
+      {filteredMembers.length > 0 ? (
+        <div
+          tabIndex={0}
+          aria-label="नोंदणीकृत सदस्य यादी उभी व आडवी स्क्रोल करा"
+          className="max-h-[440px] overflow-x-scroll overflow-y-scroll relative bg-white focus:outline-none focus:ring-1 focus:ring-[#193568]/30 touch-auto"
+          style={{
+            scrollbarGutter: 'stable',
+            touchAction: 'pan-x pan-y',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          <table className="w-full text-left border-collapse min-w-[680px]">
+            {/* Sticky Header */}
+            <thead className="sticky top-0 z-10 bg-slate-100 text-[#193568] border-b border-slate-300">
+              <tr className="text-xs font-bold">
+                <th scope="col" className="py-2.5 px-3 text-center w-16 bg-slate-100 border-r border-slate-200">
+                  अनु. क्र.
+                </th>
+                <th scope="col" className="py-2.5 px-4 w-44 bg-slate-100 border-r border-slate-200">
+                  सदस्य क्रमांक
+                </th>
+                <th scope="col" className="py-2.5 px-4 bg-slate-100 border-r border-slate-200">
+                  सदस्य नाव व पद
+                </th>
+                <th scope="col" className="py-2.5 px-3 w-36 bg-slate-100 border-r border-slate-200">
+                  तालुका / केंद्र
+                </th>
+                <th scope="col" className="py-2.5 px-4 w-36 bg-slate-100">
+                  जिल्हा
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 text-xs text-slate-800">
+              {filteredMembers.map((member, idx) => (
                 <tr
                   key={member.id || member.memberNumber}
-                  className={`transition-colors hover:bg-amber-50/60 ${
-                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
+                  className={`transition-colors hover:bg-slate-50 ${
+                    idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
                   }`}
                 >
-                  {/* Column 1: अनु. क्रमांक (1 पासून पुढे) */}
-                  <td className="py-2.5 px-3 text-center font-bold text-slate-700">
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 text-[#193568] font-mono text-xs border border-slate-200">
-                      {member.srNo}
-                    </span>
+                  {/* Column 1: अनु. क्रमांक */}
+                  <td className="py-2.5 px-3 text-center font-mono tabular-nums font-semibold text-slate-600 border-r border-slate-100">
+                    {member.srNo}
                   </td>
 
                   {/* Column 2: सदस्य क्रमांक */}
-                  <td className="py-2.5 px-4 font-mono font-bold text-[#193568]">
-                    <span className="bg-blue-50/80 text-[#193568] px-2.5 py-1 rounded-md border border-blue-200/70 inline-block tracking-tight text-[11px] sm:text-xs">
-                      {member.memberNumber}
-                    </span>
+                  <td className="py-2.5 px-4 font-mono tabular-nums font-bold text-[#193568] border-r border-slate-100">
+                    {member.memberNumber}
                   </td>
 
-                  {/* Column 3: सदस्य नाव व पद (स्टार विरहित) */}
-                  <td className="py-2.5 px-4 font-medium text-slate-900">
+                  {/* Column 3: सदस्य नाव व पद */}
+                  <td className="py-2.5 px-4 font-medium text-slate-900 border-r border-slate-100">
                     <div className="font-serifDevanagari font-bold text-[13px] text-slate-900 leading-tight">
                       {member.fullName}
                     </div>
                     {member.designation && (
-                      <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">
+                      <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
                         {member.designation}
                       </span>
                     )}
                   </td>
 
                   {/* Column 4: तालुका व केंद्र */}
-                  <td className="py-2.5 px-3 text-slate-700">
-                    <span className="inline-flex items-center gap-1 font-semibold text-slate-800">
-                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>{member.taluka || '-'}</span>
+                  <td className="py-2.5 px-3 text-slate-700 border-r border-slate-100">
+                    <span className="font-semibold text-slate-800">
+                      {member.taluka || '-'}
                     </span>
                     {member.centerName && (
-                      <span className="text-[10px] text-indigo-700 font-bold block mt-0.5">
-                        केंद्राचे नाव: {member.centerName}
+                      <span className="text-[11px] text-slate-600 block mt-0.5">
+                        केंद्र: {member.centerName}
                       </span>
                     )}
                   </td>
 
                   {/* Column 5: जिल्हा */}
-                  <td className="py-2.5 px-4 font-semibold text-slate-800">
-                    <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[11px] font-bold text-slate-700">
-                      {member.district || '-'}
-                    </span>
+                  <td className="py-2.5 px-4 font-medium text-slate-800">
+                    {member.district || '-'}
                   </td>
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} className="py-12 text-center text-slate-500 text-xs">
-                  <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="font-bold text-slate-700 text-sm">
-                    {searchTerm || selectedDistrict || selectedTaluka
-                      ? 'शोध निकषांनुसार कोणताही सदस्य आढळला नाही'
-                      : 'नोंदणीकृत सदस्य यादी तपासली जात आहे...'}
-                  </p>
-                  <p className="text-slate-500 mt-1 max-w-sm mx-auto">
-                    {searchTerm || selectedDistrict || selectedTaluka
-                      ? 'कृपया शोध शब्द, जिल्हा किंवा तालुका फिल्टर बदलून पुन्हा प्रयत्न करा.'
-                      : 'कृपया अर्जाची स्थिती तपासा किंवा काही वेळाने पुन्हा पहा.'}
-                  </p>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Frame Footer with User Guidance */}
-      <div className="bg-slate-100/80 px-4 py-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-600">
-        <div className="flex items-center gap-1.5 font-medium text-[#193568]">
-          <span className="text-base">👆</span>
-          <span>
-            <strong>उजव्या व खालच्या स्क्रोल बारने</strong> किंवा <strong>मोबाईलवर बोटाने वर-खाली व डावी-उजवी सरकवून</strong> संपूर्ण माहिती पाहता येईल.
-          </span>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <div className="font-semibold text-slate-500 shrink-0">
+      ) : (
+        <div className="py-12 px-4 text-center text-slate-500 text-xs bg-white">
+          <Users className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+          <p className="font-bold text-slate-700 text-sm">
+            {searchTerm || selectedDistrict || selectedTaluka
+              ? 'शोध निकषांनुसार कोणताही सदस्य आढळला नाही'
+              : 'नोंदणीकृत सदस्य यादी तपासली जात आहे...'}
+          </p>
+          <p className="text-slate-500 mt-1 max-w-sm mx-auto">
+            {searchTerm || selectedDistrict || selectedTaluka
+              ? 'कृपया शोध शब्द, जिल्हा किंवा तालुका फिल्टर बदलून पुन्हा प्रयत्न करा.'
+              : 'कृपया अर्जाची स्थिती तपासा किंवा काही वेळाने पुन्हा पहा.'}
+          </p>
+        </div>
+      )}
+
+      {/* Frame Footer with Clean Guidance */}
+      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-600">
+        <div className="font-medium text-slate-600">
+          टीप: उभी व आडवी स्क्रोल बार वापरून (किंवा मोबाईलवर स्क्रीन डावी-उजवी सरकवून) संपूर्ण तपशील पाहता येईल.
+        </div>
+        <div className="font-semibold text-slate-700 tabular-nums shrink-0">
           दाखवले: <strong>{filteredMembers.length}</strong> / एकूण मंजूर: <strong>{allRegisteredMembers.length}</strong>
         </div>
       </div>
