@@ -28,6 +28,21 @@ import { OfficialMember, formatAppointedPostWithTaluka } from '../data/rkMaharas
 import { MembershipApplication, formatSequentialMemberNumber } from '../data/mahasanghData';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { resolveImageUrlForPdf } from '../utils/cloudinary';
+import {
+  A4_PX_WIDTH,
+  A4_PX_HEIGHT,
+  A4_MM_WIDTH,
+  A4_MM_HEIGHT,
+  REPORT_FONT_FAMILY,
+  ReportColumn,
+  buildReportPageHeaderHtml,
+  buildTableHeaderHtml,
+  buildTableRowHtml,
+  buildSignatureBlockHtml,
+  buildSingleTablePageHtml,
+  buildSingleAppointmentLetterHtml,
+  packMeasuredRowsIntoPages,
+} from '../utils/pdfReportLayout';
 
 let cachedHedingBase64: string | null = null;
 let cachedSignBase64: string | null = null;
@@ -132,9 +147,203 @@ function getWorkingPlaceDisplay(m: OfficialMember): { cadre: string; details: st
   return { cadre, details: wPlace };
 }
 
+const DEFAULT_ORG_TITLE = 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ';
+
+async function waitForFontsAndImages(root: HTMLElement): Promise<void> {
+  if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+    try {
+      await (document as any).fonts.ready;
+    } catch {
+      // Ignore font readiness fallback
+    }
+  }
+  const imgs = Array.from(root.querySelectorAll('img'));
+  if (imgs.length > 0) {
+    await Promise.all(
+      imgs.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        if (typeof img.decode === 'function') {
+          return img.decode().catch(() => undefined);
+        }
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      })
+    );
+  }
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+/**
+ * Unified, ultra-fast A4 Paginated Report Renderer:
+ * - Single-pass synchronous DOM height measurement packs every A4 page cleanly (~95% fill)
+ * - Strictly single font ('Noto Sans Devanagari', tabular-nums) & crisp B&W print table styling
+ * - Zero bottom-touching Devanagari vowel signs (ु/ू/ृ in "पुणे" etc.)
+ * - Zero gradients, zero star emojis, zero promotional footers
+ */
+async function renderStandardPaginatedTablePdf(params: {
+  orgTitle?: string;
+  reportTitle: string;
+  leftMeta: string;
+  rightMeta: string;
+  columns: ReportColumn[];
+  rowsCells: Array<Array<{ text: string; bold?: boolean }>>;
+  fileName: string;
+  letterheadUrl?: string;
+  signUrl?: string;
+  summaryCells?: Array<{ text: string; bold?: boolean }>;
+  dense?: boolean;
+  onProgress?: (status: string) => void;
+}): Promise<void> {
+  const {
+    orgTitle = DEFAULT_ORG_TITLE,
+    reportTitle,
+    leftMeta,
+    rightMeta,
+    columns,
+    rowsCells,
+    fileName,
+    letterheadUrl,
+    signUrl,
+    summaryCells,
+    dense = false,
+    onProgress,
+  } = params;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '-9999px';
+  wrapper.style.top = '0';
+  wrapper.style.width = `${A4_PX_WIDTH}px`;
+  wrapper.style.background = '#ffffff';
+  wrapper.style.zIndex = '999999';
+  document.body.appendChild(wrapper);
+
+  try {
+    const allRowsHtml = rowsCells.map((cells, idx) =>
+      buildTableRowHtml(cells, columns, { rowIndex: idx, dense })
+    );
+    const summaryRowHtml = summaryCells
+      ? buildTableRowHtml(summaryCells, columns, { dense, isSummary: true })
+      : '';
+    const signatureHtml = signUrl ? buildSignatureBlockHtml(signUrl) : '';
+
+    // 1. Single-pass synchronous height measurement for exact A4 packing
+    const theadHtml = buildTableHeaderHtml(columns, dense);
+    const firstHeaderHtml = buildReportPageHeaderHtml({
+      orgTitle,
+      reportTitle,
+      leftMeta,
+      rightMeta,
+      pageNumber: 1,
+      totalPages: 2,
+      letterheadUrl,
+    });
+    const contHeaderHtml = buildReportPageHeaderHtml({
+      orgTitle,
+      reportTitle,
+      leftMeta,
+      rightMeta,
+      pageNumber: 2,
+      totalPages: 2,
+    });
+
+    wrapper.innerHTML = `
+      <div style="width: ${A4_PX_WIDTH}px; padding: 22px 26px; box-sizing: border-box; font-family: ${REPORT_FONT_FAMILY};">
+        <div data-m="firstHead">${firstHeaderHtml}${theadHtml}</div>
+        <div data-m="contHead">${contHeaderHtml}${theadHtml}</div>
+        <div data-m="rows" style="width: 100%; border: 1.5px solid #0f172a; border-bottom: none; box-sizing: border-box;">
+          ${allRowsHtml.join('')}
+        </div>
+        <div data-m="trailing" style="width: 100%; box-sizing: border-box;">
+          ${summaryRowHtml ? `<div style="border: 1.5px solid #0f172a; border-top: none;">${summaryRowHtml}</div>` : ''}
+          ${signatureHtml}
+        </div>
+      </div>
+    `;
+
+    await waitForFontsAndImages(wrapper);
+
+    const firstHeadH = wrapper.querySelector('[data-m="firstHead"]')?.getBoundingClientRect().height || 130;
+    const contHeadH = wrapper.querySelector('[data-m="contHead"]')?.getBoundingClientRect().height || 110;
+    const trailingH = wrapper.querySelector('[data-m="trailing"]')?.getBoundingClientRect().height || 0;
+    const rowElements = Array.from(wrapper.querySelectorAll('[data-m="rows"] .pdf-measure-row'));
+    const rowHeights = rowElements.map((el) => Math.ceil(el.getBoundingClientRect().height));
+
+    // Inner A4 height after top+bottom 22px padding = 1123 - 44 = 1079px; subtract 6px for outer border safety
+    const USABLE_PAGE_HEIGHT = A4_PX_HEIGHT - 50;
+    const pagesIndices = packMeasuredRowsIntoPages({
+      rowHeights,
+      firstPageAvailableHeight: Math.max(120, USABLE_PAGE_HEIGHT - Math.ceil(firstHeadH)),
+      continuationPageAvailableHeight: Math.max(120, USABLE_PAGE_HEIGHT - Math.ceil(contHeadH)),
+      trailingReserveHeight: trailingH > 0 ? Math.ceil(trailingH) + 8 : 0,
+    });
+
+    const totalPages = pagesIndices.length;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+
+    for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+      if (onProgress) {
+        onProgress(
+          totalPages > 1
+            ? `पान ${toEnglishDigits(pIdx + 1)} / ${toEnglishDigits(totalPages)} तयार होत आहे...`
+            : 'PDF तयार होत आहे...'
+        );
+      }
+
+      const isLast = pIdx === totalPages - 1;
+      const pageRowsHtml = pagesIndices[pIdx].map((rIdx) => allRowsHtml[rIdx]);
+
+      wrapper.innerHTML = buildSingleTablePageHtml({
+        orgTitle,
+        reportTitle,
+        leftMeta,
+        rightMeta,
+        pageNumber: pIdx + 1,
+        totalPages,
+        columns,
+        pageRowsHtml,
+        letterheadUrl: pIdx === 0 ? letterheadUrl : undefined,
+        summaryRowHtml: isLast ? summaryRowHtml : '',
+        signatureHtml: isLast ? signatureHtml : '',
+        dense,
+      });
+
+      await waitForFontsAndImages(wrapper);
+
+      const pageEl = wrapper.firstElementChild as HTMLElement;
+      const canvas = await html2canvas(pageEl, {
+        scale: 1.5,
+        useCORS: false,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        width: A4_PX_WIDTH,
+        height: A4_PX_HEIGHT,
+        windowWidth: A4_PX_WIDTH,
+        windowHeight: A4_PX_HEIGHT,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.86);
+      if (pIdx > 0) pdf.addPage('a4', 'portrait');
+      pdf.addImage(imgData, 'JPEG', 0, 0, A4_MM_WIDTH, A4_MM_HEIGHT, undefined, 'FAST');
+    }
+
+    if (onProgress) onProgress('PDF फाईल डाऊनलोड होत आहे...');
+    pdf.save(fileName);
+  } finally {
+    document.body.removeChild(wrapper);
+  }
+}
+
 /**
  * 1. Single Member Official A4 Appointment Letter PDF
- * Premium 300 DPI razor-sharp print quality (~800 KB - 1.2 MB)
+ * Clean institutional A4 layout with uniform Devanagari typography (zero gradients, zero star emojis)
  */
 export async function generateSingleLetterPdf(
   member: OfficialMember,
@@ -142,9 +351,6 @@ export async function generateSingleLetterPdf(
 ): Promise<void> {
   const serialPadded = String(serialNo).padStart(2, '0');
   const todayStr = getTodayFormattedDate();
-  const fullName = `${member.salutation} ${member.firstName} ${member.middleName ? member.middleName + ' ' : ''}${member.lastName}`;
-  const wp = getWorkingPlaceDisplay(member);
-  const displayPost = getDisplayPost(member);
 
   const [hedingUrl, signUrl] = await Promise.all([getHedingDataUrl(), getSignDataUrl()]);
 
@@ -152,98 +358,26 @@ export async function generateSingleLetterPdf(
   wrapper.style.position = 'fixed';
   wrapper.style.left = '-9999px';
   wrapper.style.top = '0';
-  wrapper.style.width = '794px';
-  wrapper.style.height = '1123px';
+  wrapper.style.width = `${A4_PX_WIDTH}px`;
+  wrapper.style.height = `${A4_PX_HEIGHT}px`;
   wrapper.style.background = '#ffffff';
   wrapper.style.zIndex = '999999';
   wrapper.style.overflow = 'hidden';
 
-  const letterHtml = `
-    <div style="width: 794px; height: 1123px; padding: 22px 36px 20px 36px; background: #ffffff; color: #1e293b; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-      <div>
-        <!-- टॉप हेडर बॅनर कार्ड -->
-        <div style="background: linear-gradient(180deg, #fffcf5 0%, #faecd0 50%, #fbf3e0 100%); border-radius: 8px; padding: 6px 12px; border: 1.5px solid #d4af37; box-shadow: 0 2px 6px rgba(0,0,0,0.06); text-align: center; margin-bottom: 12px;">
-          <img src="${hedingUrl}" alt="लेटरपॅड" style="width: 100%; height: auto; max-height: 165px; object-fit: contain; display: block; margin: 0 auto;">
-        </div>
-
-        <!-- जावक व दिनांक पट्टी -->
-        <div style="display: flex; justify-content: space-between; font-size: 11.5pt; font-weight: 800; padding-bottom: 4px; border-bottom: 1.5px dashed #851216; margin-bottom: 12px; color: #000;">
-          <div><strong>नियुक्ती पत्र क्र.:</strong> <span style="font-family: monospace; color: #851216;">MS/2026/${serialPadded}</span></div>
-          <div><strong>दिनांक:</strong> <span>${todayStr}</span></div>
-        </div>
-
-        <!-- अधिकृत नियुक्ती पत्र चॉकलेटी बॉक्स (तंतोतंत मध्यभागी) -->
-        <div style="display: flex; justify-content: center; align-items: center; text-align: center; margin-bottom: 12px;">
-          <span style="background: linear-gradient(135deg, #851216, #991b1b); color: #ffffff; padding: 6px 36px 8px 36px; font-size: 14pt; font-weight: 800; border-radius: 25px; border: 1.5px solid #d4af37; display: inline-flex; align-items: center; justify-content: center; line-height: 1.2;">
-            ॥ अधिकृत नियुक्ती पत्र ॥
-          </span>
-        </div>
-
-        <!-- प्रति (Recipient) -->
-        <div style="font-size: 12pt; line-height: 1.5; margin-bottom: 10px;">
-          प्रति,<br>
-          <span style="font-size: 15pt; font-weight: 900; color: #0b1e33;">मा. ${fullName}</span><br>
-          <span style="color: #475569;">(${wp.cadre}${wp.details ? ', ' + wp.details : ''}, जिल्हा - ${member.district})</span>
-        </div>
-
-        <!-- विषय -->
-        <div style="font-size: 12.5pt; font-weight: 800; color: #0f172a; margin-bottom: 10px;">
-          विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...
-        </div>
-
-        <!-- मुख्य मजकूर (ओळीतील अंतर वाढवले) -->
-        <div style="font-size: 12pt; font-weight: 500; line-height: 1.7; text-align: justify; color: #111;">
-          <p style="font-weight: 700; margin-bottom: 6px;">सस्नेह नमस्कार,</p>
-          <p style="margin-bottom: 8px; text-indent: 20px;">
-            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ हा राज्यातील शिक्षण क्षेत्राच्या रुपांतरणासाठी झटणाऱ्या केंद्रप्रमुख व विस्तार अधिकारी संघटनांच्या हक्कासाठी, व्यावसायिक स्वाभिमानासाठी आणि गुणवत्तापूर्ण शिक्षणासाठी कटिबद्ध असलेली अग्रगण्य संघटना आहे. महासंघाच्या सर्व सदस्यांच्या उत्स्फूर्त प्रतिसादानुसार आणि जिल्हा सभेत निवड प्रक्रियेत लोकशाहीच्या मूल्यांचा आदर करत सर्वानुमते हा निर्णय घेण्यात आला आहे.
-          </p>
-          <p style="margin-bottom: 8px; text-indent: 20px;">
-            आपला प्रदीर्घ आणि निष्कलंक सेवाप्रवास, शाळा-शिक्षणाविषयी असलेली तळमळ, उत्कृष्ट प्रशासकीय समन्वय आणि संघटनकौशल्यावरील आपली अढळ निष्ठा आम्ही अत्यंत जवळून अनुभवली आहे. सहकाऱ्यांच्या अडीअडचणीत धावून जाण्याची आपली वृत्ती आणि नेतृत्वगुणांची सार्थ दखल घेत, सर्व सदस्यांच्या बहुमताने व राज्य कार्यकारिणीच्या निर्णयानुसार आपणास—
-          </p>
-        </div>
-
-        <!-- बहाल पद गोल्डन कॉलआउट -->
-        <div style="padding: 10px 0; text-align: center; margin: 10px 0; border: 1.5px solid #d4af37; background: #fffdf7; border-radius: 8px;">
-          <div style="font-size: 11.5pt; color: #334155; font-weight: 700;">
-            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या <strong style="color: #000;">${member.district}</strong> जिल्हा कार्यकारिणीवर
-          </div>
-          <div style="font-size: 20.5pt; font-weight: 800; color: #851216; margin: 3px 0;">
-            ⭐ « ${displayPost} » ⭐
-          </div>
-          <div style="font-size: 11.5pt; color: #851216; font-weight: 700;">
-            या अत्यंत सन्मानाच्या व जबाबदारीच्या पदावर गौरवपूर्ण नियुक्ती करण्यात येत आहे.
-          </div>
-        </div>
-
-        <!-- अभिनंदन व जबाबदारी -->
-        <div style="font-size: 12pt; font-weight: 500; line-height: 1.7; text-align: justify; color: #111;">
-          <p style="margin: 0; text-indent: 20px;">
-            हे पद केवळ सन्मानाचे प्रतीक नसून महासंघाच्या पवित्र विचारांचे धोरण आहे. केंद्रप्रमुख व विस्तार अधिकारी संवर्गाचे न्याय प्रश्न सोडवणे, आत्मसन्मान जपणे आणि सर्व सहकाऱ्यांच्या पाठीशी खंबीरपणे उभे राहणे हीच आपली मुख्य जबाबदारी आहे. सर्व सदस्यांनी आपल्यावर दाखवलेला हा विश्वास आणि आपल्या दूरदर्शी नेतृत्वाखाली संघटनेची पताका निश्चितच अभिमानाने गगनभरारी घेईल, हा ठाम विश्वास आहे. या मानाच्या नियुक्तीबद्दल आपले मनःपूर्वक अभिनंदन व भावी वाटचालीस हार्दिक शुभेच्छा!
-          </p>
-        </div>
-      </div>
-
-      <!-- स्वाक्षरी ब्लॉक (फक्त राजेंद्र खैरनार सर, अंतर कमी) -->
-      <div style="display: flex; justify-content: flex-end; align-items: flex-end; padding-top: 10px; border-top: 1.5px solid #e2e8f0; margin-top: 10px;">
-        <div style="text-align: center; min-width: 250px;">
-          <img src="${signUrl}" alt="स्वाक्षरी" style="height: 52px; max-width: 180px; object-fit: contain; display: block; margin: 0 auto -2px auto;">
-          <div style="font-size: 12pt; font-weight: 800; color: #000; margin-top: 0;">( श्री. राजेंद्र शिवाजी खैरनार )</div>
-          <div style="font-size: 10pt; font-weight: 700; color: #334155; line-height: 1.2; margin-top: 1px;">
-            संस्थापक राज्याध्यक्ष<br>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  wrapper.innerHTML = letterHtml;
+  wrapper.innerHTML = buildSingleAppointmentLetterHtml({
+    member,
+    serialPadded,
+    todayStr,
+    hedingUrl,
+    signUrl,
+  });
   document.body.appendChild(wrapper);
 
-  await new Promise((r) => setTimeout(r, 50));
-
   try {
-    const canvas = await html2canvas(wrapper, {
-      scale: 1.85, // High-definition 300 DPI
+    await waitForFontsAndImages(wrapper);
+
+    const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
+      scale: 1.75,
       useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -251,22 +385,22 @@ export async function generateSingleLetterPdf(
       scrollY: 0,
       x: 0,
       y: 0,
-      width: 794,
-      height: 1123,
-      windowWidth: 794,
-      windowHeight: 1123,
-      logging: false
+      width: A4_PX_WIDTH,
+      height: A4_PX_HEIGHT,
+      windowWidth: A4_PX_WIDTH,
+      windowHeight: A4_PX_HEIGHT,
+      logging: false,
     });
 
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4',
-      compress: true
+      compress: true,
     });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    const imgData = canvas.toDataURL('image/jpeg', 0.9);
+    pdf.addImage(imgData, 'JPEG', 0, 0, A4_MM_WIDTH, A4_MM_HEIGHT, undefined, 'FAST');
 
     const cleanName = `${member.firstName}_${member.lastName}`.replace(/\s+/g, '_');
     pdf.save(`नियुक्ती_पत्र_क्र_${serialPadded}_${cleanName}.pdf`);
@@ -276,37 +410,8 @@ export async function generateSingleLetterPdf(
 }
 
 /**
- * Intelligent adaptive page distribution:
- * - If total <= 16: fits on 1 single page with header and signature.
- * - If 17 to 34 members (e.g. Gadchiroli 24 members):
- *   Page 1 gets 18 members (utilizing ~85% of A4 page with NO large blank void),
- *   and Page 2 gets the remaining members (e.g. 6 members) + signature block without any cutoff!
- * - If 35+ members: 3 pages (20, 18, remainder).
- */
-function getExecutivePageDistribution(total: number): number[] {
-  if (total <= 16) {
-    return [total];
-  }
-  if (total <= 34) {
-    // Page 1 gets up to 18 rows, leaving at least 5-6 rows on page 2 for signature
-    const page1 = Math.min(18, Math.max(14, total - 6));
-    return [page1, total - page1];
-  }
-  const page1 = 18;
-  const rem = total - 18;
-  const page2 = Math.min(20, Math.max(12, rem - 6));
-  const page3 = rem - page2;
-  return [page1, page2, page3];
-}
-
-/**
  * 2. District Executive Committee Letterhead Multi-Page PDF
- * - Uses Flexbox table layout to completely avoid html2canvas border-collapse bugs (zero strikethrough lines)
- * - True vertical & horizontal centering of text in all cells
- * - Fully utilizes Page 1 (18 rows) so there is NO big empty space at the bottom
- * - High-definition clarity (Scale 1.80, Quality 0.90, ~1.2 to 1.7 MB)
- * - scrollX:0, scrollY:0 prevents header cutoff
- * - Zero additional Firebase fetches (uses in-memory districtOfficials)
+ * Uses official letterhead on Page 1 + standard crisp table + signature on final page
  */
 export async function generateDistrictExecutivePdf(
   district: string,
@@ -314,193 +419,53 @@ export async function generateDistrictExecutivePdf(
   onProgress?: (status: string) => void
 ): Promise<void> {
   if (!list || list.length === 0) {
-    alert('या जिल्ह्यात डाऊनलोड करण्यासाठी पदाधिकारी उपलब्ध नाहीत.');
     return;
   }
 
   if (onProgress) onProgress('लेटरपॅड व स्वाक्षरी लोड करत आहे...');
   const [hedingUrl, signUrl] = await Promise.all([getHedingDataUrl(), getSignDataUrl()]);
 
-  const countsPerPage = getExecutivePageDistribution(list.length);
-  const pages: Array<{ chunk: OfficialMember[]; startIndex: number; isFirst: boolean; isLast: boolean }> = [];
+  const columns: ReportColumn[] = [
+    { header: 'अनु.', width: '44px', align: 'center' },
+    { header: 'पदाधिकाऱ्याचे संपूर्ण नाव', width: '230px', align: 'left' },
+    { header: 'सध्याचे पद व कार्यक्षेत्र', width: '215px', align: 'left' },
+    { header: 'महासंघातील बहाल पद', flex: 1, align: 'left' },
+  ];
 
-  let offset = 0;
-  countsPerPage.forEach((count, idx) => {
-    pages.push({
-      chunk: list.slice(offset, offset + count),
-      startIndex: offset,
-      isFirst: idx === 0,
-      isLast: idx === countsPerPage.length - 1
-    });
-    offset += count;
+  const rowsCells = list.map((m, idx) => {
+    const wp = getWorkingPlaceDisplay(m);
+    const fullCadreArea = `${wp.cadre}${wp.details ? ' (' + wp.details + ')' : ''}`;
+    const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`;
+    return [
+      { text: String(idx + 1), bold: true },
+      { text: fullName, bold: true },
+      { text: fullCadreArea },
+      { text: getDisplayPost(m), bold: true },
+    ];
   });
 
-  const totalPages = pages.length;
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-  const todayFormatted = getTodayFormattedDate();
-
-  const renderWrapper = document.createElement('div');
-  renderWrapper.style.position = 'fixed';
-  renderWrapper.style.left = '-9999px';
-  renderWrapper.style.top = '0';
-  renderWrapper.style.width = '794px';
-  renderWrapper.style.background = '#ffffff';
-  renderWrapper.style.zIndex = '999999';
-  document.body.appendChild(renderWrapper);
-
-  try {
-    for (let pIdx = 0; pIdx < totalPages; pIdx++) {
-      if (onProgress) onProgress(`पान ${pIdx + 1} / ${totalPages} तयार होत आहे...`);
-
-      const pageData = pages[pIdx];
-      const isLastPage = pageData.isLast;
-
-      let pageHTML = `
-        <div style="width: 794px; height: 1123px; min-height: 1123px; max-height: 1123px; padding: 20px 28px 16px 28px; background: #ffffff; color: #000000; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-          <div>
-      `;
-
-      if (pageData.isFirst) {
-        pageHTML += `
-          <!-- मूळ रंगीत लेटरपॅड (सुधारीत उंची 165px) -->
-          <div style="width: 100%; text-align: center; margin-bottom: 4px;">
-            <img src="${hedingUrl}" alt="लेटरपॅड" style="width: 100%; height: auto; max-height: 165px; object-fit: contain; display: block; margin: 0 auto;">
-          </div>
-          <!-- शुद्ध काळी ठळक माहिती पट्टी -->
-          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px solid #000000; border-bottom: 2px solid #000000; padding: 5px 6px; margin-bottom: 8px; font-weight: 900; font-size: 11.5pt; color: #000000;">
-            <div>जिल्हा कार्यकारिणी सूची : ${district}</div>
-            <div>एकूण पदाधिकारी: ${toEnglishDigits(list.length)}</div>
-            <div>दिनांक: ${todayFormatted}</div>
-          </div>
-        `;
-      } else {
-        pageHTML += `
-          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000000; padding-bottom: 5px; margin-bottom: 8px; font-weight: 900; font-size: 11.5pt; color: #000000;">
-            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - ${district} जिल्हा सूची (पुढे चालू)</div>
-            <div>दिनांक: ${todayFormatted}</div>
-          </div>
-        `;
-      }
-
-      // FLEXBOX TABLE (Zero border-collapse strikethrough bugs, 100% natural stretch)
-      pageHTML += `
-        <div style="width: 100%; border: 1.8px solid #000000; border-bottom: none; background: #ffffff; box-sizing: border-box;">
-          <!-- Table Header -->
-          <div style="display: flex; background: #f1f5f9; border-bottom: 1.8px solid #000000; font-weight: 900; box-sizing: border-box;">
-            <div style="width: 40px; border-right: 1.5px solid #000000; padding: 6px 4px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 10pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
-              अनु.
-            </div>
-            <div style="width: 250px; border-right: 1.5px solid #000000; padding: 6px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
-              पदाधिकाऱ्याचे संपूर्ण नाव
-            </div>
-            <div style="width: 220px; border-right: 1.5px solid #000000; padding: 6px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 10pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
-              सध्याचे पद व कार्यक्षेत्र
-            </div>
-            <div style="flex: 1; padding: 6px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
-              महासंघातील बहाल केलेले पद
-            </div>
-          </div>
-      `;
-
-      pageData.chunk.forEach((m, cIdx) => {
-        const rowNumber = pageData.startIndex + cIdx + 1;
-        const wp = getWorkingPlaceDisplay(m);
-        const fullCadreArea = `${wp.cadre}${wp.details ? ' (' + wp.details + ')' : ''}`;
-        pageHTML += `
-          <div style="display: flex; align-items: stretch; border-bottom: 1.2px solid #000000; min-height: 36px; box-sizing: border-box;">
-            <!-- अनुक्रमांक -->
-            <div style="width: 40px; border-right: 1.2px solid #000000; padding: 4px 4px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 900; font-size: 10pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
-              ${rowNumber}
-            </div>
-            <!-- संपूर्ण नाव (नावे WRAP होणार नाहीत - NO WRAP) -->
-            <div style="width: 250px; border-right: 1.2px solid #000000; padding: 4px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 800; font-size: 10.5pt; color: #000000; box-sizing: border-box; white-space: nowrap;">
-              ${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}
-            </div>
-            <!-- पद व कार्यक्षेत्र (गरज असल्यास WRAP होऊ शकते, पण Vertically Center) -->
-            <div style="width: 220px; border-right: 1.2px solid #000000; padding: 4px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 9.5pt; font-weight: 800; color: #000000; box-sizing: border-box; white-space: normal; word-break: break-word; line-height: 1.3;">
-              ${fullCadreArea}
-            </div>
-            <!-- बहाल केलेले पद (गरज असल्यास WRAP होऊ शकते, पण Vertically Center) -->
-            <div style="flex: 1; padding: 4px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 900; font-size: 10pt; color: #000000; box-sizing: border-box; white-space: normal; word-break: break-word; line-height: 1.3;">
-              ${getDisplayPost(m)}
-            </div>
-          </div>
-        `;
-      });
-
-      pageHTML += `
-        </div>
-      `;
-
-      // शेवटच्या पानावर सुस्पष्ट स्वाक्षरी ब्लॉक (Zero Cutoff!)
-      if (isLastPage) {
-        pageHTML += `
-          <div style="display: flex; justify-content: flex-end; margin-top: 12px; margin-bottom: 4px;">
-            <div style="text-align: center; min-width: 220px;">
-              <img src="${signUrl}" alt="स्वाक्षरी" style="height: 48px; max-width: 170px; object-fit: contain; display: block; margin: 0 auto 2px auto;">
-              <div style="font-size: 11.5pt; font-weight: 900; color: #000000; line-height: 1.2;">( श्री. राजेंद्र शिवाजी खैरनार )</div>
-              <div style="font-size: 10pt; font-weight: 800; color: #000000;">संस्थापक राज्याध्यक्ष</div>
-              <div style="font-size: 9pt; font-weight: 700; color: #000000;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-            </div>
-          </div>
-        `;
-      }
-
-      pageHTML += `
-        </div>
-        <!-- तळटीप (Footer) -->
-        <div style="display: flex; justify-content: space-between; font-size: 9.5pt; font-weight: 800; color: #000000; border-top: 1.5px solid #000000; padding-top: 4px;">
-          <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div>पान क्र. ${pIdx + 1} / ${totalPages}</div>
-        </div>
-      </div>
-      `;
-
-      renderWrapper.innerHTML = pageHTML;
-      await new Promise((r) => setTimeout(r, 40));
-
-      const canvas = await html2canvas(renderWrapper.firstElementChild as HTMLElement, {
-        scale: 1.30,
-        useCORS: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-        width: 794,
-        height: 1123,
-        windowWidth: 794,
-        windowHeight: 1123,
-        logging: false
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.75);
-      if (pIdx > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-    }
-
-    if (onProgress) onProgress('PDF फाईल डाऊनलोड होत आहे...');
-    pdf.save(`अधिकृत_कार्यकारिणी_यादी_${district}.pdf`);
-  } finally {
-    document.body.removeChild(renderWrapper);
-  }
+  await renderStandardPaginatedTablePdf({
+    reportTitle: `जिल्हा कार्यकारिणी सूची : ${district}`,
+    leftMeta: `एकूण पदाधिकारी: ${toEnglishDigits(list.length)}`,
+    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
+    columns,
+    rowsCells,
+    fileName: `अधिकृत_कार्यकारिणी_यादी_${district}.pdf`,
+    letterheadUrl: hedingUrl,
+    signUrl,
+    onProgress,
+  });
 }
 
 /**
  * 3. Statewide Master Registry Serial PDF
- * - Uses Flexbox table layout so text is 100% centered horizontally & vertically (NEVER sticks to bottom line)
- * - 35 rows per page (fast rendering in ~6-8 seconds total)
- * - High-definition print clarity (~1.5 to 1.9 MB)
- * - scrollX:0, scrollY:0 prevents header cutoff
- * - Zero additional Firebase fetches (uses in-memory allMembers)
+ * Uniform B&W institutional A4 table with dynamic pagination
  */
 export async function generateStatewideRegistryPdf(
   allMembers: OfficialMember[],
   onProgress?: (status: string) => void
 ): Promise<void> {
   if (!allMembers || allMembers.length === 0) {
-    alert('पोर्टलवर एकही नोंदणीकृत पदाधिकारी आढळला नाही.');
     return;
   }
 
@@ -514,131 +479,41 @@ export async function generateStatewideRegistryPdf(
     return String(a.id || '').localeCompare(String(b.id || ''));
   });
 
-  const totalRecords = sorted.length;
-  const ROWS_PER_PAGE = 30; // 30 rows per page for faster rendering & fewer pages
-  const totalPages = Math.ceil(totalRecords / ROWS_PER_PAGE);
-  const formattedDate = getTodayFormattedDate();
+  const columns: ReportColumn[] = [
+    { header: 'अनु.', width: '44px', align: 'center' },
+    { header: 'नियुक्ती क्र.', width: '96px', align: 'center' },
+    { header: 'जिल्हा', width: '115px', align: 'left' },
+    { header: 'पदाधिकाऱ्याचे संपूर्ण नाव', flex: 1.15, align: 'left' },
+    { header: 'बहाल केलेले पद', flex: 1, align: 'left' },
+  ];
 
-  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-  const renderWrapper = document.createElement('div');
-  renderWrapper.style.cssText =
-    'position: fixed; left: -9999px; top: 0; width: 794px; background: #ffffff; z-index: 999999;';
-  document.body.appendChild(renderWrapper);
+  const rowsCells = sorted.map((m, idx) => {
+    const serialNo = idx + 1;
+    const outwardFormatted = String(serialNo).padStart(2, '0');
+    const distName =
+      m.district === 'अहमदनगर' || (m.district && m.district.toLowerCase() === 'ahmednagar')
+        ? 'अहिल्यानगर'
+        : m.district || '-';
+    const fullName = `${m.salutation || ''} ${m.firstName || ''} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName || ''}`.trim();
+    const postName = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
+    return [
+      { text: String(serialNo), bold: true },
+      { text: `MS/2026/${outwardFormatted}`, bold: true },
+      { text: distName, bold: true },
+      { text: fullName, bold: true },
+      { text: postName },
+    ];
+  });
 
-  try {
-    for (let pIdx = 0; pIdx < totalPages; pIdx++) {
-      if (onProgress) onProgress(`माहिती पान ${pIdx + 1} / ${totalPages} तयार होत आहे...`);
-
-      const startIndex = pIdx * ROWS_PER_PAGE;
-      const chunk = sorted.slice(startIndex, startIndex + ROWS_PER_PAGE);
-
-      const pageHTML = `
-        <div style="width: 794px; height: 1123px; padding: 18px 26px 14px 26px; background: #ffffff; color: #000000; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-          <div>
-            <!-- शासकीय हेडर (रजिस्ट्रेशन क्रमांक काढून टाकला आहे) -->
-            <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 5px; margin-bottom: 6px;">
-              <div style="font-size: 9.5pt; font-weight: 800; letter-spacing: 0.5px;">श्रमिक संघ / धर्मादाय आयुक्त नोंदणीकृत संघटना</div>
-              <div style="font-size: 17pt; font-weight: 900; line-height: 1.2; margin-top: 2px;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-              <div style="font-size: 9pt; font-weight: 700; margin-top: 2px;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
-            </div>
-
-            <div style="border: 1.5px solid #000000; padding: 4px 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 10pt; font-weight: 900; background: #f8fafc;">
-              <div>॥ नियुक्ती क्रमांकानुसार सर्व माहिती ॥</div>
-              <div>एकूण जारी नियुक्ती: ${toEnglishDigits(totalRecords)}</div>
-              <div>दिनांक: ${formattedDate}</div>
-            </div>
-
-            <!-- FLEXBOX TABLE: Horizontally Left & Vertically Center Aligned -->
-            <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; background: #ffffff; box-sizing: border-box;">
-              <!-- Header Row -->
-              <div style="display: flex; background: #f1f5f9; border-bottom: 1.5px solid #000000; font-weight: 900; box-sizing: border-box;">
-                <div style="width: 44px; border-right: 1.2px solid #000000; padding: 4px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
-                  अनु.
-                </div>
-                <div style="width: 95px; border-right: 1.2px solid #000000; padding: 4px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
-                  नियुक्ती क्र.
-                </div>
-                <div style="width: 110px; border-right: 1.2px solid #000000; padding: 4px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
-                  जिल्हा
-                </div>
-                <div style="flex: 1; border-right: 1.2px solid #000000; padding: 4px 10px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
-                  पदाधिकाऱ्याचे संपूर्ण नाव
-                </div>
-                <div style="width: 230px; padding: 4px 10px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-size: 9.5pt; box-sizing: border-box; white-space: nowrap;">
-                  बहाल केलेले पद
-                </div>
-              </div>
-
-              <!-- Data Rows -->
-              ${chunk
-                .map((m, cIdx) => {
-                  const serialNo = startIndex + cIdx + 1;
-                  const outwardFormatted = String(serialNo).padStart(2, '0');
-                  const distName =
-                    m.district === 'अहमदनगर' || (m.district && m.district.toLowerCase() === 'ahmednagar')
-                      ? 'अहिल्यानगर'
-                      : m.district || '-';
-                  const postName = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
-                  return `
-                    <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 26px; box-sizing: border-box;">
-                      <div style="width: 44px; border-right: 1px solid #000000; padding: 2px 2px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 800; font-size: 9pt; box-sizing: border-box; white-space: nowrap;">
-                        ${serialNo}
-                      </div>
-                      <div style="width: 95px; border-right: 1px solid #000000; padding: 2px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: 900; font-size: 9pt; font-family: monospace; box-sizing: border-box; white-space: nowrap;">
-                        MS/2026/${outwardFormatted}
-                      </div>
-                      <div style="width: 110px; border-right: 1px solid #000000; padding: 2px 8px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 800; font-size: 9pt; box-sizing: border-box; white-space: nowrap;">
-                        ${distName}
-                      </div>
-                      <div style="flex: 1; border-right: 1px solid #000000; padding: 2px 10px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 800; font-size: 9pt; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        ${m.salutation || ''} ${m.firstName || ''} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName || ''}
-                      </div>
-                      <div style="width: 230px; padding: 2px 10px; display: flex; align-items: center; justify-content: flex-start; text-align: left; font-weight: 800; font-size: 9pt; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        ${postName}
-                      </div>
-                    </div>
-                  `;
-                })
-                .join('')}
-            </div>
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 8.5pt; font-weight: 800; border-top: 1.5px solid #000000; padding-top: 4px; margin-top: 4px;">
-            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - नियुक्ती क्रमांकानुसार माहिती</div>
-            <div>पान क्र. ${pIdx + 1} / ${totalPages}</div>
-          </div>
-        </div>
-      `;
-
-      renderWrapper.innerHTML = pageHTML;
-      await new Promise((res) => setTimeout(res, 15));
-
-      const canvas = await html2canvas(renderWrapper.firstElementChild as HTMLElement, {
-        scale: 1.25, // 2.5x faster rendering, crisp typography
-        useCORS: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-        width: 794,
-        height: 1123,
-        windowWidth: 794,
-        windowHeight: 1123,
-        logging: false
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.72); // Much smaller file size while keeping crisp black/white contrast
-      if (pIdx > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-    }
-
-    if (onProgress) onProgress('PDF फाईल डाऊनलोड होत आहे...');
-    pdf.save('नियुक्ती_क्रमांकानुसार_सर्व_माहिती.pdf');
-  } finally {
-    document.body.removeChild(renderWrapper);
-  }
+  await renderStandardPaginatedTablePdf({
+    reportTitle: 'नियुक्ती क्रमांकानुसार पदाधिकारी यादी',
+    leftMeta: `एकूण जारी नियुक्ती: ${toEnglishDigits(sorted.length)}`,
+    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
+    columns,
+    rowsCells,
+    fileName: 'नियुक्ती_क्रमांकानुसार_सर्व_माहिती.pdf',
+    onProgress,
+  });
 }
 
 /**
@@ -837,8 +712,7 @@ export async function generateMembershipCertificatePdf(app: MembershipApplicatio
 
 /**
  * 5. Organization Status Matrix A4 Black & White PDF (संघटना सद्यस्थिती अहवाल)
- * - All 36 districts with counts for State Rep, Division Rep, District Officials, Taluka Officials, Members
- * - Horizontal Row Totals (आडवी बेरीज) & Vertical Column Totals (उभी बेरीज)
+ * Clean monochrome table with zero gradients, zero star emojis, zero promotional footers
  */
 export async function generateOrganizationStatusPdf(
   stats: Array<{
@@ -853,7 +727,6 @@ export async function generateOrganizationStatusPdf(
   }>,
   onProgress?: (s: string) => void
 ): Promise<void> {
-  const todayFormatted = getTodayFormattedDate();
   const totals = stats.reduce(
     (acc, cur) => {
       const offTot = cur.officialsTotal ?? (cur.stateRep + cur.divRep + cur.distOfficial + cur.talukaOfficial);
@@ -865,124 +738,68 @@ export async function generateOrganizationStatusPdf(
         talukaOfficial: acc.talukaOfficial + cur.talukaOfficial,
         officialsTotal: acc.officialsTotal + offTot,
         members: acc.members + cur.members,
-        grandTotal: acc.grandTotal + rowTot
+        grandTotal: acc.grandTotal + rowTot,
       };
     },
     { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, officialsTotal: 0, members: 0, grandTotal: 0 }
   );
 
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'fixed';
-  wrapper.style.left = '-9999px';
-  wrapper.style.top = '0';
-  wrapper.style.width = '794px';
-  wrapper.style.background = '#ffffff';
-  wrapper.style.zIndex = '999999';
-  document.body.appendChild(wrapper);
+  const columns: ReportColumn[] = [
+    { header: 'अनु.', width: '34px', align: 'center' },
+    { header: 'जिल्ह्याचे नाव', width: '156px', align: 'left' },
+    { header: 'राज्य प्रतिनिधी', flex: 1, align: 'center' },
+    { header: 'विभागीय प्रतिनिधी', flex: 1, align: 'center' },
+    { header: 'जिल्हा पदाधिकारी', flex: 1, align: 'center' },
+    { header: 'तालुका पदाधिकारी', flex: 1, align: 'center' },
+    { header: 'एकूण पदाधिकारी', flex: 1.05, align: 'center' },
+    { header: 'सदस्य (नोंदणी)', flex: 1, align: 'center' },
+    { header: 'एकूण बेरीज', flex: 1.05, align: 'center' },
+  ];
 
-  try {
-    if (onProgress) onProgress('संघटना सद्यस्थिती अहवाल तयार होत आहे...');
+  const rowsCells = stats.map((st, idx) => {
+    const offTot = st.officialsTotal ?? (st.stateRep + st.divRep + st.distOfficial + st.talukaOfficial);
+    const rSum = st.rowTotal ?? (offTot + st.members);
+    return [
+      { text: String(idx + 1), bold: true },
+      { text: st.district, bold: true },
+      { text: toEnglishDigits(st.stateRep) },
+      { text: toEnglishDigits(st.divRep) },
+      { text: toEnglishDigits(st.distOfficial) },
+      { text: toEnglishDigits(st.talukaOfficial) },
+      { text: toEnglishDigits(offTot), bold: true },
+      { text: toEnglishDigits(st.members) },
+      { text: toEnglishDigits(rSum), bold: true },
+    ];
+  });
 
-    const pageHTML = `
-      <div style="width: 794px; min-height: 1123px; padding: 20px 24px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #0b1e33 0%, #1e3a8a 100%); border-radius: 8px; border: 2px solid #d4af37; padding: 10px 14px; text-align: center; color: #ffffff; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
-          <div style="font-size: 11pt; font-weight: 800; color: #fde047;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div style="font-size: 17pt; font-weight: 900; margin: 3px 0; color: #ffffff;">॥ महाराष्ट्र राज्य संघटनात्मक सद्यस्थिती अहवाल ॥</div>
-          <div style="font-size: 9.5pt; font-weight: 700; color: #e2e8f0;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
-        </div>
+  const summaryCells = [
+    { text: '-', bold: true },
+    { text: 'सर्व बेरीज (एकूण)', bold: true },
+    { text: toEnglishDigits(totals.stateRep), bold: true },
+    { text: toEnglishDigits(totals.divRep), bold: true },
+    { text: toEnglishDigits(totals.distOfficial), bold: true },
+    { text: toEnglishDigits(totals.talukaOfficial), bold: true },
+    { text: toEnglishDigits(totals.officialsTotal), bold: true },
+    { text: toEnglishDigits(totals.members), bold: true },
+    { text: toEnglishDigits(totals.grandTotal), bold: true },
+  ];
 
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10pt; font-weight: 900; padding: 5px 10px; border: 1.5px solid #d4af37; border-radius: 6px; margin-bottom: 8px; background: #fffdf5; color: #851216;">
-          <div>विषय: सर्व 36 जिल्ह्यांतील पदाधिकारी व सभासद संख्यात्मक स्थिती अहवाल</div>
-          <div>दिनांक: ${todayFormatted}</div>
-        </div>
-
-         {/* Designer Matrix Table with Full Width Auto-Fit, Larger Fonts and Centered Numbers */}
-        <div style="width: 100%; border: 2px solid #1e293b; border-bottom: none; box-sizing: border-box; border-radius: 4px; overflow: hidden;">
-          <!-- Table Header -->
-          <div style="display: flex; background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%); color: #ffffff; border-bottom: 2px solid #d4af37; font-weight: 900; box-sizing: border-box;">
-            <div style="width: 36px; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">अनु.</div>
-            <div style="flex: 1.7; border-right: 1.5px solid #475569; padding: 6px 8px; font-size: 10.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">जिल्ह्याचे नाव</div>
-            <div style="flex: 1; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">राज्य प्रतिनिधी</div>
-            <div style="flex: 1; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">विभागीय प्रतिनिधी</div>
-            <div style="flex: 1.1; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">जिल्हा पदाधिकारी</div>
-            <div style="flex: 1.1; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">तालुका पदाधिकारी</div>
-            <div style="flex: 1.2; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; color: #fde047; white-space: nowrap;">एकूण पदाधिकारी</div>
-            <div style="flex: 1; border-right: 1.5px solid #475569; padding: 6px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">सदस्य (नोंदणी)</div>
-            <div style="flex: 1.2; padding: 6px 4px; font-size: 10.5pt; color: #fde047; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">एकूण बेरीज</div>
-          </div>
-
-          ${stats
-            .map((st, idx) => {
-              const offTot = st.officialsTotal ?? (st.stateRep + st.divRep + st.distOfficial + st.talukaOfficial);
-              const rSum = st.rowTotal ?? (offTot + st.members);
-              const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
-              return `
-                <div style="display: flex; align-items: stretch; border-bottom: 1.2px solid #cbd5e1; background: ${bg}; min-height: 25px; box-sizing: border-box;">
-                  <div style="width: 36px; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${idx + 1}</div>
-                  <div style="flex: 1.7; border-right: 1.2px solid #e2e8f0; padding: 3px 8px; font-weight: 900; font-size: 10pt; color: #0f172a; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${st.district}</div>
-                  <div style="flex: 1; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(st.stateRep)}</div>
-                  <div style="flex: 1; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(st.divRep)}</div>
-                  <div style="flex: 1.1; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(st.distOfficial)}</div>
-                  <div style="flex: 1.1; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(st.talukaOfficial)}</div>
-                  <div style="flex: 1.2; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 900; font-size: 10pt; color: #09243f; background: #f1f5f9; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(offTot)}</div>
-                  <div style="flex: 1; border-right: 1.2px solid #e2e8f0; padding: 3px 2px; font-weight: 900; font-size: 10pt; color: #df6b16; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(st.members)}</div>
-                  <div style="flex: 1.2; padding: 3px 4px; font-weight: 900; font-size: 10.5pt; color: #851216; background: #fffdf5; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(rSum)}</div>
-                </div>
-              `;
-            })
-            .join('')}
-
-          <!-- Grand Totals Row (Matching Vertical & Horizontal Sums) -->
-          <div style="display: flex; align-items: stretch; border-bottom: 2px solid #851216; background: linear-gradient(135deg, #851216 0%, #991b1b 100%); color: #ffffff; min-height: 30px; box-sizing: border-box; font-weight: 900;">
-            <div style="flex: 1.95; border-right: 1.5px solid #d4af37; padding: 4px 8px; font-size: 10.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">सर्व बेरीज (Grand Total)</div>
-            <div style="flex: 1; border-right: 1.5px solid #d4af37; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(totals.stateRep)}</div>
-            <div style="flex: 1; border-right: 1.5px solid #d4af37; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(totals.divRep)}</div>
-            <div style="flex: 1.1; border-right: 1.5px solid #d4af37; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(totals.distOfficial)}</div>
-            <div style="flex: 1.1; border-right: 1.5px solid #d4af37; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(totals.talukaOfficial)}</div>
-            <div style="flex: 1.2; border-right: 1.5px solid #d4af37; padding: 4px 2px; font-size: 10pt; color: #fde047; font-weight: 900; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(totals.officialsTotal)}</div>
-            <div style="flex: 1; border-right: 1.5px solid #d4af37; padding: 4px 2px; font-size: 9.5pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap;">${toEnglishDigits(totals.members)}</div>
-            <div style="flex: 1.2; padding: 4px 4px; font-size: 11pt; color: #fde047; font-weight: 900; display: flex; align-items: center; justify-content: center; text-align: center; white-space: nowrap; background: rgba(0,0,0,0.25);">⭐ ${toEnglishDigits(totals.grandTotal)} ⭐</div>
-          </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 9pt; font-weight: 800; color: #1e293b; border-top: 1.5px solid #851216; padding-top: 4px;">
-          <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div>संस्थापक राज्याध्यक्ष अधिकृत अहवाल प्रत</div>
-        </div>
-      </div>
-    `;
-
-    wrapper.innerHTML = pageHTML;
-    await new Promise((r) => setTimeout(r, 40));
-
-    const canvas = await html2canvas(wrapper, {
-      scale: 1.30,
-      useCORS: false,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      x: 0,
-      y: 0,
-      width: 794,
-      windowWidth: 794,
-      logging: false
-    });
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-    const imgData = canvas.toDataURL('image/jpeg', 0.75);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-    pdf.save('संघटना_सद्यस्थिती_अहवाल_महाराष्ट्र.pdf');
-  } finally {
-    document.body.removeChild(wrapper);
-  }
+  await renderStandardPaginatedTablePdf({
+    reportTitle: `संघटना सद्यस्थिती अहवाल (${toEnglishDigits(stats.length)} जिल्हे)`,
+    leftMeta: `एकूण पदाधिकारी व सभासद: ${toEnglishDigits(totals.grandTotal)}`,
+    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
+    columns,
+    rowsCells,
+    summaryCells,
+    dense: true,
+    fileName: 'संघटना_सद्यस्थिती_अहवाल_महाराष्ट्र.pdf',
+    onProgress,
+  });
 }
 
 /**
  * 6. District Presidents List PDF (जिल्हाध्यक्ष यादी)
- * Columns: अनुक्रमांक, जिल्ह्याचे नाव, सध्याचे पद, संघटनेतील पद, मोबाईल क्रमांक
+ * Standard B&W institutional A4 report with dynamic multi-page overflow handling
  */
 export async function generateDistrictPresidentsPdf(
   list: Array<{
@@ -994,88 +811,38 @@ export async function generateDistrictPresidentsPdf(
   }>,
   onProgress?: (s: string) => void
 ): Promise<void> {
-  const todayFormatted = getTodayFormattedDate();
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'fixed';
-  wrapper.style.left = '-9999px';
-  wrapper.style.top = '0';
-  wrapper.style.width = '794px';
-  wrapper.style.background = '#ffffff';
-  wrapper.style.zIndex = '999999';
-  document.body.appendChild(wrapper);
+  const columns: ReportColumn[] = [
+    { header: 'अनु.', width: '40px', align: 'center' },
+    { header: 'जिल्हा', width: '112px', align: 'left' },
+    { header: 'पदाधिकाऱ्याचे नाव', flex: 1.2, align: 'left' },
+    { header: 'सध्याचे पद व कार्यक्षेत्र', flex: 1.1, align: 'left' },
+    { header: 'संघटनेतील पद', width: '108px', align: 'left' },
+    { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
+  ];
 
-  try {
-    if (onProgress) onProgress('जिल्हाध्यक्ष यादी तयार होत आहे...');
+  const rowsCells = list.map((item, idx) => [
+    { text: String(idx + 1), bold: true },
+    { text: item.district, bold: true },
+    { text: item.name, bold: true },
+    { text: item.cadre },
+    { text: item.post, bold: true },
+    { text: toEnglishDigits(item.mobile), bold: true },
+  ]);
 
-    const pageHTML = `
-      <div style="width: 794px; min-height: 1123px; padding: 22px 28px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-        <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 8px;">
-          <div style="font-size: 10pt; font-weight: 800;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div style="font-size: 16pt; font-weight: 900; margin: 2px 0;">॥ महाराष्ट्र राज्य सर्व जिल्हाध्यक्ष अधिकृत सूची ॥</div>
-          <div style="font-size: 9.5pt; font-weight: 700;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
-          <div>एकूण जिल्हाध्यक्ष: ${toEnglishDigits(list.length)}</div>
-          <div>दिनांक: ${todayFormatted}</div>
-        </div>
-
-        <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
-          <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; box-sizing: border-box;">
-            <div style="width: 44px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">अनु.</div>
-            <div style="width: 120px; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">जिल्ह्याचे नाव</div>
-            <div style="flex: 1; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">पदाधिकाऱ्याचे नाव</div>
-            <div style="width: 160px; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">सध्याचे पद व कार्यक्षेत्र</div>
-            <div style="width: 130px; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">संघटनेतील पद</div>
-            <div style="width: 110px; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">मोबाईल क्रमांक</div>
-          </div>
-
-          ${list
-            .map(
-              (item, idx) => `
-            <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 28px; box-sizing: border-box;">
-              <div style="width: 44px; border-right: 1px solid #000; padding: 4px 4px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${idx + 1}</div>
-              <div style="width: 120px; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; word-break: break-word; white-space: normal;">${item.district}</div>
-              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${item.name}</div>
-              <div style="width: 160px; border-right: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${item.cadre}</div>
-              <div style="width: 130px; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${item.post}</div>
-              <div style="width: 110px; padding: 4px 6px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${toEnglishDigits(item.mobile)}</div>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
-      </div>
-    `;
-
-    wrapper.innerHTML = pageHTML;
-    await new Promise((r) => setTimeout(r, 40));
-
-    const canvas = await html2canvas(wrapper, {
-      scale: 1.30,
-      useCORS: false,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      x: 0,
-      y: 0,
-      width: 794,
-      windowWidth: 794,
-      logging: false
-    });
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-    const imgData = canvas.toDataURL('image/jpeg', 0.75);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-    pdf.save('सर्व_जिल्हाध्यक्ष_यादी.pdf');
-  } finally {
-    document.body.removeChild(wrapper);
-  }
+  await renderStandardPaginatedTablePdf({
+    reportTitle: 'महाराष्ट्र राज्य सर्व जिल्हाध्यक्ष यादी',
+    leftMeta: `एकूण जिल्हाध्यक्ष: ${toEnglishDigits(list.length)}`,
+    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
+    columns,
+    rowsCells,
+    fileName: 'सर्व_जिल्हाध्यक्ष_यादी.pdf',
+    onProgress,
+  });
 }
 
 /**
  * 7. Taluka Presidents List PDF (तालुका अध्यक्ष यादी)
+ * Standard B&W institutional A4 report packed densely without blank bottom gaps
  */
 export async function generateTalukaPresidentsPdf(
   list: Array<{
@@ -1088,189 +855,72 @@ export async function generateTalukaPresidentsPdf(
   }>,
   onProgress?: (s: string) => void
 ): Promise<void> {
-  const todayFormatted = getTodayFormattedDate();
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'fixed';
-  wrapper.style.left = '-9999px';
-  wrapper.style.top = '0';
-  wrapper.style.width = '794px';
-  wrapper.style.background = '#ffffff';
-  wrapper.style.zIndex = '999999';
-  document.body.appendChild(wrapper);
+  const columns: ReportColumn[] = [
+    { header: 'अनु.', width: '40px', align: 'center' },
+    { header: 'जिल्हा व तालुका', width: '132px', align: 'left' },
+    { header: 'पदाधिकाऱ्याचे नाव', flex: 1.2, align: 'left' },
+    { header: 'सध्याचे पद व कार्यक्षेत्र', flex: 1.1, align: 'left' },
+    { header: 'संघटनेतील पद', width: '104px', align: 'left' },
+    { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
+  ];
 
-  try {
-    const itemsPerPage = 18;
-    const totalPages = Math.ceil(list.length / itemsPerPage) || 1;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const rowsCells = list.map((item, idx) => [
+    { text: String(idx + 1), bold: true },
+    { text: `${item.district}${item.taluka ? ` (${item.taluka})` : ''}`, bold: true },
+    { text: item.name, bold: true },
+    { text: item.cadre },
+    { text: item.post, bold: true },
+    { text: toEnglishDigits(item.mobile), bold: true },
+  ]);
 
-    for (let p = 0; p < totalPages; p++) {
-      if (onProgress) onProgress(`तालुका अध्यक्ष यादी तयार होत आहे... (पान ${p + 1} पैकी ${totalPages})`);
-
-      const pageItems = list.slice(p * itemsPerPage, (p + 1) * itemsPerPage);
-
-      const pageHTML = `
-        <div style="width: 794px; height: 1123px; padding: 22px 28px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif; display: flex; flex-direction: column; justify-content: space-between;">
-          <div>
-            <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 8px;">
-              <div style="font-size: 10pt; font-weight: 800;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-              <div style="font-size: 16pt; font-weight: 900; margin: 2px 0;">॥ महाराष्ट्र राज्य तालुका अध्यक्ष अधिकृत सूची ॥</div>
-              <div style="font-size: 9.5pt; font-weight: 700;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
-              <div>एकूण तालुका अध्यक्ष: ${toEnglishDigits(list.length)} (पान ${toEnglishDigits(p + 1)}/ ${toEnglishDigits(totalPages)})</div>
-              <div>दिनांक: ${todayFormatted}</div>
-            </div>
-
-            <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
-              <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; box-sizing: border-box;">
-                <div style="width: 44px; border-right: 1.2px solid #000; padding: 6px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">अनु.</div>
-                <div style="width: 150px; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">जिल्हा व तालुका</div>
-                <div style="flex: 1; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">पदाधिकाऱ्याचे नाव</div>
-                <div style="width: 150px; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">सध्याचे पद व कार्यक्षेत्र</div>
-                <div style="width: 130px; border-right: 1.2px solid #000; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">संघटनेतील पद</div>
-                <div style="width: 110px; padding: 6px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">मोबाईल क्रमांक</div>
-              </div>
-
-              ${pageItems
-                .map(
-                  (item, idx) => `
-                <div style="display: flex; align-items: center; border-bottom: 1px solid #000000; height: 36px; box-sizing: border-box;">
-                  <div style="width: 44px; border-right: 1px solid #000; padding: 2px 4px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${p * itemsPerPage + idx + 1}</div>
-                  <div style="width: 150px; border-right: 1px solid #000; padding: 2px 6px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">
-                    ${item.district}${item.taluka ? ` (${item.taluka})` : ''}
-                  </div>
-                  <div style="flex: 1; border-right: 1px solid #000; padding: 2px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${item.name}</div>
-                  <div style="width: 150px; border-right: 1px solid #000; padding: 2px 6px; font-size: 8.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${item.cadre}</div>
-                  <div style="width: 130px; border-right: 1px solid #000; padding: 2px 6px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${item.post}</div>
-                  <div style="width: 110px; padding: 2px 6px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap;">${toEnglishDigits(item.mobile)}</div>
-                </div>
-              `
-                )
-                .join('')}
-            </div>
-          </div>
-
-          <!-- Page Footer -->
-          <div style="border-top: 1px solid #000000; padding-top: 4px; display: flex; justify-content: space-between; font-size: 8.5pt; font-weight: 700;">
-            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ — तालुका अध्यक्ष सूची</div>
-            <div>पान ${toEnglishDigits(p + 1)} पैकी ${toEnglishDigits(totalPages)}</div>
-          </div>
-        </div>
-      `;
-
-      wrapper.innerHTML = pageHTML;
-      await new Promise((r) => setTimeout(r, 40));
-
-      const canvas = await html2canvas(wrapper, {
-        scale: 1.30,
-        useCORS: false,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-        width: 794,
-        windowWidth: 794,
-        logging: false
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.75);
-      if (p > 0) pdf.addPage('a4', 'portrait');
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-    }
-
-    pdf.save('सर्व_तालुका_अध्यक्ष_यादी.pdf');
-  } finally {
-    document.body.removeChild(wrapper);
-  }
+  await renderStandardPaginatedTablePdf({
+    reportTitle: 'महाराष्ट्र राज्य तालुका अध्यक्ष यादी',
+    leftMeta: `एकूण तालुका अध्यक्ष: ${toEnglishDigits(list.length)}`,
+    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
+    columns,
+    rowsCells,
+    fileName: 'सर्व_तालुका_अध्यक्ष_यादी.pdf',
+    onProgress,
+  });
 }
 
 /**
  * 8. Registered Approved Members List PDF (नोंदणीकृत सदस्य यादी)
+ * Standard B&W institutional A4 report with proper multi-page pagination
  */
 export async function generateRegisteredMembersPdf(
   list: MembershipApplication[],
   onProgress?: (s: string) => void
 ): Promise<void> {
-  const todayFormatted = getTodayFormattedDate();
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'fixed';
-  wrapper.style.left = '-9999px';
-  wrapper.style.top = '0';
-  wrapper.style.width = '794px';
-  wrapper.style.background = '#ffffff';
-  wrapper.style.zIndex = '999999';
-  document.body.appendChild(wrapper);
+  const columns: ReportColumn[] = [
+    { header: 'अनु.', width: '40px', align: 'center' },
+    { header: 'सदस्य क्रमांक', width: '128px', align: 'center' },
+    { header: 'संपूर्ण नाव', flex: 1.25, align: 'left' },
+    { header: 'सध्याचे पद / संवर्ग', flex: 1, align: 'left' },
+    { header: 'तालुका व जिल्हा', width: '125px', align: 'left' },
+    { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
+  ];
 
-  try {
-    if (onProgress) onProgress('नोंदणीकृत सदस्य यादी तयार होत आहे...');
+  const rowsCells = list.map((m, idx) => {
+    const place = m.taluka ? `${m.taluka}, ${m.district}` : m.district || '-';
+    return [
+      { text: String(idx + 1), bold: true },
+      { text: m.memberNumber || '-', bold: true },
+      { text: `${m.salutation || ''} ${m.fullName || ''}`.trim(), bold: true },
+      { text: m.professional || '-' },
+      { text: place },
+      { text: toEnglishDigits(m.phone), bold: true },
+    ];
+  });
 
-    const pageHTML = `
-      <div style="width: 794px; min-height: 1123px; padding: 22px 28px; background: #ffffff; color: #000000; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-        <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 6px; margin-bottom: 8px;">
-          <div style="font-size: 10pt; font-weight: 800;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
-          <div style="font-size: 16pt; font-weight: 900; margin: 2px 0;">॥ अधिकृत नोंदणीकृत आजीवन सदस्य यादी ॥</div>
-          <div style="font-size: 9.5pt; font-weight: 700;">कार्यालय : 131, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: 9860704098</div>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; font-size: 10.5pt; font-weight: 900; padding: 4px 6px; border: 1.5px solid #000; margin-bottom: 8px; background: #f8fafc;">
-          <div>एकूण नोंदणीकृत सदस्य: ${toEnglishDigits(list.length)}</div>
-          <div>दिनांक: ${todayFormatted}</div>
-        </div>
-
-        <div style="width: 100%; border: 1.5px solid #000000; border-bottom: none; box-sizing: border-box;">
-          <div style="display: flex; background: #e2e8f0; border-bottom: 1.5px solid #000000; font-weight: 900; box-sizing: border-box;">
-            <div style="width: 44px; border-right: 1.2px solid #000; padding: 5px 4px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">अनु.</div>
-            <div style="width: 135px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">सदस्य क्रमांक</div>
-            <div style="flex: 1; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 10pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">नाव</div>
-            <div style="width: 140px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">सध्याचे पद / व्यवसाय</div>
-            <div style="width: 110px; border-right: 1.2px solid #000; padding: 5px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">तालुका / जिल्हा</div>
-            <div style="width: 105px; padding: 5px 6px; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">मोबाईल</div>
-          </div>
-
-          ${list
-            .map(
-              (m, idx) => `
-            <div style="display: flex; align-items: stretch; border-bottom: 1px solid #000000; min-height: 26px; box-sizing: border-box;">
-              <div style="width: 44px; border-right: 1px solid #000; padding: 4px 4px; font-weight: 800; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${idx + 1}</div>
-              <div style="width: 135px; border-right: 1px solid #000; padding: 4px 6px; font-family: monospace; font-weight: 900; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${m.memberNumber || '-'}</div>
-              <div style="flex: 1; border-right: 1px solid #000; padding: 4px 6px; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.salutation} ${m.fullName}</div>
-              <div style="width: 140px; border-right: 1px solid #000; padding: 4px 6px; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${m.professional || '-'}</div>
-              <div style="width: 110px; border-right: 1px solid #000; padding: 4px 6px; font-size: 9pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${m.district}</div>
-              <div style="width: 105px; padding: 4px 6px; font-family: monospace; font-weight: 800; font-size: 9.5pt; display: flex; align-items: center; justify-content: flex-start; text-align: left;">${toEnglishDigits(m.phone)}</div>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
-      </div>
-    `;
-
-    wrapper.innerHTML = pageHTML;
-    await new Promise((r) => setTimeout(r, 40));
-
-    const canvas = await html2canvas(wrapper, {
-      scale: 1.30,
-      useCORS: false,
-      allowTaint: true,
-      backgroundColor: '#ffffff',
-      scrollX: 0,
-      scrollY: 0,
-      x: 0,
-      y: 0,
-      width: 794,
-      windowWidth: 794,
-      logging: false
-    });
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-    const imgData = canvas.toDataURL('image/jpeg', 0.75);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-    pdf.save('नोंदणीकृत_सदस्य_यादी.pdf');
-  } finally {
-    document.body.removeChild(wrapper);
-  }
+  await renderStandardPaginatedTablePdf({
+    reportTitle: 'अधिकृत नोंदणीकृत आजीवन सदस्य यादी',
+    leftMeta: `एकूण नोंदणीकृत सदस्य: ${toEnglishDigits(list.length)}`,
+    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
+    columns,
+    rowsCells,
+    fileName: 'नोंदणीकृत_सदस्य_यादी.pdf',
+    onProgress,
+  });
 }
 
