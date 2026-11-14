@@ -159,13 +159,29 @@ h1, h2, h3, .serif-marathi {
   transform: scale(0.97);
 }
 
+@keyframes mhsPulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+.mhs-pulse-glow {
+  animation: mhsPulseGlow 3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mhs-tab-enter,
   .mhs-modal-enter,
   .mhs-stagger-1,
   .mhs-stagger-2,
   .mhs-stagger-3,
-  .mhs-stagger-4 {
+  .mhs-stagger-4,
+  .mhs-pulse-glow {
     animation: none !important;
   }
   .mhs-card-interactive,

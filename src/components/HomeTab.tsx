@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
+import { AnimatedCounter } from '../utils/animations';
 
 interface HomeTabProps {
   setCurrentTab: (tab: string) => void;
@@ -100,19 +101,27 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
             {/* Key Organization Stats Strip */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-700/60">
               <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">34</strong>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                  <AnimatedCounter target={34} />
+                </strong>
                 <span className="text-xs sm:text-sm text-slate-300 font-medium">जिल्हा शाखा</span>
               </div>
               <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">350+</strong>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                  <AnimatedCounter target={350} suffix="+" />
+                </strong>
                 <span className="text-xs sm:text-sm text-slate-300 font-medium">तालुका कार्यकारिणी</span>
               </div>
               <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">5000</strong>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                  <AnimatedCounter target={5000} />
+                </strong>
                 <span className="text-xs sm:text-sm text-slate-300 font-medium">सदस्य उद्दिष्ट</span>
               </div>
               <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-emerald-400">100%</strong>
+                <strong className="block text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                  <AnimatedCounter target={100} suffix="%" />
+                </strong>
                 <span className="text-xs sm:text-sm text-slate-300 font-medium">कायदेशीर संरक्षण</span>
               </div>
             </div>
