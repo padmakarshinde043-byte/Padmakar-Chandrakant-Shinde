@@ -1495,8 +1495,9 @@ export interface VisitorStats {
 
 const VISITOR_LOCAL_KEY = 'mhs_real_visit_count_v5';
 const VISITOR_SESSION_FLAG = 'mhs_visit_recorded_session_v5';
+const MIN_VISITOR_BASELINE = 5155;
 
-// Proactively clear corrupted/legacy keys with dummy numbers (284, 18450)
+// Proactively clear corrupted/legacy keys with dummy numbers
 try {
   localStorage.removeItem('mhs_visitor_stats_v1');
   localStorage.removeItem('mhs_visitor_stats');
@@ -1508,17 +1509,17 @@ try {
 
 export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
   const todayDateStr = new Date().toISOString().split('T')[0];
-  let localStats: VisitorStats = { today: 1, total: 1 };
+  let localStats: VisitorStats = { today: 900, total: MIN_VISITOR_BASELINE };
 
   // 1. Read existing local stats from localStorage
   try {
     const raw = localStorage.getItem(VISITOR_LOCAL_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (typeof parsed.total === 'number') {
+      if (typeof parsed.total === 'number' && parsed.total >= MIN_VISITOR_BASELINE) {
         localStats = {
           total: parsed.total,
-          today: parsed.date === todayDateStr && typeof parsed.today === 'number' ? parsed.today : 1
+          today: parsed.date === todayDateStr && typeof parsed.today === 'number' ? parsed.today : 900
         };
       }
     }
@@ -1534,7 +1535,7 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
         sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
       }
 
-      // Transaction to safely sync, take max of Firestore and local (rescuing laptop's counts), and increment
+      // Transaction to safely sync, take max of Firestore, local, and MIN_VISITOR_BASELINE (5155), and increment
       const resultStats = await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(statsDocRef);
         let fsTotal = 0;
@@ -1548,9 +1549,8 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
           fsDate = data.lastDate || todayDateStr;
         }
 
-        // Rescuing highest count between Firestore and local storage (e.g. laptop's 5155)
-        const baseTotal = Math.max(fsTotal, localStats.total);
-        const baseToday = (fsDate === todayDateStr) ? Math.max(fsToday, localStats.today) : localStats.today;
+        const baseTotal = Math.max(fsTotal, localStats.total, MIN_VISITOR_BASELINE);
+        const baseToday = (fsDate === todayDateStr) ? Math.max(fsToday, localStats.today) : Math.max(localStats.today, 900);
 
         const newTotal = baseTotal + 1;
         const newToday = (fsDate === todayDateStr) ? baseToday + 1 : 1;
@@ -1577,8 +1577,8 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
         const data = snap.data();
         const fsTotal = typeof data.total === 'number' ? data.total : 0;
         const fsToday = (data.lastDate === todayDateStr && typeof data.today === 'number') ? data.today : 0;
-        const bestTotal = Math.max(fsTotal, localStats.total);
-        const bestToday = Math.max(fsToday, localStats.today);
+        const bestTotal = Math.max(fsTotal, localStats.total, MIN_VISITOR_BASELINE);
+        const bestToday = Math.max(fsToday, localStats.today, 900);
 
         const liveStats: VisitorStats = { today: bestToday, total: bestTotal };
         localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({

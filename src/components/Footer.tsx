@@ -15,7 +15,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
       const raw = localStorage.getItem('mhs_real_visit_count_v5');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (typeof parsed.total === 'number' && parsed.total < 5000) {
+        if (typeof parsed.total === 'number') {
           return {
             today: typeof parsed.today === 'number' ? parsed.today : 1,
             total: parsed.total
@@ -30,22 +30,18 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
 
   useEffect(() => {
     let isMounted = true;
-    // Fetches ONLY once per user session, deferred slightly so it never blocks first paint
-    const timer = window.setTimeout(() => {
-      getVisitorCountsOncePerSession()
-        .then((stats) => {
-          if (isMounted) {
-            setVisitorStats(stats);
-          }
-        })
-        .catch((err) => {
-          console.warn('Visitor counter init error:', err);
-        });
-    }, 500);
+    getVisitorCountsOncePerSession()
+      .then((stats) => {
+        if (isMounted) {
+          setVisitorStats(stats);
+        }
+      })
+      .catch((err) => {
+        console.warn('Visitor counter init error:', err);
+      });
 
     return () => {
       isMounted = false;
-      window.clearTimeout(timer);
     };
   }, []);
 
