@@ -620,13 +620,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         {/* Institutional Page Masthead & Standard Portal Navigation Tabs */}
         <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-6 overflow-hidden">
           <div className="px-5 py-5 sm:px-6 sm:py-6">
-            <div className="text-xs font-semibold text-slate-600 mb-1">
+            <div className="text-xs sm:text-sm font-semibold text-slate-600 mb-1">
               {ORG_DETAILS.name} · आजीवन सभासद कक्ष
             </div>
-            <h1 className="font-serifDevanagari text-xl sm:text-2xl md:text-[26px] font-bold text-[#193568] leading-snug">
+            <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-bold text-[#193568] leading-snug">
               सदस्यत्व नोंदणी व अधिकृत सभासद यादी
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed max-w-3xl">
+            <p className="text-base text-slate-600 mt-2 leading-relaxed max-w-3xl">
               नोंदणीकृत सभासद यादी, अर्जाची स्थिती व आय-कार्ड डाऊनलोड आणि नवीन आजीवन सदस्यत्व अर्जाची अधिकृत सुविधा.
             </p>
           </div>
@@ -639,7 +639,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 setActiveJumpTab('directory');
                 directorySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className={`px-2.5 sm:px-4 py-2.5 text-[11.5px] sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+              className={`px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                 activeJumpTab === 'directory'
                   ? 'border-[#193568] text-[#193568] bg-white'
                   : 'border-transparent text-slate-600 hover:text-[#193568]'
@@ -653,7 +653,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 setActiveJumpTab('track');
                 trackSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className={`px-2.5 sm:px-4 py-2.5 text-[11.5px] sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+              className={`px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                 activeJumpTab === 'track'
                   ? 'border-[#193568] text-[#193568] bg-white'
                   : 'border-transparent text-slate-600 hover:text-[#193568]'
@@ -667,7 +667,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 setActiveJumpTab('register');
                 formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className={`px-2.5 sm:px-4 py-2.5 text-[11.5px] sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+              className={`px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                 activeJumpTab === 'register'
                   ? 'border-[#193568] text-[#193568] bg-white'
                   : 'border-transparent text-slate-600 hover:text-[#193568]'
@@ -687,19 +687,19 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         <div ref={trackSectionRef} className="bg-white rounded-md border border-slate-300 mb-8 overflow-hidden">
           <div className="bg-[#f8fafc] border-b border-slate-200 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <Search className="w-4 h-4 text-[#193568] shrink-0" />
-              <h3 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#193568] leading-tight">
+              <Search className="w-5 h-5 text-[#193568] shrink-0" />
+              <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#193568] leading-tight">
                 अर्जाची स्थिती तपासा व आय-कार्ड मिळवा
               </h3>
             </div>
-            <span className="text-[11px] font-medium text-slate-500">
+            <span className="text-xs sm:text-sm font-medium text-slate-500">
               मोबाईल क्र. · सदस्य क्र. · अर्ज क्र.
             </span>
           </div>
 
           <div className="p-5 sm:p-6">
             <div className="flex flex-col gap-3">
-              <p className="text-xs sm:text-sm text-slate-700 font-medium">
+              <p className="text-base text-slate-700 font-medium leading-relaxed">
                 आपला १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज संदर्भ क्रमांक खालील रकान्यात प्रविष्ट करा:
               </p>
 
@@ -711,13 +711,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     placeholder="उदा. 9876543210 किंवा MS/2026/..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full text-sm text-slate-900 bg-white border border-slate-300 focus:border-[#193568] rounded-md pl-10 pr-4 py-2.5 focus:outline-none"
+                    className="w-full text-sm sm:text-base text-slate-900 bg-white border border-slate-300 focus:border-[#193568] rounded-md pl-10 pr-4 py-2.5 focus:outline-none"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isTrackingStatus}
-                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-70 text-white text-sm font-semibold px-6 py-2.5 rounded-md shrink-0 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-70 text-white text-sm sm:text-base font-semibold px-6 py-2.5 rounded-md shrink-0 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <Search className="w-4 h-4" />
                   <span>{isTrackingStatus ? 'तपासत आहे...' : 'स्थिती तपासा'}</span>
@@ -746,10 +746,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     </div>
                   )}
                   <div>
-                    <span className="font-serifDevanagari font-bold text-[#193568] text-base block">
+                    <span className="font-serifDevanagari font-bold text-[#193568] text-lg sm:text-xl block">
                       {searchResult.salutation} {searchResult.fullName}
                     </span>
-                    <span className="text-xs text-slate-600">
+                    <span className="text-sm text-slate-600">
                       जिल्हा: <strong>{searchResult.district}</strong>
                       {searchResult.professional && ` · संवर्ग: ${searchResult.professional}`}
                     </span>
@@ -757,7 +757,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 </div>
 
                 <span
-                  className={`px-2.5 py-1 rounded text-xs font-semibold self-start sm:self-auto border ${
+                  className={`px-2.5 py-1 rounded text-xs sm:text-sm font-semibold self-start sm:self-auto border ${
                     searchResult.status === 'approved'
                       ? 'bg-emerald-700 text-white border-emerald-800'
                       : 'bg-amber-100 text-amber-900 border-amber-300'
@@ -770,23 +770,23 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               {/* Approved View with Direct PDF Download */}
               {searchResult.status === 'approved' ? (
                 <div className="mt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-emerald-800 text-xs sm:text-sm font-semibold">
+                  <div className="flex items-center gap-2 text-emerald-800 text-sm sm:text-base font-semibold">
                     <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
                     <span>अभिनंदन, आपले आजीवन सदस्यत्व मंजूर करण्यात आले आहे.</span>
                   </div>
 
-                  <div className="bg-white p-3.5 rounded-md border border-slate-300 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-3">
+                  <div className="bg-white p-3.5 rounded-md border border-slate-300 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <span className="text-slate-500 block text-[11px]">अधिकृत आजीवन सदस्य क्रमांक:</span>
-                      <strong className="text-base text-[#193568] font-mono tabular-nums">
+                      <span className="text-slate-500 block text-xs sm:text-sm">अधिकृत आजीवन सदस्य क्रमांक:</span>
+                      <strong className="text-base sm:text-lg text-[#193568] font-mono tabular-nums">
                         {searchResult.memberNumber || 'MS/2026/MAHA/0001'}
                       </strong>
                     </div>
 
                     {searchResult.isOfficial && searchResult.officialPost && (
                       <div>
-                        <span className="text-slate-500 block text-[11px]">संघटनेतील पद:</span>
-                        <strong className="text-xs text-slate-900 font-bold">
+                        <span className="text-slate-500 block text-xs sm:text-sm">संघटनेतील पद:</span>
+                        <strong className="text-sm sm:text-base text-slate-900 font-bold">
                           {searchResult.officialPost} {searchResult.officialTaluka ? `(${searchResult.officialTaluka})` : ''}
                         </strong>
                       </div>
@@ -796,7 +796,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       type="button"
                       onClick={() => handleDownloadApprovedCertificate(searchResult)}
                       disabled={isDownloadingCert}
-                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-xs px-4 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-sm px-4 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       <Download className={`w-4 h-4 ${isDownloadingCert ? 'animate-spin' : ''}`} />
                       {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'अधिकृत आय-कार्ड डाऊनलोड (PDF)'}
@@ -805,7 +805,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">
-                  <div className="text-xs text-amber-950 font-medium bg-amber-50 p-3 rounded-md border border-amber-200">
+                  <div className="text-sm sm:text-base text-amber-950 font-medium bg-amber-50 p-3 rounded-md border border-amber-200 leading-relaxed">
                     आपला अर्ज जतन आहे, परंतु <strong>₹220</strong> सदस्यत्व शुल्क अद्याप प्रलंबित आहे. पेमेंट पूर्ण करताच आपले अधिकृत आय-कार्ड उपलब्ध होईल.
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5">
@@ -817,7 +817,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                         handleStartRazorpayCheckout(searchResult as MembershipApplication);
                       }}
                       disabled={isRazorpayLoading}
-                      className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white text-xs font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white text-sm font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CreditCard className="w-4 h-4" />
                       <span>{isRazorpayLoading ? 'पेमेंट खिडकी उघडत आहे...' : 'Razorpay ने ₹220 भरा'}</span>
@@ -828,7 +828,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                         setPendingApp(searchResult as MembershipApplication);
                         setShowPaymentModal(true);
                       }}
-                      className="bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-sm font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4 text-emerald-700" />
                       <span>पेमेंट पर्याय व स्थिती तपासा</span>
@@ -840,7 +840,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           )}
 
           {searchResult === 'not_found' && (
-            <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium rounded-md flex items-center gap-2">
+            <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium rounded-md flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>कोणताही अर्ज आढळला नाही. कृपया अचूक १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज क्रमांक तपासून पुन्हा प्रयत्न करा.</span>
             </div>
@@ -850,10 +850,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
         {/* 3. नवीन सदस्यत्व नोंदणी अर्ज Header */}
         <div ref={formSectionRef} className="bg-white border border-slate-300 border-t-4 border-t-[#df6b16] rounded-md p-4 sm:p-5 mb-5">
-          <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568]">
+          <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#193568]">
             नवीन आजीवन सदस्यत्व नोंदणी अर्ज
           </h2>
-          <p className="text-xs text-slate-600 mt-1">
+          <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
             महासंघाचे अधिकृत आजीवन सभासदत्व मिळवण्यासाठी खालील सर्व आवश्यक माहिती अचूक भरा.
           </p>
         </div>
@@ -861,7 +861,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         {/* Main Application Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {formAlert && (
-            <div className="p-3.5 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-md flex items-center gap-2 font-medium">
+            <div className="p-3.5 bg-rose-50 border border-rose-300 text-rose-800 text-sm rounded-md flex items-center gap-2 font-medium">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{formAlert}</span>
             </div>
@@ -869,21 +869,21 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
           {/* Section 1: Personal Details & Passport Photo Upload with Live Preview */}
           <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 space-y-4">
-            <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#193568] pb-2.5 border-b border-slate-200">
+            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2.5 border-b border-slate-200">
               १. वैयक्तिक माहिती व पासपोर्ट फोटो
             </h2>
 
             {/* Marathi Language Notice */}
-            <div className="bg-amber-50/70 border border-amber-300 px-3.5 py-2.5 rounded-md text-xs text-slate-800">
+            <div className="bg-amber-50/70 border border-amber-300 px-3.5 py-2.5 rounded-md text-sm sm:text-base text-slate-800 leading-relaxed">
               <strong>सूचना:</strong> अर्जातील वैयक्तिक माहिती (नाव, पत्ता, केंद्राचे नाव व छंद) <strong>फक्त मराठी भाषेतच</strong> भरावी.
             </div>
 
             {/* Passport Photo Upload & Live Preview Section */}
             <div className="bg-slate-50 border border-slate-200 rounded-md p-4 sm:p-5">
-              <label className="font-bold text-[#193568] block mb-1 text-xs sm:text-sm">
+              <label className="font-bold text-[#193568] block mb-1 text-sm sm:text-base">
                 पासपोर्ट फोटो अपलोड करा <span className="text-[#df6b16]">*</span>
               </label>
-              <p className="text-[11px] text-slate-600 mb-3">
+              <p className="text-sm text-slate-600 mb-3 leading-relaxed">
                 अधिकृत ओळखपत्रासाठी रंगीत पासपोर्ट फोटो (JPG / PNG) निवडा; निवडताच उजवीकडे पूर्वावलोकन दिसेल.
               </p>
 
@@ -895,10 +895,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     className="border border-dashed border-slate-400 hover:border-[#193568] bg-white rounded-md p-5 text-center cursor-pointer transition-colors hover:bg-slate-50"
                   >
                     <Upload className="w-7 h-7 text-[#193568] mx-auto mb-1.5" />
-                    <p className="text-xs font-semibold text-[#193568]">
+                    <p className="text-sm sm:text-base font-semibold text-[#193568]">
                       फोटो फाईल निवडण्यासाठी येथे क्लिक करा
                     </p>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                       फोटो आकार स्वयंचलित ऑप्टिमाइझ करून सुरक्षित जतन केला जाईल
                     </p>
                     <input
@@ -911,17 +911,17 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   </div>
 
                   {isUploadingPhoto && (
-                    <p className="text-xs text-[#193568] mt-2 font-semibold">
+                    <p className="text-sm text-[#193568] mt-2 font-semibold">
                       फोटो प्रक्रिया सुरू आहे...
                     </p>
                   )}
                   {photoError && (
-                    <p className="text-xs text-rose-700 mt-2 font-semibold">
+                    <p className="text-sm text-rose-700 mt-2 font-semibold">
                       {photoError}
                     </p>
                   )}
                   {photoSizeKb > 0 && !photoError && !isUploadingPhoto && (
-                    <p className="text-xs text-emerald-700 mt-2 font-semibold flex items-center gap-1">
+                    <p className="text-sm text-emerald-700 mt-2 font-semibold flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" />
                       फोटो जोडला गेला (आकार: {photoSizeKb} KB)
                     </p>
@@ -940,13 +940,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     ) : (
                       <div className="text-center p-2 text-slate-400">
                         <ImageIcon className="w-7 h-7 mx-auto mb-1 opacity-50" />
-                        <span className="text-[11px] block leading-tight font-medium">
+                        <span className="text-xs sm:text-sm block leading-tight font-medium">
                           पासपोर्ट फोटो पूर्वावलोकन
                         </span>
                       </div>
                     )}
                   </div>
-                  <span className="text-[11px] font-medium text-slate-600 mt-1.5">
+                  <span className="text-xs sm:text-sm font-medium text-slate-600 mt-1.5">
                     फोटो पूर्वावलोकन
                   </span>
                 </div>
@@ -954,7 +954,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
 
             {/* Personal Details Inputs with Strict Marathi Guidance */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm sm:text-base pt-2">
               <div>
                 <label className="font-bold text-[#172033] block mb-1">
                   पद / आदरार्थी (Salutation) <span className="text-[#df6b16]">*</span>
@@ -1015,7 +1015,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   placeholder="उदा. amol@gmail.com (आय-कार्ड ई-मेलवर मिळेल)"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
-                <p className="text-[10.5px] text-slate-500 mt-1">
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
                   पेमेंट पूर्ण झाल्यावर आपले अधिकृत PDF आय-कार्ड थेट या ई-मेलवर पाठवले जाईल.
                 </p>
               </div>
@@ -1066,7 +1066,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               {/* तालुका निवडल्यास कार्यरत केंद्राचे नाव प्रविष्ट करण्याचा बॉक्स */}
               {taluka && (
                 <div className="sm:col-span-2 bg-slate-50 p-4 rounded-md border border-slate-300 space-y-1.5">
-                  <label className="font-bold text-[#193568] block text-xs sm:text-sm">
+                  <label className="font-bold text-[#193568] block text-sm sm:text-base">
                     कार्यरत केंद्राचे नाव लिहा <span className="text-[#df6b16]">*</span>
                   </label>
                   <input
@@ -1075,9 +1075,9 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     value={centerName}
                     onChange={(e) => setCenterName(e.target.value)}
                     placeholder="उदा. कें. शा. उंबर्डा बाजार / केंद्र - मालेगाव"
-                    className="w-full p-2.5 bg-white border border-slate-300 focus:border-[#193568] rounded-md focus:outline-none text-xs font-semibold text-slate-900"
+                    className="w-full p-2.5 bg-white border border-slate-300 focus:border-[#193568] rounded-md focus:outline-none text-sm sm:text-base font-semibold text-slate-900"
                   />
-                  <p className="text-[11px] text-slate-600">
+                  <p className="text-xs sm:text-sm text-slate-600">
                     आपण ज्या बीट / शिक्षण केंद्रामध्ये कार्यरत आहात त्या केंद्राचे नाव मराठीत प्रविष्ट करा.
                   </p>
                 </div>
@@ -1128,11 +1128,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
           {/* Section 2: Educational & Professional Qualifications */}
           <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 space-y-4">
-            <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#193568] pb-2.5 border-b border-slate-200">
+            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2.5 border-b border-slate-200">
               २. शैक्षणिक व व्यावसायिक माहिती
             </h2>
 
-            <div className="space-y-4 text-xs">
+            <div className="space-y-4 text-sm sm:text-base">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* 1. शैक्षणिक पात्रता */}
                 <div>
@@ -1203,13 +1203,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
           {/* Section 3: Membership Fee & Consolidated Official Support Notice */}
           <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 space-y-4">
-            <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#193568] pb-2.5 border-b border-slate-200">
+            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568] pb-2.5 border-b border-slate-200">
               ३. सदस्यत्व शुल्क तपशील व पेमेंट सूचना
             </h2>
 
             {/* Official Fee Structure Table */}
             <div className="border border-slate-300 rounded-md overflow-hidden">
-              <table className="w-full text-xs text-left border-collapse">
+              <table className="w-full text-sm text-left border-collapse">
                 <thead className="bg-slate-100 text-[#193568] border-b border-slate-300">
                   <tr>
                     <th className="py-2.5 px-4 font-bold">शुल्काचा तपशील</th>
@@ -1227,23 +1227,23 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   </tr>
                   <tr className="bg-slate-50 font-bold text-[#193568]">
                     <td className="py-2.5 px-4">एकूण ऑनलाईन देय रक्कम</td>
-                    <td className="py-2.5 px-4 text-right font-mono tabular-nums text-sm">₹ 220.00</td>
+                    <td className="py-2.5 px-4 text-right font-mono tabular-nums text-base">₹ 220.00</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-md px-4 py-3 text-xs text-slate-700 leading-relaxed flex items-start gap-2.5">
-              <ShieldCheck className="w-4 h-4 text-[#193568] shrink-0 mt-0.5" />
+            <div className="bg-slate-50 border border-slate-200 rounded-md px-4 py-3 text-sm sm:text-base text-slate-700 leading-relaxed flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-[#193568] shrink-0 mt-1" />
               <span>
                 अर्ज सबमिट केल्यानंतर सुरक्षित <strong>Razorpay Payment Window</strong> उघडेल. त्याद्वारे UPI (PhonePe / GPay / Paytm) किंवा डेबिट/क्रेडिट कार्डने ₹220 शुल्क भरता येईल.
               </span>
             </div>
 
             {/* Single Consolidated Support & Instruction Notice (Nandanwar Sir cited ONLY ONCE) */}
-            <div className="bg-amber-50/70 border border-amber-300 rounded-md p-4 text-xs text-slate-800 space-y-2 leading-relaxed">
-              <div className="font-bold text-[#193568] flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-[#df6b16] shrink-0" />
+            <div className="bg-amber-50/70 border border-amber-300 rounded-md p-4 text-sm sm:text-base text-slate-800 space-y-2 leading-relaxed">
+              <div className="font-bold text-base sm:text-lg text-[#193568] flex items-center gap-1.5">
+                <Phone className="w-4 h-4 text-[#df6b16] shrink-0" />
                 <span>महत्त्वाची सूचना व पेमेंट साहाय्य</span>
               </div>
               <ol className="list-decimal pl-5 space-y-1.5 text-slate-700">
@@ -1283,8 +1283,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 }}
                 className="w-4 h-4 mt-1 text-[#193568] rounded border-slate-400 focus:ring-[#193568] shrink-0 cursor-pointer"
               />
-              <div className="text-xs text-slate-800 leading-relaxed">
-                <strong className="block text-sm text-[#193568] font-serifDevanagari mb-1">
+              <div className="text-sm sm:text-base text-slate-800 leading-relaxed">
+                <strong className="block text-base sm:text-lg text-[#193568] font-serifDevanagari mb-1">
                   ४. सदस्यत्व स्वयंघोषणापत्र <span className="text-rose-600">*</span>
                 </strong>
                 "मी याद्वारे घोषित करतो/करते की, मी शिक्षण विभागातील कार्यरत अधिकारी / केंद्रप्रमुख असून महासंघाच्या सदस्यत्वासाठी पात्र आहे. माझ्याद्वारे अर्जात भरलेली सर्व वैयक्तिक व कार्यालयीन माहिती पूर्णपणे सत्य आणि अचूक आहे. मी संघटनेचे नियम व उद्दिष्टे वाचली असून मला महासंघाच्या सर्व अटी व शर्ती पूर्णपणे मान्य आहेत."
@@ -1295,8 +1295,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           {/* Existing Pending Form Recovery Banner */}
           {existingPendingMatch && (
             <div className="bg-amber-50 border border-amber-400 rounded-md p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="text-xs text-slate-800 space-y-1">
-                <div className="font-bold text-sm text-[#193568] flex items-center gap-1.5">
+              <div className="text-sm sm:text-base text-slate-800 space-y-1">
+                <div className="font-bold text-base sm:text-lg text-[#193568] flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-[#df6b16] shrink-0" />
                   <span>आपला अर्ज यापूर्वीच जतन आहे (नवीन फॉर्म भरण्याची आवश्यकता नाही)</span>
                 </div>
@@ -1311,7 +1311,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   setPendingApp(existingPendingMatch.app);
                   setShowPaymentModal(true);
                 }}
-                className="w-full sm:w-auto bg-[#193568] hover:bg-[#11254a] text-white font-semibold px-5 py-2.5 rounded-md text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                className="w-full sm:w-auto bg-[#193568] hover:bg-[#11254a] text-white font-semibold px-5 py-2.5 rounded-md text-sm sm:text-base flex items-center justify-center gap-2 shrink-0 cursor-pointer"
               >
                 <CreditCard className="w-4 h-4" />
                 <span>या अर्जाचे पेमेंट पूर्ण करा (₹220)</span>
@@ -1321,9 +1321,9 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
           {/* Submit Button Section */}
           <div className="bg-white rounded-md border border-slate-300 p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="text-xs text-slate-600 max-w-md space-y-1.5">
+            <div className="text-sm sm:text-base text-slate-600 max-w-md space-y-1.5 leading-relaxed">
               {formAlert && (
-                <div className="text-xs font-semibold text-rose-700 bg-rose-50 p-2.5 rounded-md border border-rose-200 flex items-center gap-1.5">
+                <div className="text-sm font-semibold text-rose-700 bg-rose-50 p-2.5 rounded-md border border-rose-200 flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{formAlert}</span>
                 </div>
@@ -1335,7 +1335,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             <button
               type="submit"
               disabled={isSubmittingForm}
-              className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-65 text-white font-semibold px-7 py-3 rounded-md text-sm transition-colors flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+              className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-65 text-white font-semibold px-7 py-3 rounded-md text-base transition-colors flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
               <UserCheck className="w-4 h-4" />
               <span>{isSubmittingForm ? 'अर्ज जतन होत आहे...' : 'अर्ज जतन करा व ₹220 पेमेंट करा'}</span>
@@ -1350,43 +1350,43 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               <CheckCircle2 className="w-7 h-7 text-emerald-700 shrink-0 mt-0.5" />
               <div className="space-y-3 flex-1">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
-                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#193568]">
+                  <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#193568]">
                     आपले आजीवन सदस्यत्व यशस्वीरित्या मंजूर झाले आहे
                   </h3>
-                  <span className="px-2.5 py-1 rounded bg-emerald-700 text-white font-semibold text-xs">
+                  <span className="px-2.5 py-1 rounded bg-emerald-700 text-white font-semibold text-xs sm:text-sm">
                     मंजूर (Approved)
                   </span>
                 </div>
 
-                <div className="bg-slate-50 p-4 rounded-md border border-slate-200 space-y-2.5 text-xs">
+                <div className="bg-slate-50 p-4 rounded-md border border-slate-200 space-y-2.5 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <span className="text-slate-500 block text-[11px]">अधिकृत आजीवन सदस्य क्रमांक:</span>
-                      <strong className="text-base text-[#193568] font-mono tabular-nums font-bold">
+                      <span className="text-slate-500 block text-xs sm:text-sm">अधिकृत आजीवन सदस्य क्रमांक:</span>
+                      <strong className="text-base sm:text-lg text-[#193568] font-mono tabular-nums font-bold">
                         {submittedApp.memberNumber || 'MS/2026/MAHA/0001'}
                       </strong>
                     </div>
                     <div>
-                      <span className="text-slate-500 block text-[11px]">अर्ज संदर्भ क्रमांक:</span>
-                      <strong className="text-xs text-slate-800 font-mono">
+                      <span className="text-slate-500 block text-xs sm:text-sm">अर्ज संदर्भ क्रमांक:</span>
+                      <strong className="text-sm sm:text-base text-slate-800 font-mono">
                         {submittedApp.applicationNumber}
                       </strong>
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-700">
+                  <p className="text-sm sm:text-base text-slate-700 leading-relaxed">
                     {ORG_DETAILS.name} मध्ये आपले स्वागत आहे. आपले अधिकृत सदस्यत्व ओळखपत्र (ID Card) डाऊनलोडसाठी तयार आहे.
                   </p>
 
                   {emailDeliveryStatus === 'sending' && (
-                    <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 text-xs font-medium flex items-center gap-2">
+                    <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 text-sm font-medium flex items-center gap-2">
                       <Mail className="w-4 h-4 text-blue-700 shrink-0" />
                       <span>आपले PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले जात आहे...</span>
                     </div>
                   )}
 
                   {emailDeliveryStatus === 'sent' && (
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md px-3 py-2 text-xs font-medium flex items-center gap-2">
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md px-3 py-2 text-sm font-medium flex items-center gap-2">
                       <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
                       <span>आपले अधिकृत PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले आहे (कृपया Inbox / Spam तपासा).</span>
                     </div>
@@ -1397,7 +1397,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       type="button"
                       onClick={() => handleDownloadApprovedCertificate(submittedApp)}
                       disabled={isDownloadingCert}
-                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-xs px-5 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
+                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-sm px-5 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
                     >
                       <Download className={`w-4 h-4 ${isDownloadingCert ? 'animate-spin' : ''}`} />
                       {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'अधिकृत आय-कार्ड डाऊनलोड (PDF)'}
@@ -1409,7 +1409,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                         setSubmittedApp(null);
                         window.scrollTo({ top: 380, behavior: 'smooth' });
                       }}
-                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold px-4 py-2.5 rounded-md transition-colors cursor-pointer"
+                      className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-sm font-semibold px-4 py-2.5 rounded-md transition-colors cursor-pointer"
                     >
                       नवीन अर्ज भरा
                     </button>
@@ -1427,10 +1427,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               {/* Modal Header */}
               <div className="sticky top-0 z-30 bg-[#193568] text-white px-5 py-4 flex items-center justify-between shrink-0 border-b-2 border-[#efb24b]">
                 <div>
-                  <h3 className="font-serifDevanagari font-bold text-base sm:text-lg leading-tight text-white">
+                  <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl leading-tight text-white">
                     अधिकृत सदस्यत्व शुल्क पेमेंट — ₹220
                   </h3>
-                  <p className="text-[11px] text-slate-200 mt-0.5">
+                  <p className="text-xs sm:text-sm text-slate-200 mt-0.5">
                     {ORG_DETAILS.name}
                   </p>
                 </div>
@@ -1440,7 +1440,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     setShowPaymentModal(false);
                     setPaymentStatusNotice('');
                   }}
-                  className="px-2.5 py-1 rounded border border-white/25 hover:bg-white/10 text-white text-xs font-semibold transition-colors shrink-0 cursor-pointer"
+                  className="px-2.5 py-1 rounded border border-white/25 hover:bg-white/10 text-white text-sm font-semibold transition-colors shrink-0 cursor-pointer"
                   title="बंद करा"
                   aria-label="पेमेंट खिडकी बंद करा"
                 >
@@ -1451,7 +1451,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               {/* Checkout Summary & Payment Action */}
               <div className="p-5 sm:p-6 space-y-4">
                 {razorpayError && (
-                  <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-md flex items-center justify-between gap-2 font-medium">
+                  <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-sm rounded-md flex items-center justify-between gap-2 font-medium">
                     <span>{razorpayError}</span>
                     <button
                       type="button"
@@ -1464,19 +1464,19 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 )}
 
                 {paymentStatusNotice && (
-                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-md font-medium leading-relaxed">
+                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-sm rounded-md font-medium leading-relaxed">
                     {paymentStatusNotice}
                   </div>
                 )}
 
                 {existingPendingMatch && existingPendingMatch.app.id === pendingApp.id && (
-                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-xs rounded-md font-medium leading-relaxed">
+                  <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-sm rounded-md font-medium leading-relaxed">
                     <strong>टीप:</strong> आपला अर्ज यापूर्वीच जतन केलेला आहे (संदर्भ क्र.: <span className="font-mono font-bold">{pendingApp.applicationNumber}</span>). नवीन फॉर्म न भरता या अर्जाचे ₹220 शुल्क पूर्ण करा.
                   </div>
                 )}
 
                 {/* Order Summary Table */}
-                <div className="border border-slate-300 rounded-md overflow-hidden text-xs">
+                <div className="border border-slate-300 rounded-md overflow-hidden text-sm">
                   <div className="bg-slate-100 px-4 py-2 border-b border-slate-300 font-bold text-[#193568]">
                     अर्ज व देय रकमेचा तपशील
                   </div>
@@ -1491,14 +1491,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     </div>
                     <div className="px-4 py-2 flex justify-between gap-2">
                       <span className="text-slate-600">शुल्क विवरण (आजीवन ₹100 + वार्षिक ₹120)</span>
-                      <span className="font-mono tabular-nums font-bold text-[#193568] text-sm">₹ 220.00</span>
+                      <span className="font-mono tabular-nums font-bold text-[#193568] text-base">₹ 220.00</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Primary Verified Payment Button */}
                 <div className="bg-slate-50 border border-slate-200 rounded-md p-4 text-center space-y-3">
-                  <p className="text-xs text-slate-700 leading-relaxed">
+                  <p className="text-sm sm:text-base text-slate-700 leading-relaxed">
                     UPI (PhonePe / GPay / Paytm) किंवा कार्डद्वारे पेमेंट पूर्ण करा. पेमेंट पडताळणी होताच आपले अधिकृत आय-कार्ड तात्काळ तयार होईल.
                   </p>
 
@@ -1506,20 +1506,20 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     type="button"
                     onClick={() => handleStartRazorpayCheckout(pendingApp)}
                     disabled={isRazorpayLoading}
-                    className="w-full px-6 py-3 bg-[#193568] hover:bg-[#11254a] text-white font-semibold text-sm rounded-md flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
+                    className="w-full px-6 py-3 bg-[#193568] hover:bg-[#11254a] text-white font-semibold text-base rounded-md flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
                   >
                     <ShieldCheck className="w-4 h-4 text-[#efb24b]" />
                     <span>{isRazorpayLoading ? 'Razorpay पेमेंट खिडकी उघडत आहे...' : 'Razorpay द्वारे सुरक्षित ₹220 भरा'}</span>
                   </button>
 
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs sm:text-sm text-slate-500">
                     अधिकृत पेमेंट पडताळणीनंतरच सदस्यत्व क्रमांक व आय-कार्ड जारी केले जाते.
                   </p>
                 </div>
 
                 {/* Secondary Direct Payment Page + Live Webhook Status Checker */}
                 <div className="bg-white border border-slate-200 rounded-md p-3.5 space-y-2.5">
-                  <div className="text-xs text-slate-700 leading-relaxed">
+                  <div className="text-sm text-slate-700 leading-relaxed">
                     <strong className="text-[#193568] block mb-0.5">पॉपअप खिडकी न उघडल्यास पर्यायी सुविधा:</strong>
                     पर्यायी लिंकवरून पेमेंट केल्यास २–५ मिनिटांत अर्ज आपोआप मंजूर होतो. त्यानंतर खालील <em>"पेमेंट स्थिती तपासा"</em> बटनावर क्लिक करा.
                   </div>
@@ -1528,7 +1528,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       href={`https://rzp.io/rzp/Us7q4y7?name=${encodeURIComponent(pendingApp.fullName)}&email=${encodeURIComponent(pendingApp.email)}&phone=${encodeURIComponent(pendingApp.phone)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 font-semibold text-xs rounded-md flex items-center gap-1.5 transition-colors"
+                      className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 font-semibold text-sm rounded-md flex items-center gap-1.5 transition-colors"
                     >
                       <span>पर्यायी Razorpay लिंक</span>
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -1559,7 +1559,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                           setIsCheckingPaymentStatus(false);
                         }
                       }}
-                      className="px-3.5 py-2 bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-60 text-white font-semibold text-xs rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="px-3.5 py-2 bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-60 text-white font-semibold text-sm rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>{isCheckingPaymentStatus ? 'तपासत आहे...' : 'पेमेंट स्थिती तपासा'}</span>
@@ -1568,7 +1568,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 </div>
 
                 {/* Clean Modal Footer */}
-                <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] text-slate-600 pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-between flex-wrap gap-2 text-xs sm:text-sm text-slate-600 pt-2 border-t border-slate-200">
                   <span>तांत्रिक मदतीसाठी मुख्य पानावरील पेमेंट साहाय्य कक्षाशी संपर्क साधावा.</span>
                   <button
                     type="button"
@@ -1576,7 +1576,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       setShowPaymentModal(false);
                       setPaymentStatusNotice('');
                     }}
-                    className="px-3 py-1.5 bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded transition-colors cursor-pointer"
+                    className="px-3 py-1.5 bg-slate-100 border border-slate-300 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded transition-colors cursor-pointer"
                   >
                     बंद करा
                   </button>

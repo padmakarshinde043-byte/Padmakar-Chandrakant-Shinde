@@ -867,10 +867,10 @@ export const AppointmentsTab: React.FC = () => {
         <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-5 overflow-hidden">
           <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
-              <div className="text-xs font-semibold text-slate-600 mb-1">
+              <div className="text-xs sm:text-sm font-semibold text-slate-600 mb-1">
                 महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ · कार्यकारिणी कक्ष
               </div>
-              <h1 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#193568] leading-snug">
+              <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-bold text-[#193568] leading-snug">
                 जिल्हा व राज्य पदाधिकारी सूची
               </h1>
             </div>
@@ -900,10 +900,10 @@ export const AppointmentsTab: React.FC = () => {
                 </select>
               </div>
 
-              <div className="flex items-center justify-between sm:justify-end gap-2.5 text-xs border-t sm:border-t-0 pt-2.5 sm:pt-0 border-slate-200">
+              <div className="flex items-center justify-between sm:justify-end gap-2.5 text-xs sm:text-sm border-t sm:border-t-0 pt-2.5 sm:pt-0 border-slate-200">
                 <span className="text-slate-600 font-medium tabular-nums">
                   एकूण पदाधिकारी:{' '}
-                  <strong className="text-[#193568] font-mono font-bold text-sm">
+                  <strong className="text-[#193568] font-mono font-bold text-base">
                     {toEnglishDigits(districtOfficials.length)}
                   </strong>
                 </span>
@@ -912,7 +912,7 @@ export const AppointmentsTab: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+                    className="border border-rose-300 text-rose-700 hover:bg-rose-50 text-xs sm:text-sm font-semibold px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
                   >
                     लॉगआउट
                   </button>
@@ -922,7 +922,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={() => loadData(true)}
                   disabled={isRefreshing}
-                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white px-2.5 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors"
+                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white px-2.5 py-1.5 rounded-md flex items-center gap-1.5 text-xs sm:text-sm font-semibold cursor-pointer transition-colors"
                   title="रिफ्रेश करा"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -937,45 +937,45 @@ export const AppointmentsTab: React.FC = () => {
             <button
               type="button"
               onClick={handleTabClickDirectory}
-              className={`px-3 sm:px-4 py-3 text-xs sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
                 activeSubTab === 'directory'
                   ? 'border-[#193568] text-[#193568] bg-white'
                   : 'border-transparent text-slate-600 hover:text-[#193568]'
               }`}
             >
-              <Users className="w-3.5 h-3.5 shrink-0" />
+              <Users className="w-4 h-4 shrink-0" />
               <span>पदाधिकारी सूची</span>
             </button>
 
             <button
               type="button"
               onClick={handleTabClickManage}
-              className={`px-3 sm:px-4 py-3 text-xs sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
                 activeSubTab === 'manage'
                   ? 'border-[#193568] text-[#193568] bg-white'
                   : 'border-transparent text-slate-600 hover:text-[#193568]'
               }`}
             >
-              <Building className="w-3.5 h-3.5 shrink-0" />
+              <Building className="w-4 h-4 shrink-0" />
               <span>जिल्हाध्यक्ष</span>
               {!isManageUnlocked && !isSuperAdmin && (
-                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               )}
             </button>
 
             <button
               type="button"
               onClick={handleTabClickLetters}
-              className={`px-3 sm:px-4 py-3 text-xs sm:text-[13px] font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
                 activeSubTab === 'letters'
                   ? 'border-[#193568] text-[#193568] bg-white'
                   : 'border-transparent text-slate-600 hover:text-[#193568]'
               }`}
             >
-              <Award className="w-3.5 h-3.5 shrink-0" />
+              <Award className="w-4 h-4 shrink-0" />
               <span>राज्याध्यक्ष</span>
               {!isLettersUnlocked && !isSuperAdmin && (
-                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               )}
             </button>
           </div>
@@ -990,13 +990,13 @@ export const AppointmentsTab: React.FC = () => {
             <div className="bg-[#193568] text-white px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2.5">
                 <Users className="w-5 h-5 text-[#efb24b] shrink-0" />
-                <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-white leading-snug">
+                <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white leading-snug">
                   जिल्हा कार्यकारणी सूची: {currentDistrict}
                 </h2>
               </div>
-              <div className="text-xs text-slate-100 font-medium tabular-nums">
+              <div className="text-xs sm:text-sm text-slate-100 font-medium tabular-nums">
                 एकूण पदाधिकारी:{' '}
-                <strong className="text-[#efb24b] font-mono text-sm font-bold">
+                <strong className="text-[#efb24b] font-mono text-base font-bold">
                   {toEnglishDigits(districtOfficials.length)}
                 </strong>
               </div>
@@ -1011,7 +1011,7 @@ export const AppointmentsTab: React.FC = () => {
                   placeholder="नाव, पद किंवा तालुका शोधा..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-md text-xs sm:text-sm focus:outline-none focus:border-[#193568] bg-white"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-md text-sm sm:text-base focus:outline-none focus:border-[#193568] bg-white"
                 />
               </div>
             </div>
@@ -1020,12 +1020,12 @@ export const AppointmentsTab: React.FC = () => {
             {isLoading ? (
               <div className="p-12 text-center text-slate-500 bg-white">
                 <RefreshCw className="w-7 h-7 mx-auto animate-spin text-[#193568] mb-3" />
-                <p className="text-sm font-semibold">पदाधिकारी यादी लोड होत आहे...</p>
+                <p className="text-base font-semibold">पदाधिकारी यादी लोड होत आहे...</p>
               </div>
             ) : searchedOfficials.length === 0 ? (
               <div className="p-12 text-center text-slate-500 bg-white">
                 <Users className="w-9 h-9 mx-auto text-slate-300 mb-2" />
-                <h4 className="font-semibold text-sm text-slate-700">
+                <h4 className="font-semibold text-base text-slate-700">
                   या जिल्ह्यात अजून एकही पदाधिकारी नोंदवलेला नाही.
                 </h4>
               </div>
@@ -1041,22 +1041,22 @@ export const AppointmentsTab: React.FC = () => {
                     return (
                       <div key={m.id} className="p-3.5 flex flex-col gap-1.5">
                         <div className="flex items-start gap-2.5">
-                          <span className="text-xs font-mono font-bold text-slate-500 w-5 shrink-0 pt-0.5 tabular-nums">
+                          <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 pt-0.5 tabular-nums">
                             {idx + 1}.
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-bold text-[#193568] leading-snug">
+                            <div className="text-base font-bold text-[#193568] leading-snug">
                               {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                             </div>
                             <div className="mt-1">
-                              <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                              <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
                                 {displayPost}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-xs text-slate-600 leading-relaxed pl-7">
+                        <div className="text-sm text-slate-600 leading-relaxed pl-8">
                           <span className="text-slate-800 font-semibold">सध्याचे पद:</span> {cadre}
                           {details && <span className="text-slate-500"> · {details}</span>}
                         </div>
@@ -1067,12 +1067,12 @@ export const AppointmentsTab: React.FC = () => {
 
                 {/* Desktop Registry Table View */}
                 <div className="hidden sm:block overflow-x-auto bg-white">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full text-left text-sm border-collapse">
                     <thead className="bg-slate-100 text-[#193568] font-bold border-b border-slate-300">
                       <tr>
-                        <th className="py-2.5 px-4 w-16 text-center border-r border-slate-200">अनु. क्र.</th>
-                        <th className="py-2.5 px-4 text-xs sm:text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
-                        <th className="py-2.5 px-4 text-xs sm:text-sm">सध्याचे पद व कार्यक्षेत्र</th>
+                        <th className="py-2.5 px-4 w-20 text-center border-r border-slate-200">अनु. क्र.</th>
+                        <th className="py-2.5 px-4 text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
+                        <th className="py-2.5 px-4 text-sm">सध्याचे पद व कार्यक्षेत्र</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -1088,17 +1088,17 @@ export const AppointmentsTab: React.FC = () => {
                             </td>
                             <td className="py-3 px-4 border-r border-slate-200">
                               <div className="flex flex-col items-start gap-1">
-                                <span className="font-bold text-[#193568] text-sm leading-snug">
+                                <span className="font-bold text-[#193568] text-sm sm:text-base leading-snug">
                                   {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                                 </span>
-                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
                                   {displayPost}
                                 </span>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-slate-600">
-                              <strong className="text-slate-800 block text-xs font-semibold">{cadre}</strong>
-                              <span className="text-xs text-slate-500">{details}</span>
+                              <strong className="text-slate-800 block text-sm font-semibold">{cadre}</strong>
+                              <span className="text-xs sm:text-sm text-slate-500">{details}</span>
                             </td>
                           </tr>
                         );
@@ -1119,10 +1119,10 @@ export const AppointmentsTab: React.FC = () => {
             {/* Top Management Header Bar */}
             <div className="bg-[#193568] text-white px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-[#efb24b]">
               <div>
-                <h2 className="font-serifDevanagari font-bold text-base sm:text-lg text-white">
+                <h2 className="font-serifDevanagari font-bold text-xl sm:text-2xl text-white">
                   जिल्हाध्यक्ष कार्यकारिणी व्यवस्थापन: {currentDistrict}
                 </h2>
-                <p className="text-slate-200 text-xs mt-0.5">
+                <p className="text-slate-200 text-xs sm:text-sm mt-0.5">
                   {isSuperAdmin
                     ? 'राज्याध्यक्ष अधिकार — सर्व ३४ जिल्हे संपादन योग्य'
                     : `फक्त '${currentDistrict}' जिल्हा संपादन अधिकार`}
@@ -1133,7 +1133,7 @@ export const AppointmentsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleOpenAddModal}
-                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   नवीन पदाधिकारी जोडा
@@ -1142,7 +1142,7 @@ export const AppointmentsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsPasswordModalOpen(true)}
-                  className="bg-white/10 hover:bg-white/20 text-white border border-white/25 text-xs font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/25 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <KeyRound className="w-3.5 h-3.5" />
                   पासवर्ड बदला
@@ -1151,7 +1151,7 @@ export const AppointmentsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold px-3 py-2 rounded-md cursor-pointer transition-colors"
+                  className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md cursor-pointer transition-colors"
                 >
                   लॉगआउट
                 </button>
@@ -1163,7 +1163,7 @@ export const AppointmentsTab: React.FC = () => {
               {/* Mobile Rows */}
               <div className="divide-y divide-slate-200 sm:hidden bg-white">
                 {districtOfficials.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-xs">
+                  <div className="p-8 text-center text-slate-500 text-sm">
                     या जिल्ह्यात एकही पदाधिकारी नाही. 'नवीन पदाधिकारी जोडा' बटनावर क्लिक करा.
                   </div>
                 ) : (
@@ -1175,38 +1175,38 @@ export const AppointmentsTab: React.FC = () => {
                     return (
                       <div key={m.id} className="p-3.5 flex flex-col gap-2">
                         <div className="flex items-start gap-2.5">
-                          <span className="text-xs font-mono font-bold text-slate-500 w-5 shrink-0 pt-0.5 tabular-nums">
+                          <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 pt-0.5 tabular-nums">
                             {idx + 1}.
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-bold text-[#193568] leading-snug">
+                            <div className="text-base font-bold text-[#193568] leading-snug">
                               {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                             </div>
                             <div className="mt-1">
-                              <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                              <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
                                 {displayPost}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-xs text-slate-600 leading-relaxed pl-7 space-y-0.5">
+                        <div className="text-sm text-slate-600 leading-relaxed pl-8 space-y-0.5">
                           <div><strong className="text-slate-800">सध्याचे पद:</strong> {cadre}{details ? ` (${details})` : ''}</div>
                           <div><strong className="text-slate-800">मोबाईल:</strong> <span className="font-mono tabular-nums">{m.mobile}</span></div>
                         </div>
 
-                        <div className="pl-7 pt-1.5 flex gap-2">
+                        <div className="pl-8 pt-1.5 flex gap-2">
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(m)}
-                            className="flex-1 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            className="flex-1 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
                           >
                             <Edit3 className="w-3.5 h-3.5" /> दुरुस्त करा
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteMember(m)}
-                            className="flex-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            className="flex-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs sm:text-sm font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" /> वगळा
                           </button>
@@ -1219,11 +1219,11 @@ export const AppointmentsTab: React.FC = () => {
 
               {/* Desktop Table */}
               <div className="hidden sm:block overflow-x-auto bg-white">
-                <table className="w-full text-left text-xs border-collapse">
+                <table className="w-full text-left text-sm border-collapse">
                   <thead className="bg-slate-100 text-[#193568] font-bold border-b border-slate-300">
                     <tr>
-                      <th className="py-2.5 px-4 w-16 text-center border-r border-slate-200">अनु. क्र.</th>
-                      <th className="py-2.5 px-4 text-xs sm:text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
+                      <th className="py-2.5 px-4 w-20 text-center border-r border-slate-200">अनु. क्र.</th>
+                      <th className="py-2.5 px-4 text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
                       <th className="py-2.5 px-4 border-r border-slate-200">सध्याचे पद व कार्यक्षेत्र</th>
                       <th className="py-2.5 px-4 border-r border-slate-200">व्हॉट्सअ‍ॅप नंबर</th>
                       <th className="py-2.5 px-4 text-center w-36">कृती</th>
@@ -1246,17 +1246,17 @@ export const AppointmentsTab: React.FC = () => {
                             </td>
                             <td className="py-3 px-4 border-r border-slate-200">
                               <div className="flex flex-col items-start gap-1">
-                                <span className="font-bold text-[#193568] text-sm leading-snug">
+                                <span className="font-bold text-[#193568] text-sm sm:text-base leading-snug">
                                   {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                                 </span>
-                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
                                   {displayPost}
                                 </span>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-slate-600 border-r border-slate-200">
-                              <strong className="text-slate-800 block text-xs font-semibold">{m.currentCadre}</strong>
-                              <span className="text-xs text-slate-500">{m.workingPlace}</span>
+                              <strong className="text-slate-800 block text-sm font-semibold">{m.currentCadre}</strong>
+                              <span className="text-xs sm:text-sm text-slate-500">{m.workingPlace}</span>
                             </td>
                             <td className="py-3 px-4 font-semibold text-slate-700 font-mono tabular-nums border-r border-slate-200">
                               {m.mobile}
@@ -1265,7 +1265,7 @@ export const AppointmentsTab: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(m)}
-                                className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 font-semibold px-2.5 py-1.5 rounded text-xs inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 font-semibold px-2.5 py-1.5 rounded text-xs sm:text-sm inline-flex items-center gap-1 cursor-pointer transition-colors"
                                 title="दुरुस्त करा"
                               >
                                 <Edit3 className="w-3.5 h-3.5" />
@@ -1274,7 +1274,7 @@ export const AppointmentsTab: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteMember(m)}
-                                className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-semibold px-2.5 py-1.5 rounded text-xs inline-flex items-center gap-1 cursor-pointer transition-colors"
+                                className="bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 font-semibold px-2.5 py-1.5 rounded text-xs sm:text-sm inline-flex items-center gap-1 cursor-pointer transition-colors"
                                 title="वगळा"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1301,10 +1301,10 @@ export const AppointmentsTab: React.FC = () => {
               {/* Institutional Header Band */}
               <div className="bg-[#193568] text-white px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-[#efb24b]">
                 <div>
-                  <h2 className="font-serifDevanagari text-base sm:text-lg font-bold text-white">
+                  <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white">
                     अधिकृत नियुक्ती पत्र वितरण व प्रेषण
                   </h2>
-                  <p className="text-xs text-slate-200 mt-0.5 tabular-nums">
+                  <p className="text-xs sm:text-sm text-slate-200 mt-0.5 tabular-nums">
                     जिल्हा: <strong className="text-white">{currentDistrict}</strong> · एकूण पदाधिकारी:{' '}
                     <strong className="text-[#efb24b] font-mono">{districtOfficials.length}</strong>
                   </p>
@@ -1319,7 +1319,7 @@ export const AppointmentsTab: React.FC = () => {
                     setChangeNewPass2('');
                     setShowChangePresidentPasswordModal(true);
                   }}
-                  className="self-start sm:self-auto bg-white/10 hover:bg-white/20 text-white border border-white/25 text-xs font-semibold px-3 py-1.5 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="self-start sm:self-auto bg-white/10 hover:bg-white/20 text-white border border-white/25 text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
                   title="राज्याध्यक्ष पासवर्ड बदला"
                 >
                   <KeyRound className="w-3.5 h-3.5 text-[#efb24b]" />
@@ -1332,7 +1332,7 @@ export const AppointmentsTab: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowStatusMatrixModal(true)}
-                  className="bg-[#193568] hover:bg-[#11254a] text-white text-xs font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="bg-[#193568] hover:bg-[#11254a] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
                   title="महाराष्ट्रातील सर्व 34 जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता पहा व डाऊनलोड करा"
                 >
                   <Eye className="w-3.5 h-3.5 text-[#efb24b]" />
@@ -1343,7 +1343,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={handleDownloadDistrictExecutivePdf}
                   disabled={isGeneratingDirPdf || districtOfficials.length === 0}
-                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                   title="या जिल्ह्याची लेटरपॅडवरील स्वाक्षरीयुक्त अधिकृत कार्यकारिणी PDF"
                 >
                   <FileText className={`w-3.5 h-3.5 ${isGeneratingDirPdf ? 'animate-spin' : ''}`} />
@@ -1354,7 +1354,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={handleDownloadDistrictPresidentsPdf}
                   disabled={isGeneratingRegistryPdf}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                   title="महाराष्ट्रातील सर्व 34 जिल्हाध्यक्षांची अधिकृत यादी"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1365,7 +1365,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={handleDownloadTalukaPresidentsPdf}
                   disabled={isGeneratingRegistryPdf}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                   title="महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत यादी"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1376,7 +1376,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={handleDownloadRegisteredMembersPdf}
                   disabled={isGeneratingRegistryPdf}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                   title="वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1387,7 +1387,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={handleDownloadStatewideRegistryPdf}
                   disabled={isGeneratingRegistryPdf || officials.length === 0}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                   title="राज्यस्तरीय 1 ते शेवटपर्यंत नोंदवही PDF"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1397,7 +1397,7 @@ export const AppointmentsTab: React.FC = () => {
 
               {/* PDF Render Progress Notice */}
               {(isGeneratingDirPdf || isGeneratingRegistryPdf) && (
-                <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-xs font-semibold flex items-center gap-2">
+                <div className="bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-2.5 text-sm font-semibold flex items-center gap-2">
                   <RefreshCw className="w-4 h-4 animate-spin text-[#df6b16] shrink-0" />
                   <span>{pdfProgressStatus || 'कृपया वाट पहा, PDF तयार होत आहे...'}</span>
                 </div>
@@ -1408,7 +1408,7 @@ export const AppointmentsTab: React.FC = () => {
                 {/* Mobile Clean Rows */}
                 <div className="divide-y divide-slate-200 sm:hidden bg-white">
                   {districtOfficials.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-xs">
+                    <div className="p-8 text-center text-slate-500 text-sm">
                       माहिती उपलब्ध नाही.
                     </div>
                   ) : (
@@ -1418,27 +1418,27 @@ export const AppointmentsTab: React.FC = () => {
                       return (
                         <div key={m.id} className="p-3.5 flex flex-col gap-2">
                           <div className="flex items-start gap-2.5">
-                            <span className="text-xs font-mono font-bold text-slate-500 w-5 shrink-0 pt-0.5 tabular-nums">
+                            <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 pt-0.5 tabular-nums">
                               {idx + 1}.
                             </span>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-bold text-[#193568] leading-snug">
+                              <div className="text-base font-bold text-[#193568] leading-snug">
                                 {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                               </div>
                               <div className="mt-1">
-                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
                                   {displayPost}
                                 </span>
                               </div>
                             </div>
                           </div>
 
-                          <div className="pl-7 pt-1 flex flex-col gap-1.5">
+                          <div className="pl-8 pt-1 flex flex-col gap-1.5">
                             <div className="flex gap-2">
                               <button
                                 type="button"
                                 onClick={() => setSelectedOfficialForLetter(m)}
-                                className="flex-1 bg-[#193568] hover:bg-[#11254a] text-white text-xs font-semibold py-2 px-3 rounded-md flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                                className="flex-1 bg-[#193568] hover:bg-[#11254a] text-white text-xs sm:text-sm font-semibold py-2 px-3 rounded-md flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                               >
                                 <FileText className="w-3.5 h-3.5" />
                                 प्रमाणपत्र पहा
@@ -1446,7 +1446,7 @@ export const AppointmentsTab: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleShareOnWhatsApp(m)}
-                                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold py-2 px-3 rounded-md flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                                className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold py-2 px-3 rounded-md flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                               >
                                 <Share2 className="w-3.5 h-3.5" />
                                 WhatsApp
@@ -1456,14 +1456,14 @@ export const AppointmentsTab: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditModal(m)}
-                                className="flex-1 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                className="flex-1 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
                               >
                                 <Edit3 className="w-3.5 h-3.5" /> दुरुस्त करा
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleDeleteMember(m)}
-                                className="flex-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                className="flex-1 bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 text-xs sm:text-sm font-semibold py-1.5 px-2.5 rounded-md flex items-center justify-center gap-1 cursor-pointer transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> वगळा
                               </button>
@@ -1477,11 +1477,11 @@ export const AppointmentsTab: React.FC = () => {
 
                 {/* Desktop Table */}
                 <div className="hidden sm:block overflow-x-auto bg-white">
-                  <table className="w-full text-left text-xs border-collapse">
+                  <table className="w-full text-left text-sm border-collapse">
                     <thead className="bg-slate-100 text-[#193568] font-bold border-b border-slate-300">
                       <tr>
-                        <th className="py-2.5 px-4 w-16 text-center border-r border-slate-200">अनु. क्र.</th>
-                        <th className="py-2.5 px-4 text-xs sm:text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव</th>
+                        <th className="py-2.5 px-4 w-20 text-center border-r border-slate-200">अनु. क्र.</th>
+                        <th className="py-2.5 px-4 text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव</th>
                         <th className="py-2.5 px-4 border-r border-slate-200">बहाल केलेले पद</th>
                         <th className="py-2.5 px-4 text-center border-r border-slate-200">प्रमाणपत्र</th>
                         <th className="py-2.5 px-4 text-center border-r border-slate-200">व्हॉट्सअ‍ॅप</th>
@@ -1494,7 +1494,7 @@ export const AppointmentsTab: React.FC = () => {
                           <td className="py-3 px-4 text-center font-semibold text-slate-600 font-mono tabular-nums border-r border-slate-200">
                             {idx + 1}
                           </td>
-                          <td className="py-3 px-4 font-bold text-[#193568] text-sm border-r border-slate-200">
+                          <td className="py-3 px-4 font-bold text-[#193568] text-sm sm:text-base border-r border-slate-200">
                             {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                           </td>
                           <td className="py-3 px-4 border-r border-slate-200">
@@ -1506,7 +1506,7 @@ export const AppointmentsTab: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => setSelectedOfficialForLetter(m)}
-                              className="bg-[#193568] hover:bg-[#11254a] text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              className="bg-[#193568] hover:bg-[#11254a] text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
                               <FileText className="w-3.5 h-3.5" />
                               प्रमाणपत्र पहा
@@ -1516,7 +1516,7 @@ export const AppointmentsTab: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleShareOnWhatsApp(m)}
-                              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold px-3 py-1.5 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-semibold px-3 py-1.5 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
                               <Share2 className="w-3.5 h-3.5" />
                               WhatsApp
@@ -1556,7 +1556,7 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {showDistrictLoginModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-xs overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
                 {!isSettingInitialPassword ? (
@@ -1564,7 +1564,7 @@ export const AppointmentsTab: React.FC = () => {
                 ) : (
                   <KeyRound className="w-4 h-4 text-[#efb24b] shrink-0" />
                 )}
-                <h3 className="font-serifDevanagari text-base font-bold">
+                <h3 className="font-serifDevanagari text-lg font-bold">
                   {!isSettingInitialPassword
                     ? `'${currentDistrict}' जिल्हाध्यक्ष लॉगिन`
                     : `नवीन पासवर्ड सेट करा (${currentDistrict})`}
@@ -1583,7 +1583,7 @@ export const AppointmentsTab: React.FC = () => {
             <div className="p-5">
               {!isSettingInitialPassword ? (
                 <div>
-                  <p className="text-xs text-slate-600 mb-3.5">
+                  <p className="text-sm text-slate-600 mb-3.5">
                     जिल्ह्यातील पदाधिकारी व्यवस्थापनासाठी अधिकृत पासवर्ड प्रविष्ट करा.
                   </p>
 
@@ -1599,12 +1599,12 @@ export const AppointmentsTab: React.FC = () => {
                         placeholder="गोपनीय पासवर्ड प्रविष्ट करा"
                         value={districtPasswordInput}
                         onChange={(e) => setDistrictPasswordInput(e.target.value)}
-                        className="w-full p-2.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-[#193568]"
+                        className="w-full p-2.5 border border-slate-300 rounded-md text-sm sm:text-base focus:outline-none focus:border-[#193568]"
                       />
                     </div>
 
                     {districtLoginError && (
-                      <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-xs font-semibold">
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-sm font-semibold">
                         {districtLoginError}
                       </div>
                     )}
@@ -1628,7 +1628,7 @@ export const AppointmentsTab: React.FC = () => {
                 </div>
               ) : (
                 <div>
-                  <p className="text-xs text-slate-600 mb-3.5">
+                  <p className="text-sm text-slate-600 mb-3.5">
                     हा पहिला लॉगिन आहे. कृपया आपल्या जिल्ह्यासाठी सुरक्षित पासवर्ड तयार करा.
                   </p>
 
@@ -1690,7 +1690,7 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {showPresidentLoginModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-xs overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
                 {!isSettingPresidentInitialPassword ? (
@@ -1698,7 +1698,7 @@ export const AppointmentsTab: React.FC = () => {
                 ) : (
                   <KeyRound className="w-4 h-4 text-[#efb24b] shrink-0" />
                 )}
-                <h3 className="font-serifDevanagari text-base font-bold">
+                <h3 className="font-serifDevanagari text-lg font-bold">
                   {!isSettingPresidentInitialPassword
                     ? 'राज्याध्यक्ष लॉगिन'
                     : 'राज्याध्यक्ष: नवीन पासवर्ड सेट करा'}
@@ -1717,7 +1717,7 @@ export const AppointmentsTab: React.FC = () => {
             <div className="p-5">
               {!isSettingPresidentInitialPassword ? (
                 <>
-                  <p className="text-xs text-slate-600 mb-3.5">
+                  <p className="text-sm text-slate-600 mb-3.5">
                     संस्थापक राज्याध्यक्ष अधिकृत पासवर्ड प्रविष्ट करा:
                   </p>
 
@@ -1733,12 +1733,12 @@ export const AppointmentsTab: React.FC = () => {
                         placeholder="गोपनीय पासवर्ड प्रविष्ट करा"
                         value={presidentPasswordInput}
                         onChange={(e) => setPresidentPasswordInput(e.target.value)}
-                        className="w-full p-2.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-[#193568]"
+                        className="w-full p-2.5 border border-slate-300 rounded-md text-sm sm:text-base focus:outline-none focus:border-[#193568]"
                       />
                     </div>
 
                     {presidentLoginError && (
-                      <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-xs font-semibold">
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-md text-sm font-semibold">
                         {presidentLoginError}
                       </div>
                     )}
@@ -1762,7 +1762,7 @@ export const AppointmentsTab: React.FC = () => {
                 </>
               ) : (
                 <div>
-                  <p className="text-xs text-slate-600 mb-3.5 leading-relaxed">
+                  <p className="text-sm text-slate-600 mb-3.5 leading-relaxed">
                     आपण प्रथमच लॉगिन करत आहात. सुरक्षिततेसाठी आपला स्वतःचा नवीन पासवर्ड तयार करा (हा पासवर्ड फायरबेसवर जतन होईल).
                   </p>
 
@@ -1825,11 +1825,11 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {showChangePresidentPasswordModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-xs overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-[#efb24b] shrink-0" />
-                <h3 className="font-serifDevanagari text-base font-bold">
+                <h3 className="font-serifDevanagari text-lg font-bold">
                   राज्याध्यक्ष पासवर्ड बदला
                 </h3>
               </div>
@@ -1844,7 +1844,7 @@ export const AppointmentsTab: React.FC = () => {
             </div>
 
             <div className="p-5">
-              <p className="text-xs text-slate-600 mb-3.5">
+              <p className="text-sm text-slate-600 mb-3.5">
                 नवीन पासवर्ड थेट फायरबेसवर सुरक्षित सेव्ह केला जाईल.
               </p>
 
@@ -2095,9 +2095,9 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {isMemberModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-lg w-full text-xs max-h-[92vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-lg w-full text-sm max-h-[92vh] flex flex-col overflow-hidden">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b] shrink-0">
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold">
+              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold">
                 {editingMemberId ? 'पदाधिकारी माहिती दुरुस्ती' : `नवीन पदाधिकारी नोंदणी (${formDistrict} जिल्हा)`}
               </h3>
               <button
@@ -2112,7 +2112,7 @@ export const AppointmentsTab: React.FC = () => {
 
             <form onSubmit={handleSaveMember} className="p-5 space-y-3.5 overflow-y-auto">
               {formError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-300 text-rose-700 rounded-md text-xs font-semibold flex items-center gap-2">
+                <div className="p-2.5 bg-rose-50 border border-rose-300 text-rose-700 rounded-md text-sm font-semibold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{formError}</span>
                 </div>
@@ -2299,9 +2299,9 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {isPasswordModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-xs overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
-              <h3 className="font-serifDevanagari text-base font-bold">
+              <h3 className="font-serifDevanagari text-lg font-bold">
                 पासवर्ड बदला ({isSuperAdmin ? formDistrict : (lockedDistrictName || currentDistrict)} जिल्हा)
               </h3>
               <button
@@ -2358,15 +2358,15 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {memberToDelete && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-xs overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
             <div className="bg-[#193568] text-white px-5 py-3 flex items-center gap-2 border-b-2 border-[#efb24b]">
               <Trash2 className="w-4 h-4 text-rose-300 shrink-0" />
-              <h3 className="font-serifDevanagari text-base font-bold">
+              <h3 className="font-serifDevanagari text-lg font-bold">
                 पदाधिकारी वगळा?
               </h3>
             </div>
             <div className="p-5">
-              <p className="text-xs text-slate-700 mb-4 leading-relaxed">
+              <p className="text-sm text-slate-700 mb-4 leading-relaxed">
                 तुम्हाला खात्री आहे का? <strong>{memberToDelete.salutation} {memberToDelete.firstName} {memberToDelete.lastName}</strong> यांचे नाव यादीतून कायमचे हटवायचे आहे?
               </p>
               <div className="flex gap-2">
@@ -2396,17 +2396,17 @@ export const AppointmentsTab: React.FC = () => {
       {/* ========================================================================= */}
       {showStatusMatrixModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 flex items-center justify-center p-3 sm:p-5">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-4xl w-full text-xs relative max-h-[92vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-4xl w-full text-sm relative max-h-[92vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
             <div className="bg-[#193568] text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-[#efb24b] shrink-0">
               <div>
-                <div className="text-[11px] font-semibold text-slate-200">
+                <div className="text-xs sm:text-sm font-semibold text-slate-200">
                   महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
                 </div>
-                <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white">
+                <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white">
                   संघटना सद्यस्थिती अहवाल (३४ जिल्हे)
                 </h3>
-                <p className="text-slate-200 text-[11px] mt-0.5">
+                <p className="text-slate-200 text-xs sm:text-sm mt-0.5">
                   सर्व ३४ जिल्ह्यांतील राज्य, विभागीय, जिल्हा, तालुका पदाधिकारी व नोंदणीकृत सभासदांची आकडेवारी
                 </p>
               </div>
@@ -2416,7 +2416,7 @@ export const AppointmentsTab: React.FC = () => {
                   type="button"
                   onClick={handleDownloadStatusMatrixPdf}
                   disabled={isGeneratingRegistryPdf}
-                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
                   title="A4 साईज मध्ये ब्लॅक अँड व्हाईट अधिकृत PDF डाऊनलोड करा"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -2435,8 +2435,8 @@ export const AppointmentsTab: React.FC = () => {
 
             {/* Scrollable Table View */}
             <div className="overflow-auto flex-1 m-4 border border-slate-300 rounded-md">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-100 text-[#193568] text-[11px] font-bold sticky top-0 z-10 border-b border-slate-300">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead className="bg-slate-100 text-[#193568] text-xs sm:text-sm font-bold sticky top-0 z-10 border-b border-slate-300">
                   <tr>
                     <th className="py-2.5 px-3 text-center border-r border-slate-200 w-12">अनु.</th>
                     <th className="py-2.5 px-3 border-r border-slate-200">जिल्ह्याचे नाव</th>
@@ -2484,28 +2484,28 @@ export const AppointmentsTab: React.FC = () => {
                 </tbody>
                 <tfoot className="bg-[#193568] text-white font-bold border-t-2 border-slate-400 sticky bottom-0 z-10">
                   <tr>
-                    <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold">
+                    <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-700 text-sm font-bold">
                       सर्व बेरीज (Grand Total)
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.stateRep)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.divRep)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.distOfficial)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.talukaOfficial)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold font-mono tabular-nums text-[#efb24b] bg-[#11254a]">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-bold font-mono tabular-nums text-[#efb24b] bg-[#11254a]">
                       {toEnglishDigits(matrixTotals.officialsTotal)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-xs sm:text-sm font-bold font-mono tabular-nums text-amber-300">
+                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-bold font-mono tabular-nums text-amber-300">
                       {toEnglishDigits(matrixTotals.members)}
                     </td>
-                    <td className="py-3 px-3 text-center text-xs sm:text-sm font-bold font-mono tabular-nums text-white bg-[#0e1f3d]">
+                    <td className="py-3 px-3 text-center text-sm font-bold font-mono tabular-nums text-white bg-[#0e1f3d]">
                       {toEnglishDigits(matrixTotals.grandTotal)}
                     </td>
                   </tr>
@@ -2514,7 +2514,7 @@ export const AppointmentsTab: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-600 shrink-0">
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs sm:text-sm text-slate-600 shrink-0">
               <span>* आकडेवारी रिअल-टाईम डेटाबेसमधून स्वयंचलित एकत्रित केली आहे.</span>
               <button
                 type="button"
@@ -2538,7 +2538,7 @@ export const AppointmentsTab: React.FC = () => {
           ) : (
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
           )}
-          <span className="text-xs font-semibold leading-relaxed">{toast.message}</span>
+          <span className="text-sm font-semibold leading-relaxed">{toast.message}</span>
           <button
             type="button"
             onClick={() => setToast(null)}

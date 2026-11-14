@@ -217,17 +217,17 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
         <div className="flex items-center gap-2.5">
           <Users className="w-5 h-5 text-[#efb24b] shrink-0" />
           <div>
-            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-snug">
+            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white leading-snug">
               नोंदणीकृत अधिकृत सदस्य यादी
             </h2>
           </div>
         </div>
 
         {/* Total Count Metadata & Manual Refresh */}
-        <div className="flex items-center gap-3 self-start md:self-auto text-xs">
+        <div className="flex items-center gap-3 self-start md:self-auto text-xs sm:text-sm">
           <div className="text-slate-100 font-medium tabular-nums">
             एकूण मंजूर सदस्य:{' '}
-            <strong className="text-[#efb24b] font-mono text-sm font-bold">
+            <strong className="text-[#efb24b] font-mono text-base font-bold">
               {allRegisteredMembers.length}
             </strong>
           </div>
@@ -237,7 +237,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
             onClick={handleManualRefresh}
             disabled={isRefreshing}
             title="ताजी मंजूर आकडेवारी लोड करा"
-            className="bg-white/10 hover:bg-white/20 transition-colors text-white px-3 py-1.5 rounded border border-white/25 text-xs font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+            className="bg-white/10 hover:bg-white/20 transition-colors text-white px-3 py-1.5 rounded border border-white/25 text-xs sm:text-sm font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>{isRefreshing ? 'अद्ययावत होत आहे...' : 'यादी ताजी करा'}</span>
@@ -255,13 +255,13 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
             placeholder="सदस्य नाव, सदस्य क्र. किंवा तालुक्याने शोधा..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full text-xs pl-9 pr-8 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] transition-colors"
+            className="w-full text-sm pl-9 pr-8 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] transition-colors"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-sm font-bold cursor-pointer"
               aria-label="शोध रिकामा करा"
             >
               ✕
@@ -280,7 +280,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
                 setSelectedDistrict(e.target.value);
                 setSelectedTaluka('');
               }}
-              className="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] appearance-none cursor-pointer"
+              className="w-full text-sm pl-8 pr-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] appearance-none cursor-pointer"
             >
               <option value="">सर्व जिल्हे ({allRegisteredMembers.length})</option>
               {MAHARASHTRA_DISTRICTS.map((d) => (
@@ -298,7 +298,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               value={selectedTaluka}
               disabled={!selectedDistrict}
               onChange={(e) => setSelectedTaluka(e.target.value)}
-              className={`w-full text-xs pl-8 pr-3 py-2 border rounded focus:outline-none focus:border-[#193568] appearance-none transition-colors ${
+              className={`w-full text-sm pl-8 pr-3 py-2 border rounded focus:outline-none focus:border-[#193568] appearance-none transition-colors ${
                 selectedDistrict
                   ? 'bg-white border-slate-300 text-slate-800 cursor-pointer'
                   : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
@@ -332,17 +332,17 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
           <table className="w-full text-left border-collapse min-w-[680px]">
             {/* Sticky Header */}
             <thead className="sticky top-0 z-10 bg-slate-100 text-[#193568] border-b border-slate-300">
-              <tr className="text-xs font-bold">
-                <th scope="col" className="py-2.5 px-3 text-center w-16 bg-slate-100 border-r border-slate-200">
+              <tr className="text-sm font-bold">
+                <th scope="col" className="py-2.5 px-3 text-center w-20 bg-slate-100 border-r border-slate-200">
                   अनु. क्र.
                 </th>
-                <th scope="col" className="py-2.5 px-4 w-44 bg-slate-100 border-r border-slate-200">
+                <th scope="col" className="py-2.5 px-4 w-48 bg-slate-100 border-r border-slate-200">
                   सदस्य क्रमांक
                 </th>
                 <th scope="col" className="py-2.5 px-4 bg-slate-100 border-r border-slate-200">
                   सदस्य नाव व पद
                 </th>
-                <th scope="col" className="py-2.5 px-3 w-36 bg-slate-100 border-r border-slate-200">
+                <th scope="col" className="py-2.5 px-3 w-40 bg-slate-100 border-r border-slate-200">
                   तालुका / केंद्र
                 </th>
                 <th scope="col" className="py-2.5 px-4 w-36 bg-slate-100">
@@ -350,7 +350,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-xs text-slate-800">
+            <tbody className="divide-y divide-slate-200 text-sm text-slate-800">
               {filteredMembers.map((member, idx) => (
                 <tr
                   key={member.id || member.memberNumber}
@@ -370,11 +370,11 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
 
                   {/* Column 3: सदस्य नाव व पद */}
                   <td className="py-2.5 px-4 font-medium text-slate-900 border-r border-slate-100">
-                    <div className="font-serifDevanagari font-bold text-[13px] text-slate-900 leading-tight">
+                    <div className="font-serifDevanagari font-bold text-sm sm:text-base text-slate-900 leading-tight">
                       {member.fullName}
                     </div>
                     {member.designation && (
-                      <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                      <span className="text-xs sm:text-sm text-slate-500 font-medium block mt-0.5">
                         {member.designation}
                       </span>
                     )}
@@ -386,7 +386,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
                       {member.taluka || '-'}
                     </span>
                     {member.centerName && (
-                      <span className="text-[11px] text-slate-600 block mt-0.5">
+                      <span className="text-xs sm:text-sm text-slate-600 block mt-0.5">
                         केंद्र: {member.centerName}
                       </span>
                     )}
@@ -402,9 +402,9 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
           </table>
         </div>
       ) : (
-        <div className="py-12 px-4 text-center text-slate-500 text-xs bg-white">
+        <div className="py-12 px-4 text-center text-slate-500 text-sm bg-white">
           <Users className="w-7 h-7 text-slate-300 mx-auto mb-2" />
-          <p className="font-bold text-slate-700 text-sm">
+          <p className="font-bold text-slate-700 text-base">
             {searchTerm || selectedDistrict || selectedTaluka
               ? 'शोध निकषांनुसार कोणताही सदस्य आढळला नाही'
               : 'नोंदणीकृत सदस्य यादी तपासली जात आहे...'}
@@ -418,7 +418,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
       )}
 
       {/* Frame Footer with Clean Guidance */}
-      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-600">
+      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
         <div className="font-medium text-slate-600">
           टीप: उभी व आडवी स्क्रोल बार वापरून (किंवा मोबाईलवर स्क्रीन डावी-उजवी सरकवून) संपूर्ण तपशील पाहता येईल.
         </div>

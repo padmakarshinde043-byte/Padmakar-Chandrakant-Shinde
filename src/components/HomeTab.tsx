@@ -53,12 +53,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               <span>शासन नोंदणीकृत श्रमिक संघटना · नोंदणी क्र. {ORG_DETAILS.registrationNo}</span>
             </div>
 
-            <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-extrabold leading-[1.2] tracking-tight text-slate-100">
+            <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold leading-[1.25] tracking-tight text-slate-100">
               प्राथमिक शिक्षणाची धुरा सांभाळणाऱ्या <br className="hidden sm:block" />
               <span className="text-amber-400 font-bold not-italic leading-normal">केंद्रप्रमुख व अधिकाऱ्यांचे</span> महासंघटन.
             </h1>
 
-            <p className="text-sm sm:text-base md:text-lg text-slate-200 leading-relaxed max-w-2xl font-normal">
+            <p className="text-base sm:text-lg text-slate-200 leading-relaxed max-w-2xl font-normal">
               महाराष्ट्रभरातील केंद्रप्रमुख, विस्तार अधिकारी व शिक्षण प्रशासकीय संवर्गाच्या सन्मानासाठी, हक्कांसाठी आणि गुणवत्तापूर्ण प्राथमिक शिक्षणासाठी कार्यरत असलेले सर्वोच्च व्यासपीठ.
             </p>
 
@@ -135,20 +135,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                   <span className="text-xs sm:text-sm font-bold text-amber-400 tracking-wide block">
                     {ORG_DETAILS.founderPresident.role}
                   </span>
-                  <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white leading-tight mt-0.5">
+                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
                     {ORG_DETAILS.founderPresident.name}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 mt-0.5 font-mono">
+                  <p className="text-sm text-slate-300 mt-0.5 font-mono">
                     {ORG_DETAILS.founderPresident.education}
                   </p>
                 </div>
               </div>
 
-              <blockquote className="text-xs sm:text-sm text-slate-200 leading-relaxed italic border-l-2 border-amber-500 pl-3 mb-4">
+              <blockquote className="text-sm sm:text-base text-slate-200 leading-relaxed italic border-l-2 border-amber-500 pl-3 mb-4">
                 "{ORG_DETAILS.founderPresident.message}"
               </blockquote>
 
-              <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+              <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <a
                   href={`tel:${ORG_DETAILS.founderPresident.phone}`}
                   className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
@@ -172,11 +172,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
             <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
               महासंघ डिजिटल सेवा केंद्र
             </span>
-            <h2 className="font-serifDevanagari text-xl sm:text-2xl md:text-3xl font-extrabold text-[#0b1e36] mt-0.5">
+            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#0b1e36] mt-0.5">
               प्रमुख सेवा व व्यासपीठ दालन
             </h2>
           </div>
-          <p className="text-xs sm:text-sm text-slate-600 max-w-md">
+          <p className="text-base text-slate-600 max-w-md leading-relaxed">
             राज्यातील सर्व केंद्रप्रमुख व विस्तार अधिकाऱ्यांसाठी उपलब्ध असलेल्या ऑनलाईन सुविधा व अधिकृत अभिलेख.
           </p>
         </div>
@@ -194,14 +194,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center mb-3 group-hover:bg-amber-500 group-hover:text-white transition-colors">
                 <Users className="w-5 h-5" />
               </div>
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] group-hover:text-amber-800 transition-colors">
+              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-amber-800 transition-colors">
                 डिजिटल सदस्यत्व नोंदणी
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+              <p className="text-base text-slate-600 mt-2 leading-relaxed">
                 आजीवन (₹100) व वार्षिक (₹120) सदस्यत्व. ऑनलाईन अर्ज भरून पडताळणीनंतर अधिकृत ओळखपत्र व प्रमाणपत्र डाऊनलोड करा.
               </p>
             </div>
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-amber-700 group-hover:text-amber-800">
+            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-sm sm:text-base font-bold text-amber-700 group-hover:text-amber-800">
               <span>ऑनलाईन अर्ज करा</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -219,14 +219,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-800 flex items-center justify-center mb-3 group-hover:bg-[#0b1e36] group-hover:text-white transition-colors">
                 <Award className="w-5 h-5" />
               </div>
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] group-hover:text-blue-900 transition-colors">
+              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-blue-900 transition-colors">
                 पदाधिकारी
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+              <p className="text-base text-slate-600 mt-2 leading-relaxed">
                 महाराष्ट्रातील 34 जिल्ह्यांचे कार्यकारिणी संपादन, A4 रंगीत स्वाक्षरीयुक्त नियुक्ती पत्रे, WhatsApp प्रेषण व राज्य नोंदवही.
               </p>
             </div>
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-blue-700 group-hover:text-blue-900">
+            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-sm sm:text-base font-bold text-blue-700 group-hover:text-blue-900">
               <span>नियुक्ती पत्रे पहा</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -244,14 +244,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-800 flex items-center justify-center mb-3 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                 <FileText className="w-5 h-5" />
               </div>
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] group-hover:text-emerald-900 transition-colors">
+              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-emerald-900 transition-colors">
                 शासन निर्णय व परिपत्रके
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+              <p className="text-base text-slate-600 mt-2 leading-relaxed">
                 प्राथमिक शिक्षण विभाग, केंद्रप्रमुख पदोन्नती, सेवाज्येष्ठता, वेतन व महासंघाचे अधिकृत निवेदन संग्रह.
               </p>
             </div>
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-emerald-700 group-hover:text-emerald-900">
+            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-sm sm:text-base font-bold text-emerald-700 group-hover:text-emerald-900">
               <span>परिपत्रके वाचा</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -269,14 +269,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-800 flex items-center justify-center mb-3 group-hover:bg-purple-700 group-hover:text-white transition-colors">
                 <School className="w-5 h-5" />
               </div>
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] group-hover:text-purple-900 transition-colors">
+              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-purple-900 transition-colors">
                 राज्य व जिल्हा नेतृत्व
               </h3>
-              <p className="text-xs sm:text-sm text-slate-600 mt-1.5 leading-relaxed">
+              <p className="text-base text-slate-600 mt-2 leading-relaxed">
                 राज्य कार्यकारिणी, 6 महसूल विभाग समन्वयक आणि सर्व 34 जिल्हाध्यक्षांचे संपर्क क्रमांक व माहिती.
               </p>
             </div>
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-purple-700 group-hover:text-purple-900">
+            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-sm sm:text-base font-bold text-purple-700 group-hover:text-purple-900">
               <span>कार्यकारिणी पहा</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </div>
@@ -292,10 +292,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
                 आमचे ध्येय व कार्यप्रणाली
               </span>
-              <h2 className="font-serifDevanagari text-xl sm:text-2xl md:text-3xl font-extrabold text-[#0b1e36] leading-tight">
+              <h2 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#0b1e36] leading-tight">
                 शिक्षणाच्या मुळाशी काम करणाऱ्या अधिकाऱ्यांचा सशक्त आवाज.
               </h2>
-              <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-normal">
+              <p className="text-base text-slate-700 leading-relaxed font-normal">
                 केंद्रप्रमुख हा प्राथमिक शाळा आणि प्रशासन यांच्यातील सर्वात महत्त्वाचा दुवा आहे. शैक्षणिक गुणवत्ता वाढवणे आणि त्याचवेळी अधिकाऱ्यांच्या न्याय्य हक्कांसाठी शासन दरबारी पाठपुरावा करणे हे महासंघाचे मुख्य कर्तव्य आहे.
               </p>
               <div className="pt-1">
@@ -304,7 +304,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                     setCurrentTab('about');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="bg-[#0b1e36] hover:bg-[#132f52] text-white font-bold text-xs sm:text-sm px-4 py-2 rounded-lg inline-flex items-center gap-2 transition-colors"
+                  className="bg-[#0b1e36] hover:bg-[#132f52] text-white font-bold text-sm sm:text-base px-4 py-2.5 rounded-lg inline-flex items-center gap-2 transition-colors"
                 >
                   <span>आमच्याबद्दल सविस्तर वाचा</span>
                   <ArrowRight className="w-4 h-4 text-amber-400" />
@@ -317,10 +317,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold mb-2 text-sm">
                   01
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   वेतन व सेवाशर्ती सुधारणा
                 </h4>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   वेतनश्रेणीतील विसंगती दूर करणे, पदोन्नतीचे मार्ग मोकळे करणे आणि कामाचा योग्य मोबदला मिळवून देण्यासाठी शासनस्तरावर निरंतर पाठपुरावा.
                 </p>
               </div>
@@ -329,10 +329,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-900 flex items-center justify-center font-bold mb-2 text-sm">
                   02
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   शैक्षणिक गुणवत्ता सक्षमीकरण
                 </h4>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   नवीन शैक्षणिक धोरण व डिजिटल प्रशासनासाठी केंद्रप्रमुखांना आधुनिक प्रशिक्षण, कार्यशाळा व मार्गदर्शन उपलब्ध करणे.
                 </p>
               </div>
@@ -341,10 +341,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center font-bold mb-2 text-sm">
                   03
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   कायदेशीर व प्रशासकीय संरक्षण
                 </h4>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   कामाच्या ठिकाणी स्वाभिमान, अनपेक्षित कारवायांविरुद्ध कायदेविषयक सल्ला आणि संघटनात्मक संरक्षणाची भक्कम हमी.
                 </p>
               </div>
@@ -353,10 +353,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-900 flex items-center justify-center font-bold mb-2 text-sm">
                   04
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-base text-[#0b1e36]">
+                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   पारदर्शक व डिजिटल महासंघ
                 </h4>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   संपूर्ण 34 जिल्ह्यांत डिजिटल ओळखपत्रे, ऑनलाईन नियुक्ती पत्रे व थेट संपर्क प्रणालीद्वारे संपूर्ण पारदर्शक कारभार.
                 </p>
               </div>
@@ -402,9 +402,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 </div>
 
                 {taglinePhotoItem?.title && (
-                  <div className="py-2.5 px-3 sm:px-4 bg-slate-50 border-t border-slate-200 text-center">
+                  <div className="py-3 px-3 sm:px-4 bg-slate-50 border-t border-slate-200 text-center">
                     <p
-                      className="text-xs sm:text-sm md:text-base font-bold text-[#0b1e36] truncate"
+                      className="text-base sm:text-lg font-bold text-[#0b1e36] truncate"
                       title={taglinePhotoItem.title}
                     >
                       {toEnglishDigits(taglinePhotoItem.title)}
@@ -417,8 +417,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
 
           return (
             <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500">
-              <p className="font-bold text-sm text-slate-700">सध्या कोणताही टॅगलाईन फोटो उपलब्ध नाही.</p>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="font-bold text-base text-slate-700">सध्या कोणताही टॅगलाईन फोटो उपलब्ध नाही.</p>
+              <p className="text-sm text-slate-500 mt-1">
                 ॲडमिन पॅनलमध्ये बातम्या व परिपत्रके सेक्शनमध्ये 'Tagline Photo' जोडा.
               </p>
             </div>

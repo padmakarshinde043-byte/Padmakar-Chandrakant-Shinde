@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Phone, Search, ShieldCheck, UserCheck, Image as ImageIcon, RotateCw } from 'lucide-react';
+import { Search, ShieldCheck, Image as ImageIcon } from 'lucide-react';
 import {
   ORG_DETAILS,
   Leader,
@@ -96,10 +96,10 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         <h5 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36] leading-snug group-hover:text-amber-800 transition-colors">
           {leader.name}
         </h5>
-        <p className="text-xs sm:text-sm font-bold text-amber-800 tracking-wide">
+        <p className="text-sm sm:text-base font-bold text-amber-800 tracking-wide">
           {leader.role}
         </p>
-        <p className="text-xs sm:text-sm font-semibold text-slate-600">
+        <p className="text-sm sm:text-base font-semibold text-slate-600">
           {leader.region}
         </p>
       </div>
@@ -112,7 +112,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-10">
         <div className="border-b-2 border-[#102a43] pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+            <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
               नेतृत्व व पदाधिकारी सूची
             </span>
             <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
@@ -124,8 +124,8 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
 
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 space-y-12">
         {/* Section 1: Founder State President Hero Spotlight */}
-        <section className="bg-gradient-to-r from-[#0b1e36] via-[#102a4c] to-[#0b1e36] text-white rounded-2xl p-6 sm:p-8 shadow-lg border-t-4 border-amber-500">
-          <div className="flex flex-col md:flex-row items-center gap-6 sm:gap-8">
+        <section className="bg-gradient-to-r from-[#0b1e36] via-[#102a4c] to-[#0b1e36] text-white rounded-2xl p-5 sm:p-6 shadow-lg border-t-4 border-amber-500">
+          <div className="flex flex-col md:flex-row items-center gap-5 sm:gap-7">
             <div className="relative shrink-0 text-center">
               <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-full ring-4 ring-amber-500 overflow-hidden bg-white mx-auto shadow-md">
                 <img
@@ -140,28 +140,16 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
             </div>
 
             <div className="space-y-2 text-center md:text-left flex-1">
-              <div className="inline-flex items-center gap-1.5 text-xs text-amber-300 font-semibold bg-white/10 px-3 py-1 rounded-md">
+              <div className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-amber-300 font-semibold bg-white/10 px-3 py-1 rounded-md">
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
                 {ORG_DETAILS.founderPresident.role}
               </div>
-              <h2 className="font-serifDevanagari text-xl sm:text-2xl md:text-3xl font-bold text-white">
+              <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-white">
                 {ORG_DETAILS.founderPresident.name}
               </h2>
-              <p className="text-xs sm:text-sm text-amber-300 font-mono">
+              <p className="text-sm sm:text-base text-amber-300 font-mono">
                 {ORG_DETAILS.founderPresident.education}
               </p>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl italic">
-                "{ORG_DETAILS.founderPresident.message}"
-              </p>
-              <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-4 text-xs">
-                <a
-                  href={`tel:${ORG_DETAILS.founderPresident.phone}`}
-                  className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-xs"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>थेट संपर्क: {ORG_DETAILS.founderPresident.phone}</span>
-                </a>
-              </div>
             </div>
           </div>
         </section>
@@ -169,10 +157,10 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         {/* Section 2: राज्य कार्यकारिणी */}
         <section className="bg-white p-6 rounded-2xl border-l-8 border-amber-600 shadow-sm">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
               राज्य कार्यकारिणी
             </h3>
-            <span className="text-xs text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
+            <span className="text-xs sm:text-sm text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
               एकूण: <strong className="font-mono text-[#0b1e36]">{stateExecutive.length}</strong>
             </span>
           </div>
@@ -184,10 +172,10 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         {/* Section 2.5: महिला आघाडी राज्य कार्यकारिणी */}
         <section className="bg-white p-6 rounded-2xl border-l-8 border-rose-500 shadow-sm">
           <div className="mb-8 flex items-center justify-between">
-            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
               महिला आघाडी राज्य कार्यकारिणी
             </h3>
-            <span className="text-xs text-slate-500 font-medium bg-rose-50 px-3 py-1 rounded-full">
+            <span className="text-xs sm:text-sm text-slate-500 font-medium bg-rose-50 px-3 py-1 rounded-full">
               एकूण: <strong className="font-mono text-[#0b1e36]">{womenExecutive.length}</strong>
             </span>
           </div>
@@ -195,7 +183,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
             {womenExecutive.length > 0 ? (
               womenExecutive.map((leader) => renderLeaderCard(leader, 'महिला आघाडी राज्य कार्यकारिणी'))
             ) : (
-              <div className="col-span-full py-8 text-center text-xs text-slate-400">
+              <div className="col-span-full py-8 text-center text-sm sm:text-base text-slate-400">
                 महिला आघाडी राज्य कार्यकारिणीचे पदाधिकारी लवकरच जोडले जातील. (आपण ॲडमिन पॅनलमधून नवीन पदाधिकारी जोडू शकता)
               </div>
             )}
@@ -205,7 +193,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         {/* Section 3: Divisional Executive */}
         <section className="bg-white p-6 rounded-2xl border-l-8 border-blue-600 shadow-sm">
           <div className="mb-8">
-            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
               विभागीय कार्यकारिणी
             </h3>
           </div>
@@ -218,7 +206,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         <section className="bg-white p-6 rounded-2xl border-l-8 border-emerald-600 shadow-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div>
-              <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+              <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
                 जिल्हा अध्यक्ष
               </h3>
             </div>
@@ -230,7 +218,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
                 placeholder="जिल्हा शोधा..."
                 value={districtSearch}
                 onChange={(e) => setDistrictSearch(e.target.value)}
-                className="w-full text-xs pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 bg-slate-50"
+                className="w-full text-sm pl-9 pr-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 bg-slate-50"
               />
             </div>
           </div>
@@ -239,7 +227,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
             {filteredDistricts.length > 0 ? (
               filteredDistricts.map((leader) => renderLeaderCard(leader, 'जिल्हा अध्यक्ष'))
             ) : (
-              <div className="col-span-full py-8 text-center text-xs text-slate-500">
+              <div className="col-span-full py-8 text-center text-sm sm:text-base text-slate-500">
                 कोणताही जिल्हा आढळला नाही.
               </div>
             )}
@@ -249,7 +237,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         {/* Section 5: Advisory Board */}
         <section className="bg-white p-6 rounded-2xl border-l-8 border-purple-600 shadow-sm">
           <div className="mb-8">
-            <h3 className="font-serifDevanagari text-2xl sm:text-3xl font-bold text-[#0b1e36]">
+            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
               सल्लागार मंडळ
             </h3>
           </div>

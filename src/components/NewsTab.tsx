@@ -90,13 +90,13 @@ export const NewsTab: React.FC<NewsTabProps> = ({
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-6">
         <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest font-bold text-amber-700">
+            <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
               अधिकृत प्रसिद्धी दालन
             </span>
             <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
               बातम्या आणि परिपत्रके
             </h1>
-            <p className="text-sm sm:text-base text-slate-700 mt-2 max-w-2xl leading-relaxed">
+            <p className="text-base text-slate-700 mt-2 max-w-2xl leading-relaxed">
               राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित अधिकृत बातम्या, संघटना घडामोडी आणि महत्त्वाचे शासन निर्णय.
             </p>
           </div>
@@ -110,7 +110,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                 placeholder="बातमी किंवा शब्द शोधा..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 shadow-2xs"
+                className="w-full text-sm pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 shadow-2xs"
               />
             </div>
             {onRefreshNews && (
@@ -143,7 +143,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               <h2 className="font-serifDevanagari text-xl sm:text-2xl font-black text-[#0b1e36] tracking-tight">
                 १. महासंघ बातम्या व संघटना घडामोडी
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+              <p className="text-base text-slate-600 mt-1">
                 महासंघाच्या अधिकृत घोषणा, बैठका व राज्यस्तरीय संघटनात्मक घडामोडी.
               </p>
             </div>
@@ -154,7 +154,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                 <button
                   key={cat}
                   onClick={() => setSec1Category(cat)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                  className={`text-xs sm:text-sm font-bold px-3 py-1.5 rounded-lg transition-all ${
                     sec1Category === cat
                       ? 'bg-[#0b1e36] text-amber-300 shadow-xs'
                       : 'text-slate-600 hover:text-[#0b1e36] hover:bg-white'
@@ -169,7 +169,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
           {/* Section 1 Cards Grid */}
           <div className="mt-5">
             {section1Items.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
+              <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-sm sm:text-base">
                 या वर्गात सध्या कोणतीही बातमी उपलब्ध नाही.
               </div>
             ) : (
@@ -192,7 +192,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                               loading="lazy"
                             />
-                            <div className="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                            <div className="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-white text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
                               <ImageIcon className="w-3 h-3 text-amber-400" />
                               <span>छायाचित्र</span>
                             </div>
@@ -200,26 +200,26 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                         )}
 
                         <div className="p-4 sm:p-5">
-                          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                          <div className="flex items-center justify-between text-xs sm:text-sm text-slate-500 mb-2">
                             <span className="font-bold text-amber-800 bg-amber-100/70 border border-amber-200 px-2 py-0.5 rounded">
                               {news.category}
                             </span>
                             <span className="font-mono text-slate-600">{toEnglishDigits(news.date)}</span>
                           </div>
 
-                          <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] group-hover:text-amber-800 transition-colors line-clamp-2 leading-snug">
+                          <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-amber-800 transition-colors line-clamp-2 leading-snug">
                             {toEnglishDigits(news.title)}
                           </h3>
 
                           {news.summary && (
-                            <p className="text-sm text-slate-700 mt-2 line-clamp-3 leading-relaxed">
+                            <p className="text-base text-slate-700 mt-2 line-clamp-3 leading-relaxed">
                               {toEnglishDigits(news.summary)}
                             </p>
                           )}
                         </div>
                       </div>
 
-                      <div className="px-4 py-2.5 bg-slate-100/70 group-hover:bg-amber-50/50 border-t border-slate-200/60 flex items-center justify-between text-xs font-bold text-amber-800 group-hover:text-amber-900 transition-colors">
+                      <div className="px-4 py-2.5 bg-slate-100/70 group-hover:bg-amber-50/50 border-t border-slate-200/60 flex items-center justify-between text-sm font-bold text-amber-800 group-hover:text-amber-900 transition-colors">
                         <span>{isPhotoOnly ? '📷 फोटो पहा' : 'सविस्तर वाचा'}</span>
                         <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </div>
@@ -245,12 +245,12 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               <h2 className="font-serifDevanagari text-xl sm:text-2xl font-black text-[#0b1e36] tracking-tight">
                 २. अधिकृत शासन निर्णय व परिपत्रके
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+              <p className="text-base text-slate-600 mt-1">
                 महाराष्ट्र शासन, शिक्षण आयुक्तालय व शालेय शिक्षण विभागाचे अधिकृत शासन निर्णय (GR) व परिपत्रके.
               </p>
             </div>
 
-            <div className="text-xs font-bold px-3 py-1 rounded-lg bg-emerald-100/80 border border-emerald-200 text-emerald-900 self-start sm:self-auto font-mono">
+            <div className="text-xs sm:text-sm font-bold px-3 py-1 rounded-lg bg-emerald-100/80 border border-emerald-200 text-emerald-900 self-start sm:self-auto font-mono">
               एकूण निर्णय: {section2Items.length}
             </div>
           </div>
@@ -258,7 +258,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
           {/* Section 2 Cards Grid */}
           <div className="mt-5">
             {section2Items.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-xs">
+              <div className="p-6 text-center text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-sm sm:text-base">
                 सध्या कोणतेही शासन निर्णय उपलब्ध नाहीत.
               </div>
             ) : (
@@ -271,7 +271,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                       className="bg-gradient-to-b from-white to-emerald-50/30 rounded-xl border border-slate-200 hover:border-emerald-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between overflow-hidden group"
                     >
                       <div className="p-4 sm:p-5">
-                          <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                          <div className="flex items-center justify-between text-xs sm:text-sm text-slate-500 mb-2">
                             <span className="font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded flex items-center gap-1">
                               <FileText className="w-3 h-3 text-emerald-700" />
                               {go.type}
@@ -279,18 +279,18 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                             <span className="font-mono text-slate-600">{toEnglishDigits(go.date)}</span>
                           </div>
 
-                          <h3 className="font-serifDevanagari text-base font-bold text-[#0b1e36] group-hover:text-emerald-800 transition-colors line-clamp-2 leading-snug">
+                          <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-emerald-800 transition-colors line-clamp-2 leading-snug">
                             {toEnglishDigits(go.title)}
                           </h3>
 
                           {go.summary && (
-                            <p className="text-sm text-slate-700 mt-2 line-clamp-3 leading-relaxed">
+                            <p className="text-base text-slate-700 mt-2 line-clamp-3 leading-relaxed">
                               {toEnglishDigits(go.summary)}
                             </p>
                           )}
                       </div>
 
-                      <div className="px-4 py-2.5 bg-emerald-50/70 group-hover:bg-emerald-100/70 border-t border-emerald-200/60 flex items-center justify-between text-xs font-bold text-emerald-800 group-hover:text-emerald-950 transition-colors">
+                      <div className="px-4 py-2.5 bg-emerald-50/70 group-hover:bg-emerald-100/70 border-t border-emerald-200/60 flex items-center justify-between text-sm font-bold text-emerald-800 group-hover:text-emerald-950 transition-colors">
                         <span>{go.driveUrl || go.fileUrl ? '📄 फाइल / लिंक पहा' : 'अद्याप फाइल उपलब्ध नाही'}</span>
                         <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                       </div>
@@ -302,21 +302,21 @@ export const NewsTab: React.FC<NewsTabProps> = ({
           </div>
         </section>
 
-        {/* Copyright Policy (कॉपीराइट धोरण - फुटरच्या अगदी वर लहान अक्षरात) */}
+        {/* Copyright Policy (कॉपीराइट धोरण) */}
         <div className="mt-8 pt-4 border-t border-slate-200">
           <div className="bg-slate-100/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
             <div className="flex items-center gap-2 mb-2">
               <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-              <h4 className="font-serifDevanagari text-xs sm:text-sm font-bold text-[#0b1e36]">
+              <h4 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36]">
                 कॉपीराइट धोरण (Copyright Policy)
               </h4>
             </div>
 
-            <p className="text-xs text-slate-700 leading-relaxed font-medium mb-3">
+            <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-medium mb-3">
               या संकेतस्थळावरील सर्व मजकूर, लोगो, परिपत्रके, छायाचित्रे आणि डिजिटल साहित्य हे 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ' यांच्या मालकीचे असून ते कॉपीराइट कायद्यानुसार संरक्षित आहे.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-200 text-xs text-slate-700 leading-relaxed">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-200 text-sm text-slate-700 leading-relaxed">
               <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
                 <span className="font-bold text-[#0b1e36] block">● वापराची मर्यादा:</span>
                 <p>या संकेतस्थळावरील माहिती केवळ केंद्रप्रमुख, अधिकारी, शिक्षक आणि शैक्षणिक संदर्भासाठी माहितीच्या उद्देशाने वापरता येईल.</p>
@@ -343,7 +343,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
             <div className="p-5 bg-[#0b1e36] text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-amber-400" />
-                <span className="text-xs font-semibold text-amber-300">
+                <span className="text-xs sm:text-sm font-semibold text-amber-300">
                   {selectedNews.category} · {toEnglishDigits(selectedNews.date)}
                 </span>
               </div>
@@ -365,7 +365,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                     className="w-full max-h-[440px] object-contain mx-auto bg-slate-950/5"
                     loading="lazy"
                   />
-                  <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-700">
+                  <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs sm:text-sm text-slate-700">
                     <span className="font-semibold text-slate-600 flex items-center gap-1.5">
                       <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
                       <span>अधिकृत छायाचित्र / परिपत्रक</span>
@@ -374,7 +374,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                       href={selectedNews.imageUrl || selectedNews.image}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-amber-800 hover:text-amber-950 font-bold underline flex items-center gap-1 text-[11px]"
+                      className="text-amber-800 hover:text-amber-950 font-bold underline flex items-center gap-1 text-xs sm:text-sm"
                     >
                       <span>मोठ्या आकारात पहा</span>
                       <ExternalLink className="w-3 h-3" />
@@ -389,13 +389,13 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               </h2>
 
               {selectedNews.summary && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs font-semibold text-amber-900 leading-relaxed">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm sm:text-base font-semibold text-amber-900 leading-relaxed">
                   {toEnglishDigits(selectedNews.summary)}
                 </div>
               )}
 
               {selectedNews.content && (
-                <div className="text-sm text-slate-700 leading-relaxed space-y-3 whitespace-pre-line font-normal">
+                <div className="text-base text-slate-700 leading-relaxed space-y-3 whitespace-pre-line font-normal">
                   {toEnglishDigits(selectedNews.content)}
                 </div>
               )}
