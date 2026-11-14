@@ -12,7 +12,6 @@ await build({
     'express',
     'cors',
     'razorpay',
-    'nodemailer',
     'firebase',
     'firebase/*',
     'vite',
