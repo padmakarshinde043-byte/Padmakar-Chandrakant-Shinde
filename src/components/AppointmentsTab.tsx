@@ -25,7 +25,7 @@ import {
 } from '../services/rkPdfGenerator';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { ORG_DETAILS, MembershipApplication } from '../data/mahasanghData';
-import { fetchApplicationsForAdmin, subscribeToApplicationsForAdmin } from '../firebase';
+import { fetchApprovedMembersCached } from '../firebase';
 
 export const AppointmentsTab: React.FC = () => {
   // Main data state from Firebase Realtime Database
@@ -119,20 +119,9 @@ export const AppointmentsTab: React.FC = () => {
     }, 3500);
   };
 
-  // Load Initial Data on Mount & Subscribe to Live Applications
+  // Load Initial Data on Mount (Cache-first, zero background live listeners to protect Firestore quota)
   useEffect(() => {
     loadData(false);
-
-    // Live realtime listener for applications in Firestore
-    const unsubscribe = subscribeToApplicationsForAdmin((apps) => {
-      if (Array.isArray(apps)) {
-        setRegisteredApplications(apps);
-      }
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
   }, []);
 
   const loadData = async (force: boolean) => {
@@ -142,7 +131,7 @@ export const AppointmentsTab: React.FC = () => {
         fetchOfficials(force),
         fetchAppointedPosts(),
         fetchDistrictPasswords(),
-        fetchApplicationsForAdmin().catch(() => []),
+        fetchApprovedMembersCached(force).catch(() => []),
         fetchPresidentPasswordFromFirebase()
       ]);
       setOfficials(officialsData);

@@ -25,7 +25,6 @@ import {
   saveApplicationToFirestore,
   trackSingleApplicationInFirestore,
   fetchApplicationsForAdmin,
-  subscribeToApplicationsForAdmin,
   fetchApprovedMembersCached,
   safeCacheApplications,
   safeStorageGet,
@@ -143,25 +142,10 @@ export function App() {
   }, []);
 
   // Applications loading:
-  // For public visitors: Smart Cache of approved members (0 reads if cached!)
-  // Applications loading:
-  // For public visitors: Smart Cache of approved members (0 reads if cached!)
-  // For Admin only: Real-time listener for pending/approved applications
+  // - Admin Panel fetches once right after successful login (inside AdminTab) + via manual Refresh button (zero background polling/reads).
+  // - Public Membership tab uses Smart Cache of approved members (0 Firestore reads if cached).
   useEffect(() => {
-    if (currentTab === 'admin') {
-      // Admin Mode: Fetch applications once on load and auto-refresh every 1 minute (60,000ms)
-      // Replaces continuous real-time live listener to save mobile data and prevent background network traffic
-      handleFetchAdminApplications();
-
-      const intervalId = setInterval(() => {
-        handleFetchAdminApplications();
-      }, 60 * 1000);
-
-      return () => {
-        clearInterval(intervalId);
-      };
-    } else {
-      // Public Visitor Mode: Smart Cache of approved members (ZERO reads if valid cache exists!)
+    if (currentTab === 'membership') {
       fetchApprovedMembersCached(false)
         .then((approved) => {
           if (approved && approved.length > 0) {

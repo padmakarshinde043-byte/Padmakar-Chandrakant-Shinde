@@ -114,7 +114,7 @@ export async function testConnectionOncePerSession(): Promise<boolean> {
 // Regular visitors reading the website will consume ZERO Firestore reads!
 const NEWS_CACHE_KEY = 'mahasangh_news_cache_v2';
 const NEWS_CACHE_TIME_KEY = 'mahasangh_news_cache_time_v2';
-const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
 export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]> {
   try {
@@ -269,29 +269,77 @@ export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
   }
 }
 
-export async function fetchGovOrders(): Promise<GovOrder[]> {
+const GOV_ORDERS_CACHE_KEY = 'mahasangh_gov_orders_cache_v1';
+const GOV_ORDERS_CACHE_TIME_KEY = 'mahasangh_gov_orders_cache_time_v1';
+
+export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> {
     try {
+        if (!forceRefresh) {
+            const cachedTime = safeStorageGet(GOV_ORDERS_CACHE_TIME_KEY);
+            const cachedData = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+            if (cachedTime && cachedData) {
+                const age = Date.now() - parseInt(cachedTime, 10);
+                if (age < CACHE_DURATION_MS) {
+                    const parsed = JSON.parse(cachedData);
+                    if (Array.isArray(parsed)) return parsed;
+                }
+            }
+        }
+
         const snap = await getDocs(collection(db, 'gov_orders'));
         if (snap.empty) {
+            safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify([]));
+            safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
             return [];
         }
         const list: GovOrder[] = [];
         snap.forEach((d) => {
             list.push(d.data() as GovOrder);
         });
-        return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const sorted = list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(sorted));
+        safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
+        return sorted;
     } catch (error) {
         console.warn('Could not read gov_orders from firestore:', error);
+        const cachedData = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+        if (cachedData) {
+            try {
+                return JSON.parse(cachedData);
+            } catch {
+                // fallback
+            }
+        }
         return [];
     }
 }
 
 export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void> {
     await setDoc(doc(db, 'gov_orders', govOrder.id), govOrder);
+    try {
+        const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+        const list: GovOrder[] = cached ? JSON.parse(cached) : [];
+        const updated = [govOrder, ...list.filter((g) => g.id !== govOrder.id)]
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(updated));
+        safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
+    } catch {
+        // ignore cache error
+    }
 }
 
 export async function deleteGovOrderFromFirestore(id: string): Promise<void> {
     await deleteDoc(doc(db, 'gov_orders', id));
+    try {
+        const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+        if (cached) {
+            const list: GovOrder[] = JSON.parse(cached);
+            safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(list.filter((g) => g.id !== id)));
+            safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
+        }
+    } catch {
+        // ignore cache error
+    }
 }
 
 // Delete news from Firestore and update local cache
@@ -613,7 +661,7 @@ export interface MemberCounterData {
 const MEMBER_COUNTER_CACHE_KEY = 'mhs_member_counter_cache_v2';
 const APPROVED_MEMBERS_CACHE_KEY = 'mahasangh_approved_cache_v2';
 const APPROVED_MEMBERS_CACHE_TIME_KEY = 'mahasangh_approved_cache_time_v2';
-const APPROVED_CACHE_DURATION_MS = 2 * 60 * 1000; // 2 minutes smart cache
+const APPROVED_CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes smart cache
 
 /**
  * Reads the central member counter from `settings/member_counter` (Consumes exactly 1 read).
@@ -764,19 +812,22 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
     if (!forceRefresh && cachedTime && cachedData) {
       const age = Date.now() - parseInt(cachedTime, 10);
       if (age < APPROVED_CACHE_DURATION_MS) {
-        // Cache is valid
         const parsed = JSON.parse(cachedData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
     }
 
-    // Fetch full collection directly from Firestore server to guarantee 100% match with Admin Panel
+    // Use standard cached getDocs on normal load, and getDocsFromServer only on explicit manual Refresh
     let snap;
-    try {
-      snap = await getDocsFromServer(collection(db, 'applications'));
-    } catch {
+    if (forceRefresh) {
+      try {
+        snap = await getDocsFromServer(collection(db, 'applications'));
+      } catch {
+        snap = await getDocs(collection(db, 'applications'));
+      }
+    } else {
       snap = await getDocs(collection(db, 'applications'));
     }
 
@@ -817,11 +868,6 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
 
     safeStorageSet(APPROVED_MEMBERS_CACHE_KEY, JSON.stringify(lightweightList));
     safeStorageSet(APPROVED_MEMBERS_CACHE_TIME_KEY, Date.now().toString());
-
-    // Also sync the central counter if list has records
-    if (list.length > 0) {
-      syncMemberCounter(list.length).catch(() => {});
-    }
 
     return list;
   } catch (error) {
