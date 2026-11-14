@@ -297,51 +297,31 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
     setIsSubmittingForm(true);
     try {
-      // 1. Check duplicate in local cache first (phone, email, or exact full name)
-      let matchedApp: MembershipApplication | null = null;
-      let matchedBy: 'phone' | 'email' | 'name' = 'phone';
-
-      const localPhoneMatch = applications.find(
-        (a) => a.phone && a.phone.replace(/\D/g, '').slice(-10) === cleanPhone
-      );
-      if (localPhoneMatch) {
-        matchedApp = localPhoneMatch;
-        matchedBy = 'phone';
-      }
-
-      if (!matchedApp && userEnteredEmail && !userEnteredEmail.endsWith('@mahasangh.in')) {
-        const localEmailMatch = applications.find(
-          (a) => a.email && a.email.trim().toLowerCase() === userEnteredEmail
-        );
-        if (localEmailMatch) {
-          matchedApp = localEmailMatch;
-          matchedBy = 'email';
-        }
-      }
-
-      if (!matchedApp && normalizedNameLower.length >= 3) {
-        const localNameMatch = applications.find(
-          (a) =>
-            a.fullName &&
-            a.fullName.trim().replace(/\s+/g, ' ').toLowerCase() === normalizedNameLower
-        );
-        if (localNameMatch) {
-          matchedApp = localNameMatch;
-          matchedBy = 'name';
-        }
-      }
-
-      // 2. Always verify against live Firestore (catches Pending applications not in public cache!)
+      // 1. Verify against live Firestore first (absolute source of truth; ignores stale local cache)
       const remoteDuplicate = await findExistingApplicationInFirestore({
         phone: cleanPhone,
         email: userEnteredEmail,
         fullName: normalizedName,
       });
-      if (remoteDuplicate) {
-        // Prefer approved over pending, or live Firestore record if not found locally
-        if (!matchedApp || remoteDuplicate.app.status === 'approved') {
-          matchedApp = remoteDuplicate.app;
-          matchedBy = remoteDuplicate.matchedBy;
+
+      let matchedApp: MembershipApplication | null = remoteDuplicate ? remoteDuplicate.app : null;
+      let matchedBy: 'phone' | 'email' | 'name' = remoteDuplicate ? remoteDuplicate.matchedBy : 'phone';
+
+      if (!matchedApp) {
+        const localPhoneMatch = applications.find(
+          (a) => a.phone && a.phone.replace(/\D/g, '').slice(-10) === cleanPhone
+        );
+        if (localPhoneMatch) {
+          matchedApp = localPhoneMatch;
+          matchedBy = 'phone';
+        } else if (userEnteredEmail && !userEnteredEmail.endsWith('@mahasangh.in')) {
+          const localEmailMatch = applications.find(
+            (a) => a.email && a.email.trim().toLowerCase() === userEnteredEmail
+          );
+          if (localEmailMatch) {
+            matchedApp = localEmailMatch;
+            matchedBy = 'email';
+          }
         }
       }
 

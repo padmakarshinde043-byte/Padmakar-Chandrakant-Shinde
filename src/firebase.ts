@@ -650,6 +650,20 @@ export async function deleteApplicationFromFirestore(appId: string): Promise<voi
   try {
     await deleteDoc(doc(db, 'applications', appId));
     removeMemberFromCaches(appId);
+    if (typeof localStorage !== 'undefined') {
+      for (const key of ['mahasangh_applications', APPROVED_MEMBERS_CACHE_KEY, 'mahasangh_applications_v1', 'mahasangh_approved_cache_v1']) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          try {
+            const list = JSON.parse(raw);
+            if (Array.isArray(list)) {
+              const filtered = list.filter((x: any) => x.id !== appId);
+              localStorage.setItem(key, JSON.stringify(filtered));
+            }
+          } catch {}
+        }
+      }
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
@@ -739,18 +753,10 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
 function getKnownHighestSeqFromStorage(knownRecords?: Array<{ memberNumber?: string | null }>): number {
   let highest = extractHighestMemberSeq(knownRecords);
   try {
-    for (const key of ['mahasangh_applications', APPROVED_MEMBERS_CACHE_KEY]) {
-      const raw = safeStorageGet(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const h = extractHighestMemberSeq(parsed);
-        if (h > highest) highest = h;
-      }
-    }
     const counterRaw = safeStorageGet(MEMBER_COUNTER_CACHE_KEY);
     if (counterRaw) {
       const c = JSON.parse(counterRaw);
-      const val = typeof c?.lastMemberNumber === 'number' ? c.lastMemberNumber : 0;
+      const val = typeof c?.lastMemberNumber === 'number' ? c.lastMemberNumber : (typeof c?.totalApproved === 'number' ? c.totalApproved : 0);
       if (val > highest) highest = val;
     }
   } catch {
@@ -1656,6 +1662,8 @@ export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count
       localStorage.removeItem(APPROVED_MEMBERS_CACHE_KEY);
       localStorage.removeItem('mahasangh_applications');
       localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
+      localStorage.removeItem('mahasangh_approved_cache_v1');
+      localStorage.removeItem('mahasangh_applications_v1');
     }
 
     return {
@@ -1698,11 +1706,14 @@ export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq:
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
       localStorage.removeItem(APPROVED_MEMBERS_CACHE_KEY);
+      localStorage.removeItem('mahasangh_applications');
+      localStorage.removeItem('mahasangh_approved_cache_v1');
+      localStorage.removeItem('mahasangh_applications_v1');
     }
 
     return {
       highestSeq: highest,
-      message: `यशस्वी! सदस्य क्रमांक काउंटर यशस्वीरित्या दुरुस्त करून Firebase वरील शेवटच्या क्रमांकावर (${highest}) सेट करण्यात आला आहे. आता पुढील नवीन अर्ज मंजूर केल्यावर क्रमांक यापुढून सुरू होईल.`
+      message: `यशस्वी! सदस्य क्रमांक काउंटर यशस्वीरित्या दुरुस्त करून Firebase वरील शेवटच्या खऱ्या क्रमांकावर (${highest}) सेट करण्यात आला आहे. आता पुढील नवीन अर्ज मंजूर केल्यावर क्रमांक यापुढून सुरू होईल.`
     };
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'applications');
