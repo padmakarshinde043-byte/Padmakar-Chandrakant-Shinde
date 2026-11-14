@@ -1508,15 +1508,15 @@ try {
 
 export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
   const todayDateStr = new Date().toISOString().split('T')[0];
-  let currentStats: VisitorStats = { today: 1, total: 1 };
+  let localStats: VisitorStats = { today: 1, total: 1 };
 
-  // 1. Read existing local stats as fallback
+  // 1. Read existing local stats from localStorage
   try {
     const raw = localStorage.getItem(VISITOR_LOCAL_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (typeof parsed.total === 'number') {
-        currentStats = {
+        localStats = {
           total: parsed.total,
           today: parsed.date === todayDateStr && typeof parsed.today === 'number' ? parsed.today : 1
         };
@@ -1530,39 +1530,39 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
     const statsDocRef = doc(db, 'site_stats', 'visits');
 
     if (!hasRecordedSession) {
-      // Mark session counted immediately
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
       }
 
-      // Use Firestore transaction for reliable, race-free atomic increment across all devices & domains
+      // Transaction to safely sync, take max of Firestore and local (rescuing laptop's counts), and increment
       const resultStats = await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(statsDocRef);
-        let total = 1;
-        let today = 1;
+        let fsTotal = 0;
+        let fsToday = 0;
+        let fsDate = todayDateStr;
 
         if (snap.exists()) {
           const data = snap.data();
-          const prevTotal = typeof data.total === 'number' ? data.total : 0;
-          const prevToday = typeof data.today === 'number' ? data.today : 0;
-          const prevDate = data.lastDate;
-
-          total = prevTotal + 1;
-          if (prevDate === todayDateStr) {
-            today = prevToday + 1;
-          } else {
-            today = 1;
-          }
+          fsTotal = typeof data.total === 'number' ? data.total : 0;
+          fsToday = typeof data.today === 'number' ? data.today : 0;
+          fsDate = data.lastDate || todayDateStr;
         }
 
+        // Rescuing highest count between Firestore and local storage (e.g. laptop's 5155)
+        const baseTotal = Math.max(fsTotal, localStats.total);
+        const baseToday = (fsDate === todayDateStr) ? Math.max(fsToday, localStats.today) : localStats.today;
+
+        const newTotal = baseTotal + 1;
+        const newToday = (fsDate === todayDateStr) ? baseToday + 1 : 1;
+
         transaction.set(statsDocRef, {
-          total,
-          today,
+          total: newTotal,
+          today: newToday,
           lastDate: todayDateStr,
           lastUpdated: new Date().toISOString()
         }, { merge: true });
 
-        return { today, total };
+        return { today: newToday, total: newTotal };
       });
 
       localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
@@ -1571,35 +1571,38 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
       }));
       return resultStats;
     } else {
-      // Already recorded in this session, but fetch latest live count from Firestore to guarantee multi-device sync
+      // Already recorded in this session, fetch latest live count from Firestore and sync
       const snap = await getDoc(statsDocRef);
       if (snap.exists()) {
         const data = snap.data();
-        const total = typeof data.total === 'number' ? data.total : currentStats.total;
-        const today = (data.lastDate === todayDateStr && typeof data.today === 'number') ? data.today : currentStats.today;
-        const liveStats: VisitorStats = { today, total };
+        const fsTotal = typeof data.total === 'number' ? data.total : 0;
+        const fsToday = (data.lastDate === todayDateStr && typeof data.today === 'number') ? data.today : 0;
+        const bestTotal = Math.max(fsTotal, localStats.total);
+        const bestToday = Math.max(fsToday, localStats.today);
+
+        const liveStats: VisitorStats = { today: bestToday, total: bestTotal };
         localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
           ...liveStats,
           date: todayDateStr
         }));
         return liveStats;
       }
-      return currentStats;
+      return localStats;
     }
   } catch (err) {
     console.warn('Visitor counter sync notice:', err);
     if (!hasRecordedSession && typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
-      currentStats = {
-        today: currentStats.today + 1,
-        total: currentStats.total + 1
+      localStats = {
+        today: localStats.today + 1,
+        total: localStats.total + 1
       };
     }
     localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-      ...currentStats,
+      ...localStats,
       date: todayDateStr
     }));
-    return currentStats;
+    return localStats;
   }
 }
 
