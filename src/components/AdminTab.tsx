@@ -606,6 +606,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+  const [reportProgress, setReportProgress] = useState<{ current: number; total: number } | null>(null);
   const [showReportPinModal, setShowReportPinModal] = useState(false);
   const [reportPinInput, setReportPinInput] = useState('');
   const [reportPinError, setReportPinError] = useState('');
@@ -617,14 +618,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
     setReportPinError('');
-    setShowReportPinModal(false);
     setIsDownloadingReport(true);
+    setReportProgress({ current: 1, total: 47 });
     try {
-      await generateDeveloperReportPdf();
+      await generateDeveloperReportPdf((current, total) => {
+        setReportProgress({ current, total });
+      });
+      setShowReportPinModal(false);
     } catch (err: any) {
       alert('तांत्रिक रिपोर्ट डाऊनलोड करताना त्रुटी आली: ' + (err.message || 'Error'));
     } finally {
       setIsDownloadingReport(false);
+      setReportProgress(null);
       setReportPinInput('');
     }
   };
@@ -4353,11 +4358,26 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   {reportPinError}
                 </p>
               )}
+              {isDownloadingReport && reportProgress && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-[#193568]">
+                    <span>सविस्तर PDF तयार होत आहे...</span>
+                    <span>{reportProgress.current} / {reportProgress.total} पाने</span>
+                  </div>
+                  <div className="w-full h-2 bg-blue-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#df6b16] transition-all duration-150"
+                      style={{ width: `${Math.round((reportProgress.current / reportProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
+                  disabled={isDownloadingReport}
                   onClick={() => setShowReportPinModal(false)}
-                  className="px-4 py-2 text-xs font-bold border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold border border-slate-300 hover:bg-slate-100 disabled:opacity-50 rounded-lg text-slate-700 cursor-pointer"
                 >
                   रद्द करा
                 </button>
@@ -4366,7 +4386,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   disabled={isDownloadingReport}
                   className="px-5 py-2 text-xs font-bold bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white rounded-lg shadow-sm cursor-pointer"
                 >
-                  {isDownloadingReport ? 'डाऊनलोड होत आहे...' : 'पडताळणी करा'}
+                  {isDownloadingReport && reportProgress
+                    ? `पान ${reportProgress.current}/${reportProgress.total}...`
+                    : isDownloadingReport
+                      ? 'डाऊनलोड होत आहे...'
+                      : 'पडताळणी करा'}
                 </button>
               </div>
             </form>

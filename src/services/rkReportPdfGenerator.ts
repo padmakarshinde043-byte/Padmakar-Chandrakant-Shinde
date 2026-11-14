@@ -1,68 +1,117 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { REPORT_PAGES_PART_1, ReportPageData } from './rkReportChaptersPart1';
+import { REPORT_PAGES_PART_2 } from './rkReportChaptersPart2';
 
-export async function generateDeveloperReportPdf(): Promise<void> {
+const DEVANAGARI_DIGITS = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+
+function toMarathiDigits(num: number): string {
+  return String(num)
+    .split('')
+    .map((ch) => DEVANAGARI_DIGITS[Number(ch)] ?? ch)
+    .join('');
+}
+
+function buildA4PageMarkup(page: ReportPageData, pageNumber: number, totalPages: number): string {
+  return `
+    <div style="width: 794px; height: 1122px; background: #ffffff; color: #0f172a; font-family: 'Noto Sans Devanagari', Arial, sans-serif; padding: 26px 32px 22px 32px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">
+      <div>
+        <!-- Top Running Header -->
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2.5px solid #df6b16; padding-bottom: 8px; margin-bottom: 12px;">
+          <div>
+            <div style="font-size: 10px; font-weight: 800; color: #df6b16; letter-spacing: 0.4px; text-transform: uppercase;">${page.chapter}</div>
+            <div style="font-size: 11px; font-weight: 700; color: #193568;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ (mahasangh.in)</div>
+          </div>
+          <div style="background: #0b1e33; color: #fde047; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 6px;">
+            डेव्हलपर मास्टर मॅन्युअल
+          </div>
+        </div>
+
+        <!-- Page Title Banner -->
+        <div style="background: #f1f5f9; border-left: 5px solid #193568; border-radius: 6px; padding: 9px 13px; margin-bottom: 12px;">
+          <h1 style="font-size: 16.5px; line-height: 1.35; font-weight: 900; color: #0b1e33; margin: 0 0 3px 0;">${page.title}</h1>
+          ${
+            page.subtitle
+              ? `<p style="font-size: 11px; line-height: 1.45; color: #475569; margin: 0; font-weight: 600;">${page.subtitle}</p>`
+              : ''
+          }
+        </div>
+
+        <!-- Page Body Content -->
+        <div style="font-size: 11.5px; line-height: 1.58; color: #1e293b;">
+          ${page.bodyHtml}
+        </div>
+      </div>
+
+      <!-- Bottom Running Footer -->
+      <div style="border-top: 1px solid #cbd5e1; padding-top: 7px; display: flex; align-items: center; justify-content: space-between; font-size: 10px; color: #64748b;">
+        <div>गोपनीय तांत्रिक दस्तऐवज • भविष्यातील प्रोजेक्टसाठी संपूर्ण मार्गदर्शक</div>
+        <div style="font-weight: 800; color: #193568;">पान ${toMarathiDigits(pageNumber)} / ${toMarathiDigits(totalPages)}</div>
+      </div>
+    </div>
+  `;
+}
+
+export async function generateDeveloperReportPdf(
+  onProgress?: (currentPage: number, totalPages: number) => void
+): Promise<void> {
+  const allPages: ReportPageData[] = [...REPORT_PAGES_PART_1, ...REPORT_PAGES_PART_2];
+  const totalPages = allPages.length;
+
   const container = document.createElement('div');
   container.style.position = 'fixed';
-  container.style.left = '-9999px';
+  container.style.left = '-99999px';
   container.style.top = '0';
-  container.style.width = '794px'; // A4 width at 96 DPI
+  container.style.width = '794px';
+  container.style.height = '1122px';
   container.style.backgroundColor = '#ffffff';
-  container.style.color = '#102a43';
-  container.style.fontFamily = 'Noto Sans Devanagari, sans-serif';
-  container.style.padding = '40px';
-  container.style.boxSizing = 'border-box';
-
-  const htmlContent = 
-    '<div style="border: 3px solid #193568; padding: 30px; border-radius: 12px; background: #fff;">' +
-      '<div style="text-align: center; border-bottom: 2px solid #df6b16; padding-bottom: 15px; margin-bottom: 20px;">' +
-        '<h1 style="font-size: 22px; color: #193568; margin: 0 0 5px 0; font-weight: bold;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</h1>' +
-        '<p style="font-size: 13px; color: #df6b16; margin: 0; font-weight: bold;">तांत्रिक मास्टर रिपोर्ट व डेव्हलपर गाईड (Technical Developer Guide)</p>' +
-      '</div>' +
-      '<div style="font-size: 12px; line-height: 1.6; color: #243b53;">' +
-        '<h2 style="font-size: 15px; color: #193568; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 15px;">१. प्रकल्प परिचय व टेक्नॉलॉजी स्टॅक</h2>' +
-        '<p><strong>प्रोजेक्ट नाव:</strong> mahasangh.in (महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ)</p>' +
-        '<p><strong>स्टॅक:</strong> React 18, Vite, TypeScript, Tailwind CSS, Node.js Express 5, Firebase Firestore, Razorpay Webhook & Checkout.</p>' +
-        '<h2 style="font-size: 15px; color: #193568; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 15px;">२. बाहरी पोर्टल्स व सेवा सेटअप (External Portals)</h2>' +
-        '<ul style="padding-left: 20px; margin: 5px 0;">' +
-          '<li><strong>Firebase Console:</strong> Firestore डेटाबेस व ऑथेंटिकेशन (ai-studio-rknewsite-...).</li>' +
-          '<li><strong>Razorpay Dashboard:</strong> Live API Key, Secret व Webhook (https://mahasangh.in/api/razorpay/webhook).</li>' +
-          '<li><strong>HostKarle Hosting:</strong> Node.js App (Passenger) + server.cjs स्टार्टअप फाईल.</li>' +
-          '<li><strong>GitHub Actions:</strong> FTP Auto-Deploy द्वारा git push वर स्वयंचलित लाईव्ह अपडेट.</li>' +
-        '</ul>' +
-        '<h2 style="font-size: 15px; color: #193568; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-top: 15px;">३. मुख्य वैशिष्ट्ये व सुरक्षा</h2>' +
-        '<ul style="padding-left: 20px; margin: 5px 0;">' +
-          '<li><strong>डिजिटल आय-कार्ड PDF:</strong> मंजूर सदस्यांसाठी हाय-डिफिनिशन PDF आय-कार्ड निर्मिती.</li>' +
-          '<li><strong>ड्युप्लिकेट प्रतिबंध:</strong> मोबाईल, ई-मेल किंवा नावानुसार थेट Firestore मध्ये तपासणी करून दुबार फॉर्म भरण्यास प्रतिबंध.</li>' +
-          '<li><strong>डेटा बचत ऑप्टिमायझेशन:</strong> ॲडमिन पॅनलमधील रिअल-टाइम लिसनर काढून १ मिनिटाचा ऑटो-रिफ्रेश आणि मॅन्युअल रिफ्रेश.</li>' +
-          '<li><strong>पेमेंट सुरक्षा:</strong> Razorpay Signature Verify आणि Webhook द्वारे पक्क्या पेमेंटशिवाय अर्ज मंजुरी नाही.</li>' +
-        '</ul>' +
-        '<div style="margin-top: 30px; border-top: 1px dashed #cbd5e1; padding-top: 10px; text-align: center; font-size: 11px; color: #627d98;">' +
-          '<p>हा तांत्रिक रिपोर्ट नवीन वेब डेव्हलपरसाठी भविष्यातील मार्गदर्शक म्हणून तयार करण्यात आला आहे.</p>' +
-        '</div>' +
-      '</div>' +
-    '</div>';
-
-  container.innerHTML = htmlContent;
-
+  container.style.overflow = 'hidden';
+  container.style.zIndex = '-1';
   document.body.appendChild(container);
+
   try {
-    const canvas = await html2canvas(container, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
+    const pdf = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
     });
-    document.body.removeChild(container);
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-    pdf.addImage(imgData, 'JPEG', 0, 10, pdfWidth, pdfHeight);
+    for (let i = 0; i < totalPages; i++) {
+      onProgress?.(i + 1, totalPages);
+      container.innerHTML = buildA4PageMarkup(allPages[i], i + 1, totalPages);
+
+      const pageElement = container.firstElementChild as HTMLElement;
+      const canvas = await html2canvas(pageElement, {
+        scale: 1.5,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 794,
+        height: 1122,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.86);
+      if (i > 0) {
+        pdf.addPage();
+      }
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+
+      // Yield briefly to keep UI responsive across 47 pages
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
     pdf.save('Mahasangh_Technical_Developer_Report.pdf');
-  } catch (err) {
-    document.body.removeChild(container);
-    throw err;
+  } finally {
+    if (container.parentNode) {
+      container.parentNode.removeChild(container);
+    }
   }
 }
