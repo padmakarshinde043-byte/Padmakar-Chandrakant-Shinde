@@ -1601,3 +1601,71 @@ export async function resetAdminUserToFirstLogin(adminId: string): Promise<boole
   return true;
 }
 
+/**
+ * Resequences all approved members in Firebase in chronological order of their submission/approval timestamp,
+ * assigning continuous sequential numbers (1, 2, 3...) to fix gaps.
+ */
+export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count: number; message: string }> {
+  try {
+    const appsCol = collection(db, 'applications');
+    const snap = await getDocs(appsCol);
+    if (snap.empty) {
+      return { count: 0, message: 'कोणतेही अर्ज सापडले नाहीत.' };
+    }
+
+    const allApps: Array<MembershipApplication & { id: string }> = [];
+    snap.forEach((d) => {
+      const data = d.data() as MembershipApplication;
+      allApps.push({ ...data, id: d.id });
+    });
+
+    // Filter only approved members
+    const approved = allApps.filter((a) => a.status === 'approved');
+
+    // Sort by createdAt or approvedAt ascending (oldest first)
+    approved.sort((a, b) => {
+      const dateA = new Date(a.approvedAt || a.createdAt || '').getTime() || 0;
+      const dateB = new Date(b.approvedAt || b.createdAt || '').getTime() || 0;
+      return dateA - dateB;
+    });
+
+    let count = 0;
+    for (let i = 0; i < approved.length; i++) {
+      const app = approved[i];
+      const newSeq = i + 1;
+      const district = app.district || 'MAHA';
+      const newMemberNumber = formatSequentialMemberNumber(district, newSeq);
+
+      if (app.memberNumber !== newMemberNumber) {
+        const appRef = doc(db, 'applications', app.id);
+        await setDoc(appRef, { memberNumber: newMemberNumber, updatedAt: new Date().toISOString() }, { merge: true });
+        count++;
+      }
+    }
+
+    // Update central counter
+    const counterDocRef = doc(db, 'settings', 'member_counter');
+    await setDoc(counterDocRef, {
+      totalApproved: approved.length,
+      lastMemberNumber: approved.length,
+      lastUpdated: new Date().toISOString()
+    }, { merge: true });
+
+    // Clear local caches
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(APPROVED_MEMBERS_CACHE_KEY);
+      localStorage.removeItem('mahasangh_applications');
+      localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
+    }
+
+    return {
+      count,
+      message: `यशस्वी! ${approved.length} मंजूर सदस्यांचे क्रमांक क्रमाने (1 ते ${approved.length}) सलग लावले गेले.`
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'applications');
+    throw error;
+  }
+}
+
+

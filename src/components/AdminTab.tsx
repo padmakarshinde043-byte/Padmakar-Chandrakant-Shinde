@@ -35,7 +35,8 @@ import {
   fetchContactsForAdmin,
   deleteContactMessageFromFirestore,
   approveApplicationAtomicInFirestore,
-  addApprovedMemberToCache
+  addApprovedMemberToCache,
+  resequenceAllApprovedMembersInFirestore
 } from '../firebase';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -227,6 +228,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   // Certificate Modal (Point 5)
   const [certModalApp, setCertModalApp] = useState<MembershipApplication | null>(null);
+
+  // Resequencing state
+  const [isResequencing, setIsResequencing] = useState(false);
+  const handleResequence = async () => {
+    if (!window.confirm('तुम्हाला नक्की सर्व मंजूर सदस्यांचे क्रमांक सेव्हिंग/मंजुरीच्या क्रमानुसार 1 पासून सलग रांगेत लावायचे आहेत का? यामुळे जुने गॅप निघून जातील.')) {
+      return;
+    }
+    setIsResequencing(true);
+    try {
+      const res = await resequenceAllApprovedMembersInFirestore();
+      alert(res.message);
+      if (onFetchApplications) await onFetchApplications();
+    } catch (err) {
+      alert('पुनर्रचना करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsResequencing(false);
+    }
+  };
 
   // Cloudinary State (Firebase Quota Protection - 100% Free CDN Hosting)
   const [cloudinaryConfig, setCloudinaryConfig] = useState<CloudinaryConfig>(getCloudinaryConfig);
@@ -1783,17 +1802,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       येथे प्राप्त झालेले सर्व अर्ज तपासा, बँक पेमेंट पडताळा व अधिकृत सदस्य क्रमांक द्या.
                     </p>
                   </div>
-                  {onFetchApplications && (
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
                     <button
                       type="button"
-                      onClick={onFetchApplications}
-                      disabled={isLoadingApps}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                      onClick={handleResequence}
+                      disabled={isResequencing}
+                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-2xs"
+                      title="सर्व मंजूर सदस्यांचे क्रमांक सेव्हिंग क्रमानुसार 1 पासून सलग रांगेत लावा"
                     >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
-                      <span>{isLoadingApps ? 'लोड होत आहे...' : 'ताजे करा'}</span>
+                      <RefreshCw className={`w-3.5 h-3.5 ${isResequencing ? 'animate-spin' : ''}`} />
+                      <span>{isResequencing ? 'क्रमांक लावत आहे...' : 'सर्व क्रमांक क्रमाने लावा'}</span>
                     </button>
-                  )}
+                    {onFetchApplications && (
+                      <button
+                        type="button"
+                        onClick={onFetchApplications}
+                        disabled={isLoadingApps}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
+                        <span>{isLoadingApps ? 'लोड होत आहे...' : 'ताजे करा'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Quick Stats Grid inside Applications Sub-Tab */}
