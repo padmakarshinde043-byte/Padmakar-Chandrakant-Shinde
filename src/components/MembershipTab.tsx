@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   UserCheck, ShieldCheck, CheckCircle2, AlertCircle, Phone, Printer, Download, Search,
-  Upload, Image as ImageIcon, Check, Sparkles, Award, ExternalLink
+  Upload, Image as ImageIcon, Check, Sparkles, Award, ExternalLink, Mail
 } from 'lucide-react';
 import {
   ORG_DETAILS,
@@ -14,25 +14,30 @@ import {
 import { toEnglishDigits } from '../utils/formatters';
 import { fetchOfficials } from '../services/rkFirebaseService';
 import { OfficialMember, DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
-import { generateMembershipCertificatePdf } from '../services/rkPdfGenerator';
+import {
+  generateMembershipCertificatePdf,
+  generateMembershipIdCardPdfBase64
+} from '../services/rkPdfGenerator';
 import { RegisteredMembersDirectory } from './RegisteredMembersDirectory';
 import {
   allocateNextMemberNumber,
   addApprovedMemberToCache,
   findExistingApplicationInFirestore,
 } from '../firebase';
-import { initiateRazorpayPayment, fetchRazorpayPublicConfig } from '../utils/razorpay';
+import { initiateRazorpayPayment } from '../utils/razorpay';
 
 interface MembershipTabProps {
   onAddApplication: (app: MembershipApplication) => Promise<void> | void;
   applications: MembershipApplication[];
   onTrackRemote?: (query: string) => Promise<MembershipApplication | null>;
+  initialTrackQuery?: string;
 }
 
 export const MembershipTab: React.FC<MembershipTabProps> = ({
   onAddApplication,
   applications,
   onTrackRemote,
+  initialTrackQuery,
 }) => {
   // Form fields
   const [salutation, setSalutation] = useState('श्री');
@@ -86,6 +91,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     app: MembershipApplication;
     matchedBy: 'phone' | 'email' | 'name';
   } | null>(null);
+  const [emailDeliveryStatus, setEmailDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'skipped'>('idle');
+  const [emailDeliveryAddress, setEmailDeliveryAddress] = useState<string>('');
+  const trackSectionRef = useRef<HTMLDivElement | null>(null);
+  const initialTrackRanRef = useRef<boolean>(false);
 
   const handleStartRazorpayCheckout = (app: MembershipApplication) => {
     setIsRazorpayLoading(true);
@@ -145,6 +154,21 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       .then((data) => setAllOfficials(data))
       .catch((err) => console.warn('Could not load officials for membership form:', err));
   }, []);
+
+  // Auto-run lookup if landed via ?track=... link (e.g. from approval email)
+  useEffect(() => {
+    if (!initialTrackQuery || initialTrackRanRef.current) return;
+    initialTrackRanRef.current = true;
+    const clean = toEnglishDigits(initialTrackQuery.trim());
+    if (!clean) return;
+    setSearchQuery(clean);
+    runTrackLookup(clean).then(() => {
+      setTimeout(() => {
+        trackSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTrackQuery]);
 
   // Officials belonging to selected officialDistrict
   const matchingDistrictOfficials = useMemo(() => {
@@ -287,8 +311,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     setFormAlert('');
     setExistingPendingMatch(null);
 
-    if (!salutation || !fullName.trim() || !phone.trim() || !address.trim() || !education.trim() || !professionalQualification.trim() || !professional.trim() || !district || !taluka || (taluka && !centerName.trim())) {
-      setFormAlert('कृपया सर्व आवश्यक (*) माहिती (जिल्हा, तालुका व कार्यरत केंद्राच्या नावासह) अचूकपणे निवडा व भरा.');
+    if (!salutation || !fullName.trim() || !phone.trim() || !email.trim() || !address.trim() || !education.trim() || !professionalQualification.trim() || !professional.trim() || !district || !taluka || (taluka && !centerName.trim())) {
+      setFormAlert('कृपया सर्व आवश्यक (*) माहिती (ई-मेल, जिल्हा, तालुका व कार्यरत केंद्राच्या नावासह) अचूकपणे निवडा व भरा.');
       window.scrollTo({ top: 380, behavior: 'smooth' });
       return;
     }
@@ -303,7 +327,12 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     const normalizedName = fullName.trim().replace(/\s+/g, ' ');
     const normalizedNameLower = normalizedName.toLowerCase();
     const userEnteredEmail = email.trim().toLowerCase();
-    const cleanEmail = userEnteredEmail || `${cleanPhone}@mahasangh.in`;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEnteredEmail) || /^\d{10}@mahasangh\.in$/i.test(userEnteredEmail)) {
+      setFormAlert('कृपया वैध ई-मेल पत्ता (Email) प्रविष्ट करा — आपले अधिकृत आय-कार्ड ई-मेलवर पाठवले जाईल.');
+      window.scrollTo({ top: 380, behavior: 'smooth' });
+      return;
+    }
+    const cleanEmail = userEnteredEmail;
 
     setIsSubmittingForm(true);
     try {
@@ -485,6 +514,54 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       setSearchResult(finalApp);
     }
 
+    // Automatically email the official CR80 PDF ID card to the member (non-blocking)
+    const memberEmail = (finalApp.email || '').trim();
+    const hasRealEmail =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberEmail) && !/^\d{10}@mahasangh\.in$/i.test(memberEmail);
+
+    if (hasRealEmail && !finalApp.idCardEmailSent) {
+      setEmailDeliveryAddress(memberEmail);
+      setEmailDeliveryStatus('sending');
+      (async () => {
+        try {
+          const { base64, fileName } = await generateMembershipIdCardPdfBase64(finalApp);
+          const resp = await fetch('/api/email/send-id-card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              applicationId: finalApp.id,
+              toEmail: memberEmail,
+              fullName: finalApp.fullName,
+              salutation: finalApp.salutation,
+              memberNumber: finalApp.memberNumber,
+              applicationNumber: finalApp.applicationNumber,
+              district: finalApp.district,
+              professional: finalApp.professional,
+              pdfBase64: base64,
+              fileName,
+            }),
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (resp.ok && (data.sent || data.alreadySent)) {
+            setEmailDeliveryStatus('sent');
+            setSubmittedApp((prev) =>
+              prev && prev.id === finalApp.id ? { ...prev, idCardEmailSent: true } : prev
+            );
+          } else {
+            setEmailDeliveryStatus('skipped');
+          }
+        } catch (emailErr) {
+          console.warn('Auto ID Card email delivery notice:', emailErr);
+          setEmailDeliveryStatus('skipped');
+        }
+      })();
+    } else if (finalApp.idCardEmailSent && hasRealEmail) {
+      setEmailDeliveryAddress(memberEmail);
+      setEmailDeliveryStatus('sent');
+    } else {
+      setEmailDeliveryStatus('idle');
+    }
+
     // Reset Form
     setFullName('');
     setPhone('');
@@ -509,9 +586,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleTrackStatus = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const rawTrimmed = toEnglishDigits(searchQuery.trim());
+  const runTrackLookup = async (rawInput: string) => {
+    const rawTrimmed = toEnglishDigits(rawInput.trim());
     const query = rawTrimmed.toLowerCase();
     if (!query) return;
 
@@ -550,6 +626,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     }
   };
 
+  const handleTrackStatus = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runTrackLookup(searchQuery);
+  };
+
   // Direct High-Definition PDF Download for Approved Certificate
   const handleDownloadApprovedCertificate = async (app: MembershipApplication) => {
     setIsDownloadingCert(true);
@@ -583,7 +664,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         <RegisteredMembersDirectory applications={applications} />
 
         {/* 2. अर्जाची स्थिती तपासा (त्यानंतर - Middle Section, exact same position, high-visibility design) */}
-        <div className="bg-gradient-to-br from-[#fff9f2] via-white to-[#fffbeb] rounded-2xl border-2 border-[#df6b16] mb-8 shadow-lg overflow-hidden ring-4 ring-[#df6b16]/10">
+        <div ref={trackSectionRef} className="bg-gradient-to-br from-[#fff9f2] via-white to-[#fffbeb] rounded-2xl border-2 border-[#df6b16] mb-8 shadow-lg overflow-hidden ring-4 ring-[#df6b16]/10">
           {/* Bold High-Contrast Saffron Header */}
           <div className="bg-gradient-to-r from-[#df6b16] via-[#d15c0c] to-[#b34904] px-5 py-3.5 sm:px-6 sm:py-4 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
@@ -924,15 +1005,19 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
               <div>
                 <label className="font-bold text-[#172033] block mb-1">
-                  ई-मेल पत्ता (Email)
+                  ई-मेल पत्ता (Email) <span className="text-[#df6b16]">*</span>
                 </label>
                 <input
                   type="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="उदा. amol@example.com (ऐच्छिक)"
+                  placeholder="उदा. amol@gmail.com (आय-कार्ड ई-मेलवर मिळेल)"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-lg focus:outline-none focus:border-[#df6b16]"
                 />
+                <p className="text-[10.5px] text-slate-500 mt-1">
+                  पेमेंट पूर्ण झाल्यावर आपले अधिकृत PDF आय-कार्ड थेट या ई-मेलवर पाठवले जाईल.
+                </p>
               </div>
 
               <div>
@@ -1314,6 +1399,20 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   <p className="text-xs text-emerald-900 font-medium pt-1">
                     महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाशी जोडल्याबद्दल आपले मनःपूर्वक अभिनंदन! आपले अधिकृत आय-कार्ड तयार झाले आहे.
                   </p>
+
+                  {emailDeliveryStatus === 'sending' && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-blue-600 animate-pulse shrink-0" />
+                      <span>आपले PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले जात आहे...</span>
+                    </div>
+                  )}
+
+                  {emailDeliveryStatus === 'sent' && (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>आपले अधिकृत PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर यशस्वीरीत्या पाठवले आहे! (कृपया Inbox / Spam तपासा.)</span>
+                    </div>
+                  )}
 
                   <div className="pt-2 flex flex-wrap items-center gap-3">
                     <button

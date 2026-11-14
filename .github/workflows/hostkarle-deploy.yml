@@ -54,5 +54,6 @@ jobs:
           exclude: |
             node_modules/**
             razorpay-config.json
+            email-config.json
             .env*
             .git*/**

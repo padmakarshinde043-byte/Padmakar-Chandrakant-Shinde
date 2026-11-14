@@ -649,7 +649,9 @@ export async function generateStatewideRegistryPdf(
  * - Passport Photo, Member ID, Full Name, Cadre, District & Taluka, Mobile Number
  * - Bottom-Right: Founder State President Shri Rajendra Khairnar signature (/sign.jpg)
  */
-export async function generateMembershipIdCardPdf(app: MembershipApplication): Promise<void> {
+async function buildMembershipIdCardPdfDocument(
+  app: MembershipApplication
+): Promise<{ pdf: jsPDF; downloadFileName: string; emailFileName: string }> {
   const [logoUrl, signUrl, qrUrl] = await Promise.all([
     getLogoDataUrl(),
     getSignDataUrl(),
@@ -800,10 +802,30 @@ export async function generateMembershipIdCardPdf(app: MembershipApplication): P
     pdf.addImage(imgData, 'JPEG', 0, 0, 85.6, 54, undefined, 'FAST');
 
     const cleanName = (app.fullName || 'सदस्य').replace(/\s+/g, '_');
-    pdf.save(`आय_कार्ड_${cleanName}.pdf`);
+    const cleanMemberId = memberNo.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return {
+      pdf,
+      downloadFileName: `आय_कार्ड_${cleanName}.pdf`,
+      emailFileName: `Mahasangh_ID_${cleanMemberId}.pdf`
+    };
   } finally {
     document.body.removeChild(wrapper);
   }
+}
+
+export async function generateMembershipIdCardPdf(app: MembershipApplication): Promise<void> {
+  const { pdf, downloadFileName } = await buildMembershipIdCardPdfDocument(app);
+  pdf.save(downloadFileName);
+}
+
+export async function generateMembershipIdCardPdfBase64(
+  app: MembershipApplication
+): Promise<{ base64: string; fileName: string }> {
+  const { pdf, emailFileName } = await buildMembershipIdCardPdfDocument(app);
+  const dataUri = pdf.output('datauristring');
+  const commaIdx = dataUri.indexOf(',');
+  const base64 = commaIdx >= 0 ? dataUri.slice(commaIdx + 1) : dataUri;
+  return { base64, fileName: emailFileName };
 }
 
 export async function generateMembershipCertificatePdf(app: MembershipApplication): Promise<void> {

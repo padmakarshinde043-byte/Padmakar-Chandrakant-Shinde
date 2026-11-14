@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
+import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
 import { initializeApp, getApps } from 'firebase/app';
@@ -101,6 +102,191 @@ function getRazorpayInstance(): { instance: Razorpay | null; config: RazorpayCon
     key_secret: config.keySecret
   });
   return { instance, config };
+}
+
+// =========================================================================
+// SMTP Email Configuration & Membership ID Card Delivery (Nodemailer)
+// =========================================================================
+const EMAIL_CONFIG_FILE = path.resolve(process.cwd(), 'email-config.json');
+
+interface EmailConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  from: string;
+  enabled: boolean;
+}
+
+function loadEmailConfig(): EmailConfig {
+  let fileCfg: Partial<EmailConfig> = {};
+  try {
+    if (fs.existsSync(EMAIL_CONFIG_FILE)) {
+      fileCfg = JSON.parse(fs.readFileSync(EMAIL_CONFIG_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.warn('Could not load email-config.json:', e);
+  }
+
+  const host = String(fileCfg.host || process.env.SMTP_HOST || 'mail.mahasangh.in').trim();
+  const portRaw = Number(fileCfg.port || process.env.SMTP_PORT || 465);
+  const port = Number.isFinite(portRaw) && portRaw > 0 ? portRaw : 465;
+  const user = String(fileCfg.user || process.env.SMTP_USER || '').trim();
+  const pass = String(fileCfg.pass || process.env.SMTP_PASS || '').trim();
+  const from = String(fileCfg.from || process.env.SMTP_FROM || user).trim();
+  const enabled = Boolean(host && user && pass);
+
+  return { host, port, user, pass, from, enabled };
+}
+
+function isRealMemberEmail(email?: string): boolean {
+  if (!email) return false;
+  const clean = String(email).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return false;
+  if (/^\d{10}@mahasangh\.in$/i.test(clean)) return false;
+  return true;
+}
+
+function escapeEmailHtml(val?: string): string {
+  return String(val || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildMembershipEmailHtml(params: {
+  salutation?: string;
+  fullName: string;
+  memberNumber: string;
+  applicationNumber?: string;
+  district?: string;
+  professional?: string;
+  paymentId?: string;
+  hasPdfAttachment: boolean;
+  trackUrl: string;
+}): string {
+  const fullTitle = `${params.salutation ? params.salutation + ' ' : ''}${params.fullName}`.trim();
+  return `
+  <div style="font-family: 'Noto Sans Devanagari', Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #f7f9fc; padding: 20px; color: #0f172a;">
+    <div style="background: #ffffff; border: 2px solid #0b1e33; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
+      <div style="background: linear-gradient(135deg, #0b1e33 0%, #1e3a8a 100%); padding: 20px; text-align: center; border-bottom: 3px solid #d4af37; color: #ffffff;">
+        <div style="font-size: 12px; font-weight: 700; color: #fde047; letter-spacing: 0.5px;">महाराष्ट्र राज्य</div>
+        <div style="font-size: 20px; font-weight: 900; margin: 4px 0;">केंद्रप्रमुख व अधिकारी महासंघ</div>
+        <div style="font-size: 11px; color: #e2e8f0;">नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427</div>
+      </div>
+
+      <div style="padding: 22px; line-height: 1.65; font-size: 14px;">
+        <p style="margin: 0 0 12px 0; font-size: 16px; font-weight: 800; color: #193568;">
+          सप्रेम नमस्कार ${escapeEmailHtml(fullTitle)},
+        </p>
+        <p style="margin: 0 0 16px 0; color: #1e293b;">
+          <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आजीवन सदस्यत्व</strong> आपणास यशस्वीरीत्या मंजूर करण्यात आले आहे. महासंघ परिवारात आपले मनःपूर्वक स्वागत आणि अभिनंदन!
+        </p>
+
+        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;">
+          <div style="font-size: 12px; font-weight: 800; color: #166534; margin-bottom: 8px;">अधिकृत सदस्यत्व तपशील:</div>
+          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <tr>
+              <td style="padding: 4px 0; color: #475569;"><strong>सदस्य क्रमांक (Member ID):</strong></td>
+              <td style="padding: 4px 0; color: #0b1e33; font-weight: 900; font-family: monospace; font-size: 15px;">${escapeEmailHtml(params.memberNumber)}</td>
+            </tr>
+            ${params.applicationNumber ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>अर्ज संदर्भ क्रमांक:</strong></td><td style="padding: 4px 0; color: #0f172a; font-family: monospace;">${escapeEmailHtml(params.applicationNumber)}</td></tr>` : ''}
+            ${params.professional ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>पद / संवर्ग:</strong></td><td style="padding: 4px 0; color: #0f172a;">${escapeEmailHtml(params.professional)}</td></tr>` : ''}
+            ${params.district ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>कार्यक्षेत्र (जिल्हा):</strong></td><td style="padding: 4px 0; color: #0f172a;">${escapeEmailHtml(params.district)}</td></tr>` : ''}
+            ${params.paymentId ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>पेमेंट आयडी (₹220):</strong></td><td style="padding: 4px 0; color: #0f172a; font-family: monospace;">${escapeEmailHtml(params.paymentId)}</td></tr>` : ''}
+          </table>
+        </div>
+
+        ${
+          params.hasPdfAttachment
+            ? `<div style="background: #fff7ed; border-left: 4px solid #df6b16; padding: 12px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; color: #7c2d12;">
+                📎 <strong>आपले अधिकृत आजीवन डिजिटल आय-कार्ड (PDF)</strong> या ई-मेल सोबत जोडलेले (Attached) आहे. आपण ते येथून थेट डाऊनलोड व प्रिंट करू शकता.
+              </div>`
+            : `<div style="background: #fff7ed; border-left: 4px solid #df6b16; padding: 12px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; color: #7c2d12;">
+                तुमचे पेमेंट निश्चित झाले असून आपले अधिकृत डिजिटल आय-कार्ड तयार आहे. खालील बटनावर क्लिक करून आपले PDF आय-कार्ड एका क्लिकमध्ये डाऊनलोड करा:
+              </div>`
+        }
+
+        <div style="text-align: center; margin: 20px 0;">
+          <a href="${escapeEmailHtml(params.trackUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #df6b16; color: #ffffff; text-decoration: none; font-weight: 800; font-size: 14px; padding: 12px 24px; border-radius: 8px;">
+            आय-कार्ड डाऊनलोड पोर्टल उघडा →
+          </a>
+        </div>
+
+        <p style="font-size: 12px; color: #64748b; margin: 16px 0 0 0;">
+          टीप: आपण कधीही <a href="https://mahasangh.in" style="color: #193568; font-weight: 700;">mahasangh.in</a> वर जाऊन "सदस्यत्व नोंदणी → अर्जाची स्थिती तपासा" मधून आपला मोबाईल नंबर किंवा सदस्य क्रमांक टाकून आय-कार्ड मिळवू शकता.
+        </p>
+      </div>
+
+      <div style="background: #f1f5f9; border-top: 1px solid #cbd5e1; padding: 14px 20px; text-align: center; font-size: 11.5px; color: #475569;">
+        <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</strong><br>
+        कार्यालय: 131, पाटणे, ता. मालेगाव, जि. नाशिक — 423203<br>
+        संपर्क: 9860704098 | पेमेंट मदत (ज्ञानेश्वर नंदनवार): 9423484305 / 8208494368
+      </div>
+    </div>
+  </div>`;
+}
+
+async function sendMembershipEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  pdfBase64?: string;
+  fileName?: string;
+}): Promise<{ sent: boolean; reason?: string }> {
+  const emailCfg = loadEmailConfig();
+  if (!emailCfg.enabled) {
+    return { sent: false, reason: 'SMTP not configured' };
+  }
+  if (!isRealMemberEmail(params.to)) {
+    return { sent: false, reason: 'Recipient email is not valid' };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: emailCfg.host,
+    port: emailCfg.port,
+    secure: emailCfg.port === 465,
+    auth: {
+      user: emailCfg.user,
+      pass: emailCfg.pass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  const attachments = params.pdfBase64
+    ? [
+        {
+          filename: params.fileName || 'Mahasangh_ID_Card.pdf',
+          content: Buffer.from(params.pdfBase64, 'base64'),
+          contentType: 'application/pdf',
+        },
+      ]
+    : undefined;
+
+  const plainText =
+    params.text ||
+    params.html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  await transporter.sendMail({
+    from: `"महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" <${emailCfg.from}>`,
+    replyTo: emailCfg.from,
+    to: params.to.trim(),
+    subject: params.subject,
+    text: plainText,
+    html: params.html,
+    attachments,
+  });
+
+  return { sent: true };
 }
 
 // =========================================================================
@@ -260,12 +446,141 @@ app.use(express.json({ limit: '10mb' }));
 // Health check endpoint (no secrets exposed)
 app.get('/api/health', (_req, res) => {
   const config = loadRazorpayConfig();
+  const emailConfig = loadEmailConfig();
   res.json({
     status: 'ok',
     razorpayConfigured: Boolean(config.keyId && config.keySecret && config.enabled),
     webhookSecretConfigured: Boolean(config.webhookSecret),
-    firebaseConfigured: Boolean(getServerFirestore())
+    firebaseConfigured: Boolean(getServerFirestore()),
+    emailConfigured: emailConfig.enabled
   });
+});
+
+// Send Membership Official PDF ID Card via SMTP
+app.post('/api/email/send-id-card', async (req, res) => {
+  try {
+    const {
+      applicationId,
+      toEmail,
+      fullName,
+      salutation,
+      memberNumber,
+      applicationNumber,
+      district,
+      professional,
+      pdfBase64,
+      fileName
+    } = req.body || {};
+
+    if (!applicationId || typeof pdfBase64 !== 'string' || pdfBase64.length < 100) {
+      return res.status(400).json({
+        status: 'error',
+        sent: false,
+        message: 'अपूर्ण अर्ज किंवा PDF तपशील.'
+      });
+    }
+
+    if (pdfBase64.length > 7 * 1024 * 1024) {
+      return res.status(400).json({
+        status: 'error',
+        sent: false,
+        message: 'PDF आकार मर्यादेपेक्षा जास्त आहे.'
+      });
+    }
+
+    const db = getServerFirestore();
+    if (!db) {
+      return res.status(500).json({ status: 'error', sent: false, message: 'Firestore अनुपलब्ध आहे.' });
+    }
+
+    const appRef = doc(db, 'applications', String(applicationId).trim());
+    const appSnap = await getDoc(appRef);
+    if (!appSnap.exists()) {
+      return res.status(404).json({ status: 'error', sent: false, message: 'अर्ज सापडला नाही.' });
+    }
+
+    const appData = appSnap.data();
+    if (appData.status !== 'approved' || appData.paymentConfirmed !== true) {
+      return res.status(403).json({
+        status: 'error',
+        sent: false,
+        message: 'पेमेंट व सदस्यत्व मंजूर झाल्याशिवाय आय-कार्ड ई-मेल पाठवता येत नाही.'
+      });
+    }
+
+    if (appData.idCardEmailSent === true) {
+      return res.json({ status: 'ok', sent: true, alreadySent: true });
+    }
+
+    const recipientEmail = isRealMemberEmail(appData.email)
+      ? String(appData.email).trim()
+      : isRealMemberEmail(toEmail)
+        ? String(toEmail).trim()
+        : '';
+
+    if (!recipientEmail) {
+      return res.json({ status: 'skipped', sent: false, reason: 'वैध ई-मेल पत्ता उपलब्ध नाही.' });
+    }
+
+    const emailConfig = loadEmailConfig();
+    if (!emailConfig.enabled) {
+      return res.json({ status: 'skipped', sent: false, reason: 'SMTP कॉन्फिगर केलेले नाही.' });
+    }
+
+    const resolvedMemberNo = String(appData.memberNumber || memberNumber || '');
+    const origin = req.get('host')?.includes('mahasangh.in')
+      ? 'https://mahasangh.in'
+      : `${req.protocol}://${req.get('host')}`;
+    const trackUrl = `${origin}/?track=${encodeURIComponent(resolvedMemberNo || appData.phone || appData.applicationNumber || '')}`;
+
+    const html = buildMembershipEmailHtml({
+      salutation: appData.salutation || salutation,
+      fullName: appData.fullName || fullName || 'सदस्य',
+      memberNumber: resolvedMemberNo,
+      applicationNumber: appData.applicationNumber || applicationNumber,
+      district: appData.district || district,
+      professional: appData.professional || professional,
+      paymentId: appData.razorpayPaymentId || appData.paymentRef,
+      hasPdfAttachment: true,
+      trackUrl
+    });
+
+    const safeFileName =
+      typeof fileName === 'string' && /^[a-zA-Z0-9._-]+\.pdf$/i.test(fileName)
+        ? fileName
+        : `Mahasangh_ID_${resolvedMemberNo.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Card'}.pdf`;
+
+    const result = await sendMembershipEmail({
+      to: recipientEmail,
+      subject: `महासंघ आजीवन सदस्यत्व मंजूर व अधिकृत आय-कार्ड (${resolvedMemberNo})`,
+      html,
+      text: `सप्रेम नमस्कार ${appData.fullName || fullName || 'सदस्य'}, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${resolvedMemberNo}) मंजूर झाले आहे. आय-कार्ड PDF सोबत जोडलेले आहे किंवा येथून डाऊनलोड करा: ${trackUrl}`,
+      pdfBase64,
+      fileName: safeFileName
+    });
+
+    if (result.sent) {
+      await setDoc(
+        appRef,
+        {
+          idCardEmailSent: true,
+          idCardEmailSentAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+      console.log(`✓ Sent PDF ID Card email to ${recipientEmail} (${resolvedMemberNo})`);
+      return res.json({ status: 'success', sent: true, to: recipientEmail });
+    }
+
+    return res.json({ status: 'skipped', sent: false, reason: result.reason });
+  } catch (err: any) {
+    console.error('Error sending ID card email:', err);
+    res.status(500).json({
+      status: 'error',
+      sent: false,
+      message: 'ई-मेल पाठवताना त्रुटी: ' + (err.message || 'SMTP Error')
+    });
+  }
 });
 
 // =========================================================================
@@ -492,6 +807,64 @@ app.post('/api/razorpay/webhook', async (req, res) => {
           });
           if (updated) {
             console.log(`✓ Firestore application ${updated.id} approved via Webhook -> ${updated.memberNumber}`);
+
+            // Send fallback approval + 1-click download link email when approved asynchronously by webhook
+            if (
+              !updated.alreadyApproved &&
+              updated.approvedBy === 'razorpay_webhook' &&
+              !updated.welcomeEmailSent &&
+              !updated.idCardEmailSent
+            ) {
+              const targetEmail = isRealMemberEmail(updated.email)
+                ? String(updated.email).trim()
+                : isRealMemberEmail(email)
+                  ? String(email).trim()
+                  : '';
+
+              if (targetEmail && loadEmailConfig().enabled) {
+                try {
+                  const origin = req.get('host')?.includes('mahasangh.in')
+                    ? 'https://mahasangh.in'
+                    : `${req.protocol}://${req.get('host')}`;
+                  const trackUrl = `${origin}/?track=${encodeURIComponent(updated.memberNumber || updated.phone || updated.applicationNumber || '')}`;
+                  const html = buildMembershipEmailHtml({
+                    salutation: updated.salutation,
+                    fullName: updated.fullName || 'सदस्य',
+                    memberNumber: String(updated.memberNumber || ''),
+                    applicationNumber: updated.applicationNumber,
+                    district: updated.district,
+                    professional: updated.professional,
+                    paymentId,
+                    hasPdfAttachment: false,
+                    trackUrl
+                  });
+
+                  const emailRes = await sendMembershipEmail({
+                    to: targetEmail,
+                    subject: `महासंघ आजीवन सदस्यत्व मंजूर व आय-कार्ड लिंक (${updated.memberNumber})`,
+                    text: `सप्रेम नमस्कार ${updated.fullName || 'सदस्य'}, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${updated.memberNumber}) मंजूर झाले आहे. आय-कार्ड डाऊनलोड लिंक: ${trackUrl}`,
+                    html
+                  });
+
+                  if (emailRes.sent) {
+                    const db = getServerFirestore();
+                    if (db) {
+                      await setDoc(
+                        doc(db, 'applications', updated.id),
+                        {
+                          welcomeEmailSent: true,
+                          welcomeEmailSentAt: new Date().toISOString()
+                        },
+                        { merge: true }
+                      );
+                    }
+                    console.log(`✓ Sent Webhook approval link email to ${targetEmail} (${updated.memberNumber})`);
+                  }
+                } catch (emailErr) {
+                  console.warn('Webhook approval email warning:', emailErr);
+                }
+              }
+            }
           }
         } else {
           console.warn(`Webhook payment ignored because amount (${amountPaise}) < 22000 paise.`);

@@ -6,5 +6,6 @@ dist
 dist.zip
 dist.tar.gz
 razorpay-config.json
+email-config.json
 server.cjs
 tmp

@@ -149,22 +149,16 @@ export function App() {
   // For Admin only: Real-time listener for pending/approved applications
   useEffect(() => {
     if (currentTab === 'admin') {
-      // Admin Mode: Live listener for instant approval & real-time sync
-      fetchApplicationsForAdmin()
-        .then((apps) => {
-          if (apps && apps.length > 0) {
-            setApplications(apps);
-            safeCacheApplications(apps);
-          }
-        })
-        .catch((err) => console.warn('Admin fetch applications error:', err));
+      // Admin Mode: Fetch applications once on load and auto-refresh every 1 minute (60,000ms)
+      // Replaces continuous real-time live listener to save mobile data and prevent background network traffic
+      handleFetchAdminApplications();
 
-      const unsubscribe = subscribeToApplicationsForAdmin((liveApps) => {
-        setApplications(liveApps);
-        safeCacheApplications(liveApps);
-      });
+      const intervalId = setInterval(() => {
+        handleFetchAdminApplications();
+      }, 60 * 1000);
+
       return () => {
-        if (unsubscribe) unsubscribe();
+        clearInterval(intervalId);
       };
     } else {
       // Public Visitor Mode: Smart Cache of approved members (ZERO reads if valid cache exists!)

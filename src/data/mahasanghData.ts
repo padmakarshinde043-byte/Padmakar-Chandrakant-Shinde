@@ -55,6 +55,8 @@ export interface MembershipApplication {
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   approvedBy?: string;
+  idCardEmailSent?: boolean;
+  welcomeEmailSent?: boolean;
 }
 
 // अधिकृत पद / संवर्ग (केवळ ३ अधिकृत पर्याय)
