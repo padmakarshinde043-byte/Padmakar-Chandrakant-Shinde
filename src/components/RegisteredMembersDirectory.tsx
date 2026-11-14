@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Users, Filter, MapPin, RefreshCw } from 'lucide-react';
 import { MembershipApplication, MAHARASHTRA_DISTRICTS, formatSequentialMemberNumber } from '../data/mahasanghData';
+import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { toEnglishDigits } from '../utils/formatters';
 import { fetchApprovedMembersCached } from '../firebase';
 
@@ -28,6 +29,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedTaluka, setSelectedTaluka] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [localLiveApps, setLocalLiveApps] = useState<MembershipApplication[] | null>(null);
 
@@ -130,12 +132,64 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     });
   }, [activeApplications]);
 
+  // Available talukas dynamically populated based on selectedDistrict
+  const availableTalukas = useMemo(() => {
+    if (!selectedDistrict) return [];
+    const trimmed = selectedDistrict.trim();
+    let officialList: string[] = [];
+
+    if (DISTRICT_TALUKAS_MAP[trimmed]) {
+      officialList = DISTRICT_TALUKAS_MAP[trimmed];
+    } else {
+      const alt1 = trimmed.replace('शी', 'शि');
+      const alt2 = trimmed.replace('शि', 'शी');
+      if (DISTRICT_TALUKAS_MAP[alt1]) {
+        officialList = DISTRICT_TALUKAS_MAP[alt1];
+      } else if (DISTRICT_TALUKAS_MAP[alt2]) {
+        officialList = DISTRICT_TALUKAS_MAP[alt2];
+      } else {
+        for (const [dKey, list] of Object.entries(DISTRICT_TALUKAS_MAP)) {
+          if (dKey.includes(trimmed) || trimmed.includes(dKey)) {
+            officialList = list;
+            break;
+          }
+        }
+      }
+    }
+
+    // Merge official talukas with any distinct talukas recorded for members in this district
+    const merged: string[] = [];
+    const seen = new Set<string>();
+    for (const t of officialList) {
+      const clean = t.trim();
+      if (clean && !seen.has(clean.toLowerCase())) {
+        seen.add(clean.toLowerCase());
+        merged.push(clean);
+      }
+    }
+    for (const m of allRegisteredMembers) {
+      if (m.district === selectedDistrict && m.taluka && m.taluka !== '-') {
+        const clean = m.taluka.trim();
+        if (clean && !seen.has(clean.toLowerCase())) {
+          seen.add(clean.toLowerCase());
+          merged.push(clean);
+        }
+      }
+    }
+    return merged;
+  }, [selectedDistrict, allRegisteredMembers]);
+
   // Client-side filtering (0 Firebase reads)
   const filteredMembers = useMemo(() => {
     let result = allRegisteredMembers;
 
     if (selectedDistrict) {
       result = result.filter((m) => m.district === selectedDistrict);
+    }
+
+    if (selectedDistrict && selectedTaluka) {
+      const targetTaluka = selectedTaluka.trim().toLowerCase();
+      result = result.filter((m) => (m.taluka || '').trim().toLowerCase() === targetTaluka);
     }
 
     if (searchTerm.trim()) {
@@ -154,7 +208,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     }
 
     return result;
-  }, [allRegisteredMembers, selectedDistrict, searchTerm]);
+  }, [allRegisteredMembers, selectedDistrict, selectedTaluka, searchTerm]);
 
   return (
     <div className="bg-white rounded-2xl border-2 border-[#193568]/20 shadow-sm overflow-hidden mb-8 transition-all">
@@ -215,13 +269,17 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
           )}
         </div>
 
-        {/* District Filter Dropdown */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* District & Dependent Taluka Filter Dropdowns */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
           <div className="relative w-full sm:w-48">
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
+              aria-label="जिल्हा निवडा"
               value={selectedDistrict}
-              onChange={(e) => setSelectedDistrict(e.target.value)}
+              onChange={(e) => {
+                setSelectedDistrict(e.target.value);
+                setSelectedTaluka('');
+              }}
               className="w-full text-xs pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] appearance-none cursor-pointer"
             >
               <option value="">सर्व जिल्हे ({allRegisteredMembers.length})</option>
@@ -232,21 +290,45 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               ))}
             </select>
           </div>
+
+          <div className="relative w-full sm:w-52">
+            <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              aria-label="तालुका निवडा"
+              value={selectedTaluka}
+              disabled={!selectedDistrict}
+              onChange={(e) => setSelectedTaluka(e.target.value)}
+              className={`w-full text-xs pl-8 pr-3 py-2 border rounded-lg focus:outline-none focus:border-[#df6b16] appearance-none transition-colors ${
+                selectedDistrict
+                  ? 'bg-white border-slate-300 text-slate-800 cursor-pointer'
+                  : 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <option value="">
+                {selectedDistrict ? 'सर्व तालुके (संपूर्ण जिल्हा)' : 'तालुका (आधी जिल्हा निवडा)'}
+              </option>
+              {availableTalukas.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Medium Size Scrollable Frame (~10 rows visible at a time) */}
-      {/* Visible Vertical Scrollbar on Right Side, Smooth Touch-Scroll on Mobile */}
+      {/* Visible Vertical & Horizontal Scrollbars, Smooth 2D Touch-Scroll on Mobile */}
       <div
         tabIndex={0}
-        aria-label="नोंदणीकृत सदस्य यादी स्क्रोल करा"
-        className="max-h-[440px] overflow-y-scroll overflow-x-auto relative bg-white focus:outline-none focus:ring-1 focus:ring-[#df6b16]/30 touch-pan-y"
+        aria-label="नोंदणीकृत सदस्य यादी उभी व आडवी स्क्रोल करा"
+        className="max-h-[440px] overflow-x-scroll overflow-y-scroll relative bg-white focus:outline-none focus:ring-1 focus:ring-[#df6b16]/30 touch-auto"
         style={{
           scrollbarGutter: 'stable',
+          touchAction: 'pan-x pan-y',
           WebkitOverflowScrolling: 'touch'
         }}
       >
-        <table className="w-full text-left border-collapse min-w-[620px]">
+        <table className="w-full text-left border-collapse min-w-[680px]">
           {/* Sticky Header */}
           <thead className="sticky top-0 z-10 bg-[#193568] text-white shadow-xs">
             <tr className="border-b border-[#efb24b]/40 text-xs uppercase tracking-wider font-bold">
@@ -328,13 +410,13 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
                 <td colSpan={5} className="py-12 text-center text-slate-500 text-xs">
                   <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                   <p className="font-bold text-slate-700 text-sm">
-                    {searchTerm || selectedDistrict
+                    {searchTerm || selectedDistrict || selectedTaluka
                       ? 'शोध निकषांनुसार कोणताही सदस्य आढळला नाही'
                       : 'नोंदणीकृत सदस्य यादी तपासली जात आहे...'}
                   </p>
                   <p className="text-slate-500 mt-1 max-w-sm mx-auto">
-                    {searchTerm || selectedDistrict
-                      ? 'कृपया शोध शब्द किंवा जिल्हा फिल्टर बदलून पुन्हा प्रयत्न करा.'
+                    {searchTerm || selectedDistrict || selectedTaluka
+                      ? 'कृपया शोध शब्द, जिल्हा किंवा तालुका फिल्टर बदलून पुन्हा प्रयत्न करा.'
                       : 'कृपया अर्जाची स्थिती तपासा किंवा काही वेळाने पुन्हा पहा.'}
                   </p>
                 </td>
@@ -349,7 +431,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
         <div className="flex items-center gap-1.5 font-medium text-[#193568]">
           <span className="text-base">👆</span>
           <span>
-            <strong>उजव्या बाजूला उभा स्क्रोल बार</strong> वर क्लिक करून आणि <strong>मोबाईलवर बोटाने वर सरकवून</strong> संपूर्ण यादी पाहता येईल.
+            <strong>उजव्या व खालच्या स्क्रोल बारने</strong> किंवा <strong>मोबाईलवर बोटाने वर-खाली व डावी-उजवी सरकवून</strong> संपूर्ण माहिती पाहता येईल.
           </span>
         </div>
         <div className="font-semibold text-slate-500 shrink-0">

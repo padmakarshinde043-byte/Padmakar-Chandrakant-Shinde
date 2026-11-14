@@ -93,15 +93,55 @@ export function App() {
     };
   }, [currentTab]);
 
-  // Global Right Click Protection across entire website (As requested)
+  // Global Right Click & Copy (Ctrl+C / Selection) Protection across website
   useEffect(() => {
+    const isEditableElement = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+      if (target.isContentEditable) return true;
+      return Boolean(target.closest('input, textarea, select, [contenteditable="true"], .allow-copy'));
+    };
+
     const handleContextMenu = (e: MouseEvent) => {
+      if (isEditableElement(e.target)) return;
       e.preventDefault();
       return false;
     };
+
+    const handleCopyOrCutOrSelect = (e: Event) => {
+      if (isEditableElement(e.target)) return;
+      e.preventDefault();
+      return false;
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isEditableElement(e.target)) return;
+      const key = (e.key || '').toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && ['c', 'x', 'a', 'u', 's', 'p'].includes(key)) {
+        e.preventDefault();
+        return false;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['i', 'j', 'c'].includes(key)) {
+        e.preventDefault();
+        return false;
+      }
+    };
+
     document.addEventListener('contextmenu', handleContextMenu, { capture: true });
+    document.addEventListener('copy', handleCopyOrCutOrSelect, { capture: true });
+    document.addEventListener('cut', handleCopyOrCutOrSelect, { capture: true });
+    document.addEventListener('selectstart', handleCopyOrCutOrSelect, { capture: true });
+    document.addEventListener('dragstart', handleCopyOrCutOrSelect, { capture: true });
+    document.addEventListener('keydown', handleKeyDown, { capture: true });
+
     return () => {
       document.removeEventListener('contextmenu', handleContextMenu, { capture: true } as any);
+      document.removeEventListener('copy', handleCopyOrCutOrSelect, { capture: true } as any);
+      document.removeEventListener('cut', handleCopyOrCutOrSelect, { capture: true } as any);
+      document.removeEventListener('selectstart', handleCopyOrCutOrSelect, { capture: true } as any);
+      document.removeEventListener('dragstart', handleCopyOrCutOrSelect, { capture: true } as any);
+      document.removeEventListener('keydown', handleKeyDown, { capture: true } as any);
     };
   }, []);
 

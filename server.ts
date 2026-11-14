@@ -456,6 +456,31 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+// One-time AI Studio Dev download route for the 50-page Technical Manual PDF (disabled in production)
+app.get('/api/offline-manual-50p', (_req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).send('Not found');
+  }
+  const pdfPath = path.resolve(
+    process.cwd(),
+    '.aistudio',
+    'artifacts',
+    'brain',
+    'cd564686-4752-4089-b99f-1bd89d027f82',
+    'Mahasangh_50_Page_Developer_Manual.pdf'
+  );
+  if (!fs.existsSync(pdfPath)) {
+    return res.status(404).send('Manual PDF not found');
+  }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader(
+    'Content-Disposition',
+    'attachment; filename="Mahasangh_50_Page_Technical_Manual_Marathi.pdf"'
+  );
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(pdfPath, { dotfiles: 'allow' });
+});
+
 // Send Membership Official PDF ID Card via SMTP
 app.post('/api/email/send-id-card', async (req, res) => {
   try {
