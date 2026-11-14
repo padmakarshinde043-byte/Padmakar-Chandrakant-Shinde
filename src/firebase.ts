@@ -1668,4 +1668,47 @@ export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count
   }
 }
 
+/**
+ * Resets the central member counter strictly to the highest actual member sequence number
+ * found among approved members in Firebase.
+ */
+export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq: number; message: string }> {
+  try {
+    const appsCol = collection(db, 'applications');
+    const snap = await getDocs(appsCol);
+    let highest = DEFAULT_COUNTER_BASELINE;
+
+    snap.forEach((d) => {
+      const app = d.data() as MembershipApplication;
+      if (app.status === 'approved' && app.memberNumber) {
+        const seq = parseMemberNumberSeq(app.memberNumber);
+        if (seq > highest) {
+          highest = seq;
+        }
+      }
+    });
+
+    const counterDocRef = doc(db, 'settings', 'member_counter');
+    await setDoc(counterDocRef, {
+      totalApproved: highest,
+      lastMemberNumber: highest,
+      lastUpdated: new Date().toISOString()
+    }, { merge: true });
+
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
+      localStorage.removeItem(APPROVED_MEMBERS_CACHE_KEY);
+    }
+
+    return {
+      highestSeq: highest,
+      message: `यशस्वी! सदस्य क्रमांक काउंटर यशस्वीरित्या दुरुस्त करून Firebase वरील शेवटच्या क्रमांकावर (${highest}) सेट करण्यात आला आहे. आता पुढील नवीन अर्ज मंजूर केल्यावर क्रमांक यापुढून सुरू होईल.`
+    };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'applications');
+    throw error;
+  }
+}
+
+
 

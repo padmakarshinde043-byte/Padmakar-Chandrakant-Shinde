@@ -36,7 +36,8 @@ import {
   deleteContactMessageFromFirestore,
   approveApplicationAtomicInFirestore,
   addApprovedMemberToCache,
-  resequenceAllApprovedMembersInFirestore
+  resequenceAllApprovedMembersInFirestore,
+  resetMemberCounterToActualHighest
 } from '../firebase';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -244,6 +245,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       alert('पुनर्रचना करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsResequencing(false);
+    }
+  };
+
+  const [isResettingCounter, setIsResettingCounter] = useState(false);
+  const handleResetCounter = async () => {
+    if (!window.confirm('तुम्हाला नक्की सदस्य क्रमांक काउंटर Firebase वरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा आहे का? यामुळे पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.')) {
+      return;
+    }
+    setIsResettingCounter(true);
+    try {
+      const res = await resetMemberCounterToActualHighest();
+      alert(res.message);
+      if (onFetchApplications) await onFetchApplications();
+    } catch (err) {
+      alert('काउंटर रिसेट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setIsResettingCounter(false);
     }
   };
 
@@ -1812,6 +1830,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isResequencing ? 'animate-spin' : ''}`} />
                       <span>{isResequencing ? 'क्रमांक लावत आहे...' : 'सर्व क्रमांक क्रमाने लावा'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetCounter}
+                      disabled={isResettingCounter}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-2xs"
+                      title="सदस्य क्रमांक काउंटर Firebase वरील शेवटच्या खऱ्या क्रमांकावर रिसेट करा"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isResettingCounter ? 'animate-spin' : ''}`} />
+                      <span>{isResettingCounter ? 'रीसेट होत आहे...' : 'काउंट शेवटच्या क्रमांकावर सेट करा'}</span>
                     </button>
                     {onFetchApplications && (
                       <button
