@@ -1485,88 +1485,98 @@ try {
 
 export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
   const todayDateStr = new Date().toISOString().split('T')[0];
-
-  // 1. Read existing local stats (default real baseline: today: 1, total: 1 if first ever)
   let currentStats: VisitorStats = { today: 1, total: 1 };
+
+  // 1. Read existing local stats as fallback
   try {
     const raw = localStorage.getItem(VISITOR_LOCAL_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (typeof parsed.total === 'number' && parsed.total < 5000) {
+      if (typeof parsed.total === 'number') {
         currentStats = {
           total: parsed.total,
-          today: parsed.date === todayDateStr && typeof parsed.today === 'number' && parsed.today < 1000 ? parsed.today : 1
+          today: parsed.date === todayDateStr && typeof parsed.today === 'number' ? parsed.today : 1
         };
       }
     }
-  } catch {
-    // fallback
-  }
+  } catch {}
 
-  // 2. Check if this session already counted
-  if (sessionStorage.getItem(VISITOR_SESSION_FLAG)) {
-    return currentStats;
-  }
+  const hasRecordedSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem(VISITOR_SESSION_FLAG);
 
-  // 3. Mark session counted immediately so subsequent actions in this session NEVER re-query or re-write
-  sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
-
-  // 4. Update Firestore once to persist genuine visitor count across all devices
   try {
     const statsDocRef = doc(db, 'site_stats', 'visits');
-    const snap = await getDoc(statsDocRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      let rawTotal = typeof data.total === 'number' ? data.total : 0;
-      // Sanitize legacy dummy baseline (18450) if present
-      if (rawTotal >= 5000) {
-        rawTotal = 0;
+
+    if (!hasRecordedSession) {
+      // Mark session counted immediately
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
       }
-      let rawToday = (data.lastDate === todayDateStr && typeof data.today === 'number' && data.today < 1000) ? data.today : 0;
 
-      const firestoreTotal = rawTotal + 1;
-      const firestoreToday = rawToday + 1;
+      // Use Firestore transaction for reliable, race-free atomic increment across all devices & domains
+      const resultStats = await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(statsDocRef);
+        let total = 1;
+        let today = 1;
 
-      await setDoc(statsDocRef, {
-        total: firestoreTotal,
-        today: firestoreToday,
-        lastDate: todayDateStr,
-        lastUpdated: new Date().toISOString()
-      }, { merge: true });
+        if (snap.exists()) {
+          const data = snap.data();
+          const prevTotal = typeof data.total === 'number' ? data.total : 0;
+          const prevToday = typeof data.today === 'number' ? data.today : 0;
+          const prevDate = data.lastDate;
 
-      const realStats: VisitorStats = { today: firestoreToday, total: firestoreTotal };
-      localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-        ...realStats,
-        date: todayDateStr
-      }));
-      return realStats;
-    } else {
-      // First initialization in Firestore
-      const initStats: VisitorStats = { today: 1, total: 1 };
-      await setDoc(statsDocRef, {
-        total: 1,
-        today: 1,
-        lastDate: todayDateStr,
-        lastUpdated: new Date().toISOString()
+          total = prevTotal + 1;
+          if (prevDate === todayDateStr) {
+            today = prevToday + 1;
+          } else {
+            today = 1;
+          }
+        }
+
+        transaction.set(statsDocRef, {
+          total,
+          today,
+          lastDate: todayDateStr,
+          lastUpdated: new Date().toISOString()
+        }, { merge: true });
+
+        return { today, total };
       });
+
       localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-        ...initStats,
+        ...resultStats,
         date: todayDateStr
       }));
-      return initStats;
+      return resultStats;
+    } else {
+      // Already recorded in this session, but fetch latest live count from Firestore to guarantee multi-device sync
+      const snap = await getDoc(statsDocRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const total = typeof data.total === 'number' ? data.total : currentStats.total;
+        const today = (data.lastDate === todayDateStr && typeof data.today === 'number') ? data.today : currentStats.today;
+        const liveStats: VisitorStats = { today, total };
+        localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
+          ...liveStats,
+          date: todayDateStr
+        }));
+        return liveStats;
+      }
+      return currentStats;
     }
   } catch (err) {
-    // Zero disruption if offline / network hiccup - increment local count gracefully
-    console.warn('Visitor counter Firestore sync notice:', err);
-    const fallbackStats: VisitorStats = {
-      today: currentStats.today + 1,
-      total: currentStats.total + 1
-    };
+    console.warn('Visitor counter sync notice:', err);
+    if (!hasRecordedSession && typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
+      currentStats = {
+        today: currentStats.today + 1,
+        total: currentStats.total + 1
+      };
+    }
     localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-      ...fallbackStats,
+      ...currentStats,
       date: todayDateStr
     }));
-    return fallbackStats;
+    return currentStats;
   }
 }
 
