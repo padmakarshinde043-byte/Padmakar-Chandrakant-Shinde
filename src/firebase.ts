@@ -526,9 +526,25 @@ export async function findExistingApplicationInFirestore(params: {
   }
 }
 
-// Admin only: On-demand applications fetch
-export async function fetchApplicationsForAdmin(): Promise<MembershipApplication[]> {
+// Admin only: On-demand applications fetch with 60s smart cache for lightning-fast load
+const ADMIN_APPS_CACHE_KEY = 'mahasangh_admin_apps_cache_v2';
+const ADMIN_APPS_TIME_KEY = 'mahasangh_admin_apps_time_v2';
+
+export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<MembershipApplication[]> {
   try {
+    if (!forceRefresh) {
+      const cached = safeStorageGet(ADMIN_APPS_CACHE_KEY);
+      const cachedTime = safeStorageGet(ADMIN_APPS_TIME_KEY);
+      if (cached && cachedTime && Date.now() - Number(cachedTime) < 60000) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+
     const appsCol = collection(db, 'applications');
     const snap = await getDocs(appsCol);
     if (snap.empty) {
@@ -544,9 +560,15 @@ export async function fetchApplicationsForAdmin(): Promise<MembershipApplication
         new Date(b.createdAt || '').getTime() -
         new Date(a.createdAt || '').getTime()
     );
+    safeStorageSet(ADMIN_APPS_CACHE_KEY, JSON.stringify(list));
+    safeStorageSet(ADMIN_APPS_TIME_KEY, Date.now().toString());
     return list;
   } catch (error) {
     console.warn('Admin fetch applications error:', error);
+    const cached = safeStorageGet(ADMIN_APPS_CACHE_KEY);
+    if (cached) {
+      try { return JSON.parse(cached); } catch {}
+    }
     return [];
   }
 }

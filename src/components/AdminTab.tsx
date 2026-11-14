@@ -249,6 +249,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   const [isResettingCounter, setIsResettingCounter] = useState(false);
+  const [activeCircleAction, setActiveCircleAction] = useState<'resequence' | 'reset' | null>(null);
   const handleResetCounter = async () => {
     if (!window.confirm('तुम्हाला नक्की सदस्य क्रमांक काउंटर Firebase वरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा आहे का? यामुळे पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.')) {
       return;
@@ -1821,30 +1822,72 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={handleResequence}
-                      disabled={isResequencing}
-                      className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-2xs"
-                      title="सर्व मंजूर सदस्यांचे क्रमांक सेव्हिंग क्रमानुसार 1 पासून सलग रांगेत लावा"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isResequencing ? 'animate-spin' : ''}`} />
-                      <span>{isResequencing ? 'क्रमांक लावत आहे...' : 'सर्व क्रमांक क्रमाने लावा'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResetCounter}
-                      disabled={isResettingCounter}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors disabled:opacity-50 shadow-2xs"
-                      title="सदस्य क्रमांक काउंटर Firebase वरील शेवटच्या खऱ्या क्रमांकावर रिसेट करा"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isResettingCounter ? 'animate-spin' : ''}`} />
-                      <span>{isResettingCounter ? 'रीसेट होत आहे...' : 'काउंट शेवटच्या क्रमांकावर सेट करा'}</span>
-                    </button>
+                    {/* 1. Tiny Colored Circle: Resequence */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (activeCircleAction === 'resequence') {
+                            handleResequence();
+                            setActiveCircleAction(null);
+                          } else {
+                            setActiveCircleAction('resequence');
+                          }
+                        }}
+                        disabled={isResequencing}
+                        className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center text-xs font-black shadow-xs transition-transform hover:scale-110 cursor-pointer disabled:opacity-50"
+                        title="सर्व क्रमांक क्रमाने लावा"
+                      >
+                        {isResequencing ? '...' : '🔠'}
+                      </button>
+                      {activeCircleAction === 'resequence' && (
+                        <div className="absolute right-0 top-9 z-50 bg-amber-900 text-white text-[11px] font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-2">
+                          <span>सर्व क्रमांक क्रमाने लावा? (पुन्हा क्लिक करा)</span>
+                          <button
+                            onClick={() => setActiveCircleAction(null)}
+                            className="text-amber-200 hover:text-white font-bold ml-1"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. Tiny Colored Circle: Reset Counter */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (activeCircleAction === 'reset') {
+                            handleResetCounter();
+                            setActiveCircleAction(null);
+                          } else {
+                            setActiveCircleAction('reset');
+                          }
+                        }}
+                        disabled={isResettingCounter}
+                        className="w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xs font-black shadow-xs transition-transform hover:scale-110 cursor-pointer disabled:opacity-50"
+                        title="काउंट शेवटच्या क्रमांकावर सेट करा"
+                      >
+                        {isResettingCounter ? '...' : '🔢'}
+                      </button>
+                      {activeCircleAction === 'reset' && (
+                        <div className="absolute right-0 top-9 z-50 bg-indigo-900 text-white text-[11px] font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-2">
+                          <span>काउंट शेवटच्या क्रमांकावर सेट करा? (पुन्हा क्लिक करा)</span>
+                          <button
+                            onClick={() => setActiveCircleAction(null)}
+                            className="text-indigo-200 hover:text-white font-bold ml-1"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
                     {onFetchApplications && (
                       <button
                         type="button"
-                        onClick={onFetchApplications}
+                        onClick={() => onFetchApplications()}
                         disabled={isLoadingApps}
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors"
                       >

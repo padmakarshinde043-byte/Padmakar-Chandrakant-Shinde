@@ -458,21 +458,23 @@ export function App() {
       <Header currentTab={currentTab} setCurrentTab={setCurrentTab} />
 
       <main className="flex-1">
-        {currentTab === 'home' && (
+        <div className={currentTab === 'home' ? 'block' : 'hidden'}>
           <HomeTab
             setCurrentTab={setCurrentTab}
             onSelectNews={handleSelectNews}
             newsList={newsList}
           />
-        )}
-        {(currentTab === 'about' || currentTab === 'objectives') && (
+        </div>
+        <div className={currentTab === 'about' || currentTab === 'objectives' ? 'block' : 'hidden'}>
           <AboutTab setCurrentTab={setCurrentTab} />
-        )}
-        {currentTab === 'leadership' && (
+        </div>
+        <div className={currentTab === 'leadership' ? 'block' : 'hidden'}>
           <LeadershipTab setCurrentTab={setCurrentTab} />
-        )}
-        {currentTab === 'appointments' && <AppointmentsTab />}
-        {currentTab === 'news' && (
+        </div>
+        <div className={currentTab === 'appointments' ? 'block' : 'hidden'}>
+          <AppointmentsTab />
+        </div>
+        <div className={currentTab === 'news' ? 'block' : 'hidden'}>
           <NewsTab
             newsList={newsList}
             govOrders={govOrders}
@@ -481,15 +483,17 @@ export function App() {
             onRefreshNews={handleRefreshNews}
             isRefreshing={isRefreshingNews}
           />
-        )}
-        {currentTab === 'membership' && (
+        </div>
+        <div className={currentTab === 'membership' ? 'block' : 'hidden'}>
           <MembershipTab
             applications={applications}
             onAddApplication={handleAddApplication}
             onTrackRemote={handleTrackRemote}
           />
-        )}
-        {currentTab === 'contact' && <ContactTab onSaveContact={handleSaveContact} />}
+        </div>
+        <div className={currentTab === 'contact' ? 'block' : 'hidden'}>
+          <ContactTab onSaveContact={handleSaveContact} />
+        </div>
       </main>
 
       <Footer setCurrentTab={setCurrentTab} />
