@@ -16,7 +16,6 @@ import {
   ORG_DETAILS,
   Leader,
   DEFAULT_AUTHORITATIVE_LEADERS,
-  formatSequentialMemberNumber,
   MAHARASHTRA_DISTRICTS
 } from '../data/mahasanghData';
 import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatters';
@@ -35,7 +34,7 @@ import {
   ContactMessage,
   fetchContactsForAdmin,
   deleteContactMessageFromFirestore,
-  allocateNextMemberNumber,
+  approveApplicationAtomicInFirestore,
   addApprovedMemberToCache
 } from '../firebase';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
@@ -55,7 +54,11 @@ import { MemberEditManager } from './MemberEditManager';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
-  onApproveApplication: (id: string, memberNumber: string) => void;
+  onApproveApplication: (
+    id: string,
+    memberNumber: string,
+    options?: { skipFirestore?: boolean }
+  ) => void;
   onRejectApplication: (id: string, reason: string) => void;
   onDeleteApplication: (id: string) => void;
   onUpdateMember?: (member: MembershipApplication) => Promise<void> | void;
@@ -107,6 +110,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [firstLoginSuccess, setFirstLoginSuccess] = useState('');
 
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isApprovingApp, setIsApprovingApp] = useState(false);
 
   // Active view inside Admin Dashboard
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
@@ -947,33 +951,41 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setRejectReason('');
   };
 
-  // Approve Application with Sequential Number Generation via Central Counter
+  // Approve Application atomically inside single Firestore Transaction (zero duplicate numbers)
   const handleApproveVerified = async () => {
-    if (!selectedAppForVerification) return;
+    if (!selectedAppForVerification || isApprovingApp) return;
     if (!paymentConfirmedChecked) {
       alert('कृपया सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री करणारा टिक बॉक्स निवडा.');
       return;
     }
 
-    // Determine continuous sequence number across all approved applications using Central Counter
-    let newMemberNumber = '';
+    setIsApprovingApp(true);
     try {
-      const counterResult = await allocateNextMemberNumber(selectedAppForVerification.district);
-      newMemberNumber = counterResult.memberNumber;
-    } catch (e) {
-      const currentApprovedCount = applications.filter((a) => a.status === 'approved').length;
-      newMemberNumber = formatSequentialMemberNumber(selectedAppForVerification.district, currentApprovedCount + 1);
-    }
+      const atomicResult = await approveApplicationAtomicInFirestore({
+        appId: selectedAppForVerification.id,
+        district: selectedAppForVerification.district,
+        knownRecords: applications,
+        extraUpdates: {
+          paymentConfirmed: true,
+        },
+      });
 
-    onApproveApplication(selectedAppForVerification.id, newMemberNumber);
-    addApprovedMemberToCache({
-      ...selectedAppForVerification,
-      status: 'approved',
-      memberNumber: newMemberNumber,
-      approvedAt: new Date().toISOString(),
-      paymentConfirmed: true
-    });
-    setSelectedAppForVerification(null);
+      const resolvedNumber = atomicResult.memberNumber;
+      onApproveApplication(selectedAppForVerification.id, resolvedNumber, { skipFirestore: true });
+      addApprovedMemberToCache({
+        ...selectedAppForVerification,
+        ...atomicResult.application,
+        status: 'approved',
+        memberNumber: resolvedNumber,
+        approvedAt: atomicResult.application.approvedAt || new Date().toISOString(),
+        paymentConfirmed: true
+      });
+      setSelectedAppForVerification(null);
+    } catch (err: any) {
+      alert('मंजुरी देताना तांत्रिक त्रुटी आली: ' + (err?.message || 'कृपया इंटरनेट तपासून पुन्हा प्रयत्न करा.'));
+    } finally {
+      setIsApprovingApp(false);
+    }
   };
 
   // Reject Application
@@ -4103,16 +4115,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        disabled={!paymentConfirmedChecked}
+                        disabled={!paymentConfirmedChecked || isApprovingApp}
                         onClick={handleApproveVerified}
                         className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm text-xs transition-all"
                       >
                         <Check className="w-4 h-4" />
-                        मंजूर करा (Approve)
+                        {isApprovingApp ? 'मंजूर होत आहे...' : 'मंजूर करा (Approve)'}
                       </button>
                       <button
                         type="button"
-                        disabled={!paymentConfirmedChecked}
+                        disabled={!paymentConfirmedChecked || isApprovingApp}
                         onClick={handleRejectVerified}
                         className="bg-rose-50 hover:bg-rose-100 border border-rose-300 disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 text-xs transition-all"
                       >

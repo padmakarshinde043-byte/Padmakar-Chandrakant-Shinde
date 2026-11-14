@@ -15,6 +15,7 @@ import {
   where,
   limit,
   onSnapshot,
+  runTransaction,
   QuerySnapshot,
   DocumentData
 } from 'firebase/firestore';
@@ -28,6 +29,13 @@ import {
   INITIAL_GOV_ORDERS,
   formatSequentialMemberNumber,
 } from './data/mahasanghData';
+import {
+  DEFAULT_COUNTER_BASELINE,
+  parseMemberNumberSeq,
+  extractHighestMemberSeq,
+  computeNextSafeSeq,
+  buildSequentialMemberNumber,
+} from './utils/memberNumberAllocator';
 
 const app = initializeApp(firebaseConfig);
 
@@ -705,20 +713,13 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
     const appsRaw = safeStorageGet('mahasangh_applications') || safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
     if (appsRaw) {
       const apps = JSON.parse(appsRaw);
-      if (Array.isArray(apps)) {
-        for (const a of apps) {
-          if (a.memberNumber) {
-            const num = parseInt(String(a.memberNumber).replace(/\D/g, '').slice(-4) || '0', 10);
-            if (num > baseline) baseline = num;
-          }
-        }
-      }
+      baseline = extractHighestMemberSeq(apps);
     }
   } catch {
     // fallback
   }
 
-  if (baseline <= 0) baseline = 71; // baseline based on approved records
+  if (baseline <= 0) baseline = DEFAULT_COUNTER_BASELINE; // baseline based on approved records
 
   const initData: MemberCounterData = {
     totalApproved: baseline,
@@ -735,65 +736,277 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
   return initData;
 }
 
-/**
- * Atomically allocates the next sequential member number using the Central Counter.
- * Consumes ONLY 1 read + 1 write on settings/member_counter, instead of reading 80+ application documents!
- */
-export async function allocateNextMemberNumber(district?: string): Promise<{ memberNumber: string; seqNumber: number }> {
-  const counterDocRef = doc(db, 'settings', 'member_counter');
-  let currentSeq = 0;
-
+function getKnownHighestSeqFromStorage(knownRecords?: Array<{ memberNumber?: string | null }>): number {
+  let highest = extractHighestMemberSeq(knownRecords);
   try {
-    const snap = await getDoc(counterDocRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      currentSeq = typeof data.lastMemberNumber === 'number'
-        ? data.lastMemberNumber
-        : (typeof data.totalApproved === 'number' ? data.totalApproved : 0);
+    for (const key of ['mahasangh_applications', APPROVED_MEMBERS_CACHE_KEY]) {
+      const raw = safeStorageGet(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const h = extractHighestMemberSeq(parsed);
+        if (h > highest) highest = h;
+      }
     }
-  } catch (err) {
-    console.warn('Allocate next member counter fetch error:', err);
+    const counterRaw = safeStorageGet(MEMBER_COUNTER_CACHE_KEY);
+    if (counterRaw) {
+      const c = JSON.parse(counterRaw);
+      const val = typeof c?.lastMemberNumber === 'number' ? c.lastMemberNumber : 0;
+      if (val > highest) highest = val;
+    }
+  } catch {
+    // Ignore cache parse issues
   }
+  return highest;
+}
 
-  if (currentSeq <= 0) {
-    const baselineObj = await getMemberCounter();
-    currentSeq = baselineObj.lastMemberNumber;
-  }
-
-  const nextSeq = currentSeq + 1;
-  const newCounterData: MemberCounterData = {
-    totalApproved: nextSeq,
-    lastMemberNumber: nextSeq,
-    lastUpdated: new Date().toISOString()
-  };
-
+async function hasExistingMemberNumberInFirestore(
+  candidateMemberNumber: string,
+  excludeAppId?: string
+): Promise<boolean> {
   try {
-    await setDoc(counterDocRef, newCounterData, { merge: true });
-  } catch (err) {
-    console.warn('Counter save warning:', err);
+    const appsCol = collection(db, 'applications');
+    const q = query(appsCol, where('memberNumber', '==', candidateMemberNumber), limit(3));
+    const snap = await getDocs(q);
+    if (snap.empty) return false;
+    return snap.docs.some((d) => d.id !== excludeAppId);
+  } catch {
+    return false;
   }
-
-  safeStorageSet(MEMBER_COUNTER_CACHE_KEY, JSON.stringify(newCounterData));
-  const memberNumber = formatSequentialMemberNumber(district || 'MAHA', nextSeq);
-  return { memberNumber, seqNumber: nextSeq };
 }
 
 /**
- * Syncs the central counter so it never falls behind existing approved records.
+ * Atomically allocates the next unique sequential member number using a Firestore Transaction
+ * on `settings/member_counter`, plus collision defense against existing `applications`.
  */
-export async function syncMemberCounter(highestKnownCount: number): Promise<void> {
-  if (highestKnownCount <= 0) return;
-  try {
-    const current = await getMemberCounter();
-    if (highestKnownCount > current.lastMemberNumber) {
-      const updated: MemberCounterData = {
-        totalApproved: highestKnownCount,
-        lastMemberNumber: highestKnownCount,
+export async function allocateNextMemberNumber(
+  district?: string,
+  knownRecords?: Array<{ memberNumber?: string | null }>
+): Promise<{ memberNumber: string; seqNumber: number }> {
+  const counterDocRef = doc(db, 'settings', 'member_counter');
+  let floorSeq = getKnownHighestSeqFromStorage(knownRecords);
+
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const allocatedSeq = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(counterDocRef);
+      let currentSeq = 0;
+      if (snap.exists()) {
+        const data = snap.data();
+        const rawLast = typeof data.lastMemberNumber === 'number' ? data.lastMemberNumber : 0;
+        const rawTotal = typeof data.totalApproved === 'number' ? data.totalApproved : 0;
+        currentSeq = Math.max(rawLast, rawTotal);
+      }
+
+      const nextSeq = computeNextSafeSeq({
+        counterSeq: currentSeq,
+        highestExistingSeq: floorSeq,
+        minBaseline: DEFAULT_COUNTER_BASELINE,
+      });
+
+      const newCounterData: MemberCounterData = {
+        totalApproved: nextSeq,
+        lastMemberNumber: nextSeq,
         lastUpdated: new Date().toISOString()
       };
-      await setDoc(doc(db, 'settings', 'member_counter'), updated, { merge: true });
-      safeStorageSet(MEMBER_COUNTER_CACHE_KEY, JSON.stringify(updated));
+      tx.set(counterDocRef, newCounterData, { merge: true });
+      return nextSeq;
+    });
+
+    const candidateNumber = buildSequentialMemberNumber(district, allocatedSeq);
+    const hasCollision = await hasExistingMemberNumberInFirestore(candidateNumber);
+    if (!hasCollision) {
+      safeStorageSet(
+        MEMBER_COUNTER_CACHE_KEY,
+        JSON.stringify({
+          totalApproved: allocatedSeq,
+          lastMemberNumber: allocatedSeq,
+          lastUpdated: new Date().toISOString(),
+        })
+      );
+      return { memberNumber: candidateNumber, seqNumber: allocatedSeq };
     }
+
+    // Existing member already owns this number (e.g., manual edit jumped ahead); skip past it
+    floorSeq = Math.max(floorSeq, allocatedSeq);
+  }
+
+  throw new Error('दुबार टाळण्यासाठी नवीन सदस्य क्रमांक तयार करता आला नाही. कृपया पुन्हा प्रयत्न करा.');
+}
+
+/**
+ * Atomically approves an application AND allocates its memberNumber inside ONE Firestore Transaction.
+ * - If the application is ALREADY approved with a memberNumber (e.g. via Webhook/Server/Another Admin),
+ *   it preserves the existing memberNumber instead of allocating a duplicate!
+ * - Prevents race conditions across simultaneous approvals or payments.
+ */
+export async function approveApplicationAtomicInFirestore(params: {
+  appId: string;
+  district?: string;
+  extraUpdates?: Partial<MembershipApplication>;
+  knownRecords?: Array<{ memberNumber?: string | null }>;
+}): Promise<{
+  memberNumber: string;
+  seqNumber: number;
+  alreadyApproved: boolean;
+  application: MembershipApplication;
+}> {
+  const { appId, district, extraUpdates = {}, knownRecords } = params;
+  const appRef = doc(db, 'applications', appId);
+  const counterDocRef = doc(db, 'settings', 'member_counter');
+  let floorSeq = getKnownHighestSeqFromStorage(knownRecords);
+
+  // Pre-scan past any manually-assigned future numbers before locking inside transaction
+  try {
+    const preCounterSnap = await getDoc(counterDocRef);
+    const preCounterVal = preCounterSnap.exists()
+      ? Math.max(
+          Number(preCounterSnap.data().lastMemberNumber || 0),
+          Number(preCounterSnap.data().totalApproved || 0)
+        )
+      : 0;
+    let probeSeq = computeNextSafeSeq({
+      counterSeq: preCounterVal,
+      highestExistingSeq: floorSeq,
+      minBaseline: DEFAULT_COUNTER_BASELINE,
+    });
+    for (let i = 0; i < 15; i++) {
+      const probeCandidate = buildSequentialMemberNumber(district, probeSeq);
+      const exists = await hasExistingMemberNumberInFirestore(probeCandidate, appId);
+      if (!exists) break;
+      floorSeq = Math.max(floorSeq, probeSeq);
+      probeSeq++;
+    }
+  } catch {
+    // Proceed into atomic transaction with current floorSeq
+  }
+
+  const txResult = await runTransaction(db, async (tx) => {
+    const [appSnap, counterSnap] = await Promise.all([
+      tx.get(appRef),
+      tx.get(counterDocRef),
+    ]);
+
+    const nowIso = new Date().toISOString();
+    const existingData = (appSnap.exists() ? appSnap.data() : {}) as Partial<MembershipApplication>;
+
+    // Idempotent guard: if already approved with a valid memberNumber, NEVER allocate a second one!
+    const existingMemberNo = String(existingData.memberNumber || '').trim();
+    if (existingData.status === 'approved' && existingMemberNo !== '') {
+      const mergedExisting = cleanForFirestore({
+        ...existingData,
+        ...extraUpdates,
+        status: 'approved',
+        memberNumber: existingMemberNo,
+        approvedAt: existingData.approvedAt || nowIso,
+        updatedAt: nowIso,
+      }) as MembershipApplication;
+
+      // Only persist extra confirmation fields (e.g. paymentRef/paymentConfirmed) if needed
+      if (Object.keys(extraUpdates).length > 0) {
+        tx.set(appRef, mergedExisting, { merge: true });
+      }
+
+      return {
+        memberNumber: existingMemberNo,
+        seqNumber: parseMemberNumberSeq(existingMemberNo),
+        alreadyApproved: true,
+        application: { ...mergedExisting, id: appId },
+      };
+    }
+
+    let currentCounter = 0;
+    if (counterSnap.exists()) {
+      const cData = counterSnap.data();
+      currentCounter = Math.max(
+        typeof cData.lastMemberNumber === 'number' ? cData.lastMemberNumber : 0,
+        typeof cData.totalApproved === 'number' ? cData.totalApproved : 0
+      );
+    }
+
+    const nextSeq = computeNextSafeSeq({
+      counterSeq: currentCounter,
+      highestExistingSeq: floorSeq,
+      minBaseline: DEFAULT_COUNTER_BASELINE,
+    });
+    const effectiveDistrict = existingData.district || district || 'MAHA';
+    const newMemberNumber = buildSequentialMemberNumber(effectiveDistrict, nextSeq);
+
+    tx.set(
+      counterDocRef,
+      {
+        totalApproved: nextSeq,
+        lastMemberNumber: nextSeq,
+        lastUpdated: nowIso,
+      },
+      { merge: true }
+    );
+
+    const approvalPayload = cleanForFirestore({
+      ...existingData,
+      ...extraUpdates,
+      status: 'approved',
+      memberNumber: newMemberNumber,
+      approvedAt: existingData.approvedAt || nowIso,
+      updatedAt: nowIso,
+    }) as MembershipApplication;
+
+    tx.set(appRef, approvalPayload, { merge: true });
+
+    return {
+      memberNumber: newMemberNumber,
+      seqNumber: nextSeq,
+      alreadyApproved: false,
+      application: { ...approvalPayload, id: appId },
+    };
+  });
+
+  if (!txResult.alreadyApproved && txResult.seqNumber > 0) {
+    safeStorageSet(
+      MEMBER_COUNTER_CACHE_KEY,
+      JSON.stringify({
+        totalApproved: txResult.seqNumber,
+        lastMemberNumber: txResult.seqNumber,
+        lastUpdated: new Date().toISOString(),
+      })
+    );
+  }
+
+  return txResult;
+}
+
+/**
+ * Atomically syncs the central counter forward so it never falls behind existing approved records.
+ */
+export async function syncMemberCounter(highestKnownCount: number): Promise<void> {
+  if (!highestKnownCount || highestKnownCount <= 0) return;
+  const counterDocRef = doc(db, 'settings', 'member_counter');
+  try {
+    const newVal = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(counterDocRef);
+      const current = snap.exists()
+        ? Math.max(
+            typeof snap.data().lastMemberNumber === 'number' ? snap.data().lastMemberNumber : 0,
+            typeof snap.data().totalApproved === 'number' ? snap.data().totalApproved : 0
+          )
+        : 0;
+      if (highestKnownCount > current) {
+        const updated: MemberCounterData = {
+          totalApproved: highestKnownCount,
+          lastMemberNumber: highestKnownCount,
+          lastUpdated: new Date().toISOString()
+        };
+        tx.set(counterDocRef, updated, { merge: true });
+        return highestKnownCount;
+      }
+      return current;
+    });
+    safeStorageSet(
+      MEMBER_COUNTER_CACHE_KEY,
+      JSON.stringify({
+        totalApproved: newVal,
+        lastMemberNumber: newVal,
+        lastUpdated: new Date().toISOString(),
+      })
+    );
   } catch (err) {
     console.warn('Sync member counter error:', err);
   }

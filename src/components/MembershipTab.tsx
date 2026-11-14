@@ -9,7 +9,6 @@ import {
   MembershipApplication,
   OFFICIAL_CADRES,
   TEACHER_PROFESSIONAL_QUALIFICATIONS,
-  formatSequentialMemberNumber
 } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { fetchOfficials } from '../services/rkFirebaseService';
@@ -20,7 +19,7 @@ import {
 } from '../services/rkPdfGenerator';
 import { RegisteredMembersDirectory } from './RegisteredMembersDirectory';
 import {
-  allocateNextMemberNumber,
+  approveApplicationAtomicInFirestore,
   addApprovedMemberToCache,
   findExistingApplicationInFirestore,
 } from '../firebase';
@@ -28,7 +27,10 @@ import { initiateRazorpayPayment } from '../utils/razorpay';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 
 interface MembershipTabProps {
-  onAddApplication: (app: MembershipApplication) => Promise<void> | void;
+  onAddApplication: (
+    app: MembershipApplication,
+    options?: { skipFirestore?: boolean }
+  ) => Promise<void> | void;
   applications: MembershipApplication[];
   onTrackRemote?: (query: string) => Promise<MembershipApplication | null>;
   initialTrackQuery?: string;
@@ -446,28 +448,32 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         paymentRef: serverApp.paymentRef || verifiedPayment.paymentId || appToApprove.paymentRef,
       };
     } else {
-      // Server verified cryptographic signature; ensure Firestore reflects approval if server write didn't return doc
-      let autoMemberNo = '';
-      try {
-        const counterResult = await allocateNextMemberNumber(appToApprove.district);
-        autoMemberNo = counterResult.memberNumber;
-      } catch {
-        const approvedCount = applications.filter((a) => a.status === 'approved').length;
-        autoMemberNo = formatSequentialMemberNumber(appToApprove.district, approvedCount + 1);
-      }
+      // Server verified signature; run single atomic Firestore transaction (idempotent if Webhook already approved)
+      const { status: _ignoredStatus, memberNumber: _ignoredNo, ...profileFields } = appToApprove;
+      const atomicResult = await approveApplicationAtomicInFirestore({
+        appId: appToApprove.id,
+        district: appToApprove.district,
+        knownRecords: applications,
+        extraUpdates: {
+          ...profileFields,
+          paymentConfirmed: true,
+          paymentRef: verifiedPayment.paymentId,
+          razorpayPaymentId: verifiedPayment.paymentId,
+          razorpayOrderId: verifiedPayment.orderId || '',
+        },
+      });
       finalApp = {
         ...appToApprove,
+        ...atomicResult.application,
         status: 'approved',
-        memberNumber: autoMemberNo,
-        approvedAt: nowIso,
+        memberNumber: atomicResult.memberNumber,
+        approvedAt: atomicResult.application.approvedAt || nowIso,
         paymentConfirmed: true,
-        paymentRef: verifiedPayment.paymentId,
-        razorpayPaymentId: verifiedPayment.paymentId,
-        razorpayOrderId: verifiedPayment.orderId || '',
+        paymentRef: atomicResult.application.paymentRef || verifiedPayment.paymentId,
       };
     }
 
-    onAddApplication(finalApp);
+    await onAddApplication(finalApp, { skipFirestore: true });
     addApprovedMemberToCache(finalApp);
     setSubmittedApp(finalApp);
     setPendingApp(null);

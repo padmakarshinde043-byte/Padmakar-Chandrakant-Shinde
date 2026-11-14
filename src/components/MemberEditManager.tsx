@@ -28,6 +28,7 @@ import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatter
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { syncMemberCounter } from '../firebase';
+import { parseMemberNumberSeq } from '../utils/memberNumberAllocator';
 
 interface MemberEditManagerProps {
   applications: MembershipApplication[];
@@ -217,8 +218,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const handleOpenEdit = (member: MembershipApplication) => {
     setPhotoError('');
     setEditingMember({ ...member });
-    const existingDigits = toEnglishDigits(member.memberNumber || '').replace(/\D/g, '').slice(-4);
-    setSeqInputForFormat(existingDigits ? String(parseInt(existingDigits, 10)) : '');
+    const parsedSeq = parseMemberNumberSeq(member.memberNumber);
+    setSeqInputForFormat(parsedSeq > 0 ? String(parsedSeq) : '');
   };
 
   const handleFormatMemberNumberFromSeq = () => {
@@ -289,12 +290,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
       // Keep central counter in sync if a sequential number was assigned
       if (updatedRecord.memberNumber) {
-        const match = updatedRecord.memberNumber.match(/(\d{1,5})$/);
-        if (match) {
-          const seqNum = parseInt(match[1], 10);
-          if (seqNum > 0) {
-            syncMemberCounter(seqNum).catch(() => {});
-          }
+        const seqNum = parseMemberNumberSeq(updatedRecord.memberNumber);
+        if (seqNum > 0) {
+          syncMemberCounter(seqNum).catch(() => {});
         }
       }
 

@@ -20,6 +20,11 @@ import {
   Firestore
 } from 'firebase/firestore';
 import { formatSequentialMemberNumber } from './src/data/mahasanghData';
+import {
+  DEFAULT_COUNTER_BASELINE,
+  computeNextSafeSeq,
+  buildSequentialMemberNumber,
+} from './src/utils/memberNumberAllocator';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -292,40 +297,26 @@ async function sendMembershipEmail(params: {
 // =========================================================================
 // Atomic Member Number Allocation & Verified Application Approval
 // =========================================================================
-async function allocateNextMemberNumberOnServer(db: Firestore, district?: string): Promise<string> {
-  const counterRef = doc(db, 'settings', 'member_counter');
-  const nextSeq = await runTransaction(db, async (tx) => {
-    const snap = await tx.get(counterRef);
-    let currentSeq = 71;
-    if (snap.exists()) {
-      const data = snap.data();
-      const raw =
-        typeof data.lastMemberNumber === 'number'
-          ? data.lastMemberNumber
-          : typeof data.totalApproved === 'number'
-            ? data.totalApproved
-            : 71;
-      currentSeq = raw > 0 ? raw : 71;
-    }
-    const allocated = currentSeq + 1;
-    tx.set(
-      counterRef,
-      {
-        totalApproved: allocated,
-        lastMemberNumber: allocated,
-        lastUpdated: new Date().toISOString()
-      },
-      { merge: true }
+async function hasExistingMemberNumberOnServer(
+  db: Firestore,
+  candidateMemberNumber: string,
+  excludeAppId?: string
+): Promise<boolean> {
+  try {
+    const appsCol = collection(db, 'applications');
+    const snap = await getDocs(
+      query(appsCol, where('memberNumber', '==', candidateMemberNumber), limit(3))
     );
-    return allocated;
-  });
-
-  return formatSequentialMemberNumber(district || 'MAHA', nextSeq);
+    if (snap.empty) return false;
+    return snap.docs.some((d) => d.id !== excludeAppId);
+  } catch {
+    return false;
+  }
 }
 
 async function findApplicationForPayment(
   db: Firestore,
-  criteria: { applicationId?: string; phone?: string; email?: string }
+  criteria: { applicationId?: string; orderId?: string; phone?: string; email?: string; source: 'razorpay_checkout' | 'razorpay_webhook' }
 ): Promise<{ id: string; data: Record<string, any> } | null> {
   if (criteria.applicationId) {
     const directRef = doc(db, 'applications', String(criteria.applicationId).trim());
@@ -333,6 +324,22 @@ async function findApplicationForPayment(
     if (directSnap.exists()) {
       return { id: directSnap.id, data: directSnap.data() };
     }
+  }
+
+  if (criteria.orderId) {
+    const appsCol = collection(db, 'applications');
+    const orderSnap = await getDocs(query(appsCol, where('razorpayOrderId', '==', criteria.orderId), limit(1)));
+    if (!orderSnap.empty) {
+      const docMatch = orderSnap.docs[0];
+      return { id: docMatch.id, data: docMatch.data() };
+    }
+  }
+
+  // STRICT SECURITY FOR WEBHOOKS: Never fall back to phone or email matching without an explicit applicationId or orderId match.
+  // This prevents test webhooks from Razorpay dashboard or generic payments from auto-approving pending applications.
+  if (criteria.source === 'razorpay_webhook') {
+    console.warn('Webhook received without valid applicationId or matching orderId; skipping unverified fallback lookup by phone/email.');
+    return null;
   }
 
   const appsCol = collection(db, 'applications');
@@ -383,8 +390,10 @@ async function approveApplicationOnServer(params: {
 
   const found = await findApplicationForPayment(db, {
     applicationId: params.applicationId,
+    orderId: params.orderId,
     phone: params.phone,
-    email: params.email
+    email: params.email,
+    source: params.source
   });
 
   if (!found) {
@@ -397,41 +406,118 @@ async function approveApplicationOnServer(params: {
   }
 
   const { id, data } = found;
-  const nowIso = new Date().toISOString();
+  const appRef = doc(db, 'applications', id);
+  const counterRef = doc(db, 'settings', 'member_counter');
 
-  // Idempotent: if already approved & paymentConfirmed, return existing record
-  if (data.status === 'approved' && data.paymentConfirmed === true && data.memberNumber) {
-    return {
-      ...data,
-      id,
-      alreadyApproved: true
-    };
+  // Pre-scan past any manually-assigned future numbers before entering the atomic transaction
+  let floorSeq = 0;
+  try {
+    const preCounterSnap = await getDoc(counterRef);
+    const preCounterVal = preCounterSnap.exists()
+      ? Math.max(
+          Number(preCounterSnap.data().lastMemberNumber || 0),
+          Number(preCounterSnap.data().totalApproved || 0)
+        )
+      : 0;
+    let probeSeq = computeNextSafeSeq({
+      counterSeq: preCounterVal,
+      highestExistingSeq: floorSeq,
+      minBaseline: DEFAULT_COUNTER_BASELINE,
+    });
+    for (let i = 0; i < 15; i++) {
+      const candidate = buildSequentialMemberNumber(data.district, probeSeq);
+      const exists = await hasExistingMemberNumberOnServer(db, candidate, id);
+      if (!exists) break;
+      floorSeq = Math.max(floorSeq, probeSeq);
+      probeSeq++;
+    }
+  } catch {
+    // Proceed into transaction with current floorSeq
   }
 
-  const memberNumber =
-    data.status === 'approved' && data.memberNumber
-      ? String(data.memberNumber)
-      : await allocateNextMemberNumberOnServer(db, data.district);
+  // Single atomic transaction reading BOTH application + central counter together
+  // Prevents race conditions when Razorpay verify-payment & webhook run simultaneously.
+  const txResult = await runTransaction(db, async (tx) => {
+    const [appSnap, counterSnap] = await Promise.all([
+      tx.get(appRef),
+      tx.get(counterRef),
+    ]);
 
-  const updates: Record<string, any> = {
-    status: 'approved',
-    memberNumber,
-    paymentConfirmed: true,
-    paymentRef: params.paymentId,
-    razorpayPaymentId: params.paymentId,
-    razorpayOrderId: params.orderId || data.razorpayOrderId || '',
-    approvedAt: data.approvedAt || nowIso,
-    updatedAt: nowIso,
-    approvedBy: data.approvedBy || params.source
-  };
+    const currentAppData = (appSnap.exists() ? appSnap.data() : data) as Record<string, any>;
+    const nowIso = new Date().toISOString();
 
-  await setDoc(doc(db, 'applications', id), updates, { merge: true });
+    const existingMemberNo = String(currentAppData.memberNumber || '').trim();
+    if (currentAppData.status === 'approved' && existingMemberNo !== '') {
+      if (currentAppData.paymentConfirmed === true) {
+        return {
+          ...currentAppData,
+          id,
+          alreadyApproved: true
+        };
+      }
+      const confirmUpdates: Record<string, any> = {
+        paymentConfirmed: true,
+        paymentRef: currentAppData.paymentRef || params.paymentId,
+        razorpayPaymentId: currentAppData.razorpayPaymentId || params.paymentId,
+        razorpayOrderId: params.orderId || currentAppData.razorpayOrderId || '',
+        updatedAt: nowIso,
+      };
+      tx.set(appRef, confirmUpdates, { merge: true });
+      return {
+        ...currentAppData,
+        ...confirmUpdates,
+        id,
+        alreadyApproved: true
+      };
+    }
 
-  return {
-    ...data,
-    ...updates,
-    id
-  };
+    let currentSeq = 0;
+    if (counterSnap.exists()) {
+      const cData = counterSnap.data();
+      const rawLast = typeof cData.lastMemberNumber === 'number' ? cData.lastMemberNumber : 0;
+      const rawTotal = typeof cData.totalApproved === 'number' ? cData.totalApproved : 0;
+      currentSeq = Math.max(rawLast, rawTotal);
+    }
+
+    const nextSeq = computeNextSafeSeq({
+      counterSeq: currentSeq,
+      highestExistingSeq: floorSeq,
+      minBaseline: DEFAULT_COUNTER_BASELINE,
+    });
+    const memberNumber = formatSequentialMemberNumber(currentAppData.district || 'MAHA', nextSeq);
+
+    tx.set(
+      counterRef,
+      {
+        totalApproved: nextSeq,
+        lastMemberNumber: nextSeq,
+        lastUpdated: nowIso,
+      },
+      { merge: true }
+    );
+
+    const updates: Record<string, any> = {
+      status: 'approved',
+      memberNumber,
+      paymentConfirmed: true,
+      paymentRef: params.paymentId,
+      razorpayPaymentId: params.paymentId,
+      razorpayOrderId: params.orderId || currentAppData.razorpayOrderId || '',
+      approvedAt: currentAppData.approvedAt || nowIso,
+      updatedAt: nowIso,
+      approvedBy: currentAppData.approvedBy || params.source
+    };
+
+    tx.set(appRef, updates, { merge: true });
+
+    return {
+      ...currentAppData,
+      ...updates,
+      id
+    };
+  });
+
+  return txResult;
 }
 
 // =========================================================================

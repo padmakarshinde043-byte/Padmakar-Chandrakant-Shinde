@@ -222,13 +222,18 @@ export function App() {
     }
   };
 
-  // Add application
-  const handleAddApplication = async (newApp: MembershipApplication) => {
+  // Add application (optionally skip Firestore write if already written atomically)
+  const handleAddApplication = async (
+    newApp: MembershipApplication,
+    options?: { skipFirestore?: boolean }
+  ) => {
     setApplications((prev) => {
       const updated = [newApp, ...prev.filter((a) => a.id !== newApp.id)];
       safeCacheApplications(updated);
       return updated;
     });
+
+    if (options?.skipFirestore) return;
 
     try {
       await saveApplicationToFirestore(newApp);
@@ -273,8 +278,12 @@ export function App() {
     }
   };
 
-  // Admin: Approve application (Single write, syncs state & localStorage & Firestore)
-  const handleApproveApplication = async (id: string, memberNumber: string) => {
+  // Admin: Approve application (syncs state & localStorage; skips Firestore write if already committed atomically)
+  const handleApproveApplication = async (
+    id: string,
+    memberNumber: string,
+    options?: { skipFirestore?: boolean }
+  ) => {
     setApplications((prev) => {
       const updated = prev.map((app) =>
         app.id === id
@@ -282,13 +291,16 @@ export function App() {
               ...app,
               status: 'approved' as const,
               memberNumber,
-              approvedAt: new Date().toISOString(),
+              paymentConfirmed: true,
+              approvedAt: app.approvedAt || new Date().toISOString(),
             }
           : app
       );
       safeCacheApplications(updated);
       return updated;
     });
+
+    if (options?.skipFirestore) return;
 
     try {
       await approveApplicationInFirestore(id, memberNumber);
