@@ -5,6 +5,7 @@ import Razorpay from 'razorpay';
 import nodemailer from 'nodemailer';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
@@ -28,6 +29,7 @@ import {
 import { isMysqlActive, isMysqlConfigured } from './src/db/mysqlPool';
 import {
   mysqlListApplications,
+  mysqlListApprovedDirectory,
   mysqlUpsertApplication,
   mysqlTrackApplication,
   mysqlFindExistingApplication,
@@ -99,12 +101,14 @@ interface RazorpayConfig {
 // =========================================================================
 let serverDb: Firestore | null = null;
 
-function getServerFirestore(): Firestore | null {
+function getServerFirestore(allowWhenMysqlActive = false): Firestore | null {
+  if (isMysqlActive() && !allowWhenMysqlActive) {
+    return null;
+  }
   if (serverDb) return serverDb;
   try {
     const cfgPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
     if (!fs.existsSync(cfgPath)) {
-      console.warn('firebase-applet-config.json not found on server.');
       return null;
     }
     const firebaseConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
@@ -637,13 +641,14 @@ app.use(['/api/db', '/api/razorpay', '/api/email'], async (req, _res, next) => {
 app.get('/api/health', (_req, res) => {
   const config = loadRazorpayConfig();
   const emailConfig = loadEmailConfig();
+  const mysqlActive = isMysqlActive();
   res.json({
     status: 'ok',
     razorpayConfigured: Boolean(config.keyId && config.keySecret && config.enabled),
     webhookSecretConfigured: Boolean(config.webhookSecret),
-    firebaseConfigured: Boolean(getServerFirestore()),
+    firebaseConfigured: !mysqlActive && fs.existsSync(path.resolve(process.cwd(), 'firebase-applet-config.json')),
     mysqlConfigured: isMysqlConfigured(),
-    activeBackend: isMysqlActive() ? 'mysql' : 'firebase',
+    activeBackend: mysqlActive ? 'mysql' : 'firebase',
     emailConfigured: emailConfig.enabled
   });
 });
@@ -828,7 +833,7 @@ app.post('/api/email/send-id-card', async (req, res) => {
 
 app.get('/api/migration/counts', async (_req, res) => {
   try {
-    const db = getServerFirestore();
+    const db = getServerFirestore(true);
     if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
     const { counts, warnings } = await collectFullFirebaseDataset(db);
     res.json({ status: 'ok', counts, warnings, mysqlConfigured: isMysqlConfigured() });
@@ -839,7 +844,7 @@ app.get('/api/migration/counts', async (_req, res) => {
 
 app.get('/api/migration/export-sql', async (_req, res) => {
   try {
-    const db = getServerFirestore();
+    const db = getServerFirestore(true);
     if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
     const { sql, counts } = await exportFullFirebaseSqlDump(db);
     res.setHeader('Content-Type', 'application/sql; charset=utf-8');
@@ -856,7 +861,7 @@ app.post('/api/migration/sync-to-mysql', async (_req, res) => {
     if (!isMysqlConfigured()) {
       return res.status(400).json({ status: 'error', message: 'MySQL is not configured yet.' });
     }
-    const db = getServerFirestore();
+    const db = getServerFirestore(true);
     if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
     const { dataset, warnings } = await collectFullFirebaseDataset(db);
     const syncedCounts = await syncFirebaseDatasetIntoMysql(dataset);
@@ -866,11 +871,46 @@ app.post('/api/migration/sync-to-mysql', async (_req, res) => {
   }
 });
 
+function sendFreshJson(req: express.Request, res: express.Response, payload: unknown): void {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const jsonStr = JSON.stringify(payload);
+  const acceptEncoding = String(req.headers['accept-encoding'] || '');
+  if (jsonStr.length >= 1024 && /\bgzip\b/i.test(acceptEncoding)) {
+    zlib.gzip(Buffer.from(jsonStr, 'utf-8'), (err, compressed) => {
+      if (err) {
+        res.type('application/json; charset=utf-8').send(jsonStr);
+        return;
+      }
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Vary', 'Accept-Encoding');
+      res.type('application/json; charset=utf-8').send(compressed);
+    });
+    return;
+  }
+  res.type('application/json; charset=utf-8').send(jsonStr);
+}
+
+app.get('/api/db/applications/approved-directory', async (req, res) => {
+  try {
+    const list = await mysqlListApprovedDirectory();
+    sendFreshJson(req, res, { items: list });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
 app.get('/api/db/applications', async (req, res) => {
   try {
     const onlyApproved = req.query.status === 'approved';
-    const list = await mysqlListApplications(onlyApproved);
-    res.json({ items: list });
+    const isSummary = req.query.summary === '1' || req.query.summary === 'true';
+    const list =
+      onlyApproved && isSummary
+        ? await mysqlListApprovedDirectory()
+        : await mysqlListApplications(onlyApproved);
+    sendFreshJson(req, res, { items: list });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -1561,7 +1601,7 @@ async function startServer() {
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     if (isMysqlActive()) {
-      triggerInitialFirebaseMigrationOnBoot(getServerFirestore());
+      triggerInitialFirebaseMigrationOnBoot(() => getServerFirestore(true));
     }
   });
 }

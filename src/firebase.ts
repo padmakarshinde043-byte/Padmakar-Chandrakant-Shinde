@@ -48,15 +48,58 @@ import {
   classifyGhostApplicationsToPurge,
   DeleteTargetMeta,
 } from './utils/applicationCleanup';
-import { isSqlBackendActive, sqlApiRequest } from './api/sqlBridge';
+import {
+  isSqlBackendActive,
+  isFirebaseAllowedInCurrentEnvironment,
+  isFirebaseAllowedSync,
+  sqlApiRequest,
+} from './api/sqlBridge';
 import { computeNextVisitorStats } from './utils/visitorCounter';
+import { stripHeavyApplicationFields } from './utils/directoryHelper';
+import { toEnglishDigits } from './utils/formatters';
+import { canUsePreviewRead, recordPreviewFirestoreReads } from './utils/previewFirebaseGuard';
 
-const app = initializeApp(firebaseConfig);
+let cachedPreviewApp: ReturnType<typeof initializeApp> | null = null;
+let cachedPreviewDb: ReturnType<typeof getFirestore> | null = null;
+let cachedPreviewAuth: ReturnType<typeof getAuth> | null = null;
 
-export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)')
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-export const auth = getAuth(app);
+/**
+ * Lazy Firestore accessor: ONLY initializes Firebase SDK inside AI Studio Preview
+ * when HostKarle MySQL is not active. On mahasangh.in production, Firebase SDK
+ * is NEVER initialized or contacted.
+ */
+export function getPreviewDb() {
+  if (!isFirebaseAllowedSync()) {
+    return null;
+  }
+  if (cachedPreviewDb) return cachedPreviewDb;
+  if (!cachedPreviewApp) {
+    cachedPreviewApp = initializeApp(firebaseConfig);
+  }
+  cachedPreviewDb =
+    firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+      ? getFirestore(cachedPreviewApp, firebaseConfig.firestoreDatabaseId)
+      : getFirestore(cachedPreviewApp);
+  return cachedPreviewDb;
+}
+
+export function getPreviewAuth() {
+  if (!isFirebaseAllowedSync()) return null;
+  if (cachedPreviewAuth) return cachedPreviewAuth;
+  if (!cachedPreviewApp) {
+    cachedPreviewApp = initializeApp(firebaseConfig);
+  }
+  cachedPreviewAuth = getAuth(cachedPreviewApp);
+  return cachedPreviewAuth;
+}
+
+function requirePreviewDb() {
+  const instance = getPreviewDb();
+  if (!instance) {
+    throw new Error('Firebase is disabled outside AI Studio Preview.');
+  }
+  return instance;
+}
 
 // Error Handling Definition
 export enum OperationType {
@@ -90,16 +133,17 @@ export function handleFirestoreError(
   operationType: OperationType,
   path: string | null
 ) {
+  const currentUser = cachedPreviewAuth?.currentUser;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
+      userId: currentUser?.uid,
+      email: currentUser?.email,
+      emailVerified: currentUser?.emailVerified,
+      isAnonymous: currentUser?.isAnonymous,
+      tenantId: currentUser?.tenantId,
       providerInfo:
-        auth.currentUser?.providerData?.map((provider) => ({
+        currentUser?.providerData?.map((provider) => ({
           providerId: provider.providerId,
           email: provider.email,
         })) || [],
@@ -158,18 +202,24 @@ export async function testConnectionOncePerSession(): Promise<boolean> {
     if (typeof window !== 'undefined') sessionStorage.setItem('fb_conn_ok', 'true');
     return true;
   }
+  if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+    return false;
+  }
   if (typeof window !== 'undefined' && sessionStorage.getItem('fb_conn_ok')) {
     return true;
   }
-  if (isFirestoreQuotaInCooldown()) {
+  if (isFirestoreQuotaInCooldown() || !canUsePreviewRead('conn_test', false)) {
     return false;
   }
   try {
-    const connPromise = getDocFromServer(doc(db, 'test', 'connection'));
+    const previewDb = getPreviewDb();
+    if (!previewDb) return false;
+    const connPromise = getDocFromServer(doc(previewDb, 'test', 'connection'));
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Firebase connection timeout')), 3500)
     );
     await Promise.race([connPromise, timeoutPromise]);
+    recordPreviewFirestoreReads(1, 'conn_test', false);
     if (typeof window !== 'undefined') sessionStorage.setItem('fb_conn_ok', 'true');
     return true;
   } catch (error) {
@@ -183,11 +233,11 @@ export async function testConnectionOncePerSession(): Promise<boolean> {
 }
 
 // CACHE-FIRST NEWS FETCHING:
-// News is cached in localStorage for 30 minutes.
-// Regular visitors reading the website will consume ZERO Firestore reads!
+// News is cached in localStorage for 60 minutes in Preview.
+// Live mahasangh.in always uses HostKarle MySQL directly.
 const NEWS_CACHE_KEY = 'mahasangh_news_cache_v2';
 const NEWS_CACHE_TIME_KEY = 'mahasangh_news_cache_time_v2';
-const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION_MS = 60 * 60 * 1000; // 60 minutes
 
 export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]> {
   try {
@@ -197,7 +247,6 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
     if (!forceRefresh && cachedTime && cachedData) {
       const age = Date.now() - parseInt(cachedTime, 10);
       if (age < CACHE_DURATION_MS) {
-        // Cache is valid - ZERO reads from Firestore!
         return sortNewsDescending(JSON.parse(cachedData));
       }
     }
@@ -211,14 +260,25 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
       return sortedSql;
     }
 
-    if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+    if (
+      !(await isFirebaseAllowedInCurrentEnvironment()) ||
+      (!forceRefresh && isFirestoreQuotaInCooldown()) ||
+      !canUsePreviewRead('news', false)
+    ) {
       if (cachedData) return sortNewsDescending(JSON.parse(cachedData));
       return sortNewsDescending(INITIAL_NEWS);
     }
 
-    // Cache expired or force refresh: fetch from Firestore
-    const newsCol = collection(db, 'news');
+    const previewDb = getPreviewDb();
+    if (!previewDb) {
+      if (cachedData) return sortNewsDescending(JSON.parse(cachedData));
+      return sortNewsDescending(INITIAL_NEWS);
+    }
+
+    // Cache expired or force refresh in AI Studio Preview: fetch from Firestore
+    const newsCol = collection(previewDb, 'news');
     const newsSnap = await getDocs(newsCol);
+    recordPreviewFirestoreReads(newsSnap.size || 1, 'news', false);
 
     if (newsSnap.empty) {
       // If collection empty in firestore, initialize with default news
@@ -260,7 +320,7 @@ const LATEST_BANNERS_CACHE_KEY = 'mahasangh_latest_banners_cache_v2';
 const LATEST_BANNERS_CACHE_TIME_KEY = 'mahasangh_latest_banners_cache_time_v2';
 const LEGACY_BANNERS_CACHE_KEY_V1 = 'mahasangh_latest_banners_cache_v1';
 const LEGACY_BANNERS_CACHE_TIME_KEY_V1 = 'mahasangh_latest_banners_cache_time_v1';
-const LATEST_BANNERS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes so visitors quickly see new updates
+const LATEST_BANNERS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes smart cache for Preview
 const LEGACY_STUCK_BANNER_IDS = new Set(['banner-1', 'banner-2']);
 
 function parseLatestBannerTime(item: Partial<LatestBannerItem> | null | undefined): number {
@@ -341,7 +401,11 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
       return sortedSql;
     }
 
-    if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+    if (
+      !(await isFirebaseAllowedInCurrentEnvironment()) ||
+      (!forceRefresh && isFirestoreQuotaInCooldown()) ||
+      !canUsePreviewRead('latest_banners', false)
+    ) {
       if (cachedData) {
         const parsed = JSON.parse(cachedData);
         if (Array.isArray(parsed)) {
@@ -351,8 +415,12 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
       return [];
     }
 
-    const colRef = collection(db, 'latest_banners');
+    const previewDb = getPreviewDb();
+    if (!previewDb) return [];
+
+    const colRef = collection(previewDb, 'latest_banners');
     const snap = await getDocs(colRef);
+    recordPreviewFirestoreReads(snap.size || 1, 'latest_banners', false);
 
     if (snap.empty) {
       updateLatestBannersCache([]);
@@ -373,9 +441,8 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
       });
     });
 
-    // Permanently remove legacy stuck dummy docs from Firestore if they ever existed there
     if (legacyIdsToPurge.length > 0) {
-      Promise.all(legacyIdsToPurge.map((id) => deleteDoc(doc(db, 'latest_banners', id)))).catch(() => {});
+      Promise.all(legacyIdsToPurge.map((id) => deleteDoc(doc(previewDb, 'latest_banners', id)))).catch(() => {});
     }
 
     const sorted = sortLatestBannersDescending(list);
@@ -406,7 +473,11 @@ export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Pro
         body: JSON.stringify(cleanPayload),
       });
     } else {
-      const docRef = doc(db, 'latest_banners', cleanPayload.id);
+      if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+        throw new Error('Firebase is disabled outside AI Studio Preview.');
+      }
+      const previewDb = requirePreviewDb();
+      const docRef = doc(previewDb, 'latest_banners', cleanPayload.id);
       await setDoc(docRef, cleanPayload);
     }
     try {
@@ -429,7 +500,11 @@ export async function deleteLatestBannerFromFirestore(bannerId: string): Promise
         method: 'DELETE',
       });
     } else {
-      const docRef = doc(db, 'latest_banners', bannerId);
+      if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+        throw new Error('Firebase is disabled outside AI Studio Preview.');
+      }
+      const previewDb = requirePreviewDb();
+      const docRef = doc(previewDb, 'latest_banners', bannerId);
       await deleteDoc(docRef);
     }
     try {
@@ -443,8 +518,6 @@ export async function deleteLatestBannerFromFirestore(bannerId: string): Promise
     handleFirestoreError(error, OperationType.DELETE, `latest_banners/${bannerId}`);
   }
 }
-
-import { toEnglishDigits } from './utils/formatters';
 
 // Universal sorting: newest news by custom publish date at top, older news moving down
 export function sortNewsDescending(list: NewsItem[]): NewsItem[] {
@@ -550,7 +623,10 @@ export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
         body: JSON.stringify(newsWithCreated),
       });
     } else {
-      await setDoc(doc(db, 'news', news.id), newsWithCreated);
+      if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+        throw new Error('Firebase is disabled outside AI Studio Preview.');
+      }
+      await setDoc(doc(requirePreviewDb(), 'news', news.id), newsWithCreated);
     }
     // Immediately invalidate and update local cache with newest at top
     const currentCached = safeStorageGet(NEWS_CACHE_KEY);
@@ -592,7 +668,11 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
             return sortedSql;
         }
 
-        if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+        if (
+            !(await isFirebaseAllowedInCurrentEnvironment()) ||
+            (!forceRefresh && isFirestoreQuotaInCooldown()) ||
+            !canUsePreviewRead('gov_orders', false)
+        ) {
             const cachedData = safeStorageGet(GOV_ORDERS_CACHE_KEY);
             if (cachedData) {
                 try { return JSON.parse(cachedData); } catch {}
@@ -600,7 +680,10 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
             return [];
         }
 
-        const snap = await getDocs(collection(db, 'gov_orders'));
+        const previewDb = getPreviewDb();
+        if (!previewDb) return [];
+        const snap = await getDocs(collection(previewDb, 'gov_orders'));
+        recordPreviewFirestoreReads(snap.size || 1, 'gov_orders', false);
         if (snap.empty) {
             safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify([]));
             safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
@@ -636,7 +719,10 @@ export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void>
             body: JSON.stringify(govOrder),
         });
     } else {
-        await setDoc(doc(db, 'gov_orders', govOrder.id), govOrder);
+        if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+            throw new Error('Firebase is disabled outside AI Studio Preview.');
+        }
+        await setDoc(doc(requirePreviewDb(), 'gov_orders', govOrder.id), govOrder);
     }
     try {
         const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
@@ -656,7 +742,10 @@ export async function deleteGovOrderFromFirestore(id: string): Promise<void> {
             method: 'DELETE',
         });
     } else {
-        await deleteDoc(doc(db, 'gov_orders', id));
+        if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+            throw new Error('Firebase is disabled outside AI Studio Preview.');
+        }
+        await deleteDoc(doc(requirePreviewDb(), 'gov_orders', id));
     }
     try {
         const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
@@ -680,7 +769,10 @@ export async function deleteNewsFromFirestore(newsId: string): Promise<void> {
         method: 'DELETE',
       });
     } else {
-      await deleteDoc(doc(db, 'news', newsId));
+      if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+        throw new Error('Firebase is disabled outside AI Studio Preview.');
+      }
+      await deleteDoc(doc(requirePreviewDb(), 'news', newsId));
     }
     console.log('Successfully deleted news item:', newsId);
     const currentCached = safeStorageGet(NEWS_CACHE_KEY);
@@ -724,7 +816,10 @@ export async function saveApplicationToFirestore(app: MembershipApplication): Pr
       });
       return;
     }
-    await setDoc(doc(db, 'applications', app.id), cleaned, { merge: true });
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    await setDoc(doc(requirePreviewDb(), 'applications', app.id), cleaned, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }
@@ -748,11 +843,18 @@ export async function trackSingleApplicationDetailed(
     }
   }
 
+  if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('track_single', false)) {
+    return { app: null, verifiedFromServer: false };
+  }
+  const previewDb = getPreviewDb();
+  if (!previewDb) return { app: null, verifiedFromServer: false };
+
   let verifiedFromServer = false;
 
   const getDocServerFirst = async (ref: ReturnType<typeof doc>) => {
     try {
-      const snap = await getDocFromServer(ref);
+      const snap = await getDoc(ref);
+      recordPreviewFirestoreReads(1, 'track_single', false);
       verifiedFromServer = true;
       return snap;
     } catch {
@@ -762,7 +864,8 @@ export async function trackSingleApplicationDetailed(
 
   const getDocsServerFirst = async (q: ReturnType<typeof query>) => {
     try {
-      const snap = await getDocsFromServer(q);
+      const snap = await getDocs(q);
+      recordPreviewFirestoreReads(snap.size || 1, 'track_single', false);
       verifiedFromServer = true;
       return snap;
     } catch {
@@ -781,7 +884,7 @@ export async function trackSingleApplicationDetailed(
 
   try {
     // 1. Try by document ID
-    const docRef = doc(db, 'applications', queryTerm);
+    const docRef = doc(previewDb, 'applications', queryTerm);
     const docSnap = await getDocServerFirst(docRef);
     if (docSnap.exists()) {
       const data = docSnap.data() as MembershipApplication;
@@ -789,7 +892,7 @@ export async function trackSingleApplicationDetailed(
       if (active) return { app: active, verifiedFromServer };
     }
 
-    const appsCol = collection(db, 'applications');
+    const appsCol = collection(previewDb, 'applications');
 
     // 2. Try by memberNumber (exact or uppercase)
     const upperTerm = queryTerm.toUpperCase();
@@ -869,11 +972,18 @@ export async function findExistingApplicationInFirestore(params: {
     }
   }
 
+  if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('find_existing', false)) {
+    return { match: null, verifiedFromServer: false };
+  }
+  const previewDb = getPreviewDb();
+  if (!previewDb) return { match: null, verifiedFromServer: false };
+
   let verifiedFromServer = false;
 
   const getDocsServerFirst = async (q: ReturnType<typeof query>) => {
     try {
-      const snap = await getDocsFromServer(q);
+      const snap = await getDocs(q);
+      recordPreviewFirestoreReads(snap.size || 1, 'find_existing', false);
       verifiedFromServer = true;
       return snap;
     } catch {
@@ -882,7 +992,7 @@ export async function findExistingApplicationInFirestore(params: {
   };
 
   try {
-    const appsCol = collection(db, 'applications');
+    const appsCol = collection(previewDb, 'applications');
     const collectedDocs: MembershipApplication[] = [];
     const seenDocIds = new Set<string>();
 
@@ -942,7 +1052,7 @@ export async function findExistingApplicationInFirestore(params: {
   }
 }
 
-// Admin only: On-demand applications fetch with 60s smart cache (memory + lightweight localStorage)
+// Admin only: On-demand applications fetch with smart cache (60s in SQL, 60m in AI Studio Preview to guard quota)
 const ADMIN_APPS_CACHE_KEY = 'mahasangh_admin_apps_cache_v2';
 const ADMIN_APPS_TIME_KEY = 'mahasangh_admin_apps_time_v2';
 let adminAppsMemoryCache: { list: MembershipApplication[]; timestamp: number } | null = null;
@@ -959,13 +1069,16 @@ function stripHeavyPhotosForStorage(apps: MembershipApplication[]): MembershipAp
 
 export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<MembershipApplication[]> {
   try {
+    const sqlActive = await isSqlBackendActive();
+    const cacheTtl = sqlActive ? 60000 : 60 * 60 * 1000;
+
     if (!forceRefresh) {
-      if (adminAppsMemoryCache && Date.now() - adminAppsMemoryCache.timestamp < 60000) {
+      if (adminAppsMemoryCache && Date.now() - adminAppsMemoryCache.timestamp < cacheTtl) {
         return adminAppsMemoryCache.list;
       }
       const cached = safeStorageGet(ADMIN_APPS_CACHE_KEY);
       const cachedTime = safeStorageGet(ADMIN_APPS_TIME_KEY);
-      if (cached && cachedTime && Date.now() - Number(cachedTime) < 60000) {
+      if (cached && cachedTime && Date.now() - Number(cachedTime) < cacheTtl) {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
@@ -975,7 +1088,7 @@ export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<M
       }
     }
 
-    if (await isSqlBackendActive()) {
+    if (sqlActive) {
       const data = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications');
       const list = Array.isArray(data?.items) ? data.items : [];
       list.sort(
@@ -989,17 +1102,25 @@ export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<M
       return list;
     }
 
-    const appsCol = collection(db, 'applications');
-    let snap;
-    if (forceRefresh) {
-      try {
-        snap = await getDocsFromServer(appsCol);
-      } catch {
-        snap = await getDocs(appsCol);
+    // Outside AI Studio Preview OR over daily Preview quota / 15-min scan cooldown -> return cache cleanly
+    if (
+      !(await isFirebaseAllowedInCurrentEnvironment()) ||
+      !canUsePreviewRead('admin_apps', true)
+    ) {
+      if (adminAppsMemoryCache) return adminAppsMemoryCache.list;
+      const cached = safeStorageGet(ADMIN_APPS_CACHE_KEY);
+      if (cached) {
+        try { return JSON.parse(cached); } catch {}
       }
-    } else {
-      snap = await getDocs(appsCol);
+      return [];
     }
+
+    const previewDb = getPreviewDb();
+    if (!previewDb) return [];
+
+    const appsCol = collection(previewDb, 'applications');
+    const snap = await getDocs(appsCol);
+    recordPreviewFirestoreReads(snap.size || 1, 'admin_apps', true);
 
     if (snap.empty) {
       adminAppsMemoryCache = { list: [], timestamp: Date.now() };
@@ -1032,13 +1153,12 @@ export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<M
   }
 }
 
-// Admin only: Real-time listener for applications so status updates stay live in sync
+// Admin only: Zero-snapshot poll helper (avoids costly Firestore onSnapshot reconnect scans)
 export function subscribeToApplicationsForAdmin(
   onSuccess: (apps: MembershipApplication[]) => void,
   onError?: (error: unknown) => void
 ): () => void {
   let cancelled = false;
-  let unsubscribeFirestore: (() => void) | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   isSqlBackendActive()
@@ -1058,27 +1178,13 @@ export function subscribeToApplicationsForAdmin(
         return;
       }
 
-      const appsCol = collection(db, 'applications');
-      unsubscribeFirestore = onSnapshot(
-        appsCol,
-        (snap: QuerySnapshot<DocumentData>) => {
-          const list: MembershipApplication[] = [];
-          snap.forEach((d) => {
-            const data = d.data() as MembershipApplication;
-            list.push({ ...data, id: d.id || data.id });
-          });
-          list.sort(
-            (a, b) =>
-              new Date(b.createdAt || '').getTime() -
-              new Date(a.createdAt || '').getTime()
-          );
-          onSuccess(list);
-        },
-        (error: any) => {
-          console.warn('Realtime applications listener error:', error);
-          if (onError) onError(error);
-        }
-      );
+      fetchApplicationsForAdmin(false)
+        .then((list) => {
+          if (!cancelled) onSuccess(list);
+        })
+        .catch((err) => {
+          if (!cancelled && onError) onError(err);
+        });
     })
     .catch((err) => {
       if (!cancelled && onError) onError(err);
@@ -1087,7 +1193,6 @@ export function subscribeToApplicationsForAdmin(
   return () => {
     cancelled = true;
     if (pollTimer) clearInterval(pollTimer);
-    if (unsubscribeFirestore) unsubscribeFirestore();
   };
 }
 
@@ -1119,7 +1224,10 @@ export async function updateMemberInFirestore(member: MembershipApplication): Pr
       syncSingleMemberInCaches(member);
       return;
     }
-    await setDoc(doc(db, 'applications', member.id), payload, { merge: true });
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    await setDoc(doc(requirePreviewDb(), 'applications', member.id), payload, { merge: true });
     syncSingleMemberInCaches(member);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
@@ -1152,13 +1260,16 @@ export async function approveApplicationInFirestore(
       });
       return;
     }
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
     const payload = cleanForFirestore({
       status: 'approved',
       memberNumber,
       approvedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    await setDoc(doc(db, 'applications', appId), payload, { merge: true });
+    await setDoc(doc(requirePreviewDb(), 'applications', appId), payload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
@@ -1178,13 +1289,16 @@ export async function rejectApplicationInFirestore(
       });
       return;
     }
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
     const payload = cleanForFirestore({
       status: 'rejected',
       rejectReason: reason || '',
       rejectedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
-    await setDoc(doc(db, 'applications', appId), payload, { merge: true });
+    await setDoc(doc(requirePreviewDb(), 'applications', appId), payload, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
   }
@@ -1210,7 +1324,11 @@ export async function deleteApplicationFromFirestore(
       });
       return res;
     }
-    const appsCol = collection(db, 'applications');
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    const previewDb = requirePreviewDb();
+    const appsCol = collection(previewDb, 'applications');
     let resolvedMeta: DeleteTargetMeta = {
       id: appId,
       applicationNumber: targetMeta?.applicationNumber,
@@ -1221,12 +1339,7 @@ export async function deleteApplicationFromFirestore(
 
     // Fetch live document before deleting so we always have full contact/appNumber metadata
     try {
-      let existingSnap;
-      try {
-        existingSnap = await getDocFromServer(doc(db, 'applications', appId));
-      } catch {
-        existingSnap = await getDoc(doc(db, 'applications', appId));
-      }
+      const existingSnap = await getDoc(doc(previewDb, 'applications', appId));
       if (existingSnap && existingSnap.exists()) {
         const data = existingSnap.data() as MembershipApplication;
         resolvedMeta = {
@@ -1324,7 +1437,7 @@ export async function deleteApplicationFromFirestore(
     }
 
     const deletedDocIds = Array.from(docIdsToDelete).filter(Boolean);
-    await Promise.all(deletedDocIds.map((docId) => deleteDoc(doc(db, 'applications', docId))));
+    await Promise.all(deletedDocIds.map((docId) => deleteDoc(doc(previewDb, 'applications', docId))));
 
     const removeAllMatchingPhone = !otherApprovedForSamePhone;
     removeMemberFromCaches(appId, resolvedMeta, { removeAllMatchingPhone });
@@ -1353,11 +1466,11 @@ export interface MemberCounterData {
 const MEMBER_COUNTER_CACHE_KEY = 'mhs_member_counter_cache_v2';
 const APPROVED_MEMBERS_CACHE_KEY = 'mahasangh_approved_cache_v2';
 const APPROVED_MEMBERS_CACHE_TIME_KEY = 'mahasangh_approved_cache_time_v2';
-const APPROVED_CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes smart cache
+const APPROVED_CACHE_DURATION_MS = 60 * 60 * 1000; // 60 minutes smart cache in Preview
 
 /**
- * Reads the central member counter from `settings/member_counter` (Consumes exactly 1 read).
- * If counter doesn't exist yet, initializes it seamlessly based on current highest approved count.
+ * Reads the central member counter from `settings/member_counter` (Consumes at most 1 read in Preview).
+ * Never runs on production hosts (mahasangh.in).
  */
 export async function getMemberCounter(): Promise<MemberCounterData> {
   if (await isSqlBackendActive()) {
@@ -1369,38 +1482,54 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
       console.warn('SQL counter read warning:', err);
     }
   }
-  const counterDocRef = doc(db, 'settings', 'member_counter');
-  try {
-    const snap = await getDoc(counterDocRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      const count = typeof data.lastMemberNumber === 'number'
-        ? data.lastMemberNumber
-        : (typeof data.totalApproved === 'number' ? data.totalApproved : 0);
-      const res: MemberCounterData = {
-        totalApproved: count,
-        lastMemberNumber: count,
-        lastUpdated: data.lastUpdated || new Date().toISOString()
-      };
-      safeStorageSet(MEMBER_COUNTER_CACHE_KEY, JSON.stringify(res));
-      return res;
+
+  const readCachedCounter = (): MemberCounterData | null => {
+    const cachedRaw = safeStorageGet(MEMBER_COUNTER_CACHE_KEY);
+    if (cachedRaw) {
+      try {
+        return JSON.parse(cachedRaw);
+      } catch {
+        // fallback
+      }
     }
-  } catch (err) {
-    console.warn('Central counter read warning:', err);
+    return null;
+  };
+
+  if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+    return readCachedCounter() || {
+      totalApproved: DEFAULT_COUNTER_BASELINE,
+      lastMemberNumber: DEFAULT_COUNTER_BASELINE,
+      lastUpdated: new Date().toISOString(),
+    };
   }
 
-  // Fallback to local cache or initialize
-  const cachedRaw = safeStorageGet(MEMBER_COUNTER_CACHE_KEY);
-  if (cachedRaw) {
+  const previewDb = getPreviewDb();
+  if (previewDb && canUsePreviewRead('member_counter', false)) {
+    const counterDocRef = doc(previewDb, 'settings', 'member_counter');
     try {
-      return JSON.parse(cachedRaw);
-    } catch {
-      // fallback
+      const snap = await getDoc(counterDocRef);
+      recordPreviewFirestoreReads(1, 'member_counter', false);
+      if (snap.exists()) {
+        const data = snap.data();
+        const count = typeof data.lastMemberNumber === 'number'
+          ? data.lastMemberNumber
+          : (typeof data.totalApproved === 'number' ? data.totalApproved : 0);
+        const res: MemberCounterData = {
+          totalApproved: count,
+          lastMemberNumber: count,
+          lastUpdated: data.lastUpdated || new Date().toISOString()
+        };
+        safeStorageSet(MEMBER_COUNTER_CACHE_KEY, JSON.stringify(res));
+        return res;
+      }
+    } catch (err) {
+      console.warn('Central counter read warning:', err);
     }
   }
 
-  // Baseline initialization if document not created yet
-  // Checks cached applications to find highest sequential number or defaults to 71
+  const cached = readCachedCounter();
+  if (cached) return cached;
+
   let baseline = 0;
   try {
     const appsRaw = safeStorageGet('mahasangh_applications') || safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
@@ -1412,19 +1541,13 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
     // fallback
   }
 
-  if (baseline <= 0) baseline = DEFAULT_COUNTER_BASELINE; // baseline based on approved records
+  if (baseline <= 0) baseline = DEFAULT_COUNTER_BASELINE;
 
   const initData: MemberCounterData = {
     totalApproved: baseline,
     lastMemberNumber: baseline,
     lastUpdated: new Date().toISOString()
   };
-
-  try {
-    await setDoc(counterDocRef, initData, { merge: true });
-  } catch (e) {
-    console.warn('Could not write initial member counter to firestore:', e);
-  }
   safeStorageSet(MEMBER_COUNTER_CACHE_KEY, JSON.stringify(initData));
   return initData;
 }
@@ -1432,16 +1555,25 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
 let highestApprovedSeqMemoryCache: { value: number; timestamp: number } | null = null;
 
 async function getTrueHighestApprovedSeqFromFirestore(): Promise<number> {
-  if (highestApprovedSeqMemoryCache && Date.now() - highestApprovedSeqMemoryCache.timestamp < 60000) {
+  if (highestApprovedSeqMemoryCache && Date.now() - highestApprovedSeqMemoryCache.timestamp < 15 * 60 * 1000) {
     return highestApprovedSeqMemoryCache.value;
   }
-  if (isFirestoreQuotaInCooldown()) {
+  if (
+    isFirestoreQuotaInCooldown() ||
+    !(await isFirebaseAllowedInCurrentEnvironment()) ||
+    !canUsePreviewRead('highest_approved_seq', true)
+  ) {
+    return highestApprovedSeqMemoryCache?.value || DEFAULT_COUNTER_BASELINE;
+  }
+  const previewDb = getPreviewDb();
+  if (!previewDb) {
     return highestApprovedSeqMemoryCache?.value || DEFAULT_COUNTER_BASELINE;
   }
   try {
-    const appsCol = collection(db, 'applications');
+    const appsCol = collection(previewDb, 'applications');
     const approvedQ = query(appsCol, where('status', '==', 'approved'));
     const snap = await getDocs(approvedQ);
+    recordPreviewFirestoreReads(snap.size || 1, 'highest_approved_seq', true);
     let highest = DEFAULT_COUNTER_BASELINE;
     snap.forEach((d) => {
       const app = d.data() as MembershipApplication;
@@ -1479,10 +1611,16 @@ async function hasExistingMemberNumberInFirestore(
   candidateMemberNumber: string,
   excludeAppId?: string
 ): Promise<boolean> {
+  if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('member_num_check', false)) {
+    return false;
+  }
+  const previewDb = getPreviewDb();
+  if (!previewDb) return false;
   try {
-    const appsCol = collection(db, 'applications');
+    const appsCol = collection(previewDb, 'applications');
     const q = query(appsCol, where('memberNumber', '==', candidateMemberNumber), limit(3));
     const snap = await getDocs(q);
+    recordPreviewFirestoreReads(snap.size || 1, 'member_num_check', false);
     if (snap.empty) return false;
     return snap.docs.some((d) => d.id !== excludeAppId);
   } catch {
@@ -1516,12 +1654,16 @@ export async function allocateNextMemberNumber(
     );
     return res;
   }
-  const counterDocRef = doc(db, 'settings', 'member_counter');
+  if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+    throw new Error('Firebase is disabled outside AI Studio Preview.');
+  }
+  const previewDb = requirePreviewDb();
+  const counterDocRef = doc(previewDb, 'settings', 'member_counter');
   const trueHighest = await getTrueHighestApprovedSeqFromFirestore();
   let floorSeq = Math.max(getKnownHighestSeqFromStorage(knownRecords), trueHighest);
 
   for (let attempt = 0; attempt < 15; attempt++) {
-    const allocatedSeq = await runTransaction(db, async (tx) => {
+    const allocatedSeq = await runTransaction(previewDb, async (tx) => {
       const snap = await tx.get(counterDocRef);
       let currentSeq = trueHighest;
       if (snap.exists()) {
@@ -1608,14 +1750,19 @@ export async function approveApplicationAtomicInFirestore(params: {
     }
     return txResult;
   }
-  const appRef = doc(db, 'applications', appId);
-  const counterDocRef = doc(db, 'settings', 'member_counter');
+  if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+    throw new Error('Firebase is disabled outside AI Studio Preview.');
+  }
+  const previewDb = requirePreviewDb();
+  const appRef = doc(previewDb, 'applications', appId);
+  const counterDocRef = doc(previewDb, 'settings', 'member_counter');
   const trueHighest = await getTrueHighestApprovedSeqFromFirestore();
   let floorSeq = Math.max(getKnownHighestSeqFromStorage(knownRecords), trueHighest);
 
   // Pre-scan past any manually-assigned future numbers before locking inside transaction
   try {
     const preCounterSnap = await getDoc(counterDocRef);
+    recordPreviewFirestoreReads(1, 'member_counter', false);
     const preCounterVal = preCounterSnap.exists()
       ? Math.max(
           Number(preCounterSnap.data().lastMemberNumber || 0),
@@ -1639,7 +1786,7 @@ export async function approveApplicationAtomicInFirestore(params: {
     // Proceed into atomic transaction with current floorSeq
   }
 
-  const txResult = await runTransaction(db, async (tx) => {
+  const txResult = await runTransaction(previewDb, async (tx) => {
     const [appSnap, counterSnap] = await Promise.all([
       tx.get(appRef),
       tx.get(counterDocRef),
@@ -1756,9 +1903,12 @@ export async function syncMemberCounter(highestKnownCount: number): Promise<void
     }
     return;
   }
-  const counterDocRef = doc(db, 'settings', 'member_counter');
+  if (!(await isFirebaseAllowedInCurrentEnvironment())) return;
+  const previewDb = getPreviewDb();
+  if (!previewDb) return;
+  const counterDocRef = doc(previewDb, 'settings', 'member_counter');
   try {
-    const newVal = await runTransaction(db, async (tx) => {
+    const newVal = await runTransaction(previewDb, async (tx) => {
       const snap = await tx.get(counterDocRef);
       const current = snap.exists()
         ? Math.max(
@@ -1790,108 +1940,154 @@ export async function syncMemberCounter(highestKnownCount: number): Promise<void
   }
 }
 
+const SQL_APPROVED_SOFT_TTL_MS = 15 * 1000; // 15s local cache in MySQL mode (unlimited fast queries)
+let inFlightApprovedFetch: Promise<MembershipApplication[]> | null = null;
+let inFlightForcedApprovedFetch: Promise<MembershipApplication[]> | null = null;
+
+export function getCachedApprovedMembersSync(): MembershipApplication[] | null {
+  try {
+    const cachedData = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
+    if (!cachedData) return null;
+    const parsed = JSON.parse(cachedData);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function broadcastApprovedMembersUpdate(list: MembershipApplication[]): void {
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('mahasangh_approved_updated', { detail: list }));
+    } catch {}
+  }
+}
+
 /**
  * SMART CACHE FOR APPROVED MEMBERS DIRECTORY:
- * Approved members list is cached locally for 2 minutes.
- * Guarantees 100% parity with Admin Panel live count.
+ * Uses ultra-lightweight summary projection in HostKarle MySQL (~50KB gzipped)
+ * with request deduplication so "यादी ताजी करा" finishes instantaneously.
  */
 export async function fetchApprovedMembersCached(forceRefresh = false): Promise<MembershipApplication[]> {
-  try {
-    const cachedTime = safeStorageGet(APPROVED_MEMBERS_CACHE_TIME_KEY);
-    const cachedData = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
+  if (inFlightForcedApprovedFetch) {
+    return inFlightForcedApprovedFetch;
+  }
+  if (!forceRefresh && inFlightApprovedFetch) {
+    return inFlightApprovedFetch;
+  }
 
-    if (!forceRefresh && cachedTime && cachedData) {
-      const age = Date.now() - parseInt(cachedTime, 10);
-      if (age < APPROVED_CACHE_DURATION_MS) {
-        const parsed = JSON.parse(cachedData);
-        if (Array.isArray(parsed)) {
-          return parsed;
+  const runFetch = async (): Promise<MembershipApplication[]> => {
+    try {
+      const cachedTime = safeStorageGet(APPROVED_MEMBERS_CACHE_TIME_KEY);
+      const cachedData = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
+      const sqlActive = await isSqlBackendActive();
+
+      if (!forceRefresh && cachedTime && cachedData) {
+        const age = Date.now() - parseInt(cachedTime, 10);
+        const ttl = sqlActive ? SQL_APPROVED_SOFT_TTL_MS : APPROVED_CACHE_DURATION_MS;
+        if (age < ttl) {
+          const parsed = JSON.parse(cachedData);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
         }
       }
-    }
 
-    if (await isSqlBackendActive()) {
-      const res = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications?status=approved');
-      const list = Array.isArray(res?.items) ? res.items : [];
+      if (sqlActive) {
+        const cacheBuster = forceRefresh ? `&_t=${Date.now()}` : '';
+        const res = await sqlApiRequest<{ items: MembershipApplication[] }>(
+          `/api/db/applications?status=approved&summary=1${cacheBuster}`,
+          { cache: 'no-store' }
+        );
+        const list = (Array.isArray(res?.items) ? res.items : []).map(stripHeavyApplicationFields);
+        list.sort(
+          (a, b) =>
+            new Date(b.approvedAt || b.createdAt || '').getTime() -
+            new Date(a.approvedAt || a.createdAt || '').getTime()
+        );
+        safeStorageSet(APPROVED_MEMBERS_CACHE_KEY, JSON.stringify(list));
+        safeStorageSet(APPROVED_MEMBERS_CACHE_TIME_KEY, Date.now().toString());
+        broadcastApprovedMembersUpdate(list);
+        return list;
+      }
+
+      if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+        if (cachedData) return JSON.parse(cachedData);
+        return [];
+      }
+
+      if (isFirestoreQuotaInCooldown() || !canUsePreviewRead('approved_members', true)) {
+        if (cachedData) return JSON.parse(cachedData);
+        return [];
+      }
+
+      const previewDb = getPreviewDb();
+      if (!previewDb) {
+        if (cachedData) return JSON.parse(cachedData);
+        return [];
+      }
+
+      // Query only approved records inside Preview (cooldown + daily cap enforced)
+      const approvedQuery = query(collection(previewDb, 'applications'), where('status', '==', 'approved'));
+      const snap = await getDocs(approvedQuery);
+      recordPreviewFirestoreReads(snap.size || 1, 'approved_members', true);
+
+      let list: MembershipApplication[] = [];
+      if (snap && !snap.empty) {
+        snap.forEach((d) => {
+          const item = d.data() as MembershipApplication;
+          list.push({
+            ...item,
+            id: d.id
+          });
+        });
+      }
+
+      // Sort descending by approval / creation date
       list.sort(
         (a, b) =>
           new Date(b.approvedAt || b.createdAt || '').getTime() -
           new Date(a.approvedAt || a.createdAt || '').getTime()
       );
-      const lightweightSql = list.map((item) => {
-        if (item.photo && item.photo.length > 2000 && item.photo.startsWith('data:image')) {
-          const { photo, ...rest } = item;
-          return rest;
-        }
-        return item;
-      });
-      safeStorageSet(APPROVED_MEMBERS_CACHE_KEY, JSON.stringify(lightweightSql));
-      safeStorageSet(APPROVED_MEMBERS_CACHE_TIME_KEY, Date.now().toString());
-      return list;
-    }
 
-    if (!forceRefresh && isFirestoreQuotaInCooldown()) {
-      if (cachedData) return JSON.parse(cachedData);
+      // Strip heavy base64 photos for local cache to save storage space
+      const lightweightList = list.map(stripHeavyApplicationFields);
+
+      safeStorageSet(APPROVED_MEMBERS_CACHE_KEY, JSON.stringify(lightweightList));
+      safeStorageSet(APPROVED_MEMBERS_CACHE_TIME_KEY, Date.now().toString());
+      broadcastApprovedMembersUpdate(lightweightList);
+
+      return list;
+    } catch (error) {
+      if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
+      console.warn('Using cached approved members due to network / quota:', error);
+      const cachedData = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
+      if (cachedData) {
+        try {
+          return JSON.parse(cachedData);
+        } catch {
+          // fallback
+        }
+      }
       return [];
     }
+  };
 
-    // Query only approved records (avoids scanning pending/rejected documents)
-    const approvedQuery = query(collection(db, 'applications'), where('status', '==', 'approved'));
-    let snap;
+  const promise = runFetch().finally(() => {
     if (forceRefresh) {
-      try {
-        snap = await getDocsFromServer(approvedQuery);
-      } catch {
-        snap = await getDocs(approvedQuery);
-      }
+      inFlightForcedApprovedFetch = null;
     } else {
-      snap = await getDocs(approvedQuery);
+      inFlightApprovedFetch = null;
     }
+  });
 
-    let list: MembershipApplication[] = [];
-    if (snap && !snap.empty) {
-      snap.forEach((d) => {
-        const item = d.data() as MembershipApplication;
-        list.push({
-          ...item,
-          id: d.id
-        });
-      });
-    }
-
-    // Sort descending by approval / creation date
-    list.sort(
-      (a, b) =>
-        new Date(b.approvedAt || b.createdAt || '').getTime() -
-        new Date(a.approvedAt || a.createdAt || '').getTime()
-    );
-
-    // Strip heavy base64 photos for local cache to save storage space
-    const lightweightList = list.map((item) => {
-      if (item.photo && item.photo.length > 2000 && item.photo.startsWith('data:image')) {
-        const { photo, ...rest } = item;
-        return rest;
-      }
-      return item;
-    });
-
-    safeStorageSet(APPROVED_MEMBERS_CACHE_KEY, JSON.stringify(lightweightList));
-    safeStorageSet(APPROVED_MEMBERS_CACHE_TIME_KEY, Date.now().toString());
-
-    return list;
-  } catch (error) {
-    if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
-    console.warn('Using cached approved members due to network / quota:', error);
-    const cachedData = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
-    if (cachedData) {
-      try {
-        return JSON.parse(cachedData);
-      } catch {
-        // fallback
-      }
-    }
-    return [];
+  if (forceRefresh) {
+    inFlightForcedApprovedFetch = promise;
+  } else {
+    inFlightApprovedFetch = promise;
   }
+
+  return promise;
 }
 
 /**
@@ -2161,108 +2357,75 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
         return res;
       }
 
-      const statsDocRef = doc(db, 'site_stats', 'visits');
+      // In non-SQL environments: NEVER touch Firebase outside AI Studio Preview,
+      // and in AI Studio Preview use read-only getDoc at most once/hour (zero writes).
+      if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+        if (!hasCountedToday) {
+          localStats = {
+            today: localStats.today + 1,
+            total: localStats.total + 1,
+          };
+          try {
+            localStorage.setItem(VISITOR_DAILY_COUNTED_DATE_KEY, todayDateStr);
+            localStorage.setItem(
+              VISITOR_LOCAL_KEY,
+              JSON.stringify({ ...localStats, date: todayDateStr, updatedAtMs: Date.now() })
+            );
+          } catch {}
+        }
+        return localStats;
+      }
 
-      if (!hasCountedToday) {
-        // Atomic transaction: resets `today` cleanly to 1 when IST date rolls over at 12:00 AM
-        const resultStats = await runTransaction(db, async (tx) => {
-          const snap = await tx.get(statsDocRef);
-          let fsTotal = 0;
-          let fsToday = 0;
-          let fsDate = '';
+      if (
+        cachedDate === todayDateStr &&
+        localStats.total >= MIN_VISITOR_BASELINE &&
+        Date.now() - cachedAtMs < 60 * 60 * 1000
+      ) {
+        return localStats;
+      }
 
-          if (snap.exists()) {
-            const data = snap.data();
-            fsTotal = typeof data.total === 'number' ? data.total : 0;
-            fsToday = typeof data.today === 'number' ? data.today : 0;
-            fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
-          }
+      const previewDb = getPreviewDb();
+      if (!previewDb || !canUsePreviewRead('visitor_stats', false)) {
+        return { today: Math.max(localStats.today, 1), total: localStats.total };
+      }
 
-          const next = computeNextVisitorStats({
-            currentTotal: fsTotal,
-            currentToday: fsToday,
-            lastDate: fsDate,
-            todayDateStr,
-            incrementVisit: true,
-            minBaseline: MIN_VISITOR_BASELINE,
-          });
+      const statsDocRef = doc(previewDb, 'site_stats', 'visits');
+      const snap = await getDoc(statsDocRef);
+      recordPreviewFirestoreReads(1, 'visitor_stats', false);
 
-          tx.set(
-            statsDocRef,
-            {
-              total: next.total,
-              today: next.today,
-              lastDate: todayDateStr,
-              lastUpdated: new Date().toISOString(),
-            },
-            { merge: true }
-          );
+      if (snap.exists()) {
+        const data = snap.data();
+        const fsTotal = typeof data.total === 'number' ? data.total : 0;
+        const fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
+        const fsToday = typeof data.today === 'number' ? data.today : 0;
 
-          return { today: next.today, total: next.total };
+        const next = computeNextVisitorStats({
+          currentTotal: fsTotal,
+          currentToday: fsToday,
+          lastDate: fsDate,
+          todayDateStr,
+          incrementVisit: false,
+          minBaseline: MIN_VISITOR_BASELINE,
         });
 
+        const liveStats: VisitorStats = {
+          today: next.today,
+          total: next.total,
+        };
         try {
           localStorage.setItem(VISITOR_DAILY_COUNTED_DATE_KEY, todayDateStr);
           localStorage.setItem(
             VISITOR_LOCAL_KEY,
             JSON.stringify({
-              ...resultStats,
+              ...liveStats,
               date: todayDateStr,
               updatedAtMs: Date.now(),
             })
           );
         } catch {}
-
-        return resultStats;
-      } else {
-        // Already counted today from this browser: read-only refresh (auto-heals if manually reset to 0)
-        const snap = await getDoc(statsDocRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          const fsTotal = typeof data.total === 'number' ? data.total : 0;
-          const fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
-          const fsToday = typeof data.today === 'number' ? data.today : 0;
-
-          const next = computeNextVisitorStats({
-            currentTotal: fsTotal,
-            currentToday: fsToday,
-            lastDate: fsDate,
-            todayDateStr,
-            incrementVisit: false,
-            minBaseline: MIN_VISITOR_BASELINE,
-          });
-
-          if (next.shouldPersist) {
-            await setDoc(
-              statsDocRef,
-              {
-                total: next.total,
-                today: next.today,
-                lastDate: todayDateStr,
-                lastUpdated: new Date().toISOString(),
-              },
-              { merge: true }
-            ).catch(() => {});
-          }
-
-          const liveStats: VisitorStats = {
-            today: next.today,
-            total: next.total,
-          };
-          try {
-            localStorage.setItem(
-              VISITOR_LOCAL_KEY,
-              JSON.stringify({
-                ...liveStats,
-                date: todayDateStr,
-                updatedAtMs: Date.now(),
-              })
-            );
-          } catch {}
-          return liveStats;
-        }
-        return { today: Math.max(localStats.today, 1), total: localStats.total };
+        return liveStats;
       }
+      return { today: Math.max(localStats.today, 1), total: localStats.total };
     } catch (err) {
       if (isQuotaExceededError(err)) markFirestoreQuotaExceeded(err);
       console.warn('Visitor counter sync notice:', err);
@@ -2329,7 +2492,9 @@ export async function saveContactToFirestore(contact: ContactMessage): Promise<v
       });
       return;
     }
-    await setDoc(doc(db, 'contacts', contact.id), contact);
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) return;
+    const previewDb = requirePreviewDb();
+    await setDoc(doc(previewDb, 'contacts', contact.id), contact);
   } catch (error) {
     console.warn('Saved contact locally, remote sync error:', error);
   }
@@ -2352,7 +2517,13 @@ export async function fetchContactsForAdmin(): Promise<ContactMessage[]> {
       localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(sqlList));
       return sqlList;
     }
-    const snap = await getDocs(collection(db, 'contacts'));
+    if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('contacts', false)) {
+      return list;
+    }
+    const previewDb = getPreviewDb();
+    if (!previewDb) return list;
+    const snap = await getDocs(collection(previewDb, 'contacts'));
+    recordPreviewFirestoreReads(snap.size || 1, 'contacts', false);
     if (!snap.empty) {
       const firestoreList: ContactMessage[] = [];
       snap.forEach((d) => firestoreList.push(d.data() as ContactMessage));
@@ -2386,7 +2557,9 @@ export async function deleteContactMessageFromFirestore(id: string): Promise<voi
       });
       return;
     }
-    await deleteDoc(doc(db, 'contacts', id));
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) return;
+    const previewDb = requirePreviewDb();
+    await deleteDoc(doc(previewDb, 'contacts', id));
   } catch (err) {
     console.warn('Deleted contact locally, remote delete error:', err);
   }
@@ -2460,32 +2633,21 @@ export async function getAdminCredentials(): Promise<{ email: string; password: 
       }
     }
 
-    // Force fetching from server to guarantee instant sync across all phones & devices
-    let snap;
-    try {
-      snap = await getDocFromServer(doc(db, 'settings', 'admin_auth'));
-    } catch {
-      snap = await getDoc(doc(db, 'settings', 'admin_auth'));
-    }
+    if (await isFirebaseAllowedInCurrentEnvironment()) {
+      const previewDb = getPreviewDb();
+      if (previewDb && canUsePreviewRead('admin_auth', false)) {
+        const snap = await getDoc(doc(previewDb, 'settings', 'admin_auth'));
+        recordPreviewFirestoreReads(1, 'admin_auth', false);
 
-    if (snap && snap.exists()) {
-      const data = snap.data();
-      const pwd = data.password || 'Padmakar@2027';
-      const em = data.email || DEFAULT_ADMIN_EMAIL;
-      safeStorageSet(ADMIN_PWD_CACHE_KEY, pwd);
-      safeStorageSet(ADMIN_EMAIL_CACHE_KEY, em);
-      return { email: em, password: pwd };
-    } else {
-      // Document does not exist in settings yet, initialize globally in cloud
-      const initialCreds = {
-        email: DEFAULT_ADMIN_EMAIL,
-        password: 'Padmakar@2027',
-        updatedAt: new Date().toISOString(),
-      };
-      await setDoc(doc(db, 'settings', 'admin_auth'), initialCreds, { merge: true });
-      safeStorageSet(ADMIN_PWD_CACHE_KEY, initialCreds.password);
-      safeStorageSet(ADMIN_EMAIL_CACHE_KEY, initialCreds.email);
-      return initialCreds;
+        if (snap && snap.exists()) {
+          const data = snap.data();
+          const pwd = data.password || 'Padmakar@2027';
+          const em = data.email || DEFAULT_ADMIN_EMAIL;
+          safeStorageSet(ADMIN_PWD_CACHE_KEY, pwd);
+          safeStorageSet(ADMIN_EMAIL_CACHE_KEY, em);
+          return { email: em, password: pwd };
+        }
+      }
     }
   } catch (err) {
     console.warn('Could not read admin_auth setting:', err);
@@ -2512,8 +2674,11 @@ export async function updateAdminCredentials(newPassword: string, newEmail?: str
       body: JSON.stringify({ password: cleanPwd, email: targetEmail }),
     });
   } else {
-    // Save directly to Firestore cloud first to ensure all devices receive the new password
-    await setDoc(doc(db, 'settings', 'admin_auth'), {
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    const previewDb = requirePreviewDb();
+    await setDoc(doc(previewDb, 'settings', 'admin_auth'), {
       email: targetEmail,
       password: cleanPwd,
       updatedAt: new Date().toISOString(),
@@ -2564,19 +2729,18 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
       return list;
     }
 
-    // Force fetching fresh list from Firestore cloud so all devices see current sub-admins
-    let snap;
-    try {
-      snap = await getDocsFromServer(collection(db, 'sub_admins'));
-    } catch {
-      snap = await getDocs(collection(db, 'sub_admins'));
-    }
-
-    if (snap) {
-      const list: AdminUser[] = [];
-      snap.forEach((d) => list.push(d.data() as AdminUser));
-      safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(list));
-      return list;
+    if (await isFirebaseAllowedInCurrentEnvironment()) {
+      const previewDb = getPreviewDb();
+      if (previewDb && canUsePreviewRead('sub_admins', false)) {
+        const snap = await getDocs(collection(previewDb, 'sub_admins'));
+        recordPreviewFirestoreReads(snap.size || 1, 'sub_admins', false);
+        if (snap) {
+          const list: AdminUser[] = [];
+          snap.forEach((d) => list.push(d.data() as AdminUser));
+          safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(list));
+          return list;
+        }
+      }
     }
   } catch (err) {
     console.warn('Could not read sub_admins:', err);
@@ -2601,8 +2765,11 @@ export async function saveAdminUser(admin: AdminUser): Promise<void> {
       body: JSON.stringify(admin),
     });
   } else {
-    // Save to Firestore cloud first so any mobile phone can access it
-    await setDoc(doc(db, 'sub_admins', admin.id), admin);
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    const previewDb = requirePreviewDb();
+    await setDoc(doc(previewDb, 'sub_admins', admin.id), admin);
   }
 
   try {
@@ -2627,7 +2794,11 @@ export async function deleteAdminUser(adminId: string): Promise<void> {
       method: 'DELETE',
     });
   } else {
-    await deleteDoc(doc(db, 'sub_admins', adminId));
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    const previewDb = requirePreviewDb();
+    await deleteDoc(doc(previewDb, 'sub_admins', adminId));
   }
   try {
     const existing = await fetchAdminUsers();
@@ -2692,8 +2863,16 @@ export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count
       return result;
     }
 
-    const appsCol = collection(db, 'applications');
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    if (!canUsePreviewRead('admin_bulk_resequence', true)) {
+      return { count: 0, message: 'Preview दैनंदिन कोटा मर्यादेमुळे सध्या हा स्कॅन १५ मिनिटे थांबवला आहे.' };
+    }
+    const previewDb = requirePreviewDb();
+    const appsCol = collection(previewDb, 'applications');
     const snap = await getDocs(appsCol);
+    recordPreviewFirestoreReads(snap.size || 1, 'admin_bulk_resequence', true);
     if (snap.empty) {
       return { count: 0, message: 'कोणतेही अर्ज सापडले नाहीत.' };
     }
@@ -2722,14 +2901,14 @@ export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count
       const newMemberNumber = formatSequentialMemberNumber(district, newSeq);
 
       if (app.memberNumber !== newMemberNumber) {
-        const appRef = doc(db, 'applications', app.id);
+        const appRef = doc(previewDb, 'applications', app.id);
         await setDoc(appRef, { memberNumber: newMemberNumber, updatedAt: new Date().toISOString() }, { merge: true });
         count++;
       }
     }
 
     // Update central counter
-    const counterDocRef = doc(db, 'settings', 'member_counter');
+    const counterDocRef = doc(previewDb, 'settings', 'member_counter');
     await setDoc(counterDocRef, {
       totalApproved: approved.length,
       lastMemberNumber: approved.length,
@@ -2776,8 +2955,19 @@ export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq:
       return result;
     }
 
-    const appsCol = collection(db, 'applications');
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
+    if (!canUsePreviewRead('admin_bulk_reset_counter', true)) {
+      return {
+        highestSeq: DEFAULT_COUNTER_BASELINE,
+        message: 'Preview दैनंदिन कोटा मर्यादेमुळे सध्या हा स्कॅन १५ मिनिटे थांबवला आहे.',
+      };
+    }
+    const previewDb = requirePreviewDb();
+    const appsCol = collection(previewDb, 'applications');
     const snap = await getDocs(appsCol);
+    recordPreviewFirestoreReads(snap.size || 1, 'admin_bulk_reset_counter', true);
     let highest = DEFAULT_COUNTER_BASELINE;
 
     snap.forEach((d) => {
@@ -2790,7 +2980,7 @@ export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq:
       }
     });
 
-    const counterDocRef = doc(db, 'settings', 'member_counter');
+    const counterDocRef = doc(previewDb, 'settings', 'member_counter');
     await setDoc(counterDocRef, {
       totalApproved: highest,
       lastMemberNumber: highest,
@@ -2857,13 +3047,23 @@ export async function purgeDeletedAndGhostApplicationsInFirestore(): Promise<{
       return result;
     }
 
-    const appsCol = collection(db, 'applications');
-    let snap;
-    try {
-      snap = await getDocsFromServer(appsCol);
-    } catch {
-      snap = await getDocs(appsCol);
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
     }
+    if (!canUsePreviewRead('admin_bulk_purge', true)) {
+      return {
+        totalDeleted: 0,
+        rejectedOrDeletedCount: 0,
+        corruptCount: 0,
+        duplicateGhostCount: 0,
+        remainingCount: 0,
+        message: 'Preview दैनंदिन कोटा मर्यादेमुळे सध्या हा स्कॅन १५ मिनिटे थांबवला आहे.',
+      };
+    }
+    const previewDb = requirePreviewDb();
+    const appsCol = collection(previewDb, 'applications');
+    const snap = await getDocs(appsCol);
+    recordPreviewFirestoreReads(snap.size || 1, 'admin_bulk_purge', true);
 
     const allDocs: Array<MembershipApplication & { docId: string }> = [];
     snap.forEach((d) => {
@@ -2881,7 +3081,7 @@ export async function purgeDeletedAndGhostApplicationsInFirestore(): Promise<{
     const docIdsToDelete = classification.toDelete.map((item) => item.docId);
     for (let i = 0; i < docIdsToDelete.length; i += 20) {
       const chunk = docIdsToDelete.slice(i, i + 20);
-      await Promise.all(chunk.map((docId) => deleteDoc(doc(db, 'applications', docId))));
+      await Promise.all(chunk.map((docId) => deleteDoc(doc(previewDb, 'applications', docId))));
     }
 
     // Clear ALL application & counter caches so Admin and Member browsers start completely fresh

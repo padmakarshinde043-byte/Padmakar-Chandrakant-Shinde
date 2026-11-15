@@ -1,27 +1,25 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Users, Filter, MapPin, RefreshCw } from 'lucide-react';
-import { MembershipApplication, MAHARASHTRA_DISTRICTS, formatSequentialMemberNumber } from '../data/mahasanghData';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Search, Users, Filter, MapPin, RefreshCw, ArrowUpDown, Check } from 'lucide-react';
+import { MembershipApplication, MAHARASHTRA_DISTRICTS } from '../data/mahasanghData';
 import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { toEnglishDigits } from '../utils/formatters';
-import { fetchApprovedMembersCached } from '../firebase';
+import { fetchApprovedMembersCached, getCachedApprovedMembersSync } from '../firebase';
+import {
+  RegisteredMemberItem,
+  DirectorySortOrder,
+  buildRegisteredMemberItems,
+  isApprovedMemberRecord,
+} from '../utils/directoryHelper';
 
-export interface RegisteredMemberItem {
-  id: string;
-  srNo: number;
-  memberNumber: string;
-  fullName: string;
-  taluka: string;
-  centerName?: string;
-  district: string;
-  designation?: string;
-  phone?: string;
-  approvedAt?: string;
-}
+export type { RegisteredMemberItem };
 
 interface RegisteredMembersDirectoryProps {
   applications: MembershipApplication[];
   onRefreshFromFirebase?: () => Promise<void> | void;
 }
+
+const INITIAL_VISIBLE_ROWS = 120;
+const LOAD_MORE_STEP = 150;
 
 export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProps> = ({
   applications: propApplications,
@@ -30,49 +28,97 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedTaluka, setSelectedTaluka] = useState('');
+  const [sortOrder, setSortOrder] = useState<DirectorySortOrder>('asc');
+  const [visibleLimit, setVisibleLimit] = useState<number>(INITIAL_VISIBLE_ROWS);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [localLiveApps, setLocalLiveApps] = useState<MembershipApplication[] | null>(null);
+  const [refreshSucceeded, setRefreshSucceeded] = useState(false);
+  const refreshBadgeTimerRef = useRef<number | null>(null);
 
-  // Always sync with propApplications when provided by parent
-  useEffect(() => {
-    if (Array.isArray(propApplications)) {
-      setLocalLiveApps(propApplications);
+  const [localLiveApps, setLocalLiveApps] = useState<MembershipApplication[] | null>(() => {
+    const propApprovedCount = Array.isArray(propApplications)
+      ? propApplications.filter(isApprovedMemberRecord).length
+      : 0;
+    const cached = getCachedApprovedMembersSync();
+    if (cached && cached.length >= propApprovedCount) {
+      return cached;
     }
+    return Array.isArray(propApplications) && propApplications.length > 0 ? propApplications : null;
+  });
+
+  // Only sync parent propApplications when parent genuinely holds newer approved records
+  useEffect(() => {
+    if (!Array.isArray(propApplications) || propApplications.length === 0) return;
+    const incomingApprovedCount = propApplications.filter(isApprovedMemberRecord).length;
+    if (incomingApprovedCount === 0) return;
+
+    setLocalLiveApps((prev) => {
+      if (!prev || prev.length === 0) return propApplications;
+      const currentApprovedCount = prev.filter(isApprovedMemberRecord).length;
+      return incomingApprovedCount >= currentApprovedCount ? propApplications : prev;
+    });
   }, [propApplications]);
 
-  // Initial mount: load approved members using Smart Cache (0 reads if valid cache exists)
+  // Initial mount + global approved-list sync (deduplicated network request)
   useEffect(() => {
     let isMounted = true;
-    const loadFirebaseApps = async () => {
+    const loadApprovedApps = async () => {
       try {
         const fresh = await fetchApprovedMembersCached(false);
         if (isMounted && Array.isArray(fresh)) {
           setLocalLiveApps(fresh);
         }
       } catch (err) {
-        console.warn('Smart Cache approved members fetch error:', err);
+        console.warn('Approved members fetch error:', err);
       }
     };
 
-    loadFirebaseApps();
+    const handleGlobalSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (isMounted && Array.isArray(customEvent.detail)) {
+        setLocalLiveApps(customEvent.detail);
+      }
+    };
+
+    window.addEventListener('mahasangh_approved_updated', handleGlobalSync);
+    loadApprovedApps();
+
     return () => {
       isMounted = false;
+      window.removeEventListener('mahasangh_approved_updated', handleGlobalSync);
+      if (refreshBadgeTimerRef.current) {
+        window.clearTimeout(refreshBadgeTimerRef.current);
+      }
     };
   }, []);
 
-  // Manual Refresh handler to re-verify directly against Firestore server
+  // Reset rendered window cleanly when filter/sort changes
+  useEffect(() => {
+    setVisibleLimit(INITIAL_VISIBLE_ROWS);
+  }, [searchTerm, selectedDistrict, selectedTaluka, sortOrder]);
+
+  // Fast single-flight manual refresh bypassing browser & localStorage cache
   const handleManualRefresh = async () => {
+    if (isRefreshing) return;
     setIsRefreshing(true);
+    setRefreshSucceeded(false);
     try {
-      if (onRefreshFromFirebase) {
-        await onRefreshFromFirebase();
-      }
-      const fresh = await fetchApprovedMembersCached(true);
+      const freshPromise = fetchApprovedMembersCached(true);
+      const [fresh] = await Promise.all([
+        freshPromise,
+        onRefreshFromFirebase ? Promise.resolve(onRefreshFromFirebase()).catch(() => {}) : Promise.resolve(),
+      ]);
       if (Array.isArray(fresh)) {
         setLocalLiveApps(fresh);
+        setRefreshSucceeded(true);
+        if (refreshBadgeTimerRef.current) {
+          window.clearTimeout(refreshBadgeTimerRef.current);
+        }
+        refreshBadgeTimerRef.current = window.setTimeout(() => {
+          setRefreshSucceeded(false);
+        }, 4000);
       }
     } catch (err) {
-      console.warn('Firebase refresh error:', err);
+      console.warn('Approved directory refresh error:', err);
     } finally {
       setIsRefreshing(false);
     }
@@ -80,57 +126,11 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
 
   const activeApplications = localLiveApps || propApplications || [];
 
-  // Filter ONLY real approved applications from Firebase (खरे खुरे मंजूर केलेले अर्ज)
-  const allRegisteredMembers: RegisteredMemberItem[] = useMemo(() => {
-    const approvedOnly = activeApplications.filter((app) => {
-      const isApprovedStatus = app.status === 'approved' || (typeof app.status === 'string' && app.status.toLowerCase() === 'approved');
-      const hasMemberNumber = Boolean(app.memberNumber && app.memberNumber.trim() !== '');
-      const hasApprovedAt = Boolean(app.approvedAt);
-      return isApprovedStatus || hasMemberNumber || hasApprovedAt;
-    });
-
-    // Sort by approval date or creation date ascending (1st approved = #1, 2nd = #2, etc.)
-    approvedOnly.sort((a, b) => {
-      // If both have memberNumber with numeric suffix, sort by sequence
-      const numA = parseInt((a.memberNumber || '').replace(/\D/g, '').slice(-4) || '0', 10);
-      const numB = parseInt((b.memberNumber || '').replace(/\D/g, '').slice(-4) || '0', 10);
-      if (numA && numB && numA !== numB) {
-        return numA - numB;
-      }
-      const dateA = new Date(a.approvedAt || a.createdAt || '').getTime() || 0;
-      const dateB = new Date(b.approvedAt || b.createdAt || '').getTime() || 0;
-      return dateA - dateB;
-    });
-
-    return approvedOnly.map((app, index) => {
-      const srNo = index + 1;
-      const memberNumber =
-        app.memberNumber && app.memberNumber.trim() !== ''
-          ? app.memberNumber.trim()
-          : formatSequentialMemberNumber(app.district || 'MAHA', srNo);
-
-      // Clean designation without any star (*)
-      const designation =
-        app.isOfficial && app.officialPost
-          ? app.officialPost.replace(/[⭐*★]/g, '').trim()
-          : (app.professional || 'केंद्रप्रमुख').replace(/[⭐*★]/g, '').trim();
-
-      const talukaName = app.taluka || app.officialTaluka || '-';
-
-      return {
-        id: app.id || `app-${srNo}`,
-        srNo,
-        memberNumber,
-        fullName: `${app.salutation ? app.salutation + ' ' : ''}${app.fullName}`.trim(),
-        taluka: talukaName,
-        centerName: app.centerName,
-        district: app.district || app.officialDistrict || '-',
-        designation,
-        phone: app.phone,
-        approvedAt: app.approvedAt || app.createdAt
-      };
-    });
-  }, [activeApplications]);
+  // Filter and sort real approved members in memory
+  const allRegisteredMembers: RegisteredMemberItem[] = useMemo(
+    () => buildRegisteredMemberItems(activeApplications, sortOrder),
+    [activeApplications, sortOrder]
+  );
 
   // Available talukas dynamically populated based on selectedDistrict
   const availableTalukas = useMemo(() => {
@@ -157,7 +157,6 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
       }
     }
 
-    // Merge official talukas with any distinct talukas recorded for members in this district
     const merged: string[] = [];
     const seen = new Set<string>();
     for (const t of officialList) {
@@ -179,7 +178,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     return merged;
   }, [selectedDistrict, allRegisteredMembers]);
 
-  // Client-side filtering (0 Firebase reads)
+  // Client-side filtering over complete dataset in memory
   const filteredMembers = useMemo(() => {
     let result = allRegisteredMembers;
 
@@ -210,6 +209,19 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     return result;
   }, [allRegisteredMembers, selectedDistrict, selectedTaluka, searchTerm]);
 
+  const visibleMembers = useMemo(
+    () => filteredMembers.slice(0, visibleLimit),
+    [filteredMembers, visibleLimit]
+  );
+
+  const handleTableScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (visibleLimit >= filteredMembers.length) return;
+    const el = e.currentTarget;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+      setVisibleLimit((prev) => Math.min(filteredMembers.length, prev + LOAD_MORE_STEP));
+    }
+  };
+
   return (
     <div className="bg-white rounded-md border border-slate-300 overflow-hidden mb-8">
       {/* Institutional Header Bar */}
@@ -223,13 +235,21 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
           </div>
         </div>
 
-        {/* Total Count Metadata & Manual Refresh */}
-        <div className="flex items-center gap-3 self-start md:self-auto text-xs sm:text-sm">
-          <div className="text-slate-100 font-medium tabular-nums">
-            एकूण मंजूर सदस्य:{' '}
-            <strong className="text-[#efb24b] font-mono text-base font-bold">
-              {allRegisteredMembers.length}
-            </strong>
+        {/* Total Count Metadata & Instant Manual Refresh */}
+        <div className="flex flex-wrap items-center gap-3 self-start md:self-auto text-xs sm:text-sm">
+          <div className="text-slate-100 font-medium tabular-nums flex items-center gap-2">
+            <span>
+              एकूण मंजूर सदस्य:{' '}
+              <strong className="text-[#efb24b] font-mono text-base font-bold">
+                {allRegisteredMembers.length}
+              </strong>
+            </span>
+            {refreshSucceeded && (
+              <span className="inline-flex items-center gap-1 text-emerald-300 font-semibold text-xs">
+                <Check className="w-3.5 h-3.5" />
+                ताजी झाली
+              </span>
+            )}
           </div>
           <span className="text-white/30" aria-hidden="true">|</span>
           <button
@@ -240,13 +260,13 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
             className="bg-white/10 hover:bg-white/20 transition-colors text-white px-3 py-1.5 rounded border border-white/25 text-xs sm:text-sm font-semibold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? 'अद्ययावत होत आहे...' : 'यादी ताजी करा'}</span>
+            <span>{isRefreshing ? 'ताजी होत आहे...' : 'यादी ताजी करा'}</span>
           </button>
         </div>
       </div>
 
-      {/* Filter and Search Bar (100% In-Memory - 0 Extra Firebase Reads) */}
-      <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {/* Filter, Sort and Search Bar (In-Memory) */}
+      <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -269,9 +289,9 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
           )}
         </div>
 
-        {/* District & Dependent Taluka Filter Dropdowns */}
+        {/* District, Dependent Taluka & Sort Selector */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
-          <div className="relative w-full sm:w-48">
+          <div className="relative w-full sm:w-44">
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
               aria-label="जिल्हा निवडा"
@@ -291,7 +311,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
             </select>
           </div>
 
-          <div className="relative w-full sm:w-52">
+          <div className="relative w-full sm:w-48">
             <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
               aria-label="तालुका निवडा"
@@ -314,13 +334,27 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               ))}
             </select>
           </div>
+
+          <div className="relative w-full sm:w-44">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              aria-label="यादीचा क्रम निवडा"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as DirectorySortOrder)}
+              className="w-full text-sm pl-8 pr-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] appearance-none cursor-pointer font-medium text-slate-700"
+            >
+              <option value="asc">क्र. १ पासून यादी</option>
+              <option value="desc">नवीन सदस्य प्रथम</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Visible Vertical & Horizontal Scrollbars, Smooth 2D Touch-Scroll on Mobile */}
+      {/* Visible Vertical & Horizontal Scrollbars, Progressive DOM Render for 60 FPS Mobile Speed */}
       {filteredMembers.length > 0 ? (
         <div
           tabIndex={0}
+          onScroll={handleTableScroll}
           aria-label="नोंदणीकृत सदस्य यादी उभी व आडवी स्क्रोल करा"
           className="max-h-[440px] overflow-x-scroll overflow-y-scroll relative bg-white focus:outline-none focus:ring-1 focus:ring-[#193568]/30 touch-auto"
           style={{
@@ -351,7 +385,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-sm text-slate-800">
-              {filteredMembers.map((member, idx) => (
+              {visibleMembers.map((member, idx) => (
                 <tr
                   key={member.id || member.memberNumber}
                   className={`transition-colors hover:bg-slate-50 ${
@@ -398,6 +432,21 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
                   </td>
                 </tr>
               ))}
+              {visibleLimit < filteredMembers.length && (
+                <tr>
+                  <td colSpan={5} className="py-3 px-4 text-center bg-slate-50">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setVisibleLimit((prev) => Math.min(filteredMembers.length, prev + LOAD_MORE_STEP))
+                      }
+                      className="text-xs sm:text-sm font-semibold text-[#193568] hover:underline cursor-pointer"
+                    >
+                      आणखी सदस्य पहा ({filteredMembers.length - visibleLimit} उर्वरित) ↓
+                    </button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

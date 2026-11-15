@@ -306,8 +306,21 @@ export function App() {
       }
     };
     window.addEventListener('mahasangh_news_updated', handleNewsSync);
+    const handleApprovedSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (Array.isArray(customEvent.detail)) {
+        setApplications((prev) => {
+          const pendingOrLocal = prev.filter((p) => p.status !== 'approved');
+          if (pendingOrLocal.length === 0) return customEvent.detail;
+          const approvedIds = new Set(customEvent.detail.map((a: MembershipApplication) => a.id));
+          return [...customEvent.detail, ...pendingOrLocal.filter((p) => !approvedIds.has(p.id))];
+        });
+      }
+    };
+    window.addEventListener('mahasangh_approved_updated', handleApprovedSync);
     return () => {
       window.removeEventListener('mahasangh_news_updated', handleNewsSync);
+      window.removeEventListener('mahasangh_approved_updated', handleApprovedSync);
       if (idleId !== undefined && typeof win.cancelIdleCallback === 'function') {
         win.cancelIdleCallback(idleId);
       }
@@ -319,7 +332,7 @@ export function App() {
 
   // Applications loading:
   // - Admin Panel fetches once right after successful login (inside AdminTab) + via manual Refresh button (zero background polling/reads).
-  // - Public Membership tab uses Smart Cache of approved members (0 Firestore reads if cached).
+  // - Public Membership tab shares deduplicated approved-directory fetch with RegisteredMembersDirectory.
   useEffect(() => {
     if (currentTab === 'membership') {
       fetchApprovedMembersCached(false)

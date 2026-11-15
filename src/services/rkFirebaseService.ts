@@ -12,9 +12,10 @@
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
 import { Leader, DEFAULT_AUTHORITATIVE_LEADERS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
-import { db } from '../firebase';
+import { getPreviewDb } from '../firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import { isSqlBackendActive, sqlApiRequest } from '../api/sqlBridge';
+import { isSqlBackendActive, isFirebaseAllowedInCurrentEnvironment, sqlApiRequest } from '../api/sqlBridge';
+import { canUsePreviewRead, recordPreviewFirestoreReads } from '../utils/previewFirebaseGuard';
 
 import {
   CACHE_KEY_OFFICIALS,
@@ -30,7 +31,7 @@ const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
 const CACHE_KEY_LEADERSHIP_VER = 'mahasangh_leadership_ver_v1';
 const CACHE_KEY_LEADERSHIP_TS = 'mahasangh_leadership_ts_v1';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes smart cache TTL
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes smart cache TTL to minimize Preview quota usage
 
 let officialsInFlight: Promise<OfficialMember[]> | null = null;
 let postsInFlight: Promise<AppointedPostItem[]> | null = null;
@@ -61,7 +62,13 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
         return list;
       }
 
+      if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_officials', false)) {
+        const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+        return cached ? JSON.parse(cached) : [];
+      }
+
       const res = await fetch(`${RTDB_BASE_URL}/officials.json`);
+      recordPreviewFirestoreReads(1, 'rtdb_officials', false);
       if (!res.ok) {
         throw new Error(`Failed to fetch officials: ${res.statusText}`);
       }
@@ -138,6 +145,9 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
       body: JSON.stringify({ ...member, ...memberPayload, id: member.id }),
     });
   } else {
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
     const res = await fetch(`${RTDB_BASE_URL}/officials/${member.id}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -165,6 +175,9 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
       method: 'DELETE',
     });
   } else {
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
     const res = await fetch(`${RTDB_BASE_URL}/officials/${id}.json`, {
       method: 'DELETE'
     });
@@ -204,7 +217,13 @@ export async function fetchDistrictPasswords(forceRefresh = false): Promise<Reco
       return result;
     }
 
+    if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_passwords', false)) {
+      const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
+      return cached ? JSON.parse(cached) : {};
+    }
+
     const res = await fetch(`${RTDB_BASE_URL}/district_passwords.json`);
+    recordPreviewFirestoreReads(1, 'rtdb_passwords', false);
     if (!res.ok) return {};
     const data = await res.json();
     const result = data || {};
@@ -235,6 +254,9 @@ export async function updateDistrictPasswordInRtdb(district: string, newPass: st
       body: JSON.stringify({ district, password: newPass }),
     });
   } else {
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
     const res = await fetch(`${RTDB_BASE_URL}/district_passwords/${encodeURIComponent(district)}.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -285,7 +307,13 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
         return DEFAULT_APPOINTED_POSTS;
       }
 
+      if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_posts', false)) {
+        const cached = localStorage.getItem(CACHE_KEY_POSTS);
+        return cached ? JSON.parse(cached) : DEFAULT_APPOINTED_POSTS;
+      }
+
       const res = await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`);
+      recordPreviewFirestoreReads(1, 'rtdb_posts', false);
       if (!res.ok) return DEFAULT_APPOINTED_POSTS;
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -338,7 +366,12 @@ export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
       return SUPER_ADMIN_PASSWORD;
     }
 
+    if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_pres_pwd', false)) {
+      return SUPER_ADMIN_PASSWORD;
+    }
+
     const res = await fetch(`${RTDB_BASE_URL}/president_password.json`);
+    recordPreviewFirestoreReads(1, 'rtdb_pres_pwd', false);
     if (res.ok) {
       const data = await res.json();
       if (typeof data === 'string' && data.trim()) {
@@ -364,6 +397,9 @@ export async function updatePresidentPasswordInFirebase(newPass: string): Promis
       body: JSON.stringify({ password: cleanPass }),
     });
   } else {
+    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+      throw new Error('Firebase is disabled outside AI Studio Preview.');
+    }
     const res = await fetch(`${RTDB_BASE_URL}/president_password.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -407,10 +443,11 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
             return parsed;
           }
 
-          if (!useSql) {
-            // Beyond 30-min TTL in Firebase mode: check tiny 13-byte leadership_version.json
+          if (!useSql && (await isFirebaseAllowedInCurrentEnvironment()) && canUsePreviewRead('rtdb_leaders_ver', false)) {
+            // Beyond 60-min TTL in AI Studio Preview mode: check tiny 13-byte leadership_version.json
             try {
               const verRes = await fetch(`${RTDB_BASE_URL}/leadership_version.json`, { cache: 'no-store' });
+              recordPreviewFirestoreReads(1, 'rtdb_leaders_ver', false);
               if (verRes.ok) {
                 const remoteVer = await verRes.json();
                 if (remoteVer && cachedVer && String(remoteVer) === String(cachedVer)) {
@@ -459,9 +496,21 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
     return DEFAULT_AUTHORITATIVE_LEADERS;
   }
 
-  // 1. Direct fetch from Firebase RTDB (only when cache missing, version changed, or forced refresh)
+  if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_leaders', false)) {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_AUTHORITATIVE_LEADERS;
+  }
+
+  // 1. Direct fetch from Firebase RTDB (AI Studio Preview only)
   try {
     const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, { cache: 'no-store' });
+    recordPreviewFirestoreReads(1, 'rtdb_leaders', false);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
@@ -475,18 +524,22 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
     console.warn('RTDB dynamic leaders fetch failed, trying Firestore:', err);
   }
 
-  // 2. Fallback to Firestore `/leadership` collection
+  // 2. Fallback to Firestore `/leadership` collection (AI Studio Preview only)
   try {
-    const snap = await getDocs(collection(db, 'leadership'));
-    if (!snap.empty) {
-      const firestoreLeaders: Leader[] = [];
-      snap.forEach((d) => {
-        firestoreLeaders.push(d.data() as Leader);
-      });
-      if (firestoreLeaders.length > 0) {
-        firestoreLeaders.sort((a: any, b: any) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
-        localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(firestoreLeaders));
-        return firestoreLeaders;
+    const previewDb = getPreviewDb();
+    if (previewDb && canUsePreviewRead('leadership', true)) {
+      const snap = await getDocs(collection(previewDb, 'leadership'));
+      recordPreviewFirestoreReads(snap.size || 1, 'leadership', true);
+      if (!snap.empty) {
+        const firestoreLeaders: Leader[] = [];
+        snap.forEach((d) => {
+          firestoreLeaders.push(d.data() as Leader);
+        });
+        if (firestoreLeaders.length > 0) {
+          firestoreLeaders.sort((a: any, b: any) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
+          localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(firestoreLeaders));
+          return firestoreLeaders;
+        }
       }
     }
   } catch (err) {
@@ -525,6 +578,10 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
     return;
   }
 
+  if (!(await isFirebaseAllowedInCurrentEnvironment())) {
+    throw new Error('Firebase is disabled outside AI Studio Preview.');
+  }
+
   const newVer = Date.now();
 
   // Save leaders to RTDB
@@ -550,16 +607,19 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
   localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(newVer));
   window.dispatchEvent(new Event('mahasangh_leadership_updated'));
 
-  // Dual-sync to Firestore `/leadership` collection in background
+  // Dual-sync to Firestore `/leadership` collection in background (AI Studio Preview only)
   try {
-    for (let i = 0; i < leaders.length; i++) {
-      const l = leaders[i];
-      const id = l.id || `leader_${i}`;
-      setDoc(doc(db, 'leadership', id), {
-        ...l,
-        orderIndex: i,
-        updatedAt: new Date().toISOString()
-      }).catch(() => {});
+    const previewDb = getPreviewDb();
+    if (previewDb) {
+      for (let i = 0; i < leaders.length; i++) {
+        const l = leaders[i];
+        const id = l.id || `leader_${i}`;
+        setDoc(doc(previewDb, 'leadership', id), {
+          ...l,
+          orderIndex: i,
+          updatedAt: new Date().toISOString()
+        }).catch(() => {});
+      }
     }
   } catch (err) {
     console.warn('Firestore leadership sync warning:', err);

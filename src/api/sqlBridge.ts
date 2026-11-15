@@ -1,8 +1,11 @@
+import { isAiStudioPreviewHostname } from '../utils/previewFirebaseGuard';
+
 /**
- * Transparent SQL / Firebase Runtime Bridge
- * Checks /api/db/mode once per session. When HostKarle MySQL is configured and active,
- * all reads/writes route cleanly to /api/db/* (ZERO Firebase quota/billing).
- * Until MySQL is configured, it defaults cleanly to 'firebase' so the site never breaks.
+ * Transparent SQL / Preview Bridge
+ * - On live production hosts (mahasangh.in), ALL reads/writes route 100% to HostKarle MySQL (/api/db/*).
+ *   Firebase is COMPLETELY DISABLED on production domains even during transient network delays.
+ * - Only inside AI Studio Preview / localhost (when MySQL is not configured) is read-safe,
+ *   quota-capped Firebase Preview mode permitted.
  */
 
 export type ActiveBackendMode = 'mysql' | 'firebase';
@@ -10,14 +13,21 @@ export type ActiveBackendMode = 'mysql' | 'firebase';
 let resolvedMode: ActiveBackendMode | null = null;
 let modeCheckPromise: Promise<ActiveBackendMode> | null = null;
 
+export function isAiStudioPreviewEnvironment(): boolean {
+  if (typeof window === 'undefined') return false;
+  return isAiStudioPreviewHostname(window.location.hostname);
+}
+
 export async function getActiveBackendMode(): Promise<ActiveBackendMode> {
   if (resolvedMode) return resolvedMode;
   if (modeCheckPromise) return modeCheckPromise;
 
-  modeCheckPromise = (async () => {
+  const isPreview = isAiStudioPreviewEnvironment();
+
+  modeCheckPromise = (async (): Promise<ActiveBackendMode> => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), isPreview ? 2500 : 7000);
       const res = await fetch('/api/db/mode', {
         cache: 'no-store',
         signal: controller.signal,
@@ -31,8 +41,17 @@ export async function getActiveBackendMode(): Promise<ActiveBackendMode> {
         }
       }
     } catch {
-      // Fallback safely to firebase if API route isn't reachable (e.g., pure static preview)
+      // Production hosts must NEVER silently fall back to Firebase on transient fetch timeouts
+      if (!isPreview) {
+        return 'mysql';
+      }
     }
+
+    if (!isPreview) {
+      resolvedMode = 'mysql';
+      return 'mysql';
+    }
+
     resolvedMode = 'firebase';
     return 'firebase';
   })().finally(() => {
@@ -46,12 +65,22 @@ export async function isSqlBackendActive(): Promise<boolean> {
   return (await getActiveBackendMode()) === 'mysql';
 }
 
+export async function isFirebaseAllowedInCurrentEnvironment(): Promise<boolean> {
+  if (!isAiStudioPreviewEnvironment()) return false;
+  return !(await isSqlBackendActive());
+}
+
+export function isFirebaseAllowedSync(): boolean {
+  return isAiStudioPreviewEnvironment() && resolvedMode !== 'mysql';
+}
+
 export async function sqlApiRequest<T = any>(
   url: string,
   options?: RequestInit
 ): Promise<T> {
   const res = await fetch(url, {
     ...options,
+    cache: options?.cache ?? 'no-store',
     headers: {
       'Content-Type': 'application/json',
       ...(options?.headers || {}),

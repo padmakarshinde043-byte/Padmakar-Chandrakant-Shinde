@@ -101,6 +101,49 @@ export async function mysqlListApplications(onlyApproved = false): Promise<Membe
   return list;
 }
 
+export async function mysqlListApprovedDirectory(): Promise<MembershipApplication[]> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
+            \`phone\`, \`district\`, \`taluka\`, \`center_name\`, \`professional\`,
+            \`is_official\`, \`official_post\`, \`official_district\`, \`official_taluka\`,
+            \`status\`, \`approved_at\`, \`created_at\`
+     FROM \`applications\`
+     WHERE \`status\` = 'approved'
+        OR \`member_number\` != ''
+        OR \`approved_at\` != ''`
+  );
+  const list: MembershipApplication[] = rows.map((row) => ({
+    id: String(row.id),
+    applicationNumber: String(row.application_number || ''),
+    memberNumber: row.member_number ? String(row.member_number) : '',
+    salutation: String(row.salutation || ''),
+    fullName: String(row.full_name || ''),
+    phone: String(row.phone || ''),
+    email: '',
+    address: '',
+    district: String(row.district || ''),
+    taluka: String(row.taluka || ''),
+    centerName: String(row.center_name || ''),
+    education: '',
+    professional: String(row.professional || ''),
+    status: (row.status as 'pending' | 'approved' | 'rejected') || 'approved',
+    isOfficial: Boolean(row.is_official),
+    officialPost: row.official_post ? String(row.official_post) : '',
+    officialDistrict: row.official_district ? String(row.official_district) : '',
+    officialTaluka: row.official_taluka ? String(row.official_taluka) : '',
+    approvedAt: row.approved_at ? String(row.approved_at) : undefined,
+    createdAt: String(row.created_at || ''),
+  }));
+  list.sort(
+    (a, b) =>
+      new Date(b.approvedAt || b.createdAt || '').getTime() -
+      new Date(a.approvedAt || a.createdAt || '').getTime()
+  );
+  return list;
+}
+
 export async function mysqlUpsertApplication(app: Record<string, any>): Promise<void> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();

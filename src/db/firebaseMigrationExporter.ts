@@ -275,7 +275,9 @@ let bootMigrationPromise: Promise<void> | null = null;
  * Automatically ensures MySQL schema exists and imports all data from BOTH Firebase accounts
  * on the very first boot when MySQL is empty, so non-technical admins never need phpMyAdmin/curl.
  */
-export function triggerInitialFirebaseMigrationOnBoot(db: Firestore | null): void {
+export function triggerInitialFirebaseMigrationOnBoot(
+  dbOrGetter: Firestore | null | (() => Firestore | null)
+): void {
   if (bootMigrationCompleted || bootMigrationPromise) return;
 
   bootMigrationPromise = (async () => {
@@ -305,6 +307,7 @@ export function triggerInitialFirebaseMigrationOnBoot(db: Firestore | null): voi
         return;
       }
 
+      const db = typeof dbOrGetter === 'function' ? dbOrGetter() : dbOrGetter;
       if (!db) {
         console.warn('Auto-migration skipped: Firestore unavailable.');
         return;
