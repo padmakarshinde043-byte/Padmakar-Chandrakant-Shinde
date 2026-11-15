@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowRight, ShieldCheck, Users, School, Award, ChevronRight,
   FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle,
@@ -17,7 +18,7 @@ interface HomeTabProps {
 export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList }) => {
   const [fullScreenPhoto, setFullScreenPhoto] = useState<string | null>(null);
 
-  // Close full-screen photo modal on Escape key
+  // Close full-screen photo modal on Escape key and manage body overflow
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -26,10 +27,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
     };
     if (fullScreenPhoto) {
       window.addEventListener('keydown', handleKeyDown);
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        document.body.style.overflow = prevOverflow;
+      };
     }
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
   }, [fullScreenPhoto]);
 
   const list = newsList && newsList.length > 0 ? newsList : INITIAL_NEWS;
@@ -438,17 +442,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
         })()}
       </section>
 
-      {/* Full-Screen Original Size Photo Lightbox Modal */}
-      {fullScreenPhoto && (
+      {/* Full-Screen Original Size Photo Lightbox Modal — Rendered via Portal directly in document.body */}
+      {fullScreenPhoto && typeof document !== 'undefined' && createPortal(
         <div
-          className="mhs-modal-enter fixed inset-0 z-[100] bg-black/95 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 select-none"
+          className="mhs-modal-enter fixed inset-0 z-[130] bg-black/95 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 select-none"
           onClick={() => setFullScreenPhoto(null)}
         >
           {/* Top-Right CLOSE Button (उजव्या वरच्या कोपर्यात CLOSE बटन) */}
           <button
             type="button"
             onClick={() => setFullScreenPhoto(null)}
-            className="fixed top-3 right-3 sm:top-5 sm:right-5 z-[110] flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-full font-bold text-xs sm:text-sm shadow-2xl transition-all cursor-pointer border border-white/30"
+            className="fixed top-3 right-3 sm:top-5 sm:right-5 z-[140] flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-full font-bold text-xs sm:text-sm shadow-2xl transition-all cursor-pointer border border-white/30"
             title="CLOSE"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -471,7 +475,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               onClick={(e) => e.stopPropagation()}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
