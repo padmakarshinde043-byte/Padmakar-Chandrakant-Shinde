@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
       <div className="bg-[#0b1e36] border-y border-amber-500/60 shadow-inner">
         <div className="max-w-[1240px] mx-auto px-2 sm:px-6">
           {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2.5 py-2" aria-label="मुख्य नेव्हिगेशन">
+          <nav className="hidden lg:flex items-center gap-1.5 xl:gap-2.5 py-1" aria-label="मुख्य नेव्हिगेशन">
             {navItems.map((item) => {
               const isActive = currentTab === item.id;
               return (
@@ -101,7 +101,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
                   onMouseEnter={() => onPrefetchTab?.(item.id)}
                   onFocus={() => onPrefetchTab?.(item.id)}
                   onClick={() => handleNavClick(item.id)}
-                  className={`mhs-btn-press text-sm xl:text-[15px] px-3.5 xl:px-4 py-2 rounded-lg transition-all ${
+                  className={`mhs-btn-press text-sm xl:text-[15px] px-3.5 xl:px-4 py-1.5 rounded-lg transition-all ${
                     isActive
                       ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
                       : 'text-slate-100 hover:text-white hover:bg-white/10 font-bold'
@@ -114,7 +114,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
           </nav>
 
           {/* Mobile Submenu Scrolling Ribbon: Calm, elegant, theme-harmonized tabs with larger readable font */}
-          <div className="lg:hidden py-2.5">
+          <div className="lg:hidden py-1.5">
             <div
               ref={scrollNavRef}
               className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth px-1"
@@ -128,7 +128,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
                     data-active={isActive ? 'true' : 'false'}
                     onTouchStart={() => onPrefetchTab?.(item.id)}
                     onClick={() => handleNavClick(item.id)}
-                    className={`mhs-btn-press shrink-0 text-sm sm:text-base px-3.5 py-2 rounded-lg transition-all whitespace-nowrap active:scale-98 ${
+                    className={`mhs-btn-press shrink-0 text-sm sm:text-base px-3 py-1.5 rounded-lg transition-all whitespace-nowrap active:scale-98 ${
                       isActive
                         ? 'bg-amber-500 text-[#0b1e36] font-black shadow-sm'
                         : 'text-slate-100 hover:text-white bg-white/10 hover:bg-white/15 border border-white/15 font-bold'

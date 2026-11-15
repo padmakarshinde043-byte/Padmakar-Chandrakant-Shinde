@@ -58,9 +58,11 @@ import {
   INITIAL_NEWS,
   INITIAL_APPLICATIONS,
   INITIAL_GOV_ORDERS,
+  INITIAL_LATEST_BANNERS,
   NewsItem,
   MembershipApplication,
   GovOrder,
+  LatestBannerItem,
 } from './data/mahasanghData';
 import {
   testConnectionOncePerSession,
@@ -81,6 +83,9 @@ import {
   saveContactToFirestore,
   deleteNewsFromFirestore,
   sortNewsDescending,
+  fetchLatestBannersCached,
+  saveLatestBannerToFirestore,
+  deleteLatestBannerFromFirestore,
 } from './firebase';
 import {
   shouldRemoveFromCacheOnDelete,
@@ -134,6 +139,42 @@ export function App() {
     return sortNewsDescending(INITIAL_NEWS);
   });
 
+  const [latestBanners, setLatestBanners] = useState<LatestBannerItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('mahasangh_latest_banners_cache_v1');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return INITIAL_LATEST_BANNERS;
+  });
+
+  useEffect(() => {
+    fetchLatestBannersCached(false)
+      .then((banners) => {
+        if (Array.isArray(banners) && banners.length > 0) {
+          setLatestBanners(banners);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleAddLatestBanner = async (banner: LatestBannerItem) => {
+    setLatestBanners((prev) => [banner, ...prev]);
+    try {
+      await saveLatestBannerToFirestore(banner);
+    } catch (e) {
+      console.warn('Save latest banner error:', e);
+    }
+  };
+
+  const handleDeleteLatestBanner = async (bannerId: string) => {
+    setLatestBanners((prev) => prev.filter((b) => b.id !== bannerId));
+    try {
+      await deleteLatestBannerFromFirestore(bannerId);
+    } catch (e) {
+      console.warn('Delete latest banner error:', e);
+    }
+  };
+
   // Listen to browser URL changes (e.g. /admin or #admin)
   useEffect(() => {
     const handleLocationChange = () => {
@@ -159,7 +200,7 @@ export function App() {
       const tag = target.tagName.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
       if (target.isContentEditable) return true;
-      return Boolean(target.closest('input, textarea, select, [contenteditable="true"], .allow-copy'));
+      return Boolean(target.closest('input, textarea, select, [contenteditable="true"], .allow-copy, .admin-panel'));
     };
 
     const handleContextMenu = (e: MouseEvent) => {
@@ -571,6 +612,9 @@ export function App() {
           govOrders={govOrders}
           setGovOrders={setGovOrders}
           newsList={newsList}
+          latestBanners={latestBanners}
+          onAddLatestBanner={handleAddLatestBanner}
+          onDeleteLatestBanner={handleDeleteLatestBanner}
           onFetchApplications={handleFetchAdminApplications}
           isLoadingApps={isLoadingAdminApps}
           onExitAdmin={handleExitAdmin}
@@ -597,6 +641,7 @@ export function App() {
               setCurrentTab={setCurrentTab}
               onSelectNews={handleSelectNews}
               newsList={newsList}
+              latestBanners={latestBanners}
             />
           </div>
         )}

@@ -5,17 +5,19 @@ import {
   FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle,
   X
 } from 'lucide-react';
-import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem } from '../data/mahasanghData';
+import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem, LatestBannerItem, INITIAL_LATEST_BANNERS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { AnimatedCounter } from '../utils/animations';
+import { sortNewsDescending } from '../firebase';
 
 interface HomeTabProps {
   setCurrentTab: (tab: string) => void;
   onSelectNews: (news: NewsItem) => void;
   newsList?: NewsItem[];
+  latestBanners?: LatestBannerItem[];
 }
 
-export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList }) => {
+export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList, latestBanners }) => {
   const [fullScreenPhoto, setFullScreenPhoto] = useState<string | null>(null);
 
   // Close full-screen photo modal on Escape key and manage body overflow
@@ -42,7 +44,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
   return (
     <div className="bg-slate-50 text-slate-800">
       {/* Hero Section: Compact, Executive Asymmetric Portal */}
-      <section className="relative bg-gradient-to-b from-[#0b1e36] via-[#0d2545] to-[#0b1e36] text-white py-8 sm:py-12 px-4 sm:px-6 overflow-hidden border-b border-slate-800">
+      <section className="relative bg-gradient-to-b from-[#152f59] via-[#193568] to-[#132b52] text-white py-8 sm:py-12 px-4 sm:px-6 overflow-hidden border-b border-slate-700/80">
         {/* Subtle architectural background texture */}
         <div
           className="absolute inset-0 opacity-10 bg-cover bg-center pointer-events-none mix-blend-overlay"
@@ -133,7 +135,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
 
           {/* Right Column: Founder State President Feature Card */}
           <div className="lg:col-span-5">
-            <div className="bg-slate-900/90 rounded-xl border border-amber-500/40 p-5 sm:p-6 shadow-xl relative backdrop-blur-md">
+            <div className="bg-[#10254a]/90 rounded-xl border border-amber-400/45 p-5 sm:p-6 shadow-xl relative backdrop-blur-md">
               <div className="absolute top-3 right-3 bg-amber-500/20 text-amber-300 border border-amber-400/40 text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 संस्थापक नेतृत्व
               </div>
@@ -164,7 +166,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 "{ORG_DETAILS.founderPresident.message}"
               </blockquote>
 
-              <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <div className="pt-3 border-t border-white/15 flex flex-wrap items-center justify-between gap-2 text-sm">
                 <a
                   href={`tel:${ORG_DETAILS.founderPresident.phone}`}
                   className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-bold px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-xs"
@@ -182,7 +184,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
       </section>
 
       {/* Section 1.5: ताज्या घडामोडी (Latest Updates Banner Carousel) */}
-      <LatestUpdatesCarousel newsList={list} onSelectNews={onSelectNews} setFullScreenPhoto={setFullScreenPhoto} />
+      <LatestUpdatesCarousel banners={latestBanners && latestBanners.length > 0 ? latestBanners : INITIAL_LATEST_BANNERS} setFullScreenPhoto={setFullScreenPhoto} />
 
       {/* Section 2: Four Core Interactive Portal Hubs */}
       <section className="py-8 sm:py-10 max-w-[1240px] mx-auto px-4 sm:px-6">
@@ -424,16 +426,21 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
   );
 };
 
-function LatestUpdatesCarousel({ newsList, onSelectNews, setFullScreenPhoto }: { newsList: NewsItem[]; onSelectNews: (news: NewsItem) => void; setFullScreenPhoto: (url: string) => void }) {
-  const banners = useMemo(() => {
-    return newsList.filter((item) => {
-      const cat = (item.category || '').toLowerCase();
-      return cat.includes('ताज्या घडामोडी') || cat.includes('टॅगलाईन') || cat.includes('tagline') || Boolean(item.imageUrl || item.image);
+function LatestUpdatesCarousel({ banners, setFullScreenPhoto }: { banners: LatestBannerItem[]; setFullScreenPhoto: (url: string) => void }) {
+  const activeBanners = useMemo(() => {
+    return [...banners].sort((a, b) => {
+      const tA = new Date(a.createdAt || a.date || '').getTime() || 0;
+      const tB = new Date(b.createdAt || b.date || '').getTime() || 0;
+      return tB - tA; // Newest first (index 0 is newest added)
     });
-  }, [newsList]);
+  }, [banners]);
 
-  const activeBanners = banners.length > 0 ? banners : (newsList.length > 0 ? newsList.slice(0, 5) : INITIAL_NEWS.slice(0, 3));
   const [currentIndex, setCurrentIndex] = useState(0);
+  const newestBannerId = activeBanners[0]?.id;
+
+  useEffect(() => {
+    setCurrentIndex(0);
+  }, [newestBannerId]);
 
   // Touch swipe state
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -472,8 +479,10 @@ function LatestUpdatesCarousel({ newsList, onSelectNews, setFullScreenPhoto }: {
 
   if (activeBanners.length === 0) return null;
 
-  const current = activeBanners[currentIndex];
-  const imgUrl = current.imageUrl || current.image;
+  const safeIndex = currentIndex < activeBanners.length ? currentIndex : 0;
+  const current = activeBanners[safeIndex];
+  const imgUrl = current.imageUrl;
+  const hasSummary = Boolean(current.summary && current.summary.trim() && current.summary.trim() !== current.title?.trim());
 
   return (
     <section className="py-6 sm:py-8 max-w-[1240px] mx-auto px-4 sm:px-6">
@@ -486,77 +495,122 @@ function LatestUpdatesCarousel({ newsList, onSelectNews, setFullScreenPhoto }: {
             ताज्या घडामोडी
           </h2>
         </div>
+        {activeBanners.length > 1 && (
+          <span className="text-xs sm:text-sm font-mono font-bold text-slate-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md">
+            {safeIndex + 1} / {activeBanners.length}
+          </span>
+        )}
       </div>
 
-      <div 
-        className="relative w-full bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-lg overflow-hidden group select-none"
+      <div
+        className="w-full bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-md overflow-hidden select-none"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Banner Image Container */}
-        <div 
-          onClick={() => imgUrl && setFullScreenPhoto(imgUrl)}
-          className="relative w-full aspect-[16/9] sm:aspect-[21/9] bg-slate-950 flex items-center justify-center cursor-pointer overflow-hidden"
-        >
-          <img
-            src={imgUrl}
-            alt={current.title || 'ताज्या घडामोडी'}
-            className="w-full h-full object-cover object-center transition-transform duration-500 hover:scale-102"
-            loading="lazy"
-          />
-
-          {/* Gradient overlay for text readability */}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent pt-14 pb-4 px-4 sm:px-6 flex flex-col justify-end">
-            <span className="text-amber-300 font-semibold text-xs sm:text-sm mb-1">
-              {current.category || 'ताज्या घडामोडी'} · {toEnglishDigits(current.date)}
+        {/* वरचा भाग: दिनांक व शीर्षक (फोटोच्या वर - फोटोवर नाही) */}
+        <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-50 border-b border-slate-200 space-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs sm:text-sm font-bold text-amber-800">
+              ताज्या घडामोडी · {toEnglishDigits(current.date)}
             </span>
-            <h3 className="font-serifDevanagari text-white text-lg sm:text-2xl font-bold leading-snug drop-shadow-md line-clamp-2">
+          </div>
+          {current.title && (
+            <h3 className="font-serifDevanagari text-[#0b1e36] text-base sm:text-xl font-bold leading-snug">
               {toEnglishDigits(current.title)}
             </h3>
-          </div>
+          )}
         </div>
 
-        {/* Navigation Arrows */}
-        {activeBanners.length > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); prevBanner(); }}
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer border border-white/20 z-10 font-bold text-lg"
-              aria-label="मागील फोटो"
-              title="मागील फोटो"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); nextBanner(); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer border border-white/20 z-10 font-bold text-lg"
-              aria-label="पुढील फोटो"
-              title="पुढील फोटो"
-            >
-              ›
-            </button>
-          </>
-        )}
+        {/* मधला भाग: पूर्णपणे स्वच्छ व न कापलेला फोटो (Zero text overlay on image) */}
+        <div className="relative w-full bg-slate-100 flex items-center justify-center">
+          <div
+            onClick={() => imgUrl && setFullScreenPhoto(imgUrl)}
+            className="w-full flex items-center justify-center cursor-pointer p-2"
+          >
+            <img
+              src={imgUrl}
+              alt={current.title || 'ताज्या घडामोडी'}
+              className="w-full h-auto max-h-[75vh] object-contain mx-auto block"
+              loading="eager"
+            />
+          </div>
 
-        {/* Indicator Dots */}
-        {activeBanners.length > 1 && (
-          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-xs px-3 py-1 rounded-full flex items-center gap-1.5 z-10 border border-white/20">
-            {activeBanners.map((_: NewsItem, idx: number) => (
+          {/* ठळक डावे व उजवे बाण (फक्त बाजूला, मजकूर नसलेले) */}
+          {activeBanners.length > 1 && (
+            <>
               <button
-                key={idx}
                 type="button"
-                onClick={() => setCurrentIndex(idx)}
-                className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex ? 'bg-amber-400 w-4' : 'bg-white/50 hover:bg-white'}`}
-                aria-label={`Slide ${idx + 1}`}
-              />
-            ))}
+                onClick={(e) => { e.stopPropagation(); prevBanner(); }}
+                className="absolute left-1.5 sm:left-3 top-1/2 -translate-y-1/2 bg-[#0b1e36]/75 hover:bg-[#0b1e36] text-white w-8 h-11 sm:w-10 sm:h-12 rounded-lg flex items-center justify-center shadow-lg transition-transform hover:scale-105 cursor-pointer border border-white/30 z-10 font-bold text-xl"
+                aria-label="मागील फोटो"
+                title="मागील फोटो"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); nextBanner(); }}
+                className="absolute right-1.5 sm:right-3 top-1/2 -translate-y-1/2 bg-[#0b1e36]/75 hover:bg-[#0b1e36] text-white w-8 h-11 sm:w-10 sm:h-12 rounded-lg flex items-center justify-center shadow-lg transition-transform hover:scale-105 cursor-pointer border border-white/30 z-10 font-bold text-xl"
+                aria-label="पुढील फोटो"
+                title="पुढील फोटो"
+              >
+                ›
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* खालचा भाग: सारांश व स्लाईड बटणे (फोटोच्या खाली) */}
+        {(hasSummary || activeBanners.length > 1) && (
+          <div className="px-4 sm:px-6 py-3 bg-slate-50 border-t border-slate-200 space-y-2.5">
+            {hasSummary && (
+              <p className="text-sm sm:text-base text-slate-700 leading-relaxed">
+                {toEnglishDigits(current.summary)}
+              </p>
+            )}
+
+            {activeBanners.length > 1 && (
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={prevBanner}
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs sm:text-sm font-bold text-[#0b1e36] cursor-pointer transition-colors"
+                >
+                  ‹ मागील
+                </button>
+
+                <div className="flex items-center gap-1.5 flex-wrap justify-center max-w-[60%]">
+                  {activeBanners.slice(0, 12).map((_, idx: number) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`h-2 rounded-full transition-all cursor-pointer ${idx === safeIndex ? 'bg-[#0b1e36] w-5' : 'bg-slate-300 hover:bg-slate-400 w-2'}`}
+                      aria-label={`Slide ${idx + 1}`}
+                    />
+                  ))}
+                  {activeBanners.length > 12 && (
+                    <span className="text-xs font-mono text-slate-500 ml-1">
+                      ({safeIndex + 1}/{activeBanners.length})
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={nextBanner}
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs sm:text-sm font-bold text-[#0b1e36] cursor-pointer transition-colors"
+                >
+                  पुढील ›
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
     </section>
   );
 }
+
 

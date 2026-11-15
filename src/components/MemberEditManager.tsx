@@ -603,14 +603,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       <span className="block font-mono text-[11px] text-slate-500 mt-1">
                         अर्ज: {app.applicationNumber}
                       </span>
-                      <span className="block text-[10px] text-slate-400">
+                      <span className="block text-[11px] text-slate-600 mt-0.5">
                         {formatDateWithEnglishDigits(app.createdAt)}
-                        {app.createdAt && (
-                          <span className="block font-mono text-[10px] text-amber-700 font-semibold">
-                            {formatTimeOnly(app.createdAt)}
-                          </span>
-                        )}
                       </span>
+                      {app.createdAt && (
+                        <span className="block font-sans font-semibold text-xs sm:text-sm text-slate-800 mt-0.5">
+                          {formatTimeOnly(app.createdAt)}
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3 px-3">

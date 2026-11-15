@@ -476,3 +476,32 @@ export const MAHARASHTRA_DISTRICTS = [
   "अमरावती", "अकोला", "वाशीम", "बुलढाणा", "यवतमाळ"
 ];
 
+export interface LatestBannerItem {
+  id: string;
+  title: string;
+  summary?: string;
+  imageUrl: string;
+  date: string;
+  createdAt?: string;
+}
+
+export const INITIAL_LATEST_BANNERS: LatestBannerItem[] = [
+  {
+    id: "banner-1",
+    title: "महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या वर्धा जिल्हा कार्यकारिणीची घोषणा",
+    summary: "जिल्हाध्यक्षपदी संजय किनकर, तर सचिवपदी सचिन बटाले यांची निवड; आठही तालुक्यांची कार्यकारिणी जाहीर करण्यात आली.",
+    imageUrl: "/images/1793460746726.png",
+    date: "05/11/2026",
+    createdAt: "2026-11-05T10:00:00Z"
+  },
+  {
+    id: "banner-2",
+    title: "नंदुरबार जिल्ह्यात 45 केंद्रप्रमुख होणार रुजू; शिक्षण क्षेत्रात उत्साहाचे वातावरण",
+    summary: "शिक्षणमंत्री माननीय दादाजी भुसे यांच्या पुढाकाराने वर्षानुवर्षे रखडलेली पदभरती अखेर पूर्णत्वास येत असून ग्रामीण भागातील शाळांना नियमित अधिकारी मिळणार आहेत.",
+    imageUrl: "/logo.png",
+    date: "14/06/2026",
+    createdAt: "2026-06-14T10:00:00Z"
+  }
+];
+
+

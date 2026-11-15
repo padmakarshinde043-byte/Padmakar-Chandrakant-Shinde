@@ -11,6 +11,7 @@ import {
   MembershipApplication,
   NewsItem,
   GovOrder,
+  LatestBannerItem,
   INITIAL_GOV_ORDERS,
   ORG_DETAILS,
   Leader,
@@ -70,6 +71,9 @@ interface AdminTabProps {
   govOrders: GovOrder[];
   setGovOrders: React.Dispatch<React.SetStateAction<GovOrder[]>>;
   newsList?: NewsItem[];
+  latestBanners?: LatestBannerItem[];
+  onAddLatestBanner?: (banner: LatestBannerItem) => void;
+  onDeleteLatestBanner?: (id: string) => void;
   onFetchApplications?: (forceRefresh?: boolean) => Promise<void>;
   isLoadingApps?: boolean;
   onExitAdmin?: () => void;
@@ -89,6 +93,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   govOrders,
   setGovOrders,
   newsList = [],
+  latestBanners = [],
+  onAddLatestBanner,
+  onDeleteLatestBanner,
   onFetchApplications,
   isLoadingApps,
   onExitAdmin,
@@ -115,7 +122,71 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isApprovingApp, setIsApprovingApp] = useState(false);
 
   // Active view inside Admin Dashboard
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'latest_banners' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
+
+  // Latest Banners form state
+  const [bannerTitle, setBannerTitle] = useState('');
+  const [bannerSummary, setBannerSummary] = useState('');
+  const [bannerDate, setBannerDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [bannerImageUrl, setBannerImageUrl] = useState('');
+  const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [bannerSuccessMsg, setBannerSuccessMsg] = useState('');
+  const [bannerErrorMsg, setBannerErrorMsg] = useState('');
+
+  const handleBannerImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingBanner(true);
+    setBannerErrorMsg('');
+    try {
+      if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
+        const result = await uploadToCloudinary(file, cloudinaryConfig);
+        setBannerImageUrl(result.url);
+      } else {
+        const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
+        setBannerImageUrl(base64);
+      }
+    } catch (err: any) {
+      try {
+        const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
+        setBannerImageUrl(base64);
+      } catch (ex: any) {
+        setBannerErrorMsg(ex?.message || err?.message || 'फोटो अपलोड करताना त्रुटी आली.');
+      }
+    } finally {
+      setIsUploadingBanner(false);
+    }
+  };
+
+  const handleCreateLatestBannerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBannerErrorMsg('');
+    setBannerSuccessMsg('');
+
+    if (!bannerTitle.trim() || !bannerImageUrl.trim()) {
+      setBannerErrorMsg('कृपया ताज्या घडामोडीचे शीर्षक आणि फोटो आवश्यक भरा.');
+      return;
+    }
+
+    const newBanner: LatestBannerItem = {
+      id: `banner-${Date.now()}`,
+      title: bannerTitle.trim(),
+      summary: bannerSummary.trim() || undefined,
+      imageUrl: bannerImageUrl.trim(),
+      date: formatDateWithEnglishDigits(bannerDate),
+      createdAt: new Date().toISOString()
+    };
+
+    if (onAddLatestBanner) {
+      onAddLatestBanner(newBanner);
+    }
+
+    setBannerSuccessMsg('ताज्या घडामोडीचा बॅनर्स व फोटो यशस्वीरीत्या प्रसिद्ध करण्यात आला!');
+    setBannerTitle('');
+    setBannerSummary('');
+    setBannerImageUrl('');
+    setBannerDate(new Date().toISOString().split('T')[0]);
+  };
 
   // Razorpay & Webhook Settings State
   const [razorpayKeyId, setRazorpayKeyId] = useState('');
@@ -1256,8 +1327,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       content: toEnglishDigits(newsContent.trim()),
       image: newsImageUrl || undefined,
       imageUrl: newsImageUrl || undefined,
-      featured: newsCategory === 'टॅगलाईन फोटो',
-      createdAt: new Date(publishDateStr).toISOString(),
+      featured: newsCategory === 'ताज्या घडामोडी' || newsCategory === 'टॅगलाईन फोटो',
+      createdAt: new Date().toISOString(),
     };
 
     onAddNews(newPost);
@@ -1325,13 +1396,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       title: toEnglishDigits(photoOnlyTitle.trim()),
       date: displayDate,
       publishDate: publishDateStr,
-      category: photoOnlyCategory || 'टॅगलाईन फोटो',
+      category: photoOnlyCategory || 'ताज्या घडामोडी',
       summary: toEnglishDigits(photoOnlyTitle.trim()),
       content: '', // Empty content indicates photo-only mode
       image: photoOnlyImageUrl,
       imageUrl: photoOnlyImageUrl,
-      featured: photoOnlyCategory === 'टॅगलाईन फोटो',
-      createdAt: new Date(publishDateStr).toISOString(),
+      featured: photoOnlyCategory === 'ताज्या घडामोडी' || photoOnlyCategory === 'टॅगलाईन फोटो',
+      createdAt: new Date().toISOString(),
     };
 
     onAddNews(photoPost);
@@ -1436,7 +1507,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
 
   return (
-    <div className="allow-copy bg-[#f6f8fc] py-8 md:py-12 min-h-screen">
+    <div className="allow-copy admin-panel bg-[#f6f8fc] py-8 md:py-12 min-h-screen">
       <div className="max-w-[1100px] mx-auto px-4">
         {/* Top Navigation Bar */}
         <div className="border-b border-slate-300 pb-5 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1759,6 +1830,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     >
                       <FileText className="w-4 h-4" />
                       <span>बातम्या</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('latest_banners')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'latest_banners'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      <span>ताज्या घडामोडी बॅनर्स</span>
                     </button>
                     <button
                       type="button"
@@ -2093,14 +2176,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             </td>
                             <td className="py-3 px-4 font-mono font-bold text-[#17366d]">
                               {app.applicationNumber}
-                              <span className="block font-sans font-normal text-[11px] text-slate-500">
+                              <span className="block font-sans font-normal text-xs text-slate-600 mt-0.5">
                                 {formatDateWithEnglishDigits(app.createdAt)}
-                                {app.createdAt && (
-                                  <span className="block font-mono text-[10px] text-amber-700 font-semibold">
-                                    {formatTimeOnly(app.createdAt)}
-                                  </span>
-                                )}
                               </span>
+                              {app.createdAt && (
+                                <span className="block font-sans font-semibold text-sm text-slate-800 mt-0.5">
+                                  {formatTimeOnly(app.createdAt)}
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 font-bold text-slate-900">
                               <button
@@ -3273,6 +3356,163 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Sub-tab: Latest Banners Management (ताज्या घडामोडी बॅनर्स) */}
+            {activeAdminSubTab === 'latest_banners' && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
+                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-1.5 flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5 text-[#df6b16]" />
+                    ताज्या घडामोडी नवीन बॅनर्स / फोटो जोडा
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-5">
+                    येथे जोडलेले फोटो व माहिती मुख्य पानावरील 'ताज्या घडामोडी' स्लायडरमध्ये सर्वात समोर (लेटेस्ट) दिसेल.
+                  </p>
+
+                  {bannerSuccessMsg && (
+                    <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 shadow-xs">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <span className="font-semibold">{bannerSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  {bannerErrorMsg && (
+                    <div className="mb-4 p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl">
+                      {bannerErrorMsg}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleCreateLatestBannerSubmit} className="space-y-4 text-xs sm:text-sm">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        बॅनर / बातमी शीर्षक (Title) <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="उदा. वर्धा जिल्हा कार्यकारिणीची घोषणा व सत्कार समारंभ"
+                        value={bannerTitle}
+                        onChange={(e) => setBannerTitle(e.target.value)}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">दिनांक (Date)</label>
+                        <input
+                          type="date"
+                          value={bannerDate}
+                          onChange={(e) => setBannerDate(e.target.value)}
+                          className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          छायाचित्र (Image URL / Upload) <span className="text-rose-600">*</span>
+                        </label>
+                        <div className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            required
+                            placeholder="https://... किंवा खालील बटणाने अपलोड करा"
+                            value={bannerImageUrl}
+                            onChange={(e) => setBannerImageUrl(e.target.value)}
+                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
+                          />
+                          <label className="shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-colors">
+                            <Upload className="w-4 h-4" />
+                            <span>{isUploadingBanner ? 'अपलोड होत आहे...' : 'फाइल निवडा'}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={handleBannerImageUpload}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {bannerImageUrl && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-4">
+                        <img src={bannerImageUrl} alt="Preview" className="w-20 h-16 object-contain rounded bg-white border border-slate-300" />
+                        <span className="text-xs text-emerald-700 font-bold">✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">थोडक्यात सारांश (Summary / Description)</label>
+                      <textarea
+                        rows={3}
+                        placeholder="ताज्या घडामोडीबाबत थोडक्यात माहिती किंवा बातमीचा सारांश..."
+                        value={bannerSummary}
+                        onChange={(e) => setBannerSummary(e.target.value)}
+                        className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="bg-[#17366d] hover:bg-[#09243f] text-white font-bold px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                      <PlusCircle className="w-4 h-4 text-amber-400" />
+                      <span>ताज्या घडामोडी बॅनर प्रसिद्ध करा</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* Existing Banners List */}
+                <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
+                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-4">
+                    प्रसिद्ध केलेले सर्व ताज्या घडामोडी बॅनर्स ({latestBanners.length})
+                  </h4>
+
+                  {latestBanners.length === 0 ? (
+                    <div className="text-slate-500 text-xs p-6 bg-slate-50 rounded-xl text-center">
+                      अद्याप कोणतेही ताज्या घडामोडी बॅनर्स जोडलेले नाहीत.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {latestBanners.map((banner) => (
+                        <div key={banner.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            {banner.imageUrl ? (
+                              <img src={banner.imageUrl} alt="" className="w-16 h-12 object-contain rounded bg-white border border-slate-200 shrink-0" />
+                            ) : (
+                              <div className="w-16 h-12 bg-slate-200 rounded flex items-center justify-center text-slate-400 shrink-0">
+                                <ImageIcon className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                                दिनांक: {banner.date}
+                              </span>
+                              <h5 className="font-bold text-slate-900 text-sm truncate mt-0.5">{banner.title}</h5>
+                              {banner.summary && <p className="text-xs text-slate-600 truncate mt-0.5">{banner.summary}</p>}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('हा ताज्या घडामोडीचा बॅनर डिलीट करायचा आहे का?')) {
+                                onDeleteLatestBanner?.(banner.id);
+                              }
+                            }}
+                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="बॅनर डिलीट करा"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

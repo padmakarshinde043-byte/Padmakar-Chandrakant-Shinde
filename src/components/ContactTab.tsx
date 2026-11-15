@@ -77,7 +77,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Official Administrative Headquarters Information */}
           <div className="lg:col-span-5 space-y-5">
-            <div className="bg-[#0b1e36] text-white p-5 sm:p-7 rounded-2xl border border-slate-800 shadow-lg space-y-4">
+            <div className="bg-gradient-to-br from-[#152f59] via-[#193568] to-[#122b54] text-white p-5 sm:p-7 rounded-2xl border border-slate-700/80 shadow-lg space-y-4">
               <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-400">
                 मध्यवर्ती प्रशासकीय कार्यालय
               </span>
@@ -105,7 +105,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     {ORG_DETAILS.directContacts.map((contact, idx) => (
                       <div
                         key={idx}
-                        className="px-3.5 py-3 rounded-xl bg-slate-800/95 border border-slate-700 hover:border-amber-400 transition-colors flex items-center justify-between gap-3 shadow-xs"
+                        className="px-3.5 py-3 rounded-xl bg-[#10254a]/85 border border-white/15 hover:border-amber-400 transition-colors flex items-center justify-between gap-3 shadow-xs"
                       >
                         <div className="min-w-0">
                           <span className="text-white text-sm sm:text-base font-bold block leading-snug font-serifDevanagari">
@@ -117,7 +117,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                         </div>
                         <a
                           href={`tel:${contact.phone}`}
-                          className="shrink-0 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-slate-900/80 hover:bg-slate-900 text-amber-300 font-mono text-xs sm:text-sm font-bold border border-slate-700/80 whitespace-nowrap transition-colors"
+                          className="shrink-0 inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-[#0d1f3d]/85 hover:bg-[#0d1f3d] text-amber-300 font-mono text-xs sm:text-sm font-bold border border-white/15 whitespace-nowrap transition-colors"
                         >
                           <Phone className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                           <span>{contact.phone}</span>
@@ -273,7 +273,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
 
                 <button
                   type="submit"
-                  className="bg-[#0b1e36] hover:bg-[#132f52] text-amber-300 font-bold px-6 py-2.5 rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
+                  className="bg-[#193568] hover:bg-[#122b54] text-amber-300 font-bold px-6 py-2.5 rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
                 >
                   <Send className="w-4 h-4 text-amber-400" />
                   <span>संदेश पाठवा</span>
@@ -285,7 +285,7 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
 
         {/* Website Information Manager (संकेतस्थळ माहिती व्यवस्थापक - संपर्क फॉर्म नंतर व फुटर च्या वर) */}
         <div className="mt-8 pt-6 border-t border-slate-200">
-          <div className="bg-gradient-to-br from-[#07182c] via-[#0b1e36] to-[#0f2a4a] text-white rounded-2xl p-5 sm:p-7 border border-slate-800 shadow-xl relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#152f59] via-[#193568] to-[#1c3b70] text-white rounded-2xl p-5 sm:p-7 border border-slate-700/80 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">

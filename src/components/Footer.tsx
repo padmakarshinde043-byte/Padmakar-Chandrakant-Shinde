@@ -46,20 +46,20 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
   }, []);
 
   return (
-    <footer className="bg-[#0b1e36] text-slate-300 py-6 text-sm border-t-2 border-amber-500/80">
+    <footer className="bg-gradient-to-r from-[#132b52] via-[#193568] to-[#132b52] text-slate-200 py-6 text-sm border-t-2 border-amber-500/80">
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Sole Authorized Copyright Line */}
-        <div className="text-center md:text-left text-slate-300 text-sm sm:text-base font-medium">
+        <div className="text-center md:text-left text-slate-200 text-sm sm:text-base font-medium">
           © 2026 {ORG_DETAILS.name}. सर्व हक्क राखीव.
         </div>
 
         {/* Technical Assistance & Web Creation Credit */}
-        <div className="text-center text-slate-400 text-xs sm:text-sm font-medium">
-          तांत्रिक सहाय्य व वेब निर्मिती: <span className="text-amber-300/90 font-semibold">श्री. पदमाकर चंद्रकांत शिंदे</span>, केंद्रप्रमुख माजलगाव बीड
+        <div className="text-center text-slate-300 text-xs sm:text-sm font-medium">
+          तांत्रिक सहाय्य व वेब निर्मिती: <span className="text-amber-300 font-semibold">श्री. पदमाकर चंद्रकांत शिंदे</span>, केंद्रप्रमुख माजलगाव बीड
         </div>
 
         {/* Minimal High-Efficiency Zero-Quota Visitor Counter */}
-        <div className="flex items-center gap-2 bg-[#081526] px-4 py-2 rounded-xl border border-slate-700/80 text-xs sm:text-sm shadow-inner">
+        <div className="flex items-center gap-2 bg-[#0e2140]/90 px-4 py-2 rounded-xl border border-white/15 text-xs sm:text-sm shadow-inner">
           <div className="flex items-center gap-1.5 text-amber-400 font-bold">
             <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>आजच्या भेटी:</span>

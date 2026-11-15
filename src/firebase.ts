@@ -24,9 +24,11 @@ import {
   MembershipApplication,
   NewsItem,
   GovOrder,
+  LatestBannerItem,
   INITIAL_NEWS,
   INITIAL_APPLICATIONS,
   INITIAL_GOV_ORDERS,
+  INITIAL_LATEST_BANNERS,
   formatSequentialMemberNumber,
 } from './data/mahasanghData';
 import {
@@ -143,7 +145,7 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
       const age = Date.now() - parseInt(cachedTime, 10);
       if (age < CACHE_DURATION_MS) {
         // Cache is valid - ZERO reads from Firestore!
-        return JSON.parse(cachedData);
+        return sortNewsDescending(JSON.parse(cachedData));
       }
     }
 
@@ -186,79 +188,167 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
   }
 }
 
+const LATEST_BANNERS_CACHE_KEY = 'mahasangh_latest_banners_cache_v1';
+const LATEST_BANNERS_CACHE_TIME_KEY = 'mahasangh_latest_banners_cache_time_v1';
+
+export async function fetchLatestBannersCached(forceRefresh = false): Promise<LatestBannerItem[]> {
+  try {
+    const cachedTime = localStorage.getItem(LATEST_BANNERS_CACHE_TIME_KEY);
+    const cachedData = localStorage.getItem(LATEST_BANNERS_CACHE_KEY);
+
+    if (!forceRefresh && cachedTime && cachedData) {
+      const age = Date.now() - parseInt(cachedTime, 10);
+      if (age < CACHE_DURATION_MS) {
+        return JSON.parse(cachedData);
+      }
+    }
+
+    const colRef = collection(db, 'latest_banners');
+    const snap = await getDocs(colRef);
+
+    if (snap.empty) {
+      safeStorageSet(LATEST_BANNERS_CACHE_KEY, JSON.stringify(INITIAL_LATEST_BANNERS));
+      safeStorageSet(LATEST_BANNERS_CACHE_TIME_KEY, Date.now().toString());
+      return INITIAL_LATEST_BANNERS;
+    }
+
+    const list: LatestBannerItem[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as any;
+      list.push({
+        id: d.id,
+        ...data,
+      });
+    });
+
+    const sorted = list.sort((a, b) => {
+      const tA = new Date(a.createdAt || a.date || '').getTime() || 0;
+      const tB = new Date(b.createdAt || b.date || '').getTime() || 0;
+      return tB - tA;
+    });
+
+    safeStorageSet(LATEST_BANNERS_CACHE_KEY, JSON.stringify(sorted));
+    safeStorageSet(LATEST_BANNERS_CACHE_TIME_KEY, Date.now().toString());
+    return sorted;
+  } catch (error) {
+    console.warn('Using cached latest banners:', error);
+    const cachedData = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
+    if (cachedData) {
+      try {
+        return JSON.parse(cachedData);
+      } catch {}
+    }
+    return INITIAL_LATEST_BANNERS;
+  }
+}
+
+export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Promise<void> {
+  try {
+    const docRef = doc(db, 'latest_banners', banner.id);
+    await setDoc(docRef, banner, { merge: true });
+    localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `latest_banners/${banner.id}`);
+  }
+}
+
+export async function deleteLatestBannerFromFirestore(bannerId: string): Promise<void> {
+  try {
+    const docRef = doc(db, 'latest_banners', bannerId);
+    await deleteDoc(docRef);
+    localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `latest_banners/${bannerId}`);
+  }
+}
+
 import { toEnglishDigits } from './utils/formatters';
 
 // Universal sorting: newest news by custom publish date at top, older news moving down
 export function sortNewsDescending(list: NewsItem[]): NewsItem[] {
+  const parseDateDay = (item: any): number => {
+    if (!item) return 0;
+
+    // 1. Check custom publishDate (YYYY-MM-DD)
+    if (item.publishDate) {
+      const eng = toEnglishDigits(String(item.publishDate).trim());
+      const ymd = eng.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (ymd) {
+        return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10)).getTime();
+      }
+      const t = new Date(eng).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+
+    // 2. Check item.date string
+    if (item.date) {
+      const engDate = toEnglishDigits(String(item.date).trim());
+      // YYYY-MM-DD
+      const ymd = engDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (ymd) {
+        return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10)).getTime();
+      }
+      // DD/MM/YYYY or DD-MM-YYYY
+      const ddmmyyyy = engDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+      if (ddmmyyyy) {
+        const d = parseInt(ddmmyyyy[1], 10);
+        const m = parseInt(ddmmyyyy[2], 10) - 1;
+        const y = parseInt(ddmmyyyy[3], 10);
+        const t = new Date(y, m, d).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      // Marathi month names
+      const marathiMonths: Record<string, number> = {
+        'जानेवारी': 0, 'फेब्रुवारी': 1, 'मार्च': 2, 'एप्रिल': 3, 'मे': 4, 'जून': 5,
+        'जुलै': 6, 'ऑगस्ट': 7, 'सप्टेंबर': 8, 'ऑक्टोबर': 9, 'नोव्हेंबर': 10, 'डिसेंबर': 11
+      };
+      for (const [mName, mIdx] of Object.entries(marathiMonths)) {
+        if (item.date.includes(mName)) {
+          const dayMatch = engDate.match(/\d{1,2}/);
+          const yearMatch = engDate.match(/\d{4}/);
+          const d = dayMatch ? parseInt(dayMatch[0], 10) : 1;
+          const y = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
+          const t = new Date(y, mIdx, d).getTime();
+          if (!isNaN(t) && t > 0) return t;
+        }
+      }
+
+      const directT = new Date(engDate).getTime();
+      if (!isNaN(directT) && directT > 0) return directT;
+    }
+
+    return 0;
+  };
+
+  const parseExactTimestamp = (item: any): number => {
+    if (!item) return 0;
+    if (item.createdAt) {
+      if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
+        return item.createdAt.seconds * 1000;
+      }
+      const t = new Date(item.createdAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    const match = String(item.id || '').match(/\d{10,}/);
+    if (match) {
+      const num = parseInt(match[0], 10);
+      if (num > 0) return num;
+    }
+    return 0;
+  };
+
   return [...list].sort((a, b) => {
-    const parseTime = (item: any): number => {
-      if (!item) return 0;
+    const dayA = parseDateDay(a) || parseExactTimestamp(a);
+    const dayB = parseDateDay(b) || parseExactTimestamp(b);
+    if (dayB !== dayA) return dayB - dayA;
 
-      // 1. Check custom publishDate (YYYY-MM-DD)
-      if (item.publishDate) {
-        const eng = toEnglishDigits(String(item.publishDate).trim());
-        const t = new Date(eng).getTime();
-        if (!isNaN(t) && t > 0) return t;
-      }
+    const exactA = parseExactTimestamp(a);
+    const exactB = parseExactTimestamp(b);
+    if (exactB !== exactA) return exactB - exactA;
 
-      // 2. Check item.date string
-      if (item.date) {
-        const engDate = toEnglishDigits(String(item.date).trim());
-        // YYYY-MM-DD
-        if (/^\d{4}-\d{2}-\d{2}$/.test(engDate)) {
-          const t = new Date(engDate).getTime();
-          if (!isNaN(t) && t > 0) return t;
-        }
-        // DD/MM/YYYY or DD-MM-YYYY
-        const ddmmyyyy = engDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-        if (ddmmyyyy) {
-          const d = parseInt(ddmmyyyy[1], 10);
-          const m = parseInt(ddmmyyyy[2], 10) - 1;
-          const y = parseInt(ddmmyyyy[3], 10);
-          const t = new Date(y, m, d).getTime();
-          if (!isNaN(t) && t > 0) return t;
-        }
-        // Marathi month names
-        const marathiMonths: Record<string, number> = {
-          'जानेवारी': 0, 'फेब्रुवारी': 1, 'मार्च': 2, 'एप्रिल': 3, 'मे': 4, 'जून': 5,
-          'जुलै': 6, 'ऑगस्ट': 7, 'सप्टेंबर': 8, 'ऑक्टोबर': 9, 'नोव्हेंबर': 10, 'डिसेंबर': 11
-        };
-        for (const [mName, mIdx] of Object.entries(marathiMonths)) {
-          if (item.date.includes(mName)) {
-            const dayMatch = engDate.match(/\d{1,2}/);
-            const yearMatch = engDate.match(/\d{4}/);
-            const d = dayMatch ? parseInt(dayMatch[0], 10) : 1;
-            const y = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
-            const t = new Date(y, mIdx, d).getTime();
-            if (!isNaN(t) && t > 0) return t;
-          }
-        }
-
-        const directT = new Date(engDate).getTime();
-        if (!isNaN(directT) && directT > 0) return directT;
-      }
-
-      // 3. Fallback to createdAt
-      if (item.createdAt) {
-        if (typeof item.createdAt === 'object' && item.createdAt.seconds) {
-          return item.createdAt.seconds * 1000;
-        }
-        const t = new Date(item.createdAt).getTime();
-        if (!isNaN(t) && t > 0) return t;
-      }
-
-      // 4. Fallback to timestamp in item.id
-      const match = (item.id || '').match(/\d{10,}/);
-      if (match) {
-        const num = parseInt(match[0], 10);
-        if (num > 0) return num;
-      }
-      return 0;
-    };
-
-    const timeA = parseTime(a);
-    const timeB = parseTime(b);
-    return timeB - timeA;
+    const idNumA = Number(String(a?.id || '').match(/\d{10,}/)?.[0] || 0);
+    const idNumB = Number(String(b?.id || '').match(/\d{10,}/)?.[0] || 0);
+    return idNumB - idNumA;
   });
 }
 
