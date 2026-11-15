@@ -285,6 +285,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       return;
     }
 
+    const marathiRegex = /[\u0900-\u097F]/;
+    if (!marathiRegex.test(fullName.trim()) || !marathiRegex.test(centerName.trim())) {
+      setFormAlert('कृपया आपले नाव आणि केंद्राचे नाव मराठीतच भरा (कृपया मराठी देवनागरी लिपीचा वापर करा).');
+      window.scrollTo({ top: 380, behavior: 'smooth' });
+      return;
+    }
+
     const cleanPhone = toEnglishDigits(phone.trim()).replace(/\D/g, '').slice(-10);
     if (cleanPhone.length !== 10) {
       setFormAlert('कृपया 10 अंकी वैध मोबाईल नंबर प्रविष्ट करा.');

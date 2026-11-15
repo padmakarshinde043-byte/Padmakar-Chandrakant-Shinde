@@ -28,7 +28,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDistrict, setSelectedDistrict] = useState('');
   const [selectedTaluka, setSelectedTaluka] = useState('');
-  const [sortOrder, setSortOrder] = useState<DirectorySortOrder>('asc');
+  const [sortOrder, setSortOrder] = useState<DirectorySortOrder>('desc');
   const [visibleLimit, setVisibleLimit] = useState<number>(INITIAL_VISIBLE_ROWS);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshSucceeded, setRefreshSucceeded] = useState(false);
@@ -343,7 +343,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               onChange={(e) => setSortOrder(e.target.value as DirectorySortOrder)}
               className="w-full text-sm pl-8 pr-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] appearance-none cursor-pointer font-medium text-slate-700"
             >
-              <option value="asc">क्र. १ पासून यादी</option>
+              <option value="asc">क्र. 1 पासून यादी</option>
               <option value="desc">नवीन सदस्य प्रथम</option>
             </select>
           </div>

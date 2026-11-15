@@ -79,6 +79,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const [deletingMember, setDeletingMember] = useState<MembershipApplication | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isPurgingGhosts, setIsPurgingGhosts] = useState(false);
+  const [showPurgeConfirmModal, setShowPurgeConfirmModal] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(50);
 
   // Analyze duplicates & 0001 issues across all applications
   const duplicateAnalysis = useMemo(() => {
@@ -188,6 +190,21 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
     return list;
   }, [applications, searchQuery, quickFilter, duplicateAnalysis]);
+
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setVisibleCount(50);
+  };
+
+  const handleQuickFilterChange = (next: 'all' | 'duplicates' | 'issue_0001' | 'approved') => {
+    setQuickFilter(next);
+    setVisibleCount(50);
+  };
+
+  const visibleMembers = useMemo(
+    () => filteredMembers.slice(0, visibleCount),
+    [filteredMembers, visibleCount]
+  );
 
   // Talukas available for the currently edited member's district
   const availableTalukasForEdit = useMemo(() => {
@@ -334,16 +351,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   };
 
   const handlePurgeGhostRecords = async () => {
-    if (
-      !window.confirm(
-        'तुम्हाला नक्की पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा सिस्टम व कॅशमधून कायमचा स्वच्छ करायचा आहे का? (मंजूर सदस्य पूर्णपणे सुरक्षित राहतील.)'
-      )
-    ) {
-      return;
-    }
-
     try {
       setIsPurgingGhosts(true);
+      setShowPurgeConfirmModal(false);
       const res = await purgeDeletedAndGhostApplicationsInFirestore();
       setStatusBanner({
         text: res.message,
@@ -363,31 +373,30 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   };
 
   return (
-    <div className="bg-white p-4 sm:p-6 rounded-xl border-2 border-indigo-200 shadow-xs space-y-5">
+    <div className="bg-white p-4 sm:p-6 rounded-2xl border border-[#e7ded1] shadow-xs space-y-5">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-indigo-100 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-800 border border-indigo-200 px-2.5 py-0.5 rounded-full text-[11px] font-bold mb-1.5">
-            <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
-            स्वतंत्र दुरुस्ती व दुबार नोंदणी नियंत्रण कक्ष
-          </div>
-          <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d]">
-            सदस्य एडिट व दुबार नोंदणी दुरुस्ती (Member Edit)
+          <p className="text-[11px] font-bold text-[#df6b16] mb-0.5">
+            दुरुस्ती व दुबार नोंदणी नियंत्रण कक्ष
+          </p>
+          <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36]">
+            सदस्य एडिट व दुबार नोंदणी दुरुस्ती
           </h3>
-          <p className="text-xs text-slate-600 mt-0.5">
-            येथून सदस्याचे नाव किंवा मोबाईल नंबर शोधून त्यांचा <strong>सदस्य क्रमांक</strong> व <strong>संपूर्ण माहिती</strong> काळजीपूर्वक एडिट करा किंवा दुबार झालेली नोंदणी डिलीट करा.
+          <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+            सदस्याचे नाव किंवा मोबाईल नंबर शोधून त्यांचा <strong>सदस्य क्रमांक</strong> व संपूर्ण माहिती अद्ययावत करा किंवा दुबार नोंदणी काढा.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto shrink-0">
           <button
             type="button"
-            onClick={handlePurgeGhostRecords}
+            onClick={() => setShowPurgeConfirmModal(true)}
             disabled={isPurgingGhosts}
-            className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            className="flex-1 sm:flex-none min-h-[44px] bg-rose-50 hover:bg-rose-100 active:scale-[0.98] text-rose-800 border border-rose-200 text-xs font-bold px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
             title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड सिस्टममधून कायमचे काढून टाका"
           >
-            <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
-            <span>{isPurgingGhosts ? 'स्वच्छता सुरू आहे...' : 'जुने डिलीट / घोस्ट डाटा स्वच्छ करा'}</span>
+            <Trash2 className={`w-4 h-4 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
+            <span className="whitespace-nowrap">{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुने डिलीट स्वच्छ करा'}</span>
           </button>
 
           {onFetchApplications && (
@@ -395,10 +404,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               type="button"
               onClick={() => onFetchApplications(true)}
               disabled={isLoadingApps}
-              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="flex-1 sm:flex-none min-h-[44px] bg-[#0b1e36] hover:bg-[#193568] active:scale-[0.98] text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
-              <span>{isLoadingApps ? 'लोड होत आहे...' : 'यादी ताजी करा'}</span>
+              <RefreshCw className={`w-4 h-4 text-amber-400 ${isLoadingApps ? 'animate-spin' : ''}`} />
+              <span className="whitespace-nowrap">{isLoadingApps ? 'लोड होत आहे...' : 'यादी ताजी करा'}</span>
             </button>
           )}
         </div>
@@ -444,120 +453,236 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       )}
 
       {/* Search & Smart Duplicate/0001 Filters */}
-      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="सदस्याचे नाव, 10 अंकी मोबाईल नंबर, सदस्य क्र. (उदा. 0001) किंवा अर्ज क्र. टाका..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs sm:text-sm pl-10 pr-9 py-2.5 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-indigo-600 font-medium shadow-2xs"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-                title="शोध पुसा"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+      <div className="bg-[#fbf8f2] p-3.5 sm:p-4 rounded-xl border border-[#e7ded1] space-y-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="सदस्याचे नाव, 10 अंकी मोबाईल नंबर, सदस्य क्र. किंवा अर्ज क्र. शोधा..."
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full min-h-[44px] text-base sm:text-sm pl-10 pr-10 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-[#df6b16] font-medium"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => handleSearchChange('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-400 hover:text-slate-700"
+              title="शोध पुसा"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        {/* Quick Filter Buttons */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        {/* Quick Filter Buttons (Single-line horizontally scrollable on mobile) */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 text-xs">
           <button
             type="button"
-            onClick={() => setQuickFilter('all')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            onClick={() => handleQuickFilterChange('all')}
+            className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
               quickFilter === 'all'
-                ? 'bg-[#17366d] text-white shadow-xs'
-                : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
+                ? 'bg-[#0b1e36] text-white shadow-xs'
+                : 'bg-white text-slate-700 border border-[#e7ded1] hover:bg-slate-50'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            सर्व नोंदी ({applications.length})
+            <span>सर्व नोंदी ({applications.length})</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setQuickFilter('duplicates')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            onClick={() => handleQuickFilterChange('duplicates')}
+            className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
               quickFilter === 'duplicates'
-                ? 'bg-amber-600 text-white shadow-xs'
-                : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+                ? 'bg-[#df6b16] text-white shadow-xs'
+                : 'bg-white text-amber-900 border border-amber-200 hover:bg-amber-50'
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            दुबार नोंदी ({duplicateAnalysis.duplicateCount})
+            <span>दुबार नोंदी ({duplicateAnalysis.duplicateCount})</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setQuickFilter('issue_0001')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            onClick={() => handleQuickFilterChange('issue_0001')}
+            className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
               quickFilter === 'issue_0001'
-                ? 'bg-purple-700 text-white shadow-xs'
-                : 'bg-purple-50 text-purple-900 border border-purple-300 hover:bg-purple-100'
+                ? 'bg-rose-700 text-white shadow-xs'
+                : 'bg-white text-rose-800 border border-rose-200 hover:bg-rose-50'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            0001 / त्रुटी क्रमांक ({duplicateAnalysis.issue0001Count})
+            <span>0001 / त्रुटी ({duplicateAnalysis.issue0001Count})</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setQuickFilter('approved')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            onClick={() => handleQuickFilterChange('approved')}
+            className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
               quickFilter === 'approved'
                 ? 'bg-emerald-700 text-white shadow-xs'
-                : 'bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-50'
+                : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50'
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            मंजूर सदस्य ({applications.filter((a) => a.status === 'approved').length})
+            <span>मंजूर ({applications.filter((a) => a.status === 'approved').length})</span>
           </button>
         </div>
       </div>
 
       {/* Results Count */}
-      <div className="flex items-center justify-between text-xs text-slate-600 px-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1 tabular-nums">
         <span>
-          सापडलेल्या नोंदी: <strong className="text-[#17366d] font-mono">{filteredMembers.length}</strong>
+          दाखवले: <strong className="text-[#0b1e36] font-mono">{visibleMembers.length}</strong> / एकूण सापडलेले:{' '}
+          <strong className="text-[#0b1e36] font-mono">{filteredMembers.length}</strong>
         </span>
         {quickFilter === 'duplicates' && (
           <span className="text-amber-800 font-semibold">
-            💡 सारखा मोबाईल नंबर किंवा सारखे नाव असलेले सदस्य येथे एकत्र दिसत आहेत.
+            सारखा मोबाईल किंवा नाव असलेले सदस्य येथे एकत्र दिसतात.
           </span>
         )}
       </div>
 
-      {/* Members Table */}
-      <div className="overflow-x-auto border border-slate-200 rounded-xl">
+      {/* MOBILE APP CARD LIST (Shown on < md viewports) */}
+      <div className="md:hidden space-y-3">
+        {visibleMembers.length === 0 ? (
+          <div className="py-10 text-center text-slate-500 text-xs bg-[#fbf8f2] rounded-xl border border-[#e7ded1]">
+            शोधलेल्या माहितीनुसार कोणताही सदस्य आढळला नाही.
+          </div>
+        ) : (
+          visibleMembers.map((app) => {
+            const dupPhone = duplicateAnalysis.isDuplicatePhone(app);
+            const dupName = duplicateAnalysis.isDuplicateName(app);
+            const dupMemNo = duplicateAnalysis.isDuplicateMemberNo(app);
+            const is0001 = Boolean(app.memberNumber && /\/0001$/i.test(app.memberNumber.trim()));
+            const statusLabel =
+              app.status === 'approved' ? 'मंजूर' : app.status === 'rejected' ? 'नाकारले' : 'प्रलंबित';
+            const statusTextColor =
+              app.status === 'approved'
+                ? 'text-emerald-700'
+                : app.status === 'rejected'
+                ? 'text-rose-700'
+                : 'text-amber-700';
+
+            return (
+              <div
+                key={app.id}
+                className={`rounded-2xl border p-3.5 space-y-3 transition-colors ${
+                  dupPhone || dupMemNo
+                    ? 'bg-amber-50/40 border-amber-300'
+                    : 'bg-white border-[#e7ded1]'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {app.photo ? (
+                    <img
+                      src={app.photo}
+                      alt={app.fullName}
+                      loading="lazy"
+                      className="w-12 h-14 object-cover rounded-lg border border-slate-300 shrink-0 bg-slate-100"
+                    />
+                  ) : (
+                    <div className="w-12 h-14 bg-slate-100 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[11px] font-bold ${statusTextColor}`}>
+                        ● {statusLabel}
+                      </span>
+                      <span className="font-mono text-[11px] font-bold text-[#0b1e36] tabular-nums truncate">
+                        {app.memberNumber || app.applicationNumber}
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-sm leading-snug mt-0.5 truncate">
+                      {app.salutation} {app.fullName}
+                    </h4>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600 mt-1 tabular-nums">
+                      <span className="font-mono font-bold text-[#0b1e36]">{app.phone}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{app.district}</span>
+                      {app.taluka && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span>{app.taluka}</span>
+                        </>
+                      )}
+                    </div>
+                    {(dupPhone || dupName || dupMemNo || is0001) && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px] font-bold text-rose-700">
+                        {dupPhone && <span>[दुबार मोबाईल]</span>}
+                        {dupName && !dupPhone && <span>[सारखे नाव]</span>}
+                        {dupMemNo && <span>[दुबार सदस्य क्र.]</span>}
+                        {is0001 && <span>[0001 क्रमांक]</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Touch-friendly 44px action buttons */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(app)}
+                    className={`min-h-[44px] bg-[#0b1e36] hover:bg-[#193568] active:scale-[0.98] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer ${
+                      app.status === 'approved' ? '' : 'col-span-2'
+                    }`}
+                  >
+                    <Edit3 className="w-4 h-4 text-amber-400" />
+                    <span>एडिट</span>
+                  </button>
+
+                  {app.status === 'approved' && (
+                    <button
+                      type="button"
+                      onClick={() => generateMembershipIdCardPdf(app)}
+                      className="min-h-[44px] bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>ID कार्ड</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setDeletingMember(app)}
+                    className="min-h-[44px] bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>डिलीट</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* DESKTOP TABLE (Shown on >= md viewports) */}
+      <div className="hidden md:block overflow-x-auto border border-[#e7ded1] rounded-xl">
         <table className="w-full text-left text-xs">
-          <thead className="bg-indigo-50/70 border-b border-indigo-200 text-indigo-950 font-bold uppercase tracking-wider text-[11px]">
+          <thead className="bg-[#fbf8f2] border-b border-[#e7ded1] text-[#0b1e36] font-bold text-[11px]">
             <tr>
               <th className="py-3 px-3">फोटो</th>
               <th className="py-3 px-3">सदस्य क्रमांक व अर्ज क्र.</th>
               <th className="py-3 px-3">संपूर्ण नाव व संवर्ग</th>
               <th className="py-3 px-3">मोबाईल व जिल्हा/तालुका</th>
-              <th className="py-3 px-3">स्थिती व इशाऱ्यांचे टॅग</th>
+              <th className="py-3 px-3">स्थिती व सूचना</th>
               <th className="py-3 px-3 text-center">दुरुस्ती / डिलीट</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredMembers.length === 0 ? (
+            {visibleMembers.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-10 text-center text-slate-400">
                   शोधलेल्या माहितीनुसार कोणताही सदस्य आढळला नाही.
                 </td>
               </tr>
             ) : (
-              filteredMembers.map((app) => {
+              visibleMembers.map((app) => {
                 const dupPhone = duplicateAnalysis.isDuplicatePhone(app);
                 const dupName = duplicateAnalysis.isDuplicateName(app);
                 const dupMemNo = duplicateAnalysis.isDuplicateMemberNo(app);
@@ -577,6 +702,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         <img
                           src={app.photo}
                           alt={app.fullName}
+                          loading="lazy"
                           className="w-10 h-12 object-cover rounded border border-slate-300 shadow-2xs"
                         />
                       ) : (
@@ -586,13 +712,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       )}
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-3 tabular-nums">
                       {app.memberNumber ? (
                         <span
                           className={`font-mono font-black text-xs px-2 py-0.5 rounded inline-block border ${
                             dupMemNo || is0001
                               ? 'bg-rose-50 text-rose-800 border-rose-300'
-                              : 'bg-indigo-50 text-[#17366d] border-indigo-200'
+                              : 'bg-slate-100 text-[#0b1e36] border-slate-300'
                           }`}
                         >
                           {app.memberNumber}
@@ -605,12 +731,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       </span>
                       <span className="block text-[11px] text-slate-600 mt-0.5">
                         {formatDateWithEnglishDigits(app.createdAt)}
+                        {app.createdAt ? ` · ${formatTimeOnly(app.createdAt)}` : ''}
                       </span>
-                      {app.createdAt && (
-                        <span className="block font-sans font-semibold text-xs sm:text-sm text-slate-800 mt-0.5">
-                          {formatTimeOnly(app.createdAt)}
-                        </span>
-                      )}
                     </td>
 
                     <td className="py-3 px-3">
@@ -621,14 +743,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         {app.professional || 'केंद्रप्रमुख'}
                         {app.isOfficial && app.officialPost && (
                           <span className="ml-1.5 text-[#df6b16] font-bold">
-                            • {app.officialPost}
+                            · {app.officialPost}
                           </span>
                         )}
                       </div>
                     </td>
 
-                    <td className="py-3 px-3">
-                      <div className="font-mono font-bold text-[#17366d]">{app.phone}</div>
+                    <td className="py-3 px-3 tabular-nums">
+                      <div className="font-mono font-bold text-[#0b1e36]">{app.phone}</div>
                       <div className="text-[11px] text-slate-600 mt-0.5">
                         {app.district}
                         {app.taluka ? ` (ता. ${app.taluka})` : ''}
@@ -641,63 +763,41 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     </td>
 
                     <td className="py-3 px-3 space-y-1">
-                      <div>
+                      <div className="text-xs font-bold">
                         {app.status === 'approved' ? (
-                          <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                            ✓ मंजूर
-                          </span>
+                          <span className="text-emerald-700">✓ मंजूर</span>
                         ) : app.status === 'rejected' ? (
-                          <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                            ✕ नाकारले
-                          </span>
+                          <span className="text-rose-700">✕ नाकारले</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                            ⏳ प्रलंबित
-                          </span>
+                          <span className="text-amber-700">प्रलंबित</span>
                         )}
                       </div>
 
-                      <div className="flex flex-wrap gap-1">
-                        {dupPhone && (
-                          <span className="bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                            दुबार मोबाईल
-                          </span>
-                        )}
-                        {dupName && !dupPhone && (
-                          <span className="bg-orange-100 text-orange-900 border border-orange-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                            सारखे नाव
-                          </span>
-                        )}
-                        {dupMemNo && (
-                          <span className="bg-rose-100 text-rose-900 border border-rose-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                            दुबार सदस्य क्र.
-                          </span>
-                        )}
-                        {is0001 && (
-                          <span className="bg-purple-100 text-purple-900 border border-purple-300 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                            0001 क्रमांक
-                          </span>
-                        )}
+                      <div className="flex flex-wrap gap-1 text-[10px] font-bold">
+                        {dupPhone && <span className="text-amber-800">· दुबार मोबाईल</span>}
+                        {dupName && !dupPhone && <span className="text-orange-800">· सारखे नाव</span>}
+                        {dupMemNo && <span className="text-rose-800">· दुबार सदस्य क्र.</span>}
+                        {is0001 && <span className="text-rose-700">· 0001 क्रमांक</span>}
                       </div>
                     </td>
 
                     <td className="py-3 px-3">
-                      <div className="flex flex-wrap items-center justify-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(app)}
-                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                          className="bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                           title="सदस्य क्रमांक व सर्व माहिती एडिट करा"
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>एडिट करा</span>
+                          <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                          <span>एडिट</span>
                         </button>
 
                         {app.status === 'approved' && (
                           <button
                             type="button"
                             onClick={() => generateMembershipIdCardPdf(app)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                            className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
                             title="अद्ययावत आय-कार्ड PDF डाऊनलोड करा"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -708,7 +808,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         <button
                           type="button"
                           onClick={() => setDeletingMember(app)}
-                          className="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors cursor-pointer"
+                          className="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
                           title="दुबार / चुकीची नोंदणी डिलीट करा"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -724,33 +824,55 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
         </table>
       </div>
 
+      {/* Load More Pagination Bar (keeps mobile fast) */}
+      {filteredMembers.length > visibleMembers.length && (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2">
+          <button
+            type="button"
+            onClick={() => setVisibleCount((prev) => prev + 50)}
+            className="w-full sm:w-auto min-h-[44px] bg-[#fbf8f2] hover:bg-amber-50 border border-[#e7ded1] text-[#0b1e36] font-bold px-6 py-2.5 rounded-xl text-xs transition-colors cursor-pointer tabular-nums"
+          >
+            आणखी ५० नोंदी पहा ({visibleMembers.length} / {filteredMembers.length})
+          </button>
+          {filteredMembers.length - visibleMembers.length > 50 && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount(filteredMembers.length)}
+              className="w-full sm:w-auto min-h-[44px] bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-xl text-xs transition-colors cursor-pointer tabular-nums"
+            >
+              सर्व {filteredMembers.length} नोंदी दाखवा
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ============================================================== */}
       {/* Full Member Edit Modal */}
       {/* ============================================================== */}
       {editingMember && (
-        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border-2 border-indigo-900/20 max-h-[94vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-3xl w-full shadow-2xl border border-[#e7ded1] max-h-[94vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-[#17366d] via-[#1f4283] to-[#12284c] text-white px-5 py-4 flex items-center justify-between shrink-0">
+            <div className="bg-gradient-to-r from-[#132b52] via-[#193568] to-[#0b1e36] text-white px-5 py-3.5 flex items-center justify-between shrink-0 border-b border-amber-500/60">
               <div>
-                <span className="text-[11px] uppercase tracking-wider font-bold text-amber-300 block">
-                  सदस्य संपूर्ण माहिती दुरुस्ती (Edit Member)
+                <span className="text-[11px] font-bold text-amber-300 block">
+                  सदस्य संपूर्ण माहिती दुरुस्ती
                 </span>
-                <h4 className="font-serifDevanagari text-lg font-bold text-white">
+                <h4 className="font-serifDevanagari text-base sm:text-lg font-bold text-white">
                   {editingMember.salutation} {editingMember.fullName}
                 </h4>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingMember(null)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold cursor-pointer"
+                className="min-w-[44px] min-h-[44px] rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Form Body */}
-            <form onSubmit={handleSaveEditedMember} className="p-5 overflow-y-auto space-y-5 text-xs flex-1">
+            <form onSubmit={handleSaveEditedMember} className="p-4 sm:p-5 overflow-y-auto space-y-5 text-sm sm:text-xs flex-1">
               {/* Highlighted Member Number & Status Block */}
               <div className="bg-indigo-50/70 border-2 border-indigo-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -1188,21 +1310,21 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               </div>
 
               {/* Sticky Footer Action Buttons */}
-              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+              <div className="sticky bottom-0 bg-white/95 backdrop-blur-xs flex items-center justify-end gap-2.5 pt-3 pb-1 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
-                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer"
+                  className="min-h-[44px] px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-xs"
                 >
                   रद्द करा
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-6 py-2.5 bg-gradient-to-r from-[#17366d] to-[#12284c] hover:from-[#12284c] hover:to-[#0a1833] disabled:opacity-60 text-white font-bold rounded-lg shadow-md flex items-center gap-2 cursor-pointer"
+                  className="flex-1 sm:flex-none min-h-[44px] px-6 py-2.5 bg-[#df6b16] hover:bg-[#c85c0e] disabled:opacity-60 text-white font-bold rounded-xl shadow-sm flex items-center justify-center gap-2 cursor-pointer text-xs"
                 >
-                  <Check className="w-4 h-4 text-emerald-300" />
-                  <span>{isSaving ? 'सेव्ह होत आहे...' : 'बदल कायमचे सेव्ह करा'}</span>
+                  <Check className="w-4 h-4" />
+                  <span>{isSaving ? 'सेव्ह होत आहे...' : 'बदल सेव्ह करा'}</span>
                 </button>
               </div>
             </form>
@@ -1214,8 +1336,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       {/* Safe Delete Confirmation Modal */}
       {/* ============================================================== */}
       {deletingMember && (
-        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border-2 border-rose-300 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-200 space-y-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
                 <ShieldAlert className="w-6 h-6" />
@@ -1230,7 +1352,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs space-y-1.5">
+            <div className="bg-[#fbf8f2] border border-[#e7ded1] rounded-xl p-3.5 text-xs space-y-1.5">
               <div>
                 <span className="text-slate-500">नाव:</span>{' '}
                 <strong className="text-slate-900">
@@ -1239,7 +1361,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               </div>
               <div>
                 <span className="text-slate-500">सदस्य क्रमांक:</span>{' '}
-                <strong className="font-mono text-indigo-800">
+                <strong className="font-mono text-[#0b1e36]">
                   {deletingMember.memberNumber || 'नाही'}
                 </strong>
               </div>
@@ -1262,7 +1384,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 type="button"
                 onClick={() => setDeletingMember(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
               >
                 रद्द करा
               </button>
@@ -1270,10 +1392,50 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={isDeleting}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+                className="flex-1 sm:flex-none min-h-[44px] px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
                 <span>{isDeleting ? 'डिलीट होत आहे...' : 'होय, कायमचा डिलीट करा'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* In-App Purge Deleted & Ghost Confirmation Modal */}
+      {/* ============================================================== */}
+      {showPurgeConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl max-w-md w-full p-6 shadow-2xl border border-rose-200 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-serifDevanagari text-base font-bold text-[#0b1e36]">
+                  जुने डिलीट व घोस्ट रेकॉर्ड स्वच्छ करायचे का?
+                </h4>
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                  पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित अर्ज डेटाबेसमधून कायमचे काढले जातील. मंजूर सदस्य पूर्णपणे सुरक्षित राहतील.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPurgeConfirmModal(false)}
+                className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
+              >
+                रद्द करा
+              </button>
+              <button
+                type="button"
+                onClick={handlePurgeGhostRecords}
+                className="flex-1 sm:flex-none min-h-[44px] px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>होय, स्वच्छ करा</span>
               </button>
             </div>
           </div>

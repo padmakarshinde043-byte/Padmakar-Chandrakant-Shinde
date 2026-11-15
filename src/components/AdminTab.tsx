@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Lock, LogOut, Award, Printer, PlusCircle, Search,
-  UserCheck, ShieldAlert, KeyRound, CheckCircle2, ArrowLeft, Eye, EyeOff,
+  Lock, LogOut, Award, PlusCircle, Search,
+  ShieldAlert, KeyRound, CheckCircle2, ArrowLeft, Eye, EyeOff,
   Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download, List,
-  UserPlus, Shield, CheckSquare, Square, MessageSquare, Mail, PhoneCall, RefreshCw,
-  Cloud, CloudUpload, ExternalLink, AlertCircle, Settings, RotateCcw, Calendar,
-  ArrowUp, ArrowDown, ChevronUp, ChevronDown
+  UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
+  Cloud, AlertCircle, RotateCcw, Calendar,
+  ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -96,8 +96,7 @@ type AdminSubTabKey =
   | 'manage_admins'
   | 'contact_messages'
   | 'password'
-  | 'cloudinary'
-  | 'razorpay';
+  | 'cloudinary';
 
 type AdminPermissionKey = keyof AdminPermissions;
 
@@ -111,7 +110,6 @@ const ALL_ADMIN_PERMISSIONS_FALSE: AdminPermissions = {
   viewIdCardPreview: false,
   manageContactMessages: false,
   manageAdmins: false,
-  manageRazorpay: false,
   manageCloudinary: false,
 };
 
@@ -125,7 +123,6 @@ const ALL_ADMIN_PERMISSIONS_TRUE: AdminPermissions = {
   viewIdCardPreview: true,
   manageContactMessages: true,
   manageAdmins: true,
-  manageRazorpay: true,
   manageCloudinary: true,
 };
 
@@ -212,14 +209,6 @@ const ADMIN_PERMISSION_OPTIONS: AdminPermissionOption[] = [
     badgeClass: 'bg-rose-100 text-rose-900',
   },
   {
-    key: 'manageRazorpay',
-    label: 'Razorpay व वेबहूक',
-    description: 'Razorpay पेमेंट गेटवे API Keys व Webhook सेटिंग्ज',
-    activeCardClass: 'bg-lime-50/80 border-lime-300 shadow-xs',
-    checkboxClass: 'text-lime-700 focus:ring-lime-600',
-    badgeClass: 'bg-lime-100 text-lime-900',
-  },
-  {
     key: 'manageCloudinary',
     label: 'क्लाउड स्टोरेज',
     description: 'फोटो व फाइल मीडिया स्टोरेज सेटिंग्ज',
@@ -242,7 +231,6 @@ const normalizeAdminPermissions = (perms?: Partial<AdminPermissions>): AdminPerm
   viewIdCardPreview: Boolean(perms?.viewIdCardPreview),
   manageContactMessages: Boolean(perms?.manageContactMessages),
   manageAdmins: Boolean(perms?.manageAdmins),
-  manageRazorpay: Boolean(perms?.manageRazorpay),
   manageCloudinary: Boolean(perms?.manageCloudinary),
 });
 
@@ -256,7 +244,6 @@ const getFirstAllowedAdminTab = (perms: AdminPermissions): AdminSubTabKey => {
   if (perms.viewIdCardPreview) return 'id_card_preview';
   if (perms.manageContactMessages) return 'contact_messages';
   if (perms.manageAdmins) return 'manage_admins';
-  if (perms.manageRazorpay) return 'razorpay';
   if (perms.manageCloudinary) return 'cloudinary';
   return 'password';
 };
@@ -302,8 +289,28 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isApprovingApp, setIsApprovingApp] = useState(false);
 
-  // Active view inside Admin Dashboard
+  // Active view inside Admin Dashboard + Mobile App Navigation Drawer
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTabKey>('applications');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [appsVisibleCount, setAppsVisibleCount] = useState(50);
+
+  // Unified in-app feedback banner & confirmation dialog (replaces native alert/confirm)
+  const [adminFeedbackBanner, setAdminFeedbackBanner] = useState<{
+    text: string;
+    type: 'success' | 'error';
+  } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    isDanger?: boolean;
+    onConfirm: () => Promise<void> | void;
+  } | null>(null);
+  const [isConfirmExecuting, setIsConfirmExecuting] = useState(false);
+
+  const showAdminFeedback = (text: string, type: 'success' | 'error' = 'success') => {
+    setAdminFeedbackBanner({ text, type });
+  };
 
   // Latest Banners form state
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
@@ -417,24 +424,31 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  const handleDeleteBannerWithFeedback = async (bannerId: string) => {
-    if (!window.confirm('हा ताज्या घडामोडीचा बॅनर कायमचा डिलीट करायचा आहे का?')) return;
-    setBannerErrorMsg('');
-    setBannerSuccessMsg('');
-    setDeletingBannerId(bannerId);
-    try {
-      if (onDeleteLatestBanner) {
-        await onDeleteLatestBanner(bannerId);
-      }
-      if (editingBannerId === bannerId) {
-        handleCancelEditBanner();
-      }
-      setBannerSuccessMsg('ताज्या घडामोडी बॅनर यशस्वीरीत्या हटवण्यात आला!');
-    } catch (err: any) {
-      setBannerErrorMsg('बॅनर डिलीट करताना त्रुटी आली: ' + (err?.message || 'Error'));
-    } finally {
-      setDeletingBannerId(null);
-    }
+  const handleDeleteBannerWithFeedback = (bannerId: string) => {
+    setConfirmDialog({
+      title: 'बॅनर हटवा',
+      message: 'हा ताज्या घडामोडीचा बॅनर कायमचा डिलीट करायचा आहे का?',
+      confirmLabel: 'होय, डिलीट करा',
+      isDanger: true,
+      onConfirm: async () => {
+        setBannerErrorMsg('');
+        setBannerSuccessMsg('');
+        setDeletingBannerId(bannerId);
+        try {
+          if (onDeleteLatestBanner) {
+            await onDeleteLatestBanner(bannerId);
+          }
+          if (editingBannerId === bannerId) {
+            handleCancelEditBanner();
+          }
+          setBannerSuccessMsg('ताज्या घडामोडी बॅनर यशस्वीरीत्या हटवण्यात आला!');
+        } catch (err: any) {
+          setBannerErrorMsg('बॅनर डिलीट करताना त्रुटी आली: ' + (err?.message || 'Error'));
+        } finally {
+          setDeletingBannerId(null);
+        }
+      },
+    });
   };
 
   const handleRefreshBannersClick = async () => {
@@ -448,83 +462,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     } finally {
       setIsRefreshingBanners(false);
     }
-  };
-
-  // Razorpay & Webhook Settings State
-  const [razorpayKeyId, setRazorpayKeyId] = useState('');
-  const [razorpayKeySecret, setRazorpayKeySecret] = useState('');
-  const [razorpayWebhookSecret, setRazorpayWebhookSecret] = useState('');
-  const [razorpayEnabled, setRazorpayEnabled] = useState(true);
-  const [razorpayWebhookUrl, setRazorpayWebhookUrl] = useState('');
-  const [razorpayStatusMsg, setRazorpayStatusMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [isLoadingRazorpayConfig, setIsLoadingRazorpayConfig] = useState(false);
-  const [isSavingRazorpayConfig, setIsSavingRazorpayConfig] = useState(false);
-  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
-
-  const loadRazorpayAdminConfig = async () => {
-    setIsLoadingRazorpayConfig(true);
-    try {
-      const res = await fetch('/api/razorpay/admin-config');
-      if (res.ok) {
-        const data = await res.json();
-        setRazorpayKeyId(data.keyId || '');
-        setRazorpayKeySecret(data.keySecret || '');
-        setRazorpayWebhookSecret(data.webhookSecret || '');
-        setRazorpayEnabled(data.enabled ?? true);
-        setRazorpayWebhookUrl(data.webhookUrl || `${window.location.origin}/api/razorpay/webhook`);
-      }
-    } catch (e) {
-      console.warn('Could not load razorpay admin config:', e);
-    } finally {
-      setIsLoadingRazorpayConfig(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isLoggedIn && activeAdminSubTab === 'razorpay') {
-      loadRazorpayAdminConfig();
-    }
-  }, [isLoggedIn, activeAdminSubTab]);
-
-  const handleSaveRazorpayConfig = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSavingRazorpayConfig(true);
-    setRazorpayStatusMsg(null);
-    try {
-      const res = await fetch('/api/razorpay/admin-config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyId: razorpayKeyId.trim(),
-          keySecret: razorpayKeySecret.trim(),
-          webhookSecret: razorpayWebhookSecret.trim(),
-          enabled: razorpayEnabled
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setRazorpayStatusMsg({
-          text: '✓ Razorpay API व Webhook सेटिंग्ज यशस्वीरीत्या सेव्ह झाल्या! आता ऑटोमॅटिक पेमेंट गेटवे आणि वेबहूक पूर्णपणे ऑनलाइन सक्रिय आहे.',
-          type: 'success'
-        });
-      } else {
-        throw new Error(data.message || 'सेटिंग्ज सेव्ह करता आल्या नाहीत.');
-      }
-    } catch (err: any) {
-      setRazorpayStatusMsg({
-        text: 'सेटिंग्ज सेव्ह करताना त्रुटी: ' + (err.message || 'Error'),
-        type: 'error'
-      });
-    } finally {
-      setIsSavingRazorpayConfig(false);
-    }
-  };
-
-  const handleCopyWebhookUrl = () => {
-    if (!razorpayWebhookUrl) return;
-    navigator.clipboard.writeText(razorpayWebhookUrl);
-    setCopiedWebhookUrl(true);
-    setTimeout(() => setCopiedWebhookUrl(false), 2500);
   };
 
   // Contact Inquiries (प्राप्त संदेश / विचारणा)
@@ -563,83 +500,95 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [paymentConfirmedChecked, setPaymentConfirmedChecked] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [showRejectInput, setShowRejectInput] = useState<boolean>(false);
+  const [verificationErrorMsg, setVerificationErrorMsg] = useState<string>('');
 
   // Certificate Modal (Point 5)
   const [certModalApp, setCertModalApp] = useState<MembershipApplication | null>(null);
 
   // Resequencing & ghost cleanup state
   const [isResequencing, setIsResequencing] = useState(false);
-  const handleResequence = async () => {
-    if (!window.confirm('तुम्हाला नक्की सर्व मंजूर सदस्यांचे क्रमांक सेव्हिंग/मंजुरीच्या क्रमानुसार 1 पासून सलग रांगेत लावायचे आहेत का? यामुळे जुने गॅप निघून जातील.')) {
-      return;
-    }
-    setIsResequencing(true);
-    try {
-      const res = await resequenceAllApprovedMembersInFirestore();
-      alert(res.message);
-      if (onFetchApplications) await onFetchApplications(true);
-    } catch (err) {
-      alert('पुनर्रचना करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsResequencing(false);
-    }
+  const handleResequence = () => {
+    setConfirmDialog({
+      title: 'सदस्य क्रमांक पुनर्रचना',
+      message: 'तुम्हाला नक्की सर्व मंजूर सदस्यांचे क्रमांक मंजुरीच्या क्रमानुसार 1 पासून सलग रांगेत लावायचे आहेत का? यामुळे जुने गॅप निघून जातील.',
+      confirmLabel: 'होय, क्रमाने लावा',
+      onConfirm: async () => {
+        setIsResequencing(true);
+        try {
+          const res = await resequenceAllApprovedMembersInFirestore();
+          showAdminFeedback(res.message, 'success');
+          if (onFetchApplications) await onFetchApplications(true);
+        } catch (err) {
+          showAdminFeedback('पुनर्रचना करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+        } finally {
+          setIsResequencing(false);
+        }
+      },
+    });
   };
 
   const [isResettingCounter, setIsResettingCounter] = useState(false);
   const [isPurgingGhosts, setIsPurgingGhosts] = useState(false);
   const [activeCircleAction, setActiveCircleAction] = useState<'resequence' | 'reset' | null>(null);
-  const handleResetCounter = async () => {
-    if (!window.confirm('तुम्हाला नक्की सदस्य क्रमांक काउंटर सर्व्हरवरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा आहे का? यामुळे पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.')) {
-      return;
-    }
-    setIsResettingCounter(true);
-    try {
-      const res = await resetMemberCounterToActualHighest();
-      alert(res.message);
-      if (onFetchApplications) await onFetchApplications(true);
-    } catch (err) {
-      alert('काउंटर रिसेट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsResettingCounter(false);
-    }
+  const handleResetCounter = () => {
+    setConfirmDialog({
+      title: 'सदस्य काउंटर रिसेट करा',
+      message: 'सदस्य क्रमांक काउंटर सर्व्हरवरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा का? पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.',
+      confirmLabel: 'होय, रिसेट करा',
+      onConfirm: async () => {
+        setIsResettingCounter(true);
+        try {
+          const res = await resetMemberCounterToActualHighest();
+          showAdminFeedback(res.message, 'success');
+          if (onFetchApplications) await onFetchApplications(true);
+        } catch (err) {
+          showAdminFeedback('काउंटर रिसेट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+        } finally {
+          setIsResettingCounter(false);
+        }
+      },
+    });
   };
 
-  const handlePurgeDeletedGhosts = async () => {
-    if (
-      !window.confirm(
-        'पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा सिस्टम व कॅशमधून कायमचा काढून टाकायचा का? यामुळे त्या सदस्यांना पुन्हा अर्ज भरताना कोणतीही अडचण येणार नाही.'
-      )
-    ) {
-      return;
-    }
-    setIsPurgingGhosts(true);
-    try {
-      const res = await purgeDeletedAndGhostApplicationsInFirestore();
-      alert(res.message);
-      if (onFetchApplications) await onFetchApplications(true);
-    } catch (err) {
-      alert('जुना डाटा स्वच्छ करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setIsPurgingGhosts(false);
-    }
+  const handlePurgeDeletedGhosts = () => {
+    setConfirmDialog({
+      title: 'जुना व दुबार डाटा स्वच्छ करा',
+      message: 'पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित अर्जांचा डाटा सिस्टम व कॅशमधून कायमचा काढून टाकायचा का?',
+      confirmLabel: 'होय, स्वच्छ करा',
+      isDanger: true,
+      onConfirm: async () => {
+        setIsPurgingGhosts(true);
+        try {
+          const res = await purgeDeletedAndGhostApplicationsInFirestore();
+          showAdminFeedback(res.message, 'success');
+          if (onFetchApplications) await onFetchApplications(true);
+        } catch (err) {
+          showAdminFeedback('जुना डाटा स्वच्छ करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+        } finally {
+          setIsPurgingGhosts(false);
+        }
+      },
+    });
   };
 
-  const handleDeleteWithFeedback = async (app: MembershipApplication) => {
-    if (
-      !window.confirm(
-        `${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone}) यांचा हा अर्ज सिस्टम आणि सर्व कॅशमधून कायमचा डिलीट करायचा का? डिलीट केल्यानंतर ते पुन्हा अर्ज भरू शकतील.`
-      )
-    ) {
-      return;
-    }
-    try {
-      await onDeleteApplication(app.id);
-      if (selectedAppForVerification?.id === app.id) {
-        setSelectedAppForVerification(null);
-      }
-    } catch (err) {
-      alert('अर्ज डिलीट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)));
-    }
+  const handleDeleteWithFeedback = (app: MembershipApplication) => {
+    setConfirmDialog({
+      title: 'अर्ज कायमचा डिलीट करा',
+      message: `${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone}) यांचा हा अर्ज सिस्टममधून कायमचा डिलीट करायचा का? डिलीट केल्यानंतर ते पुन्हा अर्ज भरू शकतील.`,
+      confirmLabel: 'होय, डिलीट करा',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
+          await onDeleteApplication(app.id);
+          if (selectedAppForVerification?.id === app.id) {
+            setSelectedAppForVerification(null);
+          }
+          showAdminFeedback(`${app.fullName} यांचा अर्ज यशस्वीरीत्या डिलीट झाला.`, 'success');
+        } catch (err) {
+          showAdminFeedback('अर्ज डिलीट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+        }
+      },
+    });
   };
 
   // Cloudinary State (Firebase Quota Protection - 100% Free CDN Hosting)
@@ -971,24 +920,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   }, []);
 
-  const handleDownloadZip = async (e: React.MouseEvent) => {
-    try {
-      const res = await fetch('/dist.zip');
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'dist.zip';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      e.preventDefault();
-    } catch {
-      // Allow default href fallback
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1346,22 +1277,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   }, [isLoggedIn, activeAdminSubTab, currentUser?.isSuperAdmin, currentUser?.permissions.manageContactMessages]);
 
-  // Open Verification Modal for an Application
-  const handleOpenVerification = (app: MembershipApplication) => {
+  // Open Verification Modal for an Application (optionally straight into reject-reason view)
+  const handleOpenVerification = (app: MembershipApplication, openReject = false) => {
     setSelectedAppForVerification(app);
-    setPaymentConfirmedChecked(app.paymentConfirmed || false);
-    setShowRejectInput(false);
+    setPaymentConfirmedChecked(openReject ? true : (app.paymentConfirmed || false));
+    setShowRejectInput(openReject);
     setRejectReason('');
+    setVerificationErrorMsg('');
   };
 
   // Approve Application atomically inside single Firestore Transaction (zero duplicate numbers)
   const handleApproveVerified = async () => {
     if (!selectedAppForVerification || isApprovingApp) return;
     if (!paymentConfirmedChecked) {
-      alert('कृपया सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री करणारा टिक बॉक्स निवडा.');
+      setVerificationErrorMsg('कृपया सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री करणारा टिक बॉक्स निवडा.');
       return;
     }
-
+    setVerificationErrorMsg('');
     setIsApprovingApp(true);
     try {
       const atomicResult = await approveApplicationAtomicInFirestore({
@@ -1383,24 +1315,31 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         approvedAt: atomicResult.application.approvedAt || new Date().toISOString(),
         paymentConfirmed: true
       });
+      showAdminFeedback(
+        `${selectedAppForVerification.fullName} यांचा अर्ज मंजूर झाला! क्रमांक: ${resolvedNumber}`,
+        'success'
+      );
       setSelectedAppForVerification(null);
     } catch (err: any) {
-      alert('मंजुरी देताना तांत्रिक त्रुटी आली: ' + (err?.message || 'कृपया इंटरनेट तपासून पुन्हा प्रयत्न करा.'));
+      setVerificationErrorMsg('मंजुरी देताना तांत्रिक त्रुटी आली: ' + (err?.message || 'कृपया इंटरनेट तपासून पुन्हा प्रयत्न करा.'));
     } finally {
       setIsApprovingApp(false);
     }
   };
 
-  // Reject Application
+  // Reject Application cleanly without native browser prompt/alert
   const handleRejectVerified = () => {
     if (!selectedAppForVerification) return;
-    if (!paymentConfirmedChecked) {
-      alert('कृपया पेमेंट खात्री किंवा तपासणी पूर्ण झाल्याचा टिक बॉक्स निवडा.');
+    if (!showRejectInput) {
+      setShowRejectInput(true);
+      setVerificationErrorMsg('');
       return;
     }
 
-    onRejectApplication(selectedAppForVerification.id, rejectReason || 'प्रशासनाकडून नाकारले');
+    const rejectedName = selectedAppForVerification.fullName;
+    onRejectApplication(selectedAppForVerification.id, rejectReason.trim() || 'प्रशासनाकडून नाकारले');
     setSelectedAppForVerification(null);
+    showAdminFeedback(`${rejectedName} यांचा अर्ज नाकारण्यात आला.`, 'success');
   };
 
   // Handle Photo selection for Leader with client-side super-compression (15KB - 25KB)
@@ -1626,13 +1565,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  const handleDeleteGovOrder = async (id: string) => {
-      try {
+  const handleDeleteGovOrder = (id: string) => {
+    setConfirmDialog({
+      title: 'शासन निर्णय हटवा',
+      message: 'हा शासन निर्णय / परिपत्रक कायमचे हटवायचे आहे का?',
+      confirmLabel: 'होय, हटवा',
+      isDanger: true,
+      onConfirm: async () => {
+        try {
           await deleteGovOrderFromFirestore(id);
           setGovOrders(prev => prev.filter(go => go.id !== id));
-      } catch (err: any) {
-          alert('हटवताना त्रुटी: ' + err.message);
-      }
+          showAdminFeedback('शासन निर्णय यशस्वीरीत्या हटवला गेला.', 'success');
+        } catch (err: any) {
+          showAdminFeedback('हटवताना त्रुटी: ' + err.message, 'error');
+        }
+      },
+    });
   };
 
   // Start Editing News
@@ -1646,7 +1594,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setNewsImageUrl(item.imageUrl || item.image || '');
     setNewsManageMode('form');
     setNewsError('');
-    window.scrollTo({ top: 320, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Cancel Editing
@@ -1663,11 +1611,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Delete News with fallback for corrupt/missing titles
   const handleDeleteNewsItem = (item: NewsItem) => {
     const displayTitle = item.title || (item as any).headline || 'ही बातमी';
-    if (window.confirm(`आपण खात्रीने '${displayTitle}' ही बातमी / परिपत्रक / फोटो हटवू इच्छिता?`)) {
-      if (onDeleteNews) {
-        onDeleteNews(item.id);
-      }
-    }
+    setConfirmDialog({
+      title: 'बातमी / परिपत्रक हटवा',
+      message: `आपण खात्रीने '${displayTitle}' ही बातमी / परिपत्रक / फोटो हटवू इच्छिता?`,
+      confirmLabel: 'होय, हटवा',
+      isDanger: true,
+      onConfirm: () => {
+        if (onDeleteNews) {
+          onDeleteNews(item.id);
+        }
+        showAdminFeedback('बातमी यशस्वीरीत्या हटवण्यात आली.', 'success');
+      },
+    });
   };
 
   // Live Preview Handlers
@@ -1704,550 +1659,544 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     return matchesFilter && matchesSearch;
   });
 
+  const visibleFilteredApps = filteredApps.slice(0, appsVisibleCount);
+
   const totalCount = applications.length;
   const approvedCount = applications.filter((a) => a.status === 'approved').length;
   const pendingCount = applications.filter((a) => a.status === 'pending').length;
   const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
 
+  // Ordered Navigation Items tailored for Mobile Bottom Bar + Bottom Sheet Drawer + Desktop Sidebar
+  const adminNavItems: Array<{
+    key: AdminSubTabKey;
+    label: string;
+    shortLabel: string;
+    icon: React.ReactNode;
+    badge?: number;
+    allowed: boolean;
+  }> = [
+    {
+      key: 'applications',
+      label: `सदस्यत्व अर्ज (${toEnglishDigits(totalCount)})`,
+      shortLabel: 'अर्ज',
+      icon: <Users className="w-4 h-4 shrink-0" />,
+      badge: pendingCount > 0 ? pendingCount : undefined,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.approveMembers),
+    },
+    {
+      key: 'edit_members',
+      label: 'सदस्य एडिट व दुरुस्ती',
+      shortLabel: 'एडिट',
+      icon: <Edit3 className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.editMembers),
+    },
+    {
+      key: 'leadership',
+      label: 'नेतृत्व व पदाधिकारी',
+      shortLabel: 'नेतृत्व',
+      icon: <Award className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership),
+    },
+    {
+      key: 'add_news',
+      label: 'बातम्या व परिपत्रके',
+      shortLabel: 'बातम्या',
+      icon: <FileText className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageNews),
+    },
+    {
+      key: 'gov_order',
+      label: 'शासन निर्णय (GR)',
+      shortLabel: 'GR',
+      icon: <FileText className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageGovOrders),
+    },
+    {
+      key: 'latest_banners',
+      label: 'ताज्या घडामोडी बॅनर्स',
+      shortLabel: 'बॅनर्स',
+      icon: <ImageIcon className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners),
+    },
+    {
+      key: 'id_card_preview',
+      label: 'आय-कार्ड डिझाईन नमुना',
+      shortLabel: 'आय-कार्ड',
+      icon: <Award className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview),
+    },
+    {
+      key: 'contact_messages',
+      label: `प्राप्त संदेश (${toEnglishDigits(contactMessages.length)})`,
+      shortLabel: 'संदेश',
+      icon: <MessageSquare className="w-4 h-4 shrink-0" />,
+      badge: contactMessages.length > 0 ? contactMessages.length : undefined,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages),
+    },
+    {
+      key: 'manage_admins',
+      label: 'व्यवस्थापक (Admins)',
+      shortLabel: 'ॲडमिन',
+      icon: <Shield className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageAdmins),
+    },
+    {
+      key: 'cloudinary',
+      label: 'क्लाउड स्टोरेज',
+      shortLabel: 'स्टोरेज',
+      icon: <Cloud className="w-4 h-4 shrink-0" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary),
+    },
+    {
+      key: 'password',
+      label: 'पासवर्ड बदला',
+      shortLabel: 'पासवर्ड',
+      icon: <KeyRound className="w-4 h-4 shrink-0" />,
+      allowed: true,
+    },
+  ];
+
+  const permittedNavItems = adminNavItems.filter((item) => item.allowed);
+  const mobileQuickNavItems = permittedNavItems.slice(0, 4);
+
+  const handleSelectAdminTab = (tabKey: AdminSubTabKey) => {
+    setActiveAdminSubTab(tabKey);
+    setIsMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="allow-copy admin-panel bg-[#f6f8fc] py-8 md:py-12 min-h-screen">
-      <div className="max-w-[1100px] mx-auto px-4">
-        {/* Top Navigation Bar */}
-        <div className="border-b border-slate-300 pb-5 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {onExitAdmin && (
-              <button
-                type="button"
-                onClick={onExitAdmin}
-                className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow-xs transition-colors shrink-0"
-                title="मुख्य वेबसाईटवर परत जा"
-              >
-                <ArrowLeft className="w-4 h-4 text-[#df6b16]" />
-                <span className="hidden sm:inline">मुख्य वेबसाईटवर जा</span>
-              </button>
-            )}
-            <div>
-              <p className="text-[11px] uppercase tracking-widest font-bold text-[#df6b16]">
-                स्वतंत्र प्रशासन कक्ष (mahasangh.in/admin)
+    <div
+      className={`allow-copy admin-panel bg-[#fbf8f2] text-[#102a43] min-h-screen ${
+        isLoggedIn ? 'pb-24 lg:pb-10' : 'pb-12'
+      }`}
+    >
+      {/* Official Brand Sticky Header matching mahasangh.in */}
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[#132b52] via-[#193568] to-[#0b1e36] text-white border-b-2 border-[#efb24b] shadow-md">
+        <div className="max-w-[1280px] mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <img
+              src="/logo.png"
+              alt="महासंघ अधिकृत मानचिन्ह"
+              className="w-9 h-9 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#efb24b] bg-white object-contain shrink-0"
+            />
+            <div className="min-w-0">
+              <p className="text-[10px] sm:text-[11px] font-bold text-[#efb24b] tracking-wide truncate leading-tight">
+                महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
               </p>
-              <h1 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#17366d]">
-                सदस्यत्व व वेबसाईट प्रशासन (Admin Dashboard)
+              <h1 className="font-serifDevanagari text-sm sm:text-lg font-bold text-white truncate leading-tight">
+                अधिकृत प्रशासन कक्ष (Admin Panel)
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Clean Green Dot Indicator for Active Cloudinary CDN */}
-            {cloudinaryConfig.enabled && (
-              <div
-                className="inline-flex items-center gap-2 bg-white/95 border border-slate-200/90 px-3 py-1.5 rounded-full text-xs shadow-2xs select-none"
-                title={(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) ? "क्लाउड स्टोरेज सक्रिय आहे (सेटिंग्जसाठी क्लिक करा)" : "क्लाउड स्टोरेज सक्रिय आहे"}
+          <div className="flex items-center gap-2 shrink-0">
+            {onExitAdmin && (
+              <button
+                type="button"
+                onClick={onExitAdmin}
+                className="min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="मुख्य वेबसाईटवर परत जा"
               >
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-400 shrink-0" />
-                <span className="font-semibold text-emerald-800 text-[11px] sm:text-xs">क्लाउड स्टोरेज सक्रिय</span>
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveAdminSubTab(
-                        activeAdminSubTab === 'cloudinary'
-                          ? (currentUser?.isSuperAdmin ? 'applications' : getFirstAllowedAdminTab(currentUser?.permissions || ALL_ADMIN_PERMISSIONS_FALSE))
-                          : 'cloudinary'
-                      )
-                    }
-                    className="text-slate-400 hover:text-[#df6b16] ml-0.5 p-0.5 rounded transition-colors"
-                    title="क्लाउड स्टोरेज सेटिंग्ज"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+                <ArrowLeft className="w-4 h-4 text-[#efb24b]" />
+                <span className="hidden sm:inline">मुख्य वेबसाईटवर जा</span>
+                <span className="sm:hidden">वेबसाईट</span>
+              </button>
             )}
 
             {isLoggedIn && (
-              <div className="flex items-center gap-3">
-                {currentUser?.isSuperAdmin && (
-                  <a
-                    href="/dist.zip"
-                    download="dist.zip"
-                    onClick={handleDownloadZip}
-                    className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition-colors shrink-0"
-                    title="प्रशासकीय बिल्ड फाईल (dist.zip) डाऊनलोड करा"
-                  >
-                    <Download className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="hidden sm:inline">dist.zip डाऊनलोड</span>
-                  </a>
-                )}
-                <div className="text-right hidden sm:block">
-                  <div className="text-xs font-bold text-[#17366d] flex items-center justify-end gap-1">
-                    <Shield className="w-3.5 h-3.5 text-[#df6b16]" />
-                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक (Super Admin)' : (currentUser?.name || 'सह-व्यवस्थापक')}
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-mono">
-                    {currentUser?.email}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsLoggedIn(false);
-                    setCurrentUser(null);
-                  }}
-                  className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-4 py-2 rounded flex items-center gap-1.5 transition-colors shadow-xs"
-                >
-                  <LogOut className="w-3.5 h-3.5 text-rose-600" />
-                  बाहेर पडा (Logout)
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLoggedIn(false);
+                  setCurrentUser(null);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                title="प्रशासन कक्षातून बाहेर पडा"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">बाहेर पडा (Logout)</span>
+                <span className="sm:hidden">बाहेर</span>
+              </button>
             )}
           </div>
         </div>
+      </header>
 
+      <div className="max-w-[1280px] mx-auto px-3 sm:px-6 pt-5 sm:pt-7">
         {!isLoggedIn ? (
-          /* Login Card */
-          <div className="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-md">
-            {isFirstLoginMode ? (
-              /* First Login Password Setup Mode for Sub-Admins */
-              <div>
-                <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 mb-3 mx-auto">
-                  <UserPlus className="w-6 h-6" />
-                </div>
-                <h2 className="font-serifDevanagari text-xl font-bold text-center text-[#17366d] mb-1">
-                  नवीन पासवर्ड तयार करा
-                </h2>
-                <p className="text-xs text-center text-slate-500 mb-2">
-                  आपले ॲडमिन पॅनलमध्ये स्वागत आहे! आपण प्रथमच लॉगिन करत आहात.
-                </p>
-                <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-center text-xs mb-4">
-                  ई-मेल: <strong className="text-[#09243f] font-mono">{firstLoginEmail}</strong>
-                </div>
-
-                {firstLoginError && (
-                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0" />
-                    <span>{firstLoginError}</span>
+          /* Official Brand Login Card */
+          <div className="max-w-md mx-auto py-4 sm:py-8">
+            <div className="bg-white p-6 sm:p-8 rounded-2xl border border-[#e7ded1] shadow-lg">
+              {isFirstLoginMode ? (
+                /* First Login Password Setup Mode for Sub-Admins */
+                <div>
+                  <div className="w-14 h-14 bg-[#fff5e8] border border-[#efb24b]/60 rounded-full flex items-center justify-center text-[#df6b16] mb-4 mx-auto">
+                    <UserPlus className="w-7 h-7" />
                   </div>
-                )}
-
-                {firstLoginSuccess && (
-                  <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                    <span>{firstLoginSuccess}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleFirstLoginSubmit} className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      नवीन पासवर्ड तयार करा <span className="text-rose-600">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={firstLoginNewPassword}
-                      onChange={(e) => setFirstLoginNewPassword(e.target.value)}
-                      placeholder="किमान 4 अक्षरी गुप्त पासवर्ड"
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
+                  <h2 className="font-serifDevanagari text-xl font-bold text-center text-[#0b1e36] mb-1">
+                    नवीन पासवर्ड तयार करा
+                  </h2>
+                  <p className="text-xs text-center text-[#607184] mb-3">
+                    आपले ॲडमिन पॅनलमध्ये स्वागत आहे! आपण प्रथमच लॉगिन करत आहात.
+                  </p>
+                  <div className="bg-[#fbf8f2] border border-[#e7ded1] p-3 rounded-xl text-center text-xs mb-4">
+                    ई-मेल: <strong className="text-[#0b1e36] font-mono">{firstLoginEmail}</strong>
                   </div>
 
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      पासवर्ड पुन्हा प्रविष्ट करा (Confirm Password) <span className="text-rose-600">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      value={firstLoginConfirmPassword}
-                      onChange={(e) => setFirstLoginConfirmPassword(e.target.value)}
-                      placeholder="तोच पासवर्ड पुन्हा टाका"
-                      className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
+                  {firstLoginError && (
+                    <div className="mb-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 shrink-0" />
+                      <span>{firstLoginError}</span>
+                    </div>
+                  )}
 
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setIsFirstLoginMode(false)}
-                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-lg text-xs"
-                    >
-                      रद्द करा
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 rounded-lg text-xs shadow-sm"
-                    >
-                      पासवर्ड सेव्ह करा
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="max-w-md w-full mx-auto p-8 bg-white rounded-2xl shadow-xl border border-slate-100">
-                <div className="w-16 h-16 bg-[#fff0df] rounded-full flex items-center justify-center text-[#df6b16] mb-6 mx-auto">
-                  <Lock className="w-8 h-8" />
-                </div>
-                <h2 className="font-serifDevanagari text-2xl font-bold text-center text-[#17366d] mb-2">
-                  प्रशासन लॉगिन
-                </h2>
-                <p className="text-sm text-center text-slate-500 mb-8">
-                  केवळ अधिकृत व्यवस्थापकांसाठी राखीव पोर्टल
-                </p>
+                  {firstLoginSuccess && (
+                    <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                      <span>{firstLoginSuccess}</span>
+                    </div>
+                  )}
 
-                {loginError && (
-                  <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg flex items-center gap-3">
-                    <ShieldAlert className="w-5 h-5 shrink-0" />
-                    <span>{loginError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleLogin} className="space-y-5">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-2">
-                      ई-मेल (Admin Email)
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="आपला ॲडमिन ई-मेल प्रविष्ट करा"
-                      className="w-full p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#df6b16] focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-2">
-                      पासवर्ड (Password)
-                    </label>
-                    <div className="relative">
+                  <form onSubmit={handleFirstLoginSubmit} className="space-y-4">
+                    <div>
+                      <label className="font-bold text-xs text-[#102a43] block mb-1.5">
+                        नवीन पासवर्ड तयार करा <span className="text-rose-600">*</span>
+                      </label>
                       <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="पासवर्ड प्रविष्ट करा"
-                        className="w-full p-3 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#df6b16] focus:border-transparent"
+                        type="password"
+                        required
+                        value={firstLoginNewPassword}
+                        onChange={(e) => setFirstLoginNewPassword(e.target.value)}
+                        placeholder="किमान 4 अक्षरी गुप्त पासवर्ड"
+                        className="w-full px-3.5 py-3 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
                       />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-xs text-[#102a43] block mb-1.5">
+                        पासवर्ड पुन्हा प्रविष्ट करा (Confirm Password) <span className="text-rose-600">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={firstLoginConfirmPassword}
+                        onChange={(e) => setFirstLoginConfirmPassword(e.target.value)}
+                        placeholder="तोच पासवर्ड पुन्हा टाका"
+                        className="w-full px-3.5 py-3 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
+                      />
+                    </div>
+
+                    <div className="flex gap-2.5 pt-2">
                       <button
                         type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                        onClick={() => setIsFirstLoginMode(false)}
+                        className="flex-1 min-h-[46px] bg-slate-100 hover:bg-slate-200 text-[#102a43] font-bold py-2.5 rounded-xl text-sm cursor-pointer"
                       >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        रद्द करा
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 min-h-[46px] bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 rounded-xl text-sm shadow-sm cursor-pointer"
+                      >
+                        पासवर्ड सेव्ह करा
                       </button>
                     </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoggingIn}
-                    className="w-full bg-[#17366d] hover:bg-[#0b1e36] text-white font-bold py-3.5 rounded-xl text-base transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-75"
-                  >
-                    {isLoggingIn ? (
-                      <>
-                        <RefreshCw className="w-5 h-5 animate-spin" />
-                        <span>लॉगिन पडताळणी होत आहे...</span>
-                      </>
-                    ) : (
-                      <span>Login करा</span>
-                    )}
-                  </button>
-                </form>
-
-                <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!email.trim()) {
-                        setLoginError('कृपया आधी आपला अधिकृत ई-मेल प्रविष्ट करा.');
-                        return;
-                      }
-                      setIsFirstLoginMode(true);
-                      setFirstLoginEmail(email.trim().toLowerCase());
-                      setFirstLoginError('');
-                      setFirstLoginSuccess('');
-                    }}
-                    className="text-sm text-amber-700 hover:text-amber-900 font-bold flex items-center justify-center gap-2 mx-auto transition-colors"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                    नवीन ॲडमिन? पासवर्ड तयार करा
-                  </button>
+                  </form>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div>
+                  <div className="w-16 h-16 rounded-full ring-2 ring-[#efb24b] bg-[#fbf8f2] p-1 mx-auto mb-4 shadow-sm flex items-center justify-center">
+                    <img
+                      src="/logo.png"
+                      alt="महासंघ मानचिन्ह"
+                      className="w-full h-full object-contain rounded-full"
+                    />
+                  </div>
+                  <h2 className="font-serifDevanagari text-2xl font-bold text-center text-[#0b1e36] mb-1">
+                    प्रशासन लॉगिन
+                  </h2>
+                  <p className="text-xs sm:text-sm text-center text-[#607184] mb-6">
+                    केवळ अधिकृत व्यवस्थापकांसाठी राखीव पोर्टल
+                  </p>
+
+                  {loginError && (
+                    <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm rounded-xl flex items-center gap-2.5">
+                      <ShieldAlert className="w-5 h-5 shrink-0" />
+                      <span>{loginError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="font-bold text-xs sm:text-sm text-[#102a43] block mb-1.5">
+                        ई-मेल (Admin Email)
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="आपला ॲडमिन ई-मेल प्रविष्ट करा"
+                        className="w-full px-3.5 py-3 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-bold text-xs sm:text-sm text-[#102a43] block mb-1.5">
+                        पासवर्ड (Password)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="पासवर्ड प्रविष्ट करा"
+                          className="w-full px-3.5 py-3 pr-12 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label="पासवर्ड पहा किंवा लपवा"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-[#607184] hover:text-[#0b1e36] focus:outline-none cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isLoggingIn}
+                      className="w-full min-h-[48px] bg-[#0b1e36] hover:bg-[#193568] text-white font-bold py-3.5 rounded-xl text-base transition-colors shadow-md flex items-center justify-center gap-2 disabled:opacity-75 cursor-pointer"
+                    >
+                      {isLoggingIn ? (
+                        <>
+                          <RefreshCw className="w-5 h-5 animate-spin" />
+                          <span>लॉगिन पडताळणी होत आहे...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-4 h-4 text-[#efb24b]" />
+                          <span>Login करा</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  <div className="mt-6 pt-5 border-t border-[#e7ded1] text-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!email.trim()) {
+                          setLoginError('कृपया आधी आपला अधिकृत ई-मेल प्रविष्ट करा.');
+                          return;
+                        }
+                        setIsFirstLoginMode(true);
+                        setFirstLoginEmail(email.trim().toLowerCase());
+                        setFirstLoginError('');
+                        setFirstLoginSuccess('');
+                      }}
+                      className="min-h-[44px] px-3 text-sm text-[#df6b16] hover:text-[#0b1e36] font-bold flex items-center justify-center gap-2 mx-auto transition-colors cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      नवीन ॲडमिन? पासवर्ड तयार करा
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          /* Admin Dashboard */
-          <div className="space-y-6">
-            {/* Sub-tabs Navigation Bar (Always at top after login) */}
-            <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.approveMembers) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('applications')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'applications'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Users className="w-4 h-4" />
-                    <span>सदस्यत्व अर्ज ({totalCount})</span>
-                  </button>
-                )}
+          /* Authenticated Admin Dashboard Workspace */
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Desktop Left Navy Sidebar */}
+            <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 bg-[#0b1e36] text-white rounded-2xl border border-[#efb24b]/40 p-3 shadow-lg sticky top-20 space-y-1">
+              <div className="px-3 py-2.5 mb-2 border-b border-white/10">
+                <div className="flex items-center gap-2 text-xs font-bold text-[#efb24b]">
+                  <Shield className="w-4 h-4 shrink-0" />
+                  <span className="truncate">
+                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक' : currentUser?.name || 'सह-व्यवस्थापक'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 font-mono truncate mt-0.5">
+                  {currentUser?.email}
+                </p>
+              </div>
 
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.editMembers) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('edit_members')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'edit_members'
-                        ? 'bg-indigo-700 text-white shadow-xs'
-                        : 'text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200'
-                    }`}
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    <span>सदस्य एडिट</span>
-                  </button>
-                )}
+              <nav className="space-y-1" aria-label="प्रशासन विभाग">
+                {permittedNavItems.map((item) => {
+                  const isActive = activeAdminSubTab === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleSelectAdminTab(item.key)}
+                      className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between gap-2 transition-colors cursor-pointer text-left ${
+                        isActive
+                          ? 'bg-[#efb24b] text-[#0b1e36] shadow-sm'
+                          : 'text-slate-100 hover:bg-white/10'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        {item.icon}
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {item.badge !== undefined && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono tabular-nums shrink-0 ${
+                            isActive
+                              ? 'bg-[#0b1e36] text-[#efb24b]'
+                              : 'bg-[#df6b16] text-white'
+                          }`}
+                        >
+                          {toEnglishDigits(item.badge)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </nav>
+            </aside>
 
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('leadership')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'leadership'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Award className="w-4 h-4" />
-                    <span>नेतृत्व व पदाधिकारी</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageNews) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('add_news')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'add_news'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>बातम्या</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageGovOrders) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('gov_order')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'gov_order'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>शासन निर्णय</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('latest_banners')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'latest_banners'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <ImageIcon className="w-4 h-4" />
-                    <span>ताज्या घडामोडी बॅनर्स</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('id_card_preview')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'id_card_preview'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Award className="w-4 h-4 text-amber-400" />
-                    <span>आय-कार्ड डिझाईन नमुना</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageAdmins) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('manage_admins')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'manage_admins'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <Shield className="w-4 h-4" />
-                    <span>व्यवस्थापक (Admins)</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageRazorpay) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('razorpay')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'razorpay'
-                        ? 'bg-emerald-700 text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <KeyRound className="w-4 h-4 text-emerald-400" />
-                    <span>Razorpay व वेबहूक (Webhook)</span>
-                  </button>
-                )}
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab('contact_messages')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'contact_messages'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                    <span>प्राप्त संदेश</span>
-                  </button>
-                )}
-
+            {/* Main Right Workspace Column */}
+            <main className="flex-1 min-w-0 w-full space-y-5">
+              {/* Mobile Active Section Strip + Quick Menu Trigger */}
+              <div className="lg:hidden bg-white border border-[#e7ded1] rounded-2xl px-3.5 py-2.5 shadow-2xs flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-[#df6b16]">
+                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक' : currentUser?.name || 'सह-व्यवस्थापक'}
+                  </p>
+                  <p className="font-serifDevanagari font-bold text-sm text-[#0b1e36] truncate">
+                    {permittedNavItems.find((i) => i.key === activeAdminSubTab)?.label || 'प्रशासन'}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setActiveAdminSubTab('password')}
-                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                    activeAdminSubTab === 'password'
-                      ? 'bg-[#17366d] text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="min-h-[42px] px-3 py-2 rounded-xl bg-[#0b1e36] text-white text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <Menu className="w-4 h-4 text-[#efb24b]" />
+                  <span>मेनू</span>
+                </button>
+              </div>
+
+              {/* Unified Non-Blocking Feedback Banner */}
+              {adminFeedbackBanner && (
+                <div
+                  className={`p-3.5 rounded-xl border text-xs sm:text-sm font-semibold flex items-center justify-between gap-3 shadow-2xs ${
+                    adminFeedbackBanner.type === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-rose-50 border-rose-200 text-rose-900'
                   }`}
                 >
-                  <KeyRound className="w-4 h-4" />
-                  <span>पासवर्ड बदला</span>
-                </button>
-
-                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) && (
+                  <div className="flex items-center gap-2 min-w-0">
+                    {adminFeedbackBanner.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    ) : (
+                      <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                    )}
+                    <span>{adminFeedbackBanner.text}</span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setActiveAdminSubTab('cloudinary')}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                      activeAdminSubTab === 'cloudinary'
-                        ? 'bg-[#17366d] text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
+                    onClick={() => setAdminFeedbackBanner(null)}
+                    className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0 cursor-pointer"
+                    aria-label="बंद करा"
                   >
-                    <Cloud className="w-4 h-4" />
-                    <span>क्लाउड स्टोरेज</span>
+                    <X className="w-4 h-4" />
                   </button>
-                )}
-              </div>
-            </div>
+                </div>
+              )}
 
             {/* Sub-tab 1: Applications */}
             {activeAdminSubTab === 'applications' && (currentUser?.isSuperAdmin || currentUser?.permissions.approveMembers) && (
-              <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-[#e7ded1] shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7ded1] pb-4">
                   <div>
-                    <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
-                      सदस्यत्व अर्ज तपासणी व मंजुरी (Membership Applications)
+                    <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e36]">
+                      सदस्यत्व अर्ज तपासणी व मंजुरी
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-[#607184] mt-0.5">
                       येथे प्राप्त झालेले सर्व अर्ज तपासा, बँक पेमेंट पडताळा व अधिकृत सदस्य क्रमांक द्या.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <div className="flex flex-wrap items-center gap-2">
                     {currentUser?.isSuperAdmin && (
                       <>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (activeCircleAction === 'resequence') {
-                            handleResequence();
-                            setActiveCircleAction(null);
-                          } else {
-                            setActiveCircleAction('resequence');
-                          }
-                        }}
-                        disabled={isResequencing}
-                        className="w-7 h-7 rounded-full bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center text-xs font-black shadow-xs transition-transform hover:scale-110 cursor-pointer disabled:opacity-50"
-                        title="सर्व क्रमांक क्रमाने लावा"
-                      >
-                        {isResequencing ? '...' : '🔠'}
-                      </button>
-                      {activeCircleAction === 'resequence' && (
-                        <div className="absolute right-0 top-9 z-50 bg-amber-900 text-white text-[11px] font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-2">
-                          <span>सर्व क्रमांक क्रमाने लावा? (पुन्हा क्लिक करा)</span>
+                        <div className="relative">
                           <button
-                            onClick={() => setActiveCircleAction(null)}
-                            className="text-amber-200 hover:text-white font-bold ml-1"
+                            type="button"
+                            onClick={() => {
+                              if (activeCircleAction === 'resequence') {
+                                handleResequence();
+                                setActiveCircleAction(null);
+                              } else {
+                                setActiveCircleAction('resequence');
+                              }
+                            }}
+                            disabled={isResequencing}
+                            className="min-w-[40px] min-h-[40px] rounded-xl bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-2.5"
+                            title="सर्व क्रमांक क्रमाने लावा"
                           >
-                            ✕
+                            {isResequencing ? '...' : 'क्रमाने लावा'}
                           </button>
+                          {activeCircleAction === 'resequence' && (
+                            <div className="absolute left-0 sm:left-auto sm:right-0 top-11 z-30 bg-[#0b1e36] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2 border border-[#efb24b]">
+                              <span>पुनर्रचना करायची? (पुन्हा टॅप करा)</span>
+                              <button
+                                type="button"
+                                onClick={() => setActiveCircleAction(null)}
+                                className="text-[#efb24b] hover:text-white font-bold px-1"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    {/* 2. Tiny Colored Circle: Reset Counter */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (activeCircleAction === 'reset') {
-                            handleResetCounter();
-                            setActiveCircleAction(null);
-                          } else {
-                            setActiveCircleAction('reset');
-                          }
-                        }}
-                        disabled={isResettingCounter}
-                        className="w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xs font-black shadow-xs transition-transform hover:scale-110 cursor-pointer disabled:opacity-50"
-                        title="काउंट शेवटच्या क्रमांकावर सेट करा"
-                      >
-                        {isResettingCounter ? '...' : '🔢'}
-                      </button>
-                      {activeCircleAction === 'reset' && (
-                        <div className="absolute right-0 top-9 z-50 bg-indigo-900 text-white text-[11px] font-bold px-3 py-2 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-2">
-                          <span>काउंट शेवटच्या क्रमांकावर सेट करा? (पुन्हा क्लिक करा)</span>
+                        <div className="relative">
                           <button
-                            onClick={() => setActiveCircleAction(null)}
-                            className="text-indigo-200 hover:text-white font-bold ml-1"
+                            type="button"
+                            onClick={() => {
+                              if (activeCircleAction === 'reset') {
+                                handleResetCounter();
+                                setActiveCircleAction(null);
+                              } else {
+                                setActiveCircleAction('reset');
+                              }
+                            }}
+                            disabled={isResettingCounter}
+                            className="min-w-[40px] min-h-[40px] rounded-xl bg-[#193568] hover:bg-[#0b1e36] text-white flex items-center justify-center text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-2.5"
+                            title="काउंट शेवटच्या क्रमांकावर सेट करा"
                           >
-                            ✕
+                            {isResettingCounter ? '...' : 'काउंटर रिसेट'}
                           </button>
+                          {activeCircleAction === 'reset' && (
+                            <div className="absolute left-0 sm:left-auto sm:right-0 top-11 z-30 bg-[#0b1e36] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2 border border-[#efb24b]">
+                              <span>शेवटच्या क्रमांकावर सेट करा? (पुन्हा टॅप करा)</span>
+                              <button
+                                type="button"
+                                onClick={() => setActiveCircleAction(null)}
+                                className="text-[#efb24b] hover:text-white font-bold px-1"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={handlePurgeDeletedGhosts}
-                      disabled={isPurgingGhosts}
-                      className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-                      title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड सिस्टममधून स्वच्छ करा"
-                    >
-                      <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
-                      <span>{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुने डिलीट डाटा स्वच्छ करा'}</span>
-                    </button>
+                        <button
+                          type="button"
+                          onClick={handlePurgeDeletedGhosts}
+                          disabled={isPurgingGhosts}
+                          className="min-h-[40px] bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                          title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित रेकॉर्ड सिस्टममधून स्वच्छ करा"
+                        >
+                          <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
+                          <span>{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुना डाटा स्वच्छ करा'}</span>
+                        </button>
                       </>
                     )}
 
@@ -2256,9 +2205,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         type="button"
                         onClick={() => onFetchApplications(true)}
                         disabled={isLoadingApps}
-                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="min-h-[40px] bg-[#fbf8f2] hover:bg-[#f2eadf] text-[#0b1e36] border border-[#e7ded1] text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingApps ? 'animate-spin' : ''}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 text-[#df6b16] ${isLoadingApps ? 'animate-spin' : ''}`} />
                         <span>{isLoadingApps ? 'लोड होत आहे...' : 'ताजे करा'}</span>
                       </button>
                     )}
@@ -2266,56 +2215,62 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </div>
 
                 {/* Quick Stats Grid inside Applications Sub-Tab */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 shadow-2xs">
-                    <span className="text-slate-500 text-xs font-bold block">एकूण अर्ज</span>
-                    <span className="text-2xl font-black text-[#17366d] font-mono">{totalCount}</span>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                  <div className="bg-[#fbf8f2] p-3.5 rounded-xl border border-[#e7ded1]">
+                    <span className="text-[#607184] text-xs font-bold block">एकूण अर्ज</span>
+                    <span className="text-2xl font-black text-[#0b1e36] tabular-nums">{toEnglishDigits(totalCount)}</span>
                   </div>
-                  <div className="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 shadow-2xs">
+                  <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200">
                     <span className="text-emerald-800 text-xs font-bold block">मंजूर अर्ज</span>
-                    <span className="text-2xl font-black text-emerald-600 font-mono">{approvedCount}</span>
+                    <span className="text-2xl font-black text-emerald-700 tabular-nums">{toEnglishDigits(approvedCount)}</span>
                   </div>
-                  <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 shadow-2xs">
+                  <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200">
                     <span className="text-amber-800 text-xs font-bold block">प्रलंबित अर्ज</span>
-                    <span className="text-2xl font-black text-amber-600 font-mono">{pendingCount}</span>
+                    <span className="text-2xl font-black text-amber-700 tabular-nums">{toEnglishDigits(pendingCount)}</span>
                   </div>
-                  <div className="bg-rose-50/50 p-3.5 rounded-xl border border-rose-200 shadow-2xs">
+                  <div className="bg-rose-50/70 p-3.5 rounded-xl border border-rose-200">
                     <span className="text-rose-800 text-xs font-bold block">नाकारलेले अर्ज</span>
-                    <span className="text-2xl font-black text-rose-600 font-mono">{rejectedCount}</span>
+                    <span className="text-2xl font-black text-rose-700 tabular-nums">{toEnglishDigits(rejectedCount)}</span>
                   </div>
                 </div>
 
                 {/* Filters & Search */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-                  <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200 text-xs">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar bg-[#fbf8f2] p-1.5 rounded-xl border border-[#e7ded1] text-xs">
                     {(['all', 'pending', 'approved', 'rejected'] as const).map((st) => (
                       <button
                         key={st}
                         type="button"
-                        onClick={() => setFilterStatus(st)}
-                        className={`px-3 py-1.5 rounded-md font-bold transition-all ${
+                        onClick={() => {
+                          setFilterStatus(st);
+                          setAppsVisibleCount(50);
+                        }}
+                        className={`min-h-[38px] px-3 py-1.5 rounded-lg font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                           filterStatus === st
-                            ? 'bg-[#17366d] text-white shadow-2xs'
-                            : 'text-slate-600 hover:text-slate-900'
+                            ? 'bg-[#0b1e36] text-[#efb24b] shadow-xs'
+                            : 'text-[#607184] hover:text-[#0b1e36]'
                         }`}
                       >
-                        {st === 'all' && `सर्व (${totalCount})`}
-                        {st === 'pending' && `प्रलंबित (${pendingCount})`}
-                        {st === 'approved' && `मंजूर (${approvedCount})`}
-                        {st === 'rejected' && `नाकारलेले (${rejectedCount})`}
+                        {st === 'all' && `सर्व (${toEnglishDigits(totalCount)})`}
+                        {st === 'pending' && `प्रलंबित (${toEnglishDigits(pendingCount)})`}
+                        {st === 'approved' && `मंजूर (${toEnglishDigits(approvedCount)})`}
+                        {st === 'rejected' && `नाकारलेले (${toEnglishDigits(rejectedCount)})`}
                       </button>
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
                     <div className="relative flex-1 sm:w-64">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <Search className="w-4 h-4 text-[#607184] absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="नाव, अर्ज क्र., मोबाईल किंवा जिल्हा शोधा..."
+                        placeholder="नाव, अर्ज क्र., मोबाईल किंवा जिल्हा..."
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full text-xs pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setAppsVisibleCount(50);
+                        }}
+                        className="w-full min-h-[44px] text-base sm:text-xs pl-9 pr-3 py-2 bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:border-[#df6b16]"
                       />
                     </div>
                     <button
@@ -2339,39 +2294,167 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                         const worksheet = XLSX.utils.json_to_sheet(excelData);
                         worksheet['!cols'] = [
-                          { wch: 10 }, // अनुक्रमांक
-                          { wch: 22 }, // सदस्य क्रमांक
-                          { wch: 18 }, // अर्ज क्रमांक
-                          { wch: 32 }, // पूर्ण नाव
-                          { wch: 22 }, // पद
-                          { wch: 16 }, // जिल्हा
-                          { wch: 16 }, // तालुका
-                          { wch: 22 }, // केंद्र
-                          { wch: 16 }, // मोबाईल
-                          { wch: 26 }, // ईमेल
-                          { wch: 14 }, // स्थिती
-                          { wch: 16 }, // दिनांक
+                          { wch: 10 },
+                          { wch: 22 },
+                          { wch: 18 },
+                          { wch: 32 },
+                          { wch: 22 },
+                          { wch: 16 },
+                          { wch: 16 },
+                          { wch: 22 },
+                          { wch: 16 },
+                          { wch: 26 },
+                          { wch: 14 },
+                          { wch: 16 },
                         ];
 
                         const workbook = XLSX.utils.book_new();
                         XLSX.utils.book_append_sheet(workbook, worksheet, 'सदस्य माहिती');
-                        
                         const fileName = `mahasangh_members_${filterStatus}_${new Date().toISOString().split('T')[0]}.xlsx`;
                         XLSX.writeFile(workbook, fileName);
                       }}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
+                      className="min-h-[44px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
                       title="सर्व सदस्य माहिती मूळ एक्सेल (.XLSX) फॉरमॅटमध्ये डाऊनलोड करा"
                     >
-                      <Download className="w-3.5 h-3.5" />
+                      <Download className="w-4 h-4" />
                       <span>XLSX डाऊनलोड</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Table */}
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                {/* Mobile App Card List (Visible on Mobile & Small Tablets) */}
+                <div className="md:hidden space-y-3">
+                  {filteredApps.length === 0 ? (
+                    <div className="py-10 text-center text-sm text-[#607184] bg-[#fbf8f2] rounded-xl border border-dashed border-[#e7ded1]">
+                      कोणताही अर्ज सापडला नाही.
+                    </div>
+                  ) : (
+                    visibleFilteredApps.map((app) => (
+                      <div
+                        key={app.id}
+                        className="bg-[#fbf8f2] border border-[#e7ded1] rounded-2xl p-3.5 space-y-3 shadow-2xs"
+                      >
+                        <div className="flex items-start gap-3">
+                          {app.photo ? (
+                            <img
+                              src={app.photo}
+                              alt={app.fullName}
+                              onClick={() => handleOpenVerification(app)}
+                              className="w-14 h-16 object-cover rounded-xl border border-[#e7ded1] shrink-0 cursor-pointer"
+                            />
+                          ) : (
+                            <div
+                              onClick={() => handleOpenVerification(app)}
+                              className="w-14 h-16 bg-white rounded-xl border border-[#e7ded1] flex items-center justify-center text-[#607184] shrink-0 cursor-pointer"
+                            >
+                              <ImageIcon className="w-5 h-5" />
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenVerification(app)}
+                                className="text-left font-serifDevanagari font-bold text-sm text-[#0b1e36] leading-snug hover:text-[#df6b16]"
+                              >
+                                {app.salutation ? `${app.salutation} ` : ''}
+                                {app.fullName}
+                              </button>
+                              {app.status === 'approved' ? (
+                                <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
+                                  मंजूर
+                                </span>
+                              ) : app.status === 'rejected' ? (
+                                <span className="inline-flex items-center bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
+                                  नाकारले
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
+                                  प्रलंबित
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="text-xs text-[#607184] mt-1 space-y-0.5">
+                              <p className="font-mono font-bold text-[#193568] text-[11px]">
+                                {app.memberNumber || app.applicationNumber} • {formatDateWithEnglishDigits(app.createdAt)}
+                              </p>
+                              <p>
+                                {app.professional || 'केंद्रप्रमुख'} • <strong className="text-[#102a43]">{app.district}</strong>
+                              </p>
+                              <p className="font-mono text-[#df6b16] font-bold">{app.phone}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Touch Action Bar (min 44px height) */}
+                        <div className="pt-2 border-t border-[#e7ded1]">
+                          {app.status === 'pending' ? (
+                            <div className="grid grid-cols-3 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenVerification(app)}
+                                className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Check className="w-4 h-4" />
+                                <span>मंजूर</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenVerification(app, true)}
+                                className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <X className="w-4 h-4" />
+                                <span>नाकारा</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWithFeedback(app)}
+                                className="min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>डिलीट</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setCertModalApp(app)}
+                                className="min-h-[44px] bg-[#0b1e36] hover:bg-[#193568] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Eye className="w-4 h-4 text-[#efb24b]" />
+                                <span>आय-कार्ड</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => generateMembershipIdCardPdf(app)}
+                                className="min-h-[44px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Download className="w-4 h-4" />
+                                <span>PDF</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteWithFeedback(app)}
+                                className="min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>डिलीट</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Desktop Table (Hidden on Mobile) */}
+                <div className="hidden md:block overflow-x-auto border border-[#e7ded1] rounded-xl">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                    <thead className="bg-[#fbf8f2] border-b border-[#e7ded1] text-[#0b1e36] font-bold uppercase tracking-wider text-[11px]">
                       <tr>
                         <th className="py-3 px-4">फोटो</th>
                         <th className="py-3 px-4">अर्ज क्र. / तारीख</th>
@@ -2382,49 +2465,49 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <th className="py-3 px-4 text-center">कृती (Action)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[#e7ded1]/70">
                       {filteredApps.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-8 text-center text-slate-400">
+                          <td colSpan={7} className="py-8 text-center text-[#607184]">
                             कोणताही अर्ज सापडला नाही.
                           </td>
                         </tr>
                       ) : (
-                        filteredApps.map((app) => (
-                          <tr key={app.id} className="hover:bg-slate-50/80 transition-colors">
+                        visibleFilteredApps.map((app) => (
+                          <tr key={app.id} className="hover:bg-[#fbf8f2] transition-colors">
                             <td className="py-3 px-4">
                               {app.photo ? (
                                 <img
                                   src={app.photo}
                                   alt={app.fullName}
-                                  className="w-9 h-11 object-cover rounded border border-slate-300 cursor-pointer"
+                                  className="w-9 h-11 object-cover rounded border border-[#e7ded1] cursor-pointer"
                                   onClick={() => handleOpenVerification(app)}
                                 />
                               ) : (
                                 <div
                                   onClick={() => handleOpenVerification(app)}
-                                  className="w-9 h-11 bg-slate-200 rounded border border-slate-300 flex items-center justify-center text-slate-400 cursor-pointer"
+                                  className="w-9 h-11 bg-[#fbf8f2] rounded border border-[#e7ded1] flex items-center justify-center text-[#607184] cursor-pointer"
                                 >
                                   <ImageIcon className="w-4 h-4" />
                                 </div>
                               )}
                             </td>
-                            <td className="py-3 px-4 font-mono font-bold text-[#17366d]">
+                            <td className="py-3 px-4 font-mono font-bold text-[#193568]">
                               {app.applicationNumber}
-                              <span className="block font-sans font-normal text-xs text-slate-600 mt-0.5">
+                              <span className="block font-sans font-normal text-xs text-[#607184] mt-0.5">
                                 {formatDateWithEnglishDigits(app.createdAt)}
                               </span>
                               {app.createdAt && (
-                                <span className="block font-sans font-semibold text-sm text-slate-800 mt-0.5">
+                                <span className="block font-sans font-semibold text-xs text-[#102a43] mt-0.5">
                                   {formatTimeOnly(app.createdAt)}
                                 </span>
                               )}
                             </td>
-                            <td className="py-3 px-4 font-bold text-slate-900">
+                            <td className="py-3 px-4 font-bold text-[#0b1e36]">
                               <button
                                 type="button"
                                 onClick={() => handleOpenVerification(app)}
-                                className="text-left hover:text-[#df6b16] hover:underline"
+                                className="text-left hover:text-[#df6b16] hover:underline cursor-pointer"
                                 title="तपशीलवार पडताळणी उघडा"
                               >
                                 {app.fullName}
@@ -2435,13 +2518,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 )}
                               </button>
                             </td>
-                            <td className="py-3 px-4 text-slate-700">
+                            <td className="py-3 px-4 text-[#102a43]">
                               {app.professional || 'केंद्रप्रमुख / अधिकारी'}
-                              <span className="block text-[11px] text-slate-500 font-semibold">
+                              <span className="block text-[11px] text-[#607184] font-semibold">
                                 {app.district}
                               </span>
                             </td>
-                            <td className="py-3 px-4 font-mono">
+                            <td className="py-3 px-4 font-mono tabular-nums">
                               {app.phone}
                             </td>
                             <td className="py-3 px-4">
@@ -2466,24 +2549,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => handleOpenVerification(app)}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                                   >
                                     मंजूर करा
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      const reason = prompt("अर्ज नाकारण्याचे कारण प्रविष्ट करा:");
-                                      if(reason !== null) onRejectApplication(app.id, reason);
-                                    }}
-                                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs"
+                                    onClick={() => handleOpenVerification(app, true)}
+                                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                                   >
                                     नाकारा
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteWithFeedback(app)}
-                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded text-xs transition-colors shadow-xs cursor-pointer"
+                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                                   >
                                     डिलीट
                                   </button>
@@ -2493,16 +2573,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => setCertModalApp(app)}
-                                    className="bg-[#17366d] hover:bg-[#0f244c] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                    className="bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
                                     title="आय-कार्ड पहा"
                                   >
-                                    <Eye className="w-3.5 h-3.5" />
+                                    <Eye className="w-3.5 h-3.5 text-[#efb24b]" />
                                     आय-कार्ड पहा
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => generateMembershipIdCardPdf(app)}
-                                    className="bg-[#047857] hover:bg-[#065f46] text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
                                     title="आय-कार्ड PDF डाऊनलोड करा"
                                   >
                                     <Download className="w-3.5 h-3.5" />
@@ -2511,7 +2591,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteWithFeedback(app)}
-                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
+                                    className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
                                     title="हा अर्ज कायमचा डिलीट करा"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -2525,6 +2605,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </tbody>
                   </table>
                 </div>
+
+                {/* Fast Load-More Pagination Bar */}
+                {filteredApps.length > 0 && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-[#607184]">
+                    <span>
+                      एकूण <strong className="text-[#0b1e36] tabular-nums">{toEnglishDigits(filteredApps.length)}</strong> पैकी{' '}
+                      <strong className="text-[#0b1e36] tabular-nums">{toEnglishDigits(visibleFilteredApps.length)}</strong> नोंदी दाखवल्या आहेत
+                    </span>
+                    {visibleFilteredApps.length < filteredApps.length && (
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setAppsVisibleCount((prev) => prev + 50)}
+                          className="flex-1 sm:flex-none min-h-[42px] px-4 py-2 bg-[#0b1e36] hover:bg-[#193568] text-white font-bold rounded-xl cursor-pointer"
+                        >
+                          आणखी ५० अर्ज पहा
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAppsVisibleCount(filteredApps.length)}
+                          className="min-h-[42px] px-4 py-2 bg-[#fbf8f2] hover:bg-[#f0e9de] text-[#0b1e36] border border-[#e7ded1] font-bold rounded-xl cursor-pointer"
+                        >
+                          सर्व दाखवा
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -4523,189 +4631,280 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Razorpay Payment Gateway & Webhook Config */}
-            {activeAdminSubTab === 'razorpay' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageRazorpay) && (
-              <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-md space-y-6 max-w-2xl mx-auto">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-200">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
-                      💳
-                    </div>
-                    <div>
-                      <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
-                        Razorpay ऑटोमॅटिक पेमेंट व वेबहूक (Webhook) गेटवे
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Razorpay API Keys आणि Webhook जोडून बनावट UTR/पेमेंट फसवणूक १००% रोखा
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveAdminSubTab(currentUser?.isSuperAdmin ? 'applications' : getFirstAllowedAdminTab(currentUser?.permissions || ALL_ADMIN_PERMISSIONS_FALSE))}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                    title="बंद करा"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Status Message */}
-                {razorpayStatusMsg && (
-                  <div
-                    className={`p-3.5 rounded-lg text-xs font-semibold flex items-center justify-between gap-2 ${
-                      razorpayStatusMsg.type === 'success'
-                        ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
-                        : 'bg-rose-50 border border-rose-300 text-rose-900'
-                    }`}
-                  >
-                    <span>{razorpayStatusMsg.text}</span>
-                    <button
-                      type="button"
-                      onClick={() => setRazorpayStatusMsg(null)}
-                      className="text-slate-400 hover:text-slate-700"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Webhook Endpoint Display Box */}
-                <div className="bg-slate-900 text-slate-100 p-4 rounded-xl border border-slate-700 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-amber-400 flex items-center gap-1.5">
-                      <Shield className="w-4 h-4" />
-                      तुमचा ॲक्टिव्ह Razorpay Webhook URL Endpoint:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyWebhookUrl}
-                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1 rounded text-[11px] transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      {copiedWebhookUrl ? '✓ कॉपी झाला!' : 'URL कॉपी करा'}
-                    </button>
-                  </div>
-                  <div className="font-mono text-xs bg-slate-950 p-2.5 rounded border border-slate-800 text-emerald-400 break-all select-all">
-                    {razorpayWebhookUrl || `${window.location.origin}/api/razorpay/webhook`}
-                  </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    👉 हा URL तुमच्या <a href="https://dashboard.razorpay.com/app/webhooks" target="_blank" rel="noreferrer" className="text-amber-300 underline font-bold">Razorpay Dashboard &gt; Settings &gt; Webhooks</a> मध्ये जोडा. 
-                    तिथे Active Events म्हणून <strong>payment.captured</strong> आणि <strong>order.paid</strong> निवडा.
-                  </p>
-                </div>
-
-                <form onSubmit={handleSaveRazorpayConfig} className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Razorpay Key ID <span className="text-rose-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="rzp_live_... किंवा rzp_test_..."
-                      value={razorpayKeyId}
-                      onChange={(e) => setRazorpayKeyId(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Razorpay Key Secret <span className="text-rose-600">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="Razorpay Secret Key प्रविष्ट करा"
-                      value={razorpayKeySecret}
-                      onChange={(e) => setRazorpayKeySecret(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:outline-none focus:border-[#df6b16]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="font-bold text-slate-700 block mb-1">
-                      Razorpay Webhook Secret (ऐच्छिक परंतु अत्यंत सुरक्षित)
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="Razorpay वेबहूक सिक्रेट कोड (उदा. Mahasangh@2026)"
-                      value={razorpayWebhookSecret}
-                      onChange={(e) => setRazorpayWebhookSecret(e.target.value)}
-                      className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono text-xs focus:bg-white focus:outline-none focus:border-[#df6b16]"
-                    />
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      हाच सेम कोड Razorpay वेबहूक तयार करताना 'Secret' मध्ये टाका.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <input
-                      type="checkbox"
-                      id="rzpEnabled"
-                      checked={razorpayEnabled}
-                      onChange={(e) => setRazorpayEnabled(e.target.checked)}
-                      className="w-4 h-4 text-[#df6b16] rounded border-slate-300 cursor-pointer"
-                    />
-                    <label htmlFor="rzpEnabled" className="font-bold text-slate-800 cursor-pointer">
-                      सदस्यत्व अर्जासाठी Razorpay ऑटोमॅटिक पेमेंट गेटवे पर्याय चालू ठेवा
-                    </label>
-                  </div>
-
-                  <div className="pt-3">
-                    <button
-                      type="submit"
-                      disabled={isSavingRazorpayConfig}
-                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-2.5 rounded-lg transition-colors shadow-xs flex items-center justify-center gap-2 text-sm disabled:opacity-60 cursor-pointer"
-                    >
-                      {isSavingRazorpayConfig ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>सेव्ह होत आहे...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                          <span>Razorpay API व वेबहूक सेटिंग्ज जतन करा</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            )}
+            </main>
           </div>
         )}
       </div>
 
       {/* ============================================================== */}
-      {/* Verification Modal with Details & Mandatory Payment Checkbox (Point 4) */}
+      {/* Mobile App Fixed Bottom Navigation Bar (< 1024px)              */}
+      {/* ============================================================== */}
+      {isLoggedIn && (
+        <nav
+          aria-label="मोबाईल प्रशासन नेव्हिगेशन"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-[58px] bg-[#0b1e36]/95 backdrop-blur-md border-t border-[#efb24b]/70 text-white shadow-[0_-4px_20px_rgba(11,30,54,0.28)]"
+        >
+          <div className="h-full max-w-lg mx-auto grid grid-flow-col auto-cols-fr items-stretch">
+            {mobileQuickNavItems.map((item) => {
+              const isActive = activeAdminSubTab === item.key && !isMobileMenuOpen;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => handleSelectAdminTab(item.key)}
+                  className={`relative flex flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold transition-colors cursor-pointer ${
+                    isActive
+                      ? 'text-[#efb24b] bg-white/10'
+                      : 'text-slate-200 hover:text-white'
+                  }`}
+                >
+                  {isActive && (
+                    <span className="absolute top-0 inset-x-3 h-0.5 bg-[#efb24b] rounded-b-full" />
+                  )}
+                  <span className="relative">
+                    {item.icon}
+                    {item.badge !== undefined && (
+                      <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#df6b16] text-white text-[9px] font-mono tabular-nums flex items-center justify-center">
+                        {item.badge > 99 ? '99+' : toEnglishDigits(item.badge)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="truncate max-w-full">{item.shortLabel}</span>
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className={`relative flex flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-bold transition-colors cursor-pointer ${
+                isMobileMenuOpen || !mobileQuickNavItems.some((m) => m.key === activeAdminSubTab)
+                  ? 'text-[#efb24b] bg-white/10'
+                  : 'text-slate-200 hover:text-white'
+              }`}
+            >
+              <Menu className="w-4 h-4" />
+              <span>सर्व मेनू</span>
+            </button>
+          </div>
+        </nav>
+      )}
+
+      {/* ============================================================== */}
+      {/* Mobile Slide-Up Bottom Sheet Menu Drawer                       */}
+      {/* ============================================================== */}
+      {isLoggedIn && isMobileMenuOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end"
+          onClick={() => setIsMobileMenuOpen(false)}
+        >
+          <div
+            className="w-full bg-[#fbf8f2] rounded-t-3xl border-t-2 border-[#efb24b] shadow-2xl max-h-[84vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Bottom Sheet Header */}
+            <div className="bg-[#0b1e36] text-white px-5 py-4 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <img
+                  src="/logo.png"
+                  alt="महासंघ मानचिन्ह"
+                  className="w-10 h-10 rounded-full ring-2 ring-[#efb24b] bg-white object-contain shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#efb24b] truncate">
+                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक (Super Admin)' : currentUser?.name || 'सह-व्यवस्थापक'}
+                  </p>
+                  <p className="text-[11px] text-slate-300 font-mono truncate">
+                    {currentUser?.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white shrink-0 cursor-pointer"
+                aria-label="मेनू बंद करा"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Menu Grid */}
+            <div className="p-4 overflow-y-auto space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#607184] px-1">
+                प्रशासन विभाग निवडा
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {permittedNavItems.map((item) => {
+                  const isActive = activeAdminSubTab === item.key;
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => handleSelectAdminTab(item.key)}
+                      className={`min-h-[52px] px-4 py-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                        isActive
+                          ? 'bg-[#0b1e36] border-[#efb24b] text-white shadow-sm'
+                          : 'bg-white border-[#e7ded1] text-[#0b1e36] hover:border-[#df6b16]'
+                      }`}
+                    >
+                      <span className="flex items-center gap-3 min-w-0 font-bold text-sm">
+                        <span className={isActive ? 'text-[#efb24b]' : 'text-[#df6b16]'}>
+                          {item.icon}
+                        </span>
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {item.badge !== undefined && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-mono tabular-nums font-bold shrink-0 ${
+                            isActive
+                              ? 'bg-[#efb24b] text-[#0b1e36]'
+                              : 'bg-[#df6b16] text-white'
+                          }`}
+                        >
+                          {toEnglishDigits(item.badge)}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-3 mt-2 border-t border-[#e7ded1] grid grid-cols-2 gap-2.5">
+                {onExitAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onExitAdmin();
+                    }}
+                    className="min-h-[48px] bg-white border border-[#e7ded1] text-[#0b1e36] font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-[#df6b16]" />
+                    <span>मुख्य वेबसाईट</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setIsLoggedIn(false);
+                    setCurrentUser(null);
+                  }}
+                  className="min-h-[48px] bg-rose-600 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>बाहेर पडा (Logout)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* Reusable Confirmation Modal (Replaces window.confirm)          */}
+      {/* ============================================================== */}
+      {confirmDialog && (
+        <div
+          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => !isConfirmExecuting && setConfirmDialog(null)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl border border-[#e7ded1] shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#0b1e36] text-white px-5 py-4 flex items-center justify-between gap-2">
+              <h3 className="font-serifDevanagari text-base font-bold text-white">
+                {confirmDialog.title}
+              </h3>
+              <button
+                type="button"
+                disabled={isConfirmExecuting}
+                onClick={() => setConfirmDialog(null)}
+                className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white cursor-pointer"
+                aria-label="बंद करा"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-5">
+              <p className="text-sm text-[#102a43] leading-relaxed">
+                {confirmDialog.message}
+              </p>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isConfirmExecuting}
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 min-h-[46px] bg-slate-100 hover:bg-slate-200 text-[#102a43] font-bold rounded-xl text-sm cursor-pointer"
+                >
+                  रद्द करा
+                </button>
+                <button
+                  type="button"
+                  disabled={isConfirmExecuting}
+                  onClick={async () => {
+                    try {
+                      setIsConfirmExecuting(true);
+                      await confirmDialog.onConfirm();
+                      setConfirmDialog(null);
+                    } finally {
+                      setIsConfirmExecuting(false);
+                    }
+                  }}
+                  className={`flex-1 min-h-[46px] text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 ${
+                    confirmDialog.isDanger
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : 'bg-[#0b1e36] hover:bg-[#193568]'
+                  }`}
+                >
+                  {isConfirmExecuting ? 'प्रक्रिया सुरू...' : confirmDialog.confirmLabel}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* Verification Modal with Bottom-Sheet Support on Mobile         */}
       {/* ============================================================== */}
       {selectedAppForVerification && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl relative border-2 border-slate-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-start justify-between pb-3 border-b border-slate-200">
+        <div
+          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setSelectedAppForVerification(null)}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-xl w-full shadow-2xl relative border border-[#e7ded1] max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Sticky Modal Header */}
+            <div className="bg-[#0b1e36] text-white px-5 py-4 flex items-center justify-between gap-2 shrink-0">
               <div>
-                <span className="text-[11px] font-bold uppercase text-[#df6b16]">
-                  अर्ज पडताळणी कक्ष (Verification)
+                <span className="text-[11px] font-bold uppercase text-[#efb24b] block">
+                  अर्ज पडताळणी कक्ष
                 </span>
-                <h3 className="font-serifDevanagari text-lg font-bold text-[#09243f]">
+                <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white">
                   सदस्यत्व अर्जदार सविस्तर माहिती
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedAppForVerification(null)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer shrink-0"
+                aria-label="बंद करा"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-4 space-y-4 text-xs">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
               {/* Photo & Core Name Row */}
-              <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div className="shrink-0 w-24 h-28 bg-white border-2 border-[#d4af37] rounded-lg overflow-hidden flex items-center justify-center shadow-xs">
+              <div className="flex items-center gap-4 bg-[#fbf8f2] p-4 rounded-2xl border border-[#e7ded1]">
+                <div className="shrink-0 w-20 h-24 sm:w-24 sm:h-28 bg-white border-2 border-[#efb24b] rounded-xl overflow-hidden flex items-center justify-center shadow-xs">
                   {selectedAppForVerification.photo ? (
                     <img
                       src={selectedAppForVerification.photo}
@@ -4713,64 +4912,64 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="text-center text-slate-400 p-2">
+                    <div className="text-center text-[#607184] p-2">
                       <ImageIcon className="w-8 h-8 mx-auto opacity-50" />
                       <span className="text-[9px]">फोटो नाही</span>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-1">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#193568]">
+                <div className="space-y-1 min-w-0 flex-1">
+                  <h4 className="font-serifDevanagari text-base font-bold text-[#0b1e36]">
                     {selectedAppForVerification.salutation} {selectedAppForVerification.fullName}
                   </h4>
-                  <p className="text-slate-600">
-                    अर्ज क्रमांक: <strong className="font-mono text-[#09243f]">{selectedAppForVerification.applicationNumber}</strong>
+                  <p className="text-[#607184]">
+                    अर्ज क्र.: <strong className="font-mono text-[#0b1e36]">{selectedAppForVerification.applicationNumber}</strong>
                   </p>
-                  <p className="text-slate-600">
-                    नोंदणी दिनांक: {formatDateWithEnglishDigits(selectedAppForVerification.createdAt)}
+                  <p className="text-[#607184]">
+                    दिनांक: {formatDateWithEnglishDigits(selectedAppForVerification.createdAt)}
                   </p>
-                  <p className="text-slate-600">
+                  <p className="text-[#607184]">
                     मोबाईल: <strong className="font-mono text-[#df6b16]">{selectedAppForVerification.phone}</strong>
                   </p>
-                  <p className="text-slate-600">
+                  <p className="text-[#607184] truncate">
                     ई-मेल: {selectedAppForVerification.email}
                   </p>
                 </div>
               </div>
 
               {/* Geographical & Organizational Details */}
-              <div className="grid grid-cols-2 gap-3 bg-white p-3 border border-slate-200 rounded-lg">
+              <div className="grid grid-cols-2 gap-3 bg-white p-3.5 border border-[#e7ded1] rounded-2xl">
                 <div>
-                  <span className="text-slate-400 block text-[10px]">जिल्हा:</span>
-                  <strong className="text-[#09243f]">{selectedAppForVerification.district}</strong>
+                  <span className="text-[#607184] block text-[10px]">जिल्हा:</span>
+                  <strong className="text-[#0b1e36]">{selectedAppForVerification.district}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px]">सध्याचे पद / संवर्ग:</span>
-                  <strong className="text-[#09243f]">{selectedAppForVerification.professional || 'केंद्रप्रमुख'}</strong>
+                  <span className="text-[#607184] block text-[10px]">सध्याचे पद / संवर्ग:</span>
+                  <strong className="text-[#0b1e36]">{selectedAppForVerification.professional || 'केंद्रप्रमुख'}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px]">शैक्षणिक पात्रता:</span>
+                  <span className="text-[#607184] block text-[10px]">शैक्षणिक पात्रता:</span>
                   <span>{selectedAppForVerification.education || '-'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[10px]">व्यावसायिक पात्रता:</span>
-                  <span className="font-semibold text-slate-800">{selectedAppForVerification.professionalQualification || '-'}</span>
+                  <span className="text-[#607184] block text-[10px]">व्यावसायिक पात्रता:</span>
+                  <span className="font-semibold text-[#102a43]">{selectedAppForVerification.professionalQualification || '-'}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-slate-400 block text-[10px]">कुटुंब सदस्य / छंद:</span>
+                  <span className="text-[#607184] block text-[10px]">कुटुंब सदस्य / छंद:</span>
                   <span>{selectedAppForVerification.familyMembers || '-'} / {selectedAppForVerification.hobby || '-'}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-slate-400 block text-[10px]">पत्ता / कार्यक्षेत्र:</span>
+                  <span className="text-[#607184] block text-[10px]">पत्ता / कार्यक्षेत्र:</span>
                   <span>{selectedAppForVerification.address}</span>
                 </div>
               </div>
 
               {/* If Official Member */}
               {selectedAppForVerification.isOfficial && (
-                <div className="bg-amber-50/60 border border-amber-300 p-3 rounded-lg text-amber-900">
-                  <span className="font-bold block text-xs mb-0.5">⭐ संघटनेतील अधिकृत पदाधिकारी:</span>
+                <div className="bg-amber-50/70 border border-amber-300 p-3 rounded-xl text-amber-950">
+                  <span className="font-bold block text-xs mb-0.5">संघटनात्मक अधिकृत पदाधिकारी:</span>
                   <p>
                     पद: <strong>{selectedAppForVerification.officialPost}</strong>
                     {selectedAppForVerification.officialDistrict && ` | जिल्हा: ${selectedAppForVerification.officialDistrict}`}
@@ -4779,99 +4978,119 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </div>
               )}
 
-              {/* Action Section: Pending vs Already Decided */}
+              {verificationErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl font-semibold flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>{verificationErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Action Section */}
               {selectedAppForVerification.status === 'pending' ? (
-                <>
-                  {/* Mandatory Checkbox for Payment Verification */}
-                  <div className="bg-[#fff7f0] border-2 border-[#df6b16] p-4 rounded-xl">
-                    <label className="flex items-center gap-3 cursor-pointer">
+                <div className="space-y-3">
+                  <div className="bg-[#fff7f0] border border-[#df6b16] p-3.5 rounded-2xl">
+                    <label className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={paymentConfirmedChecked}
-                        onChange={(e) => setPaymentConfirmedChecked(e.target.checked)}
-                        className="w-5 h-5 text-[#df6b16] rounded border-slate-300 focus:ring-[#df6b16]"
+                        onChange={(e) => {
+                          setPaymentConfirmedChecked(e.target.checked);
+                          setVerificationErrorMsg('');
+                        }}
+                        className="mt-0.5 w-5 h-5 text-[#df6b16] rounded border-[#e7ded1] focus:ring-[#df6b16] shrink-0"
                       />
                       <div>
-                        <strong className="text-xs text-[#09243f] block">
-                          सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री केली आहे <span className="text-rose-600">*</span>
+                        <strong className="text-xs text-[#0b1e36] block">
+                          सदस्यत्व फी बँक खात्यावर जमा झाल्याची खात्री केली आहे <span className="text-rose-600">*</span>
                         </strong>
-                        <span className="text-[11px] text-slate-600">
-                          आजीवन सदस्यत्व (₹100) किंवा वार्षिक वर्गणी (₹120) महासंघाच्या अधिकृत बँक ऑफ महाराष्ट्र खात्यावर जमा झाल्याची पडताळणी झाली आहे.
+                        <span className="text-[11px] text-[#607184]">
+                          आजीवन सदस्यत्व (₹100) किंवा वार्षिक वर्गणी (₹120) महासंघाच्या खात्यावर जमा झाल्याची पडताळणी झाली आहे.
                         </span>
                       </div>
                     </label>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="pt-2 flex items-center justify-between gap-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        disabled={!paymentConfirmedChecked || isApprovingApp}
-                        onClick={handleApproveVerified}
-                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-5 py-2.5 rounded-lg flex items-center gap-1.5 shadow-sm text-xs transition-all"
-                      >
-                        <Check className="w-4 h-4" />
-                        {isApprovingApp ? 'मंजूर होत आहे...' : 'मंजूर करा (Approve)'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!paymentConfirmedChecked || isApprovingApp}
-                        onClick={handleRejectVerified}
-                        className="bg-rose-50 hover:bg-rose-100 border border-rose-300 disabled:opacity-40 disabled:cursor-not-allowed text-rose-700 font-bold px-4 py-2.5 rounded-lg flex items-center gap-1.5 text-xs transition-all"
-                      >
-                        <X className="w-4 h-4" />
-                        नाकारा (Reject)
-                      </button>
+                  {showRejectInput && (
+                    <div className="bg-rose-50/70 border border-rose-200 p-3.5 rounded-2xl space-y-2">
+                      <label className="font-bold text-xs text-rose-900 block">
+                        अर्ज नाकारण्याचे कारण प्रविष्ट करा:
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="उदा. पेमेंट तपशील अपूर्ण किंवा चुकीचा फोटो..."
+                        className="w-full px-3 py-2.5 text-base sm:text-xs bg-white border border-rose-300 rounded-xl focus:outline-none focus:border-rose-500"
+                      />
                     </div>
+                  )}
 
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      disabled={!paymentConfirmedChecked || isApprovingApp}
+                      onClick={handleApproveVerified}
+                      className="min-h-[46px] bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm text-xs cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{isApprovingApp ? 'मंजूर होत आहे...' : 'मंजूर करा'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isApprovingApp}
+                      onClick={handleRejectVerified}
+                      className="min-h-[46px] bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>{showRejectInput ? 'नाकारणे निश्चित करा' : 'नाकारा'}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setSelectedAppForVerification(null)}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-lg text-xs"
+                      className="min-h-[46px] bg-slate-100 hover:bg-slate-200 text-[#0b1e36] font-bold px-4 py-2.5 rounded-xl text-xs cursor-pointer"
                     >
                       बंद करा
                     </button>
                   </div>
-                </>
+                </div>
               ) : (
-                <div className="space-y-4 pt-2">
-                  {/* Decision Recorded Locked Status Notice */}
+                <div className="space-y-4 pt-1">
                   {selectedAppForVerification.status === 'approved' ? (
-                    <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-950 rounded-xl text-xs space-y-1">
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-2xl text-xs space-y-1">
                       <div className="font-bold flex items-center gap-2 text-sm text-emerald-800">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                         <span>निर्णय अंतिम: हा अर्ज मंजूर झाला आहे!</span>
                       </div>
-                      <p className="text-slate-700">
-                        अधिकृत सदस्य नोंदणी क्रमांक: <strong className="font-mono text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">{selectedAppForVerification.memberNumber || 'MS-2026-MEMBER'}</strong>
+                      <p className="text-[#102a43]">
+                        सदस्य क्रमांक:{' '}
+                        <strong className="font-mono text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                          {selectedAppForVerification.memberNumber || 'MS-2026-MEMBER'}
+                        </strong>
                       </p>
                     </div>
                   ) : (
-                    <div className="p-4 bg-rose-50 border border-rose-300 text-rose-950 rounded-xl text-xs space-y-1">
+                    <div className="p-4 bg-rose-50 border border-rose-200 text-rose-950 rounded-2xl text-xs space-y-1">
                       <div className="font-bold flex items-center gap-2 text-sm text-rose-800">
                         <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
                         <span>निर्णय अंतिम: हा अर्ज नाकारण्यात आला आहे.</span>
                       </div>
-                      <p className="text-slate-700">
-                        या अर्जावर प्रशासनाकडून अंतिम निर्णय झालेला आहे.
-                      </p>
+                      <p className="text-[#607184]">या अर्जावर प्रशासनाकडून अंतिम निर्णय झालेला आहे.</p>
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <button
                       type="button"
                       onClick={() => handleDeleteWithFeedback(selectedAppForVerification)}
-                      className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-lg text-xs shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      className="min-h-[46px] bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                       <span>अर्ज कायमचा डिलीट करा</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedAppForVerification(null)}
-                      className="bg-[#17366d] hover:bg-[#0b1e36] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-xs cursor-pointer"
+                      className="min-h-[46px] bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-xs cursor-pointer"
                     >
                       बंद करा
                     </button>
@@ -4884,57 +5103,59 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       )}
 
       {/* ============================================================== */}
-      {/* Official Lifetime Membership ID Card Modal Preview */}
+      {/* Official Lifetime Membership ID Card Modal Preview             */}
       {/* ============================================================== */}
       {certModalApp && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-4 md:p-6 shadow-2xl relative border-2 border-[#0b1e33] max-h-[90vh] overflow-y-auto space-y-4">
-            
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e33] flex items-center gap-2">
-                <span>🪪</span> अधिकृत आजीवन सदस्य आय-कार्ड (मंजूर सदस्य)
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setCertModalApp(null)}
+        >
+          <div
+            className="bg-white rounded-t-3xl sm:rounded-2xl max-w-xl w-full shadow-2xl relative border border-[#e7ded1] max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-[#0b1e36] text-white px-5 py-3.5 flex items-center justify-between gap-2 shrink-0">
+              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <Award className="w-5 h-5 text-[#efb24b]" />
+                <span>अधिकृत आजीवन सदस्य आय-कार्ड</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setCertModalApp(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold p-1 rounded-lg text-lg"
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer shrink-0"
+                aria-label="बंद करा"
               >
-                ✕
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* ID Card Box Container */}
-            <div className="flex justify-center">
-              <MembershipIdCardPreview app={certModalApp} photoFallbackUrl="" />
-            </div>
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+              <div className="flex justify-center">
+                <MembershipIdCardPreview app={certModalApp} photoFallbackUrl="" />
+              </div>
 
-            {/* Modal Buttons */}
-            <div className="pt-2 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => generateMembershipIdCardPdf(certModalApp)}
-                className="bg-[#0b1e33] hover:bg-[#1e3a8a] text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-md transition-all hover:scale-105"
-              >
-                <Download className="w-4 h-4" />
-                आय-कार्ड PDF डाऊनलोड करा
-              </button>
-              <button
-                type="button"
-                onClick={() => setCertModalApp(null)}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold px-4 py-2.5 rounded-xl"
-              >
-                बंद करा
-              </button>
+              <div className="flex flex-col sm:flex-row justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => generateMembershipIdCardPdf(certModalApp)}
+                  className="min-h-[46px] bg-[#0b1e36] hover:bg-[#193568] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                >
+                  <Download className="w-4 h-4 text-[#efb24b]" />
+                  <span>आय-कार्ड PDF डाऊनलोड करा</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCertModalApp(null)}
+                  className="min-h-[46px] bg-slate-200 hover:bg-slate-300 text-[#0b1e36] text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl cursor-pointer"
+                >
+                  बंद करा
+                </button>
+              </div>
             </div>
-
           </div>
         </div>
       )}
     </div>
   );
 };
-// Inside AdminTab, add the new section in the render logic where activeAdminSubTab is handled.
-// Since AdminTab is huge, I will just provide the conceptual UI update.
-// In a real scenario, this would be injected into the main render switch case.
-// Assuming the user wants the form to be available in AdminTab.
-// I will just add the form logic here.
+
