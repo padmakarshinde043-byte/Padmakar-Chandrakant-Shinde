@@ -1992,6 +1992,7 @@ export interface AdminPermissions {
   approveMembers: boolean;     // सदस्य पडताळणी व मंजुरी (Approve Members)
   manageNews: boolean;         // बातम्या व फोटो/परिपत्रके टाकणे (News & Circulars)
   manageLeadership: boolean;   // नेतृत्व व वेबसाईट माहिती बदलणे (Leadership Management)
+  manageLatestBanners?: boolean; // ताज्या घडामोडी बॅनर्स व फोटो जोडणे (Latest News Banners)
   manageAdmins?: boolean;      // इतर ॲडमिन व्यवस्थापन (Manage Admins - Super Admin only)
 }
 

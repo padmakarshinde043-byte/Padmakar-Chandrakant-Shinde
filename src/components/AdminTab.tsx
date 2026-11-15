@@ -279,7 +279,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     approveMembers: true,
     manageNews: false,
     manageLeadership: false,
+    manageLatestBanners: false,
   });
+  const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
+  const [editingPermissions, setEditingPermissions] = useState<AdminPermissions>({
+    approveMembers: false,
+    manageNews: false,
+    manageLeadership: false,
+    manageLatestBanners: false,
+  });
+  const [isUpdatingAdminPerms, setIsUpdatingAdminPerms] = useState(false);
   const [adminActionMsg, setAdminActionMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [isSubmittingAdmin, setIsSubmittingAdmin] = useState(false);
 
@@ -770,6 +779,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             approveMembers: true,
             manageNews: true,
             manageLeadership: true,
+            manageLatestBanners: true,
             manageAdmins: true,
           },
           createdAt: '',
@@ -819,6 +829,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           setActiveAdminSubTab('applications');
         } else if (matchingSubAdmin.permissions.manageNews) {
           setActiveAdminSubTab('add_news');
+        } else if (matchingSubAdmin.permissions.manageLatestBanners) {
+          setActiveAdminSubTab('latest_banners');
         } else if (matchingSubAdmin.permissions.manageLeadership) {
           setActiveAdminSubTab('leadership');
         } else {
@@ -879,6 +891,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             setActiveAdminSubTab('applications');
           } else if (user.permissions.manageNews) {
             setActiveAdminSubTab('add_news');
+          } else if (user.permissions.manageLatestBanners) {
+            setActiveAdminSubTab('latest_banners');
           } else if (user.permissions.manageLeadership) {
             setActiveAdminSubTab('leadership');
           } else {
@@ -965,7 +979,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    if (!newAdminPermissions.approveMembers && !newAdminPermissions.manageNews && !newAdminPermissions.manageLeadership) {
+    if (
+      !newAdminPermissions.approveMembers &&
+      !newAdminPermissions.manageNews &&
+      !newAdminPermissions.manageLeadership &&
+      !newAdminPermissions.manageLatestBanners
+    ) {
       setAdminActionMsg({ text: 'कृपया या व्यवस्थापकासाठी किमान एक अधिकार निवडा.', type: 'error' });
       return;
     }
@@ -986,7 +1005,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setAdminUsersList(updated);
       setNewAdminEmail('');
       setNewAdminName('');
-      setNewAdminPermissions({ approveMembers: true, manageNews: false, manageLeadership: false });
+      setNewAdminPermissions({
+        approveMembers: true,
+        manageNews: false,
+        manageLeadership: false,
+        manageLatestBanners: false,
+      });
       setAdminActionMsg({
         text: `व्यवस्थापक (${targetEmail}) यशस्वीपणे जोडला! ते पहिल्या लॉगिन वेळी स्वतःचा पासवर्ड तयार करू शकतील.`,
         type: 'success',
@@ -995,6 +1019,55 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setAdminActionMsg({ text: 'व्यवस्थापक जोडताना त्रुटी आली: ' + (err.message || 'Error'), type: 'error' });
     } finally {
       setIsSubmittingAdmin(false);
+    }
+  };
+
+  // Manage Admins: Start Editing Existing Sub-Admin Permissions
+  const handleStartEditPermissions = (subAdmin: AdminUser) => {
+    setAdminActionMsg(null);
+    setEditingAdminId(subAdmin.id);
+    setEditingPermissions({
+      approveMembers: Boolean(subAdmin.permissions.approveMembers),
+      manageNews: Boolean(subAdmin.permissions.manageNews),
+      manageLeadership: Boolean(subAdmin.permissions.manageLeadership),
+      manageLatestBanners: Boolean(subAdmin.permissions.manageLatestBanners),
+    });
+  };
+
+  // Manage Admins: Save Updated Permissions for Existing Sub-Admin
+  const handleSaveAdminPermissions = async (subAdmin: AdminUser) => {
+    setAdminActionMsg(null);
+    if (
+      !editingPermissions.approveMembers &&
+      !editingPermissions.manageNews &&
+      !editingPermissions.manageLeadership &&
+      !editingPermissions.manageLatestBanners
+    ) {
+      setAdminActionMsg({ text: 'कृपया या व्यवस्थापकासाठी किमान एक अधिकार निवडा.', type: 'error' });
+      return;
+    }
+
+    try {
+      setIsUpdatingAdminPerms(true);
+      const updatedAdmin: AdminUser = {
+        ...subAdmin,
+        permissions: { ...editingPermissions },
+      };
+      await saveAdminUser(updatedAdmin);
+      const updatedList = await fetchAdminUsers();
+      setAdminUsersList(updatedList);
+      setEditingAdminId(null);
+      setAdminActionMsg({
+        text: `✓ ${subAdmin.email} यांचे अधिकार यशस्वीपणे अद्ययावत (Update) करण्यात आले!`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setAdminActionMsg({
+        text: 'अधिकार अद्ययावत करताना त्रुटी आली: ' + (err.message || 'Error'),
+        type: 'error',
+      });
+    } finally {
+      setIsUpdatingAdminPerms(false);
     }
   };
 
@@ -1757,20 +1830,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </>
                 )}
 
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('latest_banners')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'latest_banners'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <ImageIcon className="w-4 h-4" />
+                    <span>ताज्या घडामोडी बॅनर्स</span>
+                  </button>
+                )}
+
                 {currentUser?.isSuperAdmin && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('latest_banners')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'latest_banners'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      <span>ताज्या घडामोडी बॅनर्स</span>
-                    </button>
                     <button
                       type="button"
                       onClick={() => setActiveAdminSubTab('id_card_preview')}
@@ -3131,7 +3207,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab: Latest Banners Management (ताज्या घडामोडी बॅनर्स) */}
-            {activeAdminSubTab === 'latest_banners' && currentUser?.isSuperAdmin && (
+            {activeAdminSubTab === 'latest_banners' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners) && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
                   <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-1.5 flex items-center gap-2">
@@ -3468,7 +3544,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   )}
 
                   {/* Add Admin Form */}
-                  <form onSubmit={handleAddAdminUser} className="space-y-4 max-w-2xl bg-slate-50/70 p-5 rounded-xl border border-slate-200 text-xs">
+                  <form onSubmit={handleAddAdminUser} className="space-y-4 max-w-4xl bg-slate-50/70 p-5 rounded-xl border border-slate-200 text-xs">
                     <h4 className="font-bold text-[#09243f] text-sm flex items-center gap-1.5 border-b border-slate-200 pb-2">
                       <UserPlus className="w-4 h-4 text-[#df6b16]" />
                       नवीन व्यवस्थापक जोडा (Add New Sub-Admin)
@@ -3509,7 +3585,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         या ॲडमिनला द्यावयाचे अधिकार निवडा (Select Permissions): <span className="text-rose-600">*</span>
                       </label>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <label
                           className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
                             newAdminPermissions.approveMembers
@@ -3562,6 +3638,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             </strong>
                             <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
                               बातम्या, GR व फोटो वेबसाईटवर टाकणे
+                            </span>
+                          </div>
+                        </label>
+
+                        <label
+                          className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
+                            newAdminPermissions.manageLatestBanners
+                              ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
+                              : 'bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(newAdminPermissions.manageLatestBanners)}
+                            onChange={(e) =>
+                              setNewAdminPermissions({
+                                ...newAdminPermissions,
+                                manageLatestBanners: e.target.checked,
+                              })
+                            }
+                            className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                          />
+                          <div>
+                            <strong className="text-slate-800 block text-xs">
+                              ताज्या घडामोडी बॅनर्स
+                            </strong>
+                            <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                              होमपेज ताज्या घडामोडी फोटो व बॅनर जोडणे
                             </span>
                           </div>
                         </label>
@@ -3638,7 +3742,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {adminUsersList.map((subAdmin, index) => (
+                          {adminUsersList.map((subAdmin, index) => {
+                            const isEditing = editingAdminId === subAdmin.id;
+                            return (
                             <tr key={subAdmin.id} className="hover:bg-slate-50 transition-colors">
                               <td className="p-3 text-center font-mono font-bold text-slate-500">
                                 {toEnglishDigits(index + 1)}
@@ -3654,28 +3760,95 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 )}
                               </td>
                               <td className="p-3">
-                                <div className="flex flex-wrap gap-1.5">
-                                  {subAdmin.permissions.approveMembers && (
-                                    <span key="approveMembers" className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                {isEditing ? (
+                                  <div className="flex flex-wrap gap-2 py-0.5">
+                                    <label className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded text-[11px] font-bold text-amber-900 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={editingPermissions.approveMembers}
+                                        onChange={(e) =>
+                                          setEditingPermissions({
+                                            ...editingPermissions,
+                                            approveMembers: e.target.checked,
+                                          })
+                                        }
+                                        className="w-3.5 h-3.5 text-[#df6b16] rounded border-slate-300"
+                                      />
                                       सदस्य मंजुरी
-                                    </span>
-                                  )}
-                                  {subAdmin.permissions.manageNews && (
-                                    <span key="manageNews" className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    </label>
+                                    <label className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded text-[11px] font-bold text-blue-900 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={editingPermissions.manageNews}
+                                        onChange={(e) =>
+                                          setEditingPermissions({
+                                            ...editingPermissions,
+                                            manageNews: e.target.checked,
+                                          })
+                                        }
+                                        className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300"
+                                      />
                                       बातम्या व परिपत्रके
-                                    </span>
-                                  )}
-                                  {subAdmin.permissions.manageLeadership && (
-                                    <span key="manageLeadership" className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                    </label>
+                                    <label className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] font-bold text-emerald-900 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={Boolean(editingPermissions.manageLatestBanners)}
+                                        onChange={(e) =>
+                                          setEditingPermissions({
+                                            ...editingPermissions,
+                                            manageLatestBanners: e.target.checked,
+                                          })
+                                        }
+                                        className="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300"
+                                      />
+                                      ताज्या घडामोडी बॅनर्स
+                                    </label>
+                                    <label className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 px-2 py-1 rounded text-[11px] font-bold text-purple-900 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={editingPermissions.manageLeadership}
+                                        onChange={(e) =>
+                                          setEditingPermissions({
+                                            ...editingPermissions,
+                                            manageLeadership: e.target.checked,
+                                          })
+                                        }
+                                        className="w-3.5 h-3.5 text-purple-600 rounded border-slate-300"
+                                      />
                                       नेतृत्व व्यवस्थापन
-                                    </span>
-                                  )}
-                                  {!subAdmin.permissions.approveMembers &&
-                                    !subAdmin.permissions.manageNews &&
-                                    !subAdmin.permissions.manageLeadership && (
-                                      <span key="noPermissions" className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
+                                    </label>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {subAdmin.permissions.approveMembers && (
+                                      <span key="approveMembers" className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        सदस्य मंजुरी
+                                      </span>
                                     )}
-                                </div>
+                                    {subAdmin.permissions.manageNews && (
+                                      <span key="manageNews" className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        बातम्या व परिपत्रके
+                                      </span>
+                                    )}
+                                    {subAdmin.permissions.manageLatestBanners && (
+                                      <span key="manageLatestBanners" className="bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        ताज्या घडामोडी बॅनर्स
+                                      </span>
+                                    )}
+                                    {subAdmin.permissions.manageLeadership && (
+                                      <span key="manageLeadership" className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        नेतृत्व व्यवस्थापन
+                                      </span>
+                                    )}
+                                    {!subAdmin.permissions.approveMembers &&
+                                      !subAdmin.permissions.manageNews &&
+                                      !subAdmin.permissions.manageLatestBanners &&
+                                      !subAdmin.permissions.manageLeadership && (
+                                        <span key="noPermissions" className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
+                                      )}
+                                  </div>
+                                )}
                               </td>
                               <td className="p-3">
                                 {subAdmin.isFirstLogin || !subAdmin.password ? (
@@ -3690,25 +3863,59 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 )}
                               </td>
                               <td className="p-3 text-center whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={() => handleResetSubAdmin(subAdmin.id, subAdmin.email)}
-                                  className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded transition-colors mr-1 inline-flex items-center"
-                                  title="पासवर्ड रिसेट करा (पुन्हा नवीन पासवर्ड सेट करू द्या)"
-                                >
-                                  <RotateCcw className="w-4 h-4" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteAdmin(subAdmin.id, subAdmin.email)}
-                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors inline-flex items-center"
-                                  title="व्यवस्थापक अधिकार काढून टाका"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                {isEditing ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={isUpdatingAdminPerms}
+                                      onClick={() => handleSaveAdminPermissions(subAdmin)}
+                                      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-1 rounded text-[11px] font-bold mr-1 inline-flex items-center gap-1 transition-colors"
+                                      title="अधिकार सेव्ह करा"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      सेव्ह करा
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingAdminId(null)}
+                                      className="text-slate-600 hover:text-slate-800 hover:bg-slate-100 p-1.5 rounded transition-colors inline-flex items-center"
+                                      title="रद्द करा"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditPermissions(subAdmin)}
+                                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 inline-flex items-center"
+                                      title="अधिकार बदला (Edit Permissions)"
+                                    >
+                                      <Edit3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResetSubAdmin(subAdmin.id, subAdmin.email)}
+                                      className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded transition-colors mr-1 inline-flex items-center"
+                                      title="पासवर्ड रिसेट करा (पुन्हा नवीन पासवर्ड सेट करू द्या)"
+                                    >
+                                      <RotateCcw className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteAdmin(subAdmin.id, subAdmin.email)}
+                                      className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors inline-flex items-center"
+                                      title="व्यवस्थापक अधिकार काढून टाका"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
                               </td>
                             </tr>
-                          ))}
+                          );
+                          })}
                         </tbody>
                       </table>
                     </div>
