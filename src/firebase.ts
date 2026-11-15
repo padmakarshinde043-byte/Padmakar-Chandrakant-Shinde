@@ -1739,23 +1739,25 @@ export function purgeStaleApplicationFromCachesByContact(params: {
 }
 
 // ==========================================
-// Zero-Quota Visitor Counter (Runs ONLY once per browser session)
+// Zero-Quota Visitor Counter (Once per IST calendar day per browser, resets to 0 at 12:00 AM IST)
 // ==========================================
 export interface VisitorStats {
   today: number;
   total: number;
 }
 
-const VISITOR_LOCAL_KEY = 'mhs_real_visit_count_v5';
-const VISITOR_SESSION_FLAG = 'mhs_visit_recorded_session_v5';
+const VISITOR_LOCAL_KEY = 'mhs_real_visit_count_v6';
+const VISITOR_DAILY_COUNTED_DATE_KEY = 'mhs_visit_counted_date_v6';
 const MIN_VISITOR_BASELINE = 5155;
 
-// Proactively clear corrupted/legacy keys with dummy numbers
+// Proactively clear legacy keys that carried old dummy/900 numbers
 try {
   localStorage.removeItem('mhs_visitor_stats_v1');
   localStorage.removeItem('mhs_visitor_stats');
   localStorage.removeItem('mhs_site_visits');
+  localStorage.removeItem('mhs_real_visit_count_v5');
   sessionStorage.removeItem('mhs_visit_recorded_session');
+  sessionStorage.removeItem('mhs_visit_recorded_session_v5');
 } catch {
   // ignore
 }
@@ -1770,110 +1772,185 @@ export function getTodayISTString(): string {
   }
 }
 
+export function getMsUntilNextISTMidnight(): number {
+  try {
+    const now = new Date();
+    const istNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const nextMidnight = new Date(istNow);
+    nextMidnight.setHours(24, 0, 2, 0); // 12:00:02 AM IST
+    const diff = nextMidnight.getTime() - istNow.getTime();
+    return diff > 1000 ? diff : 60 * 1000;
+  } catch {
+    return 60 * 60 * 1000;
+  }
+}
+
+let visitorSyncInFlight: Promise<VisitorStats> | null = null;
+let visitorSyncDateStr = '';
+
 export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
   const todayDateStr = getTodayISTString();
-  let localStats: VisitorStats = { today: 900, total: MIN_VISITOR_BASELINE };
 
-  // 1. Read existing local stats from localStorage
-  try {
-    const raw = localStorage.getItem(VISITOR_LOCAL_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed.total === 'number' && parsed.total >= MIN_VISITOR_BASELINE) {
-        localStats = {
-          total: parsed.total,
-          today: parsed.date === todayDateStr && typeof parsed.today === 'number' ? parsed.today : 900
-        };
-      }
-    }
-  } catch {}
-
-  const hasRecordedSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem(VISITOR_SESSION_FLAG);
-
-  if (isFirestoreQuotaInCooldown()) {
-    if (!hasRecordedSession && typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
-    }
-    return localStats;
+  if (visitorSyncInFlight && visitorSyncDateStr === todayDateStr) {
+    return visitorSyncInFlight;
   }
 
-  try {
-    const statsDocRef = doc(db, 'site_stats', 'visits');
+  visitorSyncDateStr = todayDateStr;
+  visitorSyncInFlight = (async (): Promise<VisitorStats> => {
+    let localStats: VisitorStats = { today: 0, total: MIN_VISITOR_BASELINE };
+    let cachedDate = '';
+    let cachedAtMs = 0;
 
-    if (!hasRecordedSession) {
-      if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
+    // 1. Read existing local stats from localStorage (resets today to 0 whenever IST date changes)
+    try {
+      const raw = localStorage.getItem(VISITOR_LOCAL_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed.total === 'number' && parsed.total >= MIN_VISITOR_BASELINE) {
+          cachedDate = typeof parsed.date === 'string' ? parsed.date : '';
+          cachedAtMs = typeof parsed.updatedAtMs === 'number' ? parsed.updatedAtMs : 0;
+          localStats = {
+            total: parsed.total,
+            today: cachedDate === todayDateStr && typeof parsed.today === 'number' ? Math.max(parsed.today, 0) : 0,
+          };
+        }
       }
+    } catch {}
 
-      // Single lightweight getDoc + non-retrying setDoc (avoids runTransaction retry loops on quota exhaustion)
-      const snap = await getDoc(statsDocRef);
-      let fsTotal = 0;
-      let fsToday = 0;
-      let fsDate = todayDateStr;
+    let hasCountedToday = false;
+    try {
+      hasCountedToday =
+        typeof localStorage !== 'undefined' &&
+        localStorage.getItem(VISITOR_DAILY_COUNTED_DATE_KEY) === todayDateStr;
+    } catch {}
 
-      if (snap.exists()) {
-        const data = snap.data();
-        fsTotal = typeof data.total === 'number' ? data.total : 0;
-        fsToday = typeof data.today === 'number' ? data.today : 0;
-        fsDate = data.lastDate || todayDateStr;
-      }
-
-      const baseTotal = Math.max(fsTotal, localStats.total, MIN_VISITOR_BASELINE);
-      const baseToday = (fsDate === todayDateStr) ? Math.max(fsToday, localStats.today) : Math.max(localStats.today, 900);
-
-      const newTotal = baseTotal + 1;
-      const newToday = (fsDate === todayDateStr) ? baseToday + 1 : 1;
-
-      setDoc(statsDocRef, {
-        total: newTotal,
-        today: newToday,
-        lastDate: todayDateStr,
-        lastUpdated: new Date().toISOString()
-      }, { merge: true }).catch((writeErr) => {
-        if (isQuotaExceededError(writeErr)) markFirestoreQuotaExceeded(writeErr);
-      });
-
-      const resultStats = { today: newToday, total: newTotal };
-      localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-        ...resultStats,
-        date: todayDateStr
-      }));
-      return resultStats;
-    } else {
-      // Already recorded in this session, fetch latest cached/live count from Firestore cleanly
-      const snap = await getDoc(statsDocRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        const fsTotal = typeof data.total === 'number' ? data.total : 0;
-        const fsToday = (data.lastDate === todayDateStr && typeof data.today === 'number') ? data.today : 0;
-        const bestTotal = Math.max(fsTotal, localStats.total, MIN_VISITOR_BASELINE);
-        const bestToday = Math.max(fsToday, localStats.today, 900);
-
-        const liveStats: VisitorStats = { today: bestToday, total: bestTotal };
-        localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-          ...liveStats,
-          date: todayDateStr
-        }));
-        return liveStats;
+    if (isFirestoreQuotaInCooldown()) {
+      if (!hasCountedToday) {
+        localStats = {
+          today: localStats.today + 1,
+          total: localStats.total + 1,
+        };
+        try {
+          localStorage.setItem(VISITOR_DAILY_COUNTED_DATE_KEY, todayDateStr);
+          localStorage.setItem(
+            VISITOR_LOCAL_KEY,
+            JSON.stringify({ ...localStats, date: todayDateStr, updatedAtMs: Date.now() })
+          );
+        } catch {}
       }
       return localStats;
     }
-  } catch (err) {
-    if (isQuotaExceededError(err)) markFirestoreQuotaExceeded(err);
-    console.warn('Visitor counter sync notice:', err);
-    if (!hasRecordedSession && typeof sessionStorage !== 'undefined') {
-      sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
-      localStats = {
-        today: localStats.today + 1,
-        total: localStats.total + 1
-      };
+
+    // If this browser already counted today and local cache is fresh (< 2 min), return cached stats with 0 Firestore reads
+    if (hasCountedToday && cachedDate === todayDateStr && Date.now() - cachedAtMs < 2 * 60 * 1000) {
+      return localStats;
     }
-    localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
-      ...localStats,
-      date: todayDateStr
-    }));
-    return localStats;
-  }
+
+    try {
+      const statsDocRef = doc(db, 'site_stats', 'visits');
+
+      if (!hasCountedToday) {
+        // Atomic transaction: resets `today` cleanly to 0 (+1 = 1) when IST date rolls over at 12:00 AM
+        const resultStats = await runTransaction(db, async (tx) => {
+          const snap = await tx.get(statsDocRef);
+          let fsTotal = 0;
+          let fsToday = 0;
+          let fsDate = '';
+
+          if (snap.exists()) {
+            const data = snap.data();
+            fsTotal = typeof data.total === 'number' ? data.total : 0;
+            fsToday = typeof data.today === 'number' ? data.today : 0;
+            fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
+          }
+
+          const baseTotal = Math.max(fsTotal, MIN_VISITOR_BASELINE);
+          const newTotal = baseTotal + 1;
+          const newToday = fsDate === todayDateStr ? Math.max(fsToday, 0) + 1 : 1;
+
+          tx.set(
+            statsDocRef,
+            {
+              total: newTotal,
+              today: newToday,
+              lastDate: todayDateStr,
+              lastUpdated: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+
+          return { today: newToday, total: newTotal };
+        });
+
+        try {
+          localStorage.setItem(VISITOR_DAILY_COUNTED_DATE_KEY, todayDateStr);
+          localStorage.setItem(
+            VISITOR_LOCAL_KEY,
+            JSON.stringify({
+              ...resultStats,
+              date: todayDateStr,
+              updatedAtMs: Date.now(),
+            })
+          );
+        } catch {}
+
+        return resultStats;
+      } else {
+        // Already counted today from this browser: read-only refresh from Firestore (no increment)
+        const snap = await getDoc(statsDocRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          const fsTotal = typeof data.total === 'number' ? data.total : 0;
+          const fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
+          const fsToday = fsDate === todayDateStr && typeof data.today === 'number' ? Math.max(data.today, 0) : 0;
+
+          const liveStats: VisitorStats = {
+            today: fsToday,
+            total: Math.max(fsTotal, MIN_VISITOR_BASELINE),
+          };
+          try {
+            localStorage.setItem(
+              VISITOR_LOCAL_KEY,
+              JSON.stringify({
+                ...liveStats,
+                date: todayDateStr,
+                updatedAtMs: Date.now(),
+              })
+            );
+          } catch {}
+          return liveStats;
+        }
+        return localStats;
+      }
+    } catch (err) {
+      if (isQuotaExceededError(err)) markFirestoreQuotaExceeded(err);
+      console.warn('Visitor counter sync notice:', err);
+      if (!hasCountedToday) {
+        localStats = {
+          today: localStats.today + 1,
+          total: localStats.total + 1,
+        };
+        try {
+          localStorage.setItem(VISITOR_DAILY_COUNTED_DATE_KEY, todayDateStr);
+        } catch {}
+      }
+      try {
+        localStorage.setItem(
+          VISITOR_LOCAL_KEY,
+          JSON.stringify({
+            ...localStats,
+            date: todayDateStr,
+            updatedAtMs: Date.now(),
+          })
+        );
+      } catch {}
+      return localStats;
+    }
+  })().finally(() => {
+    visitorSyncInFlight = null;
+  });
+
+  return visitorSyncInFlight;
 }
 
 // ==========================================

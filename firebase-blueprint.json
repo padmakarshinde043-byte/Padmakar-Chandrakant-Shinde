@@ -84,6 +84,18 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "title", "imageUrl", "date", "createdAt"]
+    },
+    "SiteStat": {
+      "title": "SiteStat",
+      "description": "Website daily and total visitor statistics reset at 12:00 AM IST",
+      "type": "object",
+      "properties": {
+        "total": { "type": "number" },
+        "today": { "type": "number" },
+        "lastDate": { "type": "string", "maxLength": 32 },
+        "lastUpdated": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["total", "today", "lastDate"]
     }
   },
   "firestore": {
@@ -106,6 +118,10 @@
     "/latest_banners/{bannerId}": {
       "schema": { "$ref": "LatestBanner" },
       "description": "Homepage latest updates carousel banners with Cloudinary image links"
+    },
+    "/site_stats/{statId}": {
+      "schema": { "$ref": "SiteStat" },
+      "description": "Global visitor counter storing daily (IST midnight reset) and cumulative site visits"
     }
   }
 }

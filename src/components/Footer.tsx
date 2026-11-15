@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Users, Lock } from 'lucide-react';
 import { ORG_DETAILS } from '../data/mahasanghData';
-import { getVisitorCountsOncePerSession, VisitorStats } from '../firebase';
+import { getVisitorCountsOncePerSession, getTodayISTString, getMsUntilNextISTMidnight, VisitorStats } from '../firebase';
 
 interface FooterProps {
   setCurrentTab?: (tab: string) => void;
@@ -12,12 +12,14 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
     try {
       localStorage.removeItem('mhs_visitor_stats_v1');
       localStorage.removeItem('mhs_visitor_stats');
-      const raw = localStorage.getItem('mhs_real_visit_count_v5');
+      localStorage.removeItem('mhs_real_visit_count_v5');
+      const todayStr = getTodayISTString();
+      const raw = localStorage.getItem('mhs_real_visit_count_v6');
       if (raw) {
         const parsed = JSON.parse(raw);
         if (typeof parsed.total === 'number') {
           return {
-            today: typeof parsed.today === 'number' ? parsed.today : 1,
+            today: parsed.date === todayStr && typeof parsed.today === 'number' ? Math.max(parsed.today, 0) : 0,
             total: parsed.total
           };
         }
@@ -25,23 +27,62 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
     } catch {
       // fallback
     }
-    return { today: 1, total: 1 };
+    return { today: 0, total: 5155 };
   });
 
   useEffect(() => {
     let isMounted = true;
-    getVisitorCountsOncePerSession()
-      .then((stats) => {
-        if (isMounted) {
-          setVisitorStats(stats);
+    let activeDateStr = getTodayISTString();
+    let midnightTimer: number | undefined;
+
+    const syncStats = () => {
+      activeDateStr = getTodayISTString();
+      getVisitorCountsOncePerSession()
+        .then((stats) => {
+          if (isMounted) {
+            setVisitorStats(stats);
+          }
+        })
+        .catch((err) => {
+          console.warn('Visitor counter init error:', err);
+        });
+    };
+
+    const scheduleMidnightReset = () => {
+      if (midnightTimer) window.clearTimeout(midnightTimer);
+      midnightTimer = window.setTimeout(() => {
+        if (!isMounted) return;
+        const newDateStr = getTodayISTString();
+        if (newDateStr !== activeDateStr) {
+          activeDateStr = newDateStr;
+          setVisitorStats((prev) => ({ ...prev, today: 0 }));
+          if (document.visibilityState === 'visible') {
+            syncStats();
+          }
         }
-      })
-      .catch((err) => {
-        console.warn('Visitor counter init error:', err);
-      });
+        scheduleMidnightReset();
+      }, getMsUntilNextISTMidnight());
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const currentStr = getTodayISTString();
+        if (currentStr !== activeDateStr) {
+          setVisitorStats((prev) => ({ ...prev, today: 0 }));
+          syncStats();
+          scheduleMidnightReset();
+        }
+      }
+    };
+
+    syncStats();
+    scheduleMidnightReset();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isMounted = false;
+      if (midnightTimer) window.clearTimeout(midnightTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
