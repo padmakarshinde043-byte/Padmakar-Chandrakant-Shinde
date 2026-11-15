@@ -21,6 +21,16 @@ export const NewsTab: React.FC<NewsTabProps> = ({
   isRefreshing,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const modalBodyRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (selectedNews) {
+      if (modalBodyRef.current) {
+        modalBodyRef.current.scrollTop = 0;
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [selectedNews]);
 
   // पहिला विभाग (Section 1 Filters: सर्व, अधिकृत घोषणा, अधिकृत वृत्त, संघटना वृत्त, अभिनंदन, टॅगलाईन फोटो)
   const section1Categories = ['सर्व', 'अधिकृत घोषणा', 'अधिकृत वृत्त', 'संघटना घडामोडी', 'संघटना वृत्त', 'अभिनंदन', 'टॅगलाईन फोटो'];
@@ -338,9 +348,9 @@ export const NewsTab: React.FC<NewsTabProps> = ({
 
       {/* Read News / View Photo Modal (सविस्तर बातमी व वर फोटो) */}
       {selectedNews && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-5 bg-[#0b1e36] text-white flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden relative my-auto">
+            <div className="sticky top-0 z-20 p-4 sm:p-5 bg-[#0b1e36] text-white flex items-center justify-between shrink-0 shadow-md">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5 text-amber-400" />
                 <span className="text-xs sm:text-sm font-semibold text-amber-300">
@@ -349,13 +359,14 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               </div>
               <button
                 onClick={() => setSelectedNews(null)}
-                className="text-slate-300 hover:text-white p-1"
+                className="text-slate-300 hover:text-white p-1.5 rounded-full hover:bg-white/15 transition-colors cursor-pointer"
+                title="बंद करा"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-4">
+            <div ref={modalBodyRef} className="p-4 sm:p-6 overflow-y-auto space-y-4">
               {/* वर फोटो (Photo on Top) */}
               {(selectedNews.imageUrl || selectedNews.image) && (
                 <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xs">
