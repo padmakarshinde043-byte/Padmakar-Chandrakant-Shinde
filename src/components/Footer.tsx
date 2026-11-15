@@ -19,7 +19,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
         const parsed = JSON.parse(raw);
         if (typeof parsed.total === 'number') {
           return {
-            today: parsed.date === todayStr && typeof parsed.today === 'number' ? Math.max(parsed.today, 0) : 0,
+            today: parsed.date === todayStr && typeof parsed.today === 'number' ? Math.max(parsed.today, 1) : 1,
             total: parsed.total
           };
         }
@@ -27,7 +27,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
     } catch {
       // fallback
     }
-    return { today: 0, total: 5155 };
+    return { today: 1, total: 5155 };
   });
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
         const newDateStr = getTodayISTString();
         if (newDateStr !== activeDateStr) {
           activeDateStr = newDateStr;
-          setVisitorStats((prev) => ({ ...prev, today: 0 }));
+          setVisitorStats((prev) => ({ ...prev, today: 1 }));
           if (document.visibilityState === 'visible') {
             syncStats();
           }
@@ -68,7 +68,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
       if (document.visibilityState === 'visible') {
         const currentStr = getTodayISTString();
         if (currentStr !== activeDateStr) {
-          setVisitorStats((prev) => ({ ...prev, today: 0 }));
+          setVisitorStats((prev) => ({ ...prev, today: 1 }));
           syncStats();
           scheduleMidnightReset();
         }

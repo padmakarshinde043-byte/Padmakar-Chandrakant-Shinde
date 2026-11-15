@@ -24,6 +24,7 @@ import {
   classifyGhostApplicationsToPurge,
 } from '../utils/applicationCleanup';
 import { toEnglishDigits } from '../utils/formatters';
+import { computeNextVisitorStats } from '../utils/visitorCounter';
 
 function getTodayISTString(): string {
   try {
@@ -1092,28 +1093,29 @@ export async function mysqlRecordOrReadVisit(incrementVisit: boolean): Promise<{
       dbDate = String(rows[0].last_date || '');
     }
 
-    if (!incrementVisit) {
-      return {
-        total: dbTotal,
-        today: dbDate === todayDateStr ? dbToday : 0,
-      };
+    const next = computeNextVisitorStats({
+      currentTotal: dbTotal,
+      currentToday: dbToday,
+      lastDate: dbDate,
+      todayDateStr,
+      incrementVisit,
+      minBaseline: 5155,
+    });
+
+    if (next.shouldPersist) {
+      await conn.execute(
+        `INSERT INTO \`site_stats\` (stat_key, total_count, today_count, last_date, last_updated)
+         VALUES ('visits', ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           total_count = VALUES(total_count),
+           today_count = VALUES(today_count),
+           last_date = VALUES(last_date),
+           last_updated = VALUES(last_updated)`,
+        [next.total, next.today, todayDateStr, nowIso]
+      );
     }
 
-    const nextTotal = dbTotal + 1;
-    const nextToday = dbDate === todayDateStr ? dbToday + 1 : 1;
-
-    await conn.execute(
-      `INSERT INTO \`site_stats\` (stat_key, total_count, today_count, last_date, last_updated)
-       VALUES ('visits', ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         total_count = VALUES(total_count),
-         today_count = VALUES(today_count),
-         last_date = VALUES(last_date),
-         last_updated = VALUES(last_updated)`,
-      [nextTotal, nextToday, todayDateStr, nowIso]
-    );
-
-    return { total: nextTotal, today: nextToday };
+    return { total: next.total, today: next.today };
   });
 }
 

@@ -49,6 +49,7 @@ import {
   DeleteTargetMeta,
 } from './utils/applicationCleanup';
 import { isSqlBackendActive, sqlApiRequest } from './api/sqlBridge';
+import { computeNextVisitorStats } from './utils/visitorCounter';
 
 const app = initializeApp(firebaseConfig);
 
@@ -2126,8 +2127,13 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
       return localStats;
     }
 
-    // If this browser already counted today and local cache is fresh (< 2 min), return cached stats with 0 Firestore reads
-    if (hasCountedToday && cachedDate === todayDateStr && Date.now() - cachedAtMs < 2 * 60 * 1000) {
+    // If this browser already counted today and local cache is fresh (< 2 min) with valid non-zero today count, return cached stats
+    if (
+      hasCountedToday &&
+      cachedDate === todayDateStr &&
+      localStats.today >= 1 &&
+      Date.now() - cachedAtMs < 2 * 60 * 1000
+    ) {
       return localStats;
     }
 
@@ -2158,7 +2164,7 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
       const statsDocRef = doc(db, 'site_stats', 'visits');
 
       if (!hasCountedToday) {
-        // Atomic transaction: resets `today` cleanly to 0 (+1 = 1) when IST date rolls over at 12:00 AM
+        // Atomic transaction: resets `today` cleanly to 1 when IST date rolls over at 12:00 AM
         const resultStats = await runTransaction(db, async (tx) => {
           const snap = await tx.get(statsDocRef);
           let fsTotal = 0;
@@ -2172,22 +2178,27 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
             fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
           }
 
-          const baseTotal = Math.max(fsTotal, MIN_VISITOR_BASELINE);
-          const newTotal = baseTotal + 1;
-          const newToday = fsDate === todayDateStr ? Math.max(fsToday, 0) + 1 : 1;
+          const next = computeNextVisitorStats({
+            currentTotal: fsTotal,
+            currentToday: fsToday,
+            lastDate: fsDate,
+            todayDateStr,
+            incrementVisit: true,
+            minBaseline: MIN_VISITOR_BASELINE,
+          });
 
           tx.set(
             statsDocRef,
             {
-              total: newTotal,
-              today: newToday,
+              total: next.total,
+              today: next.today,
               lastDate: todayDateStr,
               lastUpdated: new Date().toISOString(),
             },
             { merge: true }
           );
 
-          return { today: newToday, total: newTotal };
+          return { today: next.today, total: next.total };
         });
 
         try {
@@ -2204,17 +2215,39 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
 
         return resultStats;
       } else {
-        // Already counted today from this browser: read-only refresh from Firestore (no increment)
+        // Already counted today from this browser: read-only refresh (auto-heals if manually reset to 0)
         const snap = await getDoc(statsDocRef);
         if (snap.exists()) {
           const data = snap.data();
           const fsTotal = typeof data.total === 'number' ? data.total : 0;
           const fsDate = typeof data.lastDate === 'string' ? data.lastDate : '';
-          const fsToday = fsDate === todayDateStr && typeof data.today === 'number' ? Math.max(data.today, 0) : 0;
+          const fsToday = typeof data.today === 'number' ? data.today : 0;
+
+          const next = computeNextVisitorStats({
+            currentTotal: fsTotal,
+            currentToday: fsToday,
+            lastDate: fsDate,
+            todayDateStr,
+            incrementVisit: false,
+            minBaseline: MIN_VISITOR_BASELINE,
+          });
+
+          if (next.shouldPersist) {
+            await setDoc(
+              statsDocRef,
+              {
+                total: next.total,
+                today: next.today,
+                lastDate: todayDateStr,
+                lastUpdated: new Date().toISOString(),
+              },
+              { merge: true }
+            ).catch(() => {});
+          }
 
           const liveStats: VisitorStats = {
-            today: fsToday,
-            total: Math.max(fsTotal, MIN_VISITOR_BASELINE),
+            today: next.today,
+            total: next.total,
           };
           try {
             localStorage.setItem(
@@ -2228,7 +2261,7 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
           } catch {}
           return liveStats;
         }
-        return localStats;
+        return { today: Math.max(localStats.today, 1), total: localStats.total };
       }
     } catch (err) {
       if (isQuotaExceededError(err)) markFirestoreQuotaExceeded(err);
