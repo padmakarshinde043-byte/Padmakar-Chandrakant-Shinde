@@ -1049,7 +1049,8 @@ export async function allocateNextMemberNumber(
         const data = snap.data();
         const rawLast = typeof data.lastMemberNumber === 'number' ? data.lastMemberNumber : 0;
         const rawTotal = typeof data.totalApproved === 'number' ? data.totalApproved : 0;
-        currentSeq = Math.max(rawLast, rawTotal, trueHighest);
+        const candidateCounter = Math.max(rawLast, rawTotal);
+        currentSeq = candidateCounter > trueHighest + 5 ? trueHighest : Math.max(candidateCounter, trueHighest);
       }
 
       const nextSeq = computeNextSafeSeq({
@@ -1173,11 +1174,10 @@ export async function approveApplicationAtomicInFirestore(params: {
     let currentCounter = trueHighest;
     if (counterSnap.exists()) {
       const cData = counterSnap.data();
-      currentCounter = Math.max(
-        typeof cData.lastMemberNumber === 'number' ? cData.lastMemberNumber : 0,
-        typeof cData.totalApproved === 'number' ? cData.totalApproved : 0,
-        trueHighest
-      );
+      const rawLast = typeof cData.lastMemberNumber === 'number' ? cData.lastMemberNumber : 0;
+      const rawTotal = typeof cData.totalApproved === 'number' ? cData.totalApproved : 0;
+      const candidateCounter = Math.max(rawLast, rawTotal);
+      currentCounter = candidateCounter > trueHighest + 5 ? trueHighest : Math.max(candidateCounter, trueHighest);
     }
 
     const nextSeq = computeNextSafeSeq({
@@ -1507,8 +1507,18 @@ try {
   // ignore
 }
 
+export function getTodayISTString(): string {
+  try {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  } catch {
+    const d = new Date();
+    const istTime = new Date(d.getTime() + (5.5 * 60 * 60 * 1000));
+    return istTime.toISOString().split('T')[0];
+  }
+}
+
 export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
-  const todayDateStr = new Date().toISOString().split('T')[0];
+  const todayDateStr = getTodayISTString();
   let localStats: VisitorStats = { today: 900, total: MIN_VISITOR_BASELINE };
 
   // 1. Read existing local stats from localStorage
