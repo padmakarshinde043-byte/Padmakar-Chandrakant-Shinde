@@ -5,7 +5,7 @@ import {
   FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle,
   X
 } from 'lucide-react';
-import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem, LatestBannerItem, INITIAL_LATEST_BANNERS } from '../data/mahasanghData';
+import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem, LatestBannerItem } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { AnimatedCounter } from '../utils/animations';
 import { sortNewsDescending } from '../firebase';
@@ -184,7 +184,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
       </section>
 
       {/* Section 1.5: ताज्या घडामोडी (Latest Updates Banner Carousel) */}
-      <LatestUpdatesCarousel banners={latestBanners && latestBanners.length > 0 ? latestBanners : INITIAL_LATEST_BANNERS} setFullScreenPhoto={setFullScreenPhoto} />
+      <LatestUpdatesCarousel banners={latestBanners || []} setFullScreenPhoto={setFullScreenPhoto} />
 
       {/* Section 2: Four Core Interactive Portal Hubs */}
       <section className="py-8 sm:py-10 max-w-[1240px] mx-auto px-4 sm:px-6">
@@ -428,11 +428,23 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
 
 function LatestUpdatesCarousel({ banners, setFullScreenPhoto }: { banners: LatestBannerItem[]; setFullScreenPhoto: (url: string) => void }) {
   const activeBanners = useMemo(() => {
-    return [...banners].sort((a, b) => {
-      const tA = new Date(a.createdAt || a.date || '').getTime() || 0;
-      const tB = new Date(b.createdAt || b.date || '').getTime() || 0;
-      return tB - tA; // Newest first (index 0 is newest added)
-    });
+    const parseTime = (item: LatestBannerItem): number => {
+      if (item.createdAt) {
+        const t = new Date(item.createdAt).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      if (item.date) {
+        const eng = toEnglishDigits(String(item.date).trim());
+        const dmy = eng.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+        if (dmy) {
+          return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10)).getTime();
+        }
+        const t = new Date(eng).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
+      return 0;
+    };
+    return [...banners].sort((a, b) => parseTime(b) - parseTime(a));
   }, [banners]);
 
   const [currentIndex, setCurrentIndex] = useState(0);

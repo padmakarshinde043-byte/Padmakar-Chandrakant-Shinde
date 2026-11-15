@@ -29,6 +29,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Latest banners & updates carousel - public read, admin write
+    match /latest_banners/{bannerId} {
+      allow read, write: if true;
+    }
+
     // Applications collection - public submit, admin review and approval
     match /applications/{applicationId} {
       allow read, write: if true;

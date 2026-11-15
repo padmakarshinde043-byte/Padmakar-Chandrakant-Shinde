@@ -47,6 +47,8 @@ import {
   getCloudinaryConfig,
   saveCloudinaryConfig,
   uploadToCloudinary,
+  uploadBannerPhotoToCloudinary,
+  uploadDataUrlToCloudinary,
   CloudinaryConfig
 } from '../utils/cloudinary';
 import {
@@ -73,8 +75,9 @@ interface AdminTabProps {
   setGovOrders: React.Dispatch<React.SetStateAction<GovOrder[]>>;
   newsList?: NewsItem[];
   latestBanners?: LatestBannerItem[];
-  onAddLatestBanner?: (banner: LatestBannerItem) => void;
-  onDeleteLatestBanner?: (id: string) => void;
+  onAddLatestBanner?: (banner: LatestBannerItem) => Promise<void> | void;
+  onDeleteLatestBanner?: (id: string) => Promise<void> | void;
+  onRefreshLatestBanners?: () => Promise<void>;
   onFetchApplications?: (forceRefresh?: boolean) => Promise<void>;
   isLoadingApps?: boolean;
   onExitAdmin?: () => void;
@@ -273,6 +276,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   latestBanners = [],
   onAddLatestBanner,
   onDeleteLatestBanner,
+  onRefreshLatestBanners,
   onFetchApplications,
   isLoadingApps,
   onExitAdmin,
@@ -302,11 +306,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTabKey>('applications');
 
   // Latest Banners form state
+  const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
   const [bannerTitle, setBannerTitle] = useState('');
   const [bannerSummary, setBannerSummary] = useState('');
   const [bannerDate, setBannerDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [bannerImageUrl, setBannerImageUrl] = useState('');
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+  const [deletingBannerId, setDeletingBannerId] = useState<string | null>(null);
+  const [isRefreshingBanners, setIsRefreshingBanners] = useState(false);
   const [bannerSuccessMsg, setBannerSuccessMsg] = useState('');
   const [bannerErrorMsg, setBannerErrorMsg] = useState('');
 
@@ -315,54 +323,131 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     if (!file) return;
     setIsUploadingBanner(true);
     setBannerErrorMsg('');
+    setBannerSuccessMsg('');
     try {
-      if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
-        const result = await uploadToCloudinary(file, cloudinaryConfig);
-        setBannerImageUrl(result.url);
-      } else {
-        const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
-        setBannerImageUrl(base64);
-      }
+      const { url } = await uploadBannerPhotoToCloudinary(file, cloudinaryConfig);
+      setBannerImageUrl(url);
     } catch (err: any) {
-      try {
-        const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
-        setBannerImageUrl(base64);
-      } catch (ex: any) {
-        setBannerErrorMsg(ex?.message || err?.message || 'फोटो अपलोड करताना त्रुटी आली.');
-      }
+      setBannerErrorMsg(
+        'फोटो Cloudinary वर अपलोड करताना त्रुटी आली: ' +
+          (err?.message || 'कृपया इंटरनेट किंवा Cloudinary सेटिंग तपासा.')
+      );
     } finally {
       setIsUploadingBanner(false);
+      e.target.value = '';
     }
   };
 
-  const handleCreateLatestBannerSubmit = (e: React.FormEvent) => {
+  const handleStartEditBanner = (banner: LatestBannerItem) => {
+    setBannerErrorMsg('');
+    setBannerSuccessMsg('');
+    setEditingBannerId(banner.id);
+    setBannerTitle(banner.title || '');
+    setBannerSummary(banner.summary || '');
+    setBannerImageUrl(banner.imageUrl || '');
+    setBannerDate(parseDateStringToYYYYMMDD(banner.date));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEditBanner = () => {
+    setEditingBannerId(null);
+    setBannerTitle('');
+    setBannerSummary('');
+    setBannerImageUrl('');
+    setBannerDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleCreateLatestBannerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBannerErrorMsg('');
     setBannerSuccessMsg('');
+
+    if (isUploadingBanner) {
+      setBannerErrorMsg('फोटो Cloudinary वर अपलोड होत आहे, कृपया काही सेकंद थांबा.');
+      return;
+    }
 
     if (!bannerTitle.trim() || !bannerImageUrl.trim()) {
       setBannerErrorMsg('कृपया ताज्या घडामोडीचे शीर्षक आणि फोटो आवश्यक भरा.');
       return;
     }
 
-    const newBanner: LatestBannerItem = {
-      id: `banner-${Date.now()}`,
-      title: bannerTitle.trim(),
-      summary: bannerSummary.trim() || undefined,
-      imageUrl: bannerImageUrl.trim(),
-      date: formatDateWithEnglishDigits(bannerDate),
-      createdAt: new Date().toISOString()
-    };
+    setIsSavingBanner(true);
+    try {
+      let finalImageUrl = bannerImageUrl.trim();
+      // If user somehow pasted or had a base64 Data URL, upload to Cloudinary first so only URL is saved in Firebase
+      if (finalImageUrl.startsWith('data:image/')) {
+        finalImageUrl = await uploadDataUrlToCloudinary(finalImageUrl, `latest_banner_${Date.now()}`, cloudinaryConfig);
+        setBannerImageUrl(finalImageUrl);
+      }
 
-    if (onAddLatestBanner) {
-      onAddLatestBanner(newBanner);
+      const existingBanner = editingBannerId
+        ? latestBanners.find((b) => b.id === editingBannerId)
+        : undefined;
+
+      const newBanner: LatestBannerItem = {
+        id: editingBannerId || `banner-${Date.now()}`,
+        title: bannerTitle.trim(),
+        ...(bannerSummary.trim() ? { summary: bannerSummary.trim() } : {}),
+        imageUrl: finalImageUrl,
+        date: formatDateWithEnglishDigits(bannerDate),
+        createdAt: existingBanner?.createdAt || new Date().toISOString(),
+      };
+
+      if (onAddLatestBanner) {
+        await onAddLatestBanner(newBanner);
+      }
+
+      setBannerSuccessMsg(
+        editingBannerId
+          ? 'ताज्या घडामोडी बॅनरमधील बदल Cloudinary लिंकसह Firebase वर सेव्ह झाले असून मुख्य पानावर अद्ययावत झाले आहेत!'
+          : 'ताज्या घडामोडी फोटो Cloudinary वर आणि माहिती Firebase मध्ये यशस्वीरीत्या सेव्ह झाली असून मुख्य पानावर प्रसिद्ध झाली आहे!'
+      );
+      setEditingBannerId(null);
+      setBannerTitle('');
+      setBannerSummary('');
+      setBannerImageUrl('');
+      setBannerDate(new Date().toISOString().split('T')[0]);
+    } catch (err: any) {
+      setBannerErrorMsg(
+        'Firebase मध्ये सेव्ह करताना त्रुटी आली: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.')
+      );
+    } finally {
+      setIsSavingBanner(false);
     }
+  };
 
-    setBannerSuccessMsg('ताज्या घडामोडीचा बॅनर्स व फोटो यशस्वीरीत्या प्रसिद्ध करण्यात आला!');
-    setBannerTitle('');
-    setBannerSummary('');
-    setBannerImageUrl('');
-    setBannerDate(new Date().toISOString().split('T')[0]);
+  const handleDeleteBannerWithFeedback = async (bannerId: string) => {
+    if (!window.confirm('हा ताज्या घडामोडीचा बॅनर कायमचा डिलीट करायचा आहे का?')) return;
+    setBannerErrorMsg('');
+    setBannerSuccessMsg('');
+    setDeletingBannerId(bannerId);
+    try {
+      if (onDeleteLatestBanner) {
+        await onDeleteLatestBanner(bannerId);
+      }
+      if (editingBannerId === bannerId) {
+        handleCancelEditBanner();
+      }
+      setBannerSuccessMsg('ताज्या घडामोडी बॅनर Firebase मधून यशस्वीरीत्या हटवण्यात आला!');
+    } catch (err: any) {
+      setBannerErrorMsg('बॅनर डिलीट करताना त्रुटी आली: ' + (err?.message || 'Error'));
+    } finally {
+      setDeletingBannerId(null);
+    }
+  };
+
+  const handleRefreshBannersClick = async () => {
+    if (!onRefreshLatestBanners) return;
+    setIsRefreshingBanners(true);
+    setBannerErrorMsg('');
+    try {
+      await onRefreshLatestBanners();
+    } catch (err: any) {
+      setBannerErrorMsg('बॅनर्स ताजे करताना त्रुटी आली: ' + (err?.message || 'Error'));
+    } finally {
+      setIsRefreshingBanners(false);
+    }
   };
 
   // Razorpay & Webhook Settings State
@@ -3359,12 +3444,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {activeAdminSubTab === 'latest_banners' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners) && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
-                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-1.5 flex items-center gap-2">
-                    <ImageIcon className="w-5 h-5 text-[#df6b16]" />
-                    ताज्या घडामोडी नवीन बॅनर्स / फोटो जोडा
-                  </h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-[#df6b16]" />
+                      {editingBannerId ? 'ताज्या घडामोडी बॅनर संपादन करा (Edit)' : 'ताज्या घडामोडी नवीन बॅनर्स / फोटो जोडा'}
+                    </h3>
+                    {editingBannerId && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEditBanner}
+                        className="text-xs font-bold text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200"
+                      >
+                        संपादन रद्द करा
+                      </button>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500 mb-5">
-                    येथे जोडलेले फोटो व माहिती मुख्य पानावरील 'ताज्या घडामोडी' स्लायडरमध्ये सर्वात समोर (लेटेस्ट) दिसेल.
+                    येथे जोडलेला फोटो थेट Cloudinary वर सेव्ह होतो व त्याची लिंक Firebase द्वारे मुख्य पानावरील 'ताज्या घडामोडी' मध्ये सर्वात समोर दिसते.
                   </p>
 
                   {bannerSuccessMsg && (
@@ -3408,23 +3504,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          छायाचित्र (Image URL / Upload) <span className="text-rose-600">*</span>
+                          छायाचित्र (Cloudinary Upload / URL) <span className="text-rose-600">*</span>
                         </label>
                         <div className="flex gap-2 items-center">
                           <input
                             type="text"
                             required
-                            placeholder="https://... किंवा खालील बटणाने अपलोड करा"
+                            placeholder="https://... किंवा फाइल निवडा (Cloudinary)"
                             value={bannerImageUrl}
                             onChange={(e) => setBannerImageUrl(e.target.value)}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
                           />
-                          <label className="shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs cursor-pointer flex items-center gap-1.5 transition-colors">
+                          <label className={`shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBanner ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
                             <Upload className="w-4 h-4" />
-                            <span>{isUploadingBanner ? 'अपलोड होत आहे...' : 'फाइल निवडा'}</span>
+                            <span>{isUploadingBanner ? 'Cloudinary अपलोड...' : 'फाइल निवडा'}</span>
                             <input
                               type="file"
                               accept="image/*"
+                              disabled={isUploadingBanner}
                               className="hidden"
                               onChange={handleBannerImageUpload}
                             />
@@ -3436,7 +3533,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {bannerImageUrl && (
                       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-4">
                         <img src={bannerImageUrl} alt="Preview" className="w-20 h-16 object-contain rounded bg-white border border-slate-300" />
-                        <span className="text-xs text-emerald-700 font-bold">✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.</span>
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs text-emerald-700 font-bold block">
+                            {bannerImageUrl.includes('cloudinary.com')
+                              ? '✓ फोटो Cloudinary वर सेव्ह झाला (Firebase वर फक्त लिंक सेव्ह होईल)'
+                              : '✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.'}
+                          </span>
+                        </div>
                       </div>
                     )}
 
@@ -3451,25 +3554,56 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       />
                     </div>
 
-                    <button
-                      type="submit"
-                      className="bg-[#17366d] hover:bg-[#09243f] text-white font-bold px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
-                    >
-                      <PlusCircle className="w-4 h-4 text-amber-400" />
-                      <span>ताज्या घडामोडी बॅनर प्रसिद्ध करा</span>
-                    </button>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={isUploadingBanner || isSavingBanner}
+                        className="bg-[#17366d] hover:bg-[#09243f] disabled:opacity-60 text-white font-bold px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
+                      >
+                        <PlusCircle className="w-4 h-4 text-amber-400" />
+                        <span>
+                          {isSavingBanner
+                            ? 'Firebase वर सेव्ह होत आहे...'
+                            : editingBannerId
+                            ? 'बदल सेव्ह करा'
+                            : 'ताज्या घडामोडी बॅनर प्रसिद्ध करा'}
+                        </span>
+                      </button>
+                      {editingBannerId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditBanner}
+                          className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-3 rounded-xl text-xs transition-colors"
+                        >
+                          रद्द करा
+                        </button>
+                      )}
+                    </div>
                   </form>
                 </div>
 
                 {/* Existing Banners List */}
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-4">
-                    प्रसिद्ध केलेले सर्व ताज्या घडामोडी बॅनर्स ({latestBanners.length})
-                  </h4>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                    <h4 className="font-serifDevanagari text-base font-bold text-[#17366d]">
+                      प्रसिद्ध केलेले सर्व ताज्या घडामोडी बॅनर्स ({latestBanners.length})
+                    </h4>
+                    {onRefreshLatestBanners && (
+                      <button
+                        type="button"
+                        onClick={handleRefreshBannersClick}
+                        disabled={isRefreshingBanners}
+                        className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingBanners ? 'animate-spin' : ''}`} />
+                        <span>{isRefreshingBanners ? 'ताजे होत आहे...' : 'ताजे करा'}</span>
+                      </button>
+                    )}
+                  </div>
 
                   {latestBanners.length === 0 ? (
                     <div className="text-slate-500 text-xs p-6 bg-slate-50 rounded-xl text-center">
-                      अद्याप कोणतेही ताज्या घडामोडी बॅनर्स जोडलेले नाहीत.
+                      सध्या कोणतेही ताज्या घडामोडी बॅनर्स नाहीत. वर दिलेल्या फॉर्ममधून नवीन फोटो व बातमी जोडा.
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -3492,18 +3626,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm('हा ताज्या घडामोडीचा बॅनर डिलीट करायचा आहे का?')) {
-                                onDeleteLatestBanner?.(banner.id);
-                              }
-                            }}
-                            className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-colors cursor-pointer shrink-0"
-                            title="बॅनर डिलीट करा"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditBanner(banner)}
+                              className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors cursor-pointer"
+                              title="बॅनर संपादन करा"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deletingBannerId === banner.id}
+                              onClick={() => handleDeleteBannerWithFeedback(banner.id)}
+                              className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                              title="बॅनर डिलीट करा"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -107,8 +107,56 @@ function dataUrlToFile(dataUrl: string, fileName: string): File {
   while (n--) {
     u8arr[n] = bstr.charCodeAt(n);
   }
-  const ext = mime.includes('webp') ? 'webp' : 'jpg';
+  const ext = mime.includes('webp') ? 'webp' : mime.includes('png') ? 'png' : 'jpg';
   return new File([u8arr], `${fileName}.${ext}`, { type: mime });
+}
+
+/**
+ * Converts a base64 Data URL to a File and uploads it to Cloudinary, returning the HTTPS CDN URL.
+ */
+export async function uploadDataUrlToCloudinary(
+  dataUrl: string,
+  fileName = `banner_${Date.now()}`,
+  overrideConfig?: CloudinaryConfig
+): Promise<string> {
+  const baseConfig = overrideConfig || getCloudinaryConfig();
+  const activeConfig: CloudinaryConfig = {
+    cloudName: baseConfig.cloudName?.trim() || 'fdrjsgjy',
+    uploadPreset: baseConfig.uploadPreset?.trim() || 'mahasangh',
+    enabled: true,
+  };
+  const file = dataUrlToFile(dataUrl, fileName);
+  const result = await uploadToCloudinary(file, activeConfig);
+  return result.url;
+}
+
+/**
+ * Compresses oversized banner images if needed and uploads directly to Cloudinary,
+ * always returning a clean Cloudinary HTTPS URL for saving in Firebase.
+ */
+export async function uploadBannerPhotoToCloudinary(
+  file: File,
+  overrideConfig?: CloudinaryConfig
+): Promise<{ url: string; sizeKb: number }> {
+  const baseConfig = overrideConfig || getCloudinaryConfig();
+  const activeConfig: CloudinaryConfig = {
+    cloudName: baseConfig.cloudName?.trim() || 'fdrjsgjy',
+    uploadPreset: baseConfig.uploadPreset?.trim() || 'mahasangh',
+    enabled: true,
+  };
+
+  let uploadFile = file;
+  let sizeKb = Math.round(file.size / 1024);
+
+  // Compress large camera/WhatsApp images to sharp 1600px HD so Cloudinary upload is fast & under limit
+  if (file.size > 1500 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    const compressed = await compressImageFile(file, 1600, 1600, 0.88);
+    uploadFile = dataUrlToFile(compressed.base64, `latest_banner_${Date.now()}`);
+    sizeKb = compressed.sizeKb;
+  }
+
+  const uploaded = await uploadToCloudinary(uploadFile, activeConfig);
+  return { url: uploaded.url, sizeKb };
 }
 
 /**

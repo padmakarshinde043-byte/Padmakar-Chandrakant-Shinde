@@ -70,6 +70,20 @@
         "totalApproved": { "type": "number" },
         "lastUpdated": { "type": "string", "maxLength": 64 }
       }
+    },
+    "LatestBanner": {
+      "title": "LatestBanner",
+      "description": "Homepage latest updates carousel banner with Cloudinary image URL",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 500 },
+        "summary": { "type": "string", "maxLength": 2000 },
+        "imageUrl": { "type": "string", "maxLength": 1000 },
+        "date": { "type": "string", "maxLength": 64 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "title", "imageUrl", "date", "createdAt"]
     }
   },
   "firestore": {
@@ -88,6 +102,10 @@
     "/settings/{settingId}": {
       "schema": { "$ref": "SystemSetting" },
       "description": "Central atomic counters and administrative configuration settings"
+    },
+    "/latest_banners/{bannerId}": {
+      "schema": { "$ref": "LatestBanner" },
+      "description": "Homepage latest updates carousel banners with Cloudinary image links"
     }
   }
 }

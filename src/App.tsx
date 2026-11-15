@@ -86,6 +86,8 @@ import {
   fetchLatestBannersCached,
   saveLatestBannerToFirestore,
   deleteLatestBannerFromFirestore,
+  sortLatestBannersDescending,
+  updateLatestBannersCache,
 } from './firebase';
 import {
   shouldRemoveFromCacheOnDelete,
@@ -141,8 +143,17 @@ export function App() {
 
   const [latestBanners, setLatestBanners] = useState<LatestBannerItem[]>(() => {
     try {
-      const saved = localStorage.getItem('mahasangh_latest_banners_cache_v1');
-      if (saved) return JSON.parse(saved);
+      localStorage.removeItem('mahasangh_latest_banners_cache_v1');
+      localStorage.removeItem('mahasangh_latest_banners_cache_time_v1');
+      const saved = localStorage.getItem('mahasangh_latest_banners_cache_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return sortLatestBannersDescending(
+            parsed.filter((b: LatestBannerItem) => b?.id !== 'banner-1' && b?.id !== 'banner-2')
+          );
+        }
+      }
     } catch {}
     return INITIAL_LATEST_BANNERS;
   });
@@ -150,29 +161,34 @@ export function App() {
   useEffect(() => {
     fetchLatestBannersCached(false)
       .then((banners) => {
-        if (Array.isArray(banners) && banners.length > 0) {
+        if (Array.isArray(banners)) {
           setLatestBanners(banners);
         }
       })
       .catch(() => {});
   }, []);
 
+  const handleRefreshLatestBanners = async () => {
+    const fresh = await fetchLatestBannersCached(true);
+    setLatestBanners(fresh);
+  };
+
   const handleAddLatestBanner = async (banner: LatestBannerItem) => {
-    setLatestBanners((prev) => [banner, ...prev]);
-    try {
-      await saveLatestBannerToFirestore(banner);
-    } catch (e) {
-      console.warn('Save latest banner error:', e);
-    }
+    await saveLatestBannerToFirestore(banner);
+    setLatestBanners((prev) => {
+      const next = sortLatestBannersDescending([banner, ...prev.filter((b) => b.id !== banner.id)]);
+      updateLatestBannersCache(next);
+      return next;
+    });
   };
 
   const handleDeleteLatestBanner = async (bannerId: string) => {
-    setLatestBanners((prev) => prev.filter((b) => b.id !== bannerId));
-    try {
-      await deleteLatestBannerFromFirestore(bannerId);
-    } catch (e) {
-      console.warn('Delete latest banner error:', e);
-    }
+    await deleteLatestBannerFromFirestore(bannerId);
+    setLatestBanners((prev) => {
+      const next = prev.filter((b) => b.id !== bannerId);
+      updateLatestBannersCache(next);
+      return next;
+    });
   };
 
   // Listen to browser URL changes (e.g. /admin or #admin)
@@ -615,6 +631,7 @@ export function App() {
           latestBanners={latestBanners}
           onAddLatestBanner={handleAddLatestBanner}
           onDeleteLatestBanner={handleDeleteLatestBanner}
+          onRefreshLatestBanners={handleRefreshLatestBanners}
           onFetchApplications={handleFetchAdminApplications}
           isLoadingApps={isLoadingAdminApps}
           onExitAdmin={handleExitAdmin}

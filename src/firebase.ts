@@ -241,37 +241,106 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
   }
 }
 
-const LATEST_BANNERS_CACHE_KEY = 'mahasangh_latest_banners_cache_v1';
-const LATEST_BANNERS_CACHE_TIME_KEY = 'mahasangh_latest_banners_cache_time_v1';
+const LATEST_BANNERS_CACHE_KEY = 'mahasangh_latest_banners_cache_v2';
+const LATEST_BANNERS_CACHE_TIME_KEY = 'mahasangh_latest_banners_cache_time_v2';
+const LEGACY_BANNERS_CACHE_KEY_V1 = 'mahasangh_latest_banners_cache_v1';
+const LEGACY_BANNERS_CACHE_TIME_KEY_V1 = 'mahasangh_latest_banners_cache_time_v1';
+const LATEST_BANNERS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes so visitors quickly see new updates
+const LEGACY_STUCK_BANNER_IDS = new Set(['banner-1', 'banner-2']);
+
+function parseLatestBannerTime(item: Partial<LatestBannerItem> | null | undefined): number {
+  if (!item) return 0;
+  if (item.createdAt) {
+    const t = new Date(item.createdAt).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  if (item.date) {
+    const clean = toEnglishDigits(String(item.date).trim());
+    const dmy = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (dmy) {
+      return new Date(parseInt(dmy[3], 10), parseInt(dmy[2], 10) - 1, parseInt(dmy[1], 10)).getTime();
+    }
+    const t = new Date(clean).getTime();
+    if (!isNaN(t) && t > 0) return t;
+  }
+  return 0;
+}
+
+export function sortLatestBannersDescending(list: LatestBannerItem[]): LatestBannerItem[] {
+  return [...list].sort((a, b) => parseLatestBannerTime(b) - parseLatestBannerTime(a));
+}
+
+function cleanLatestBannerPayload(banner: LatestBannerItem): LatestBannerItem {
+  const payload: LatestBannerItem = {
+    id: banner.id,
+    title: banner.title.trim(),
+    imageUrl: banner.imageUrl.trim(),
+    date: banner.date,
+    createdAt: banner.createdAt || new Date().toISOString(),
+  };
+  if (banner.summary && banner.summary.trim()) {
+    payload.summary = banner.summary.trim();
+  }
+  return payload;
+}
+
+export function updateLatestBannersCache(list: LatestBannerItem[]): void {
+  const sorted = sortLatestBannersDescending(
+    list.filter((b) => !LEGACY_STUCK_BANNER_IDS.has(b.id))
+  );
+  safeStorageSet(LATEST_BANNERS_CACHE_KEY, JSON.stringify(sorted));
+  safeStorageSet(LATEST_BANNERS_CACHE_TIME_KEY, Date.now().toString());
+  try {
+    localStorage.removeItem(LEGACY_BANNERS_CACHE_KEY_V1);
+    localStorage.removeItem(LEGACY_BANNERS_CACHE_TIME_KEY_V1);
+  } catch {}
+}
 
 export async function fetchLatestBannersCached(forceRefresh = false): Promise<LatestBannerItem[]> {
   try {
+    try {
+      localStorage.removeItem(LEGACY_BANNERS_CACHE_KEY_V1);
+      localStorage.removeItem(LEGACY_BANNERS_CACHE_TIME_KEY_V1);
+    } catch {}
+
     const cachedTime = localStorage.getItem(LATEST_BANNERS_CACHE_TIME_KEY);
     const cachedData = localStorage.getItem(LATEST_BANNERS_CACHE_KEY);
 
     if (!forceRefresh && cachedTime && cachedData) {
       const age = Date.now() - parseInt(cachedTime, 10);
-      if (age < CACHE_DURATION_MS) {
-        return JSON.parse(cachedData);
+      if (age < LATEST_BANNERS_CACHE_TTL_MS) {
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed)) {
+          return sortLatestBannersDescending(parsed.filter((b) => !LEGACY_STUCK_BANNER_IDS.has(b?.id)));
+        }
       }
     }
 
     if (!forceRefresh && isFirestoreQuotaInCooldown()) {
-      if (cachedData) return JSON.parse(cachedData);
-      return INITIAL_LATEST_BANNERS;
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed)) {
+          return sortLatestBannersDescending(parsed.filter((b) => !LEGACY_STUCK_BANNER_IDS.has(b?.id)));
+        }
+      }
+      return [];
     }
 
     const colRef = collection(db, 'latest_banners');
     const snap = await getDocs(colRef);
 
     if (snap.empty) {
-      safeStorageSet(LATEST_BANNERS_CACHE_KEY, JSON.stringify(INITIAL_LATEST_BANNERS));
-      safeStorageSet(LATEST_BANNERS_CACHE_TIME_KEY, Date.now().toString());
-      return INITIAL_LATEST_BANNERS;
+      updateLatestBannersCache([]);
+      return [];
     }
 
     const list: LatestBannerItem[] = [];
+    const legacyIdsToPurge: string[] = [];
     snap.forEach((d) => {
+      if (LEGACY_STUCK_BANNER_IDS.has(d.id)) {
+        legacyIdsToPurge.push(d.id);
+        return;
+      }
       const data = d.data() as any;
       list.push({
         id: d.id,
@@ -279,14 +348,13 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
       });
     });
 
-    const sorted = list.sort((a, b) => {
-      const tA = new Date(a.createdAt || a.date || '').getTime() || 0;
-      const tB = new Date(b.createdAt || b.date || '').getTime() || 0;
-      return tB - tA;
-    });
+    // Permanently remove legacy stuck dummy docs from Firestore if they ever existed there
+    if (legacyIdsToPurge.length > 0) {
+      Promise.all(legacyIdsToPurge.map((id) => deleteDoc(doc(db, 'latest_banners', id)))).catch(() => {});
+    }
 
-    safeStorageSet(LATEST_BANNERS_CACHE_KEY, JSON.stringify(sorted));
-    safeStorageSet(LATEST_BANNERS_CACHE_TIME_KEY, Date.now().toString());
+    const sorted = sortLatestBannersDescending(list);
+    updateLatestBannersCache(sorted);
     return sorted;
   } catch (error) {
     if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
@@ -294,18 +362,29 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
     const cachedData = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
     if (cachedData) {
       try {
-        return JSON.parse(cachedData);
+        const parsed = JSON.parse(cachedData);
+        if (Array.isArray(parsed)) {
+          return sortLatestBannersDescending(parsed.filter((b) => !LEGACY_STUCK_BANNER_IDS.has(b?.id)));
+        }
       } catch {}
     }
-    return INITIAL_LATEST_BANNERS;
+    return [];
   }
 }
 
 export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Promise<void> {
   try {
-    const docRef = doc(db, 'latest_banners', banner.id);
-    await setDoc(docRef, banner, { merge: true });
-    localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
+    const cleanPayload = cleanLatestBannerPayload(banner);
+    const docRef = doc(db, 'latest_banners', cleanPayload.id);
+    await setDoc(docRef, cleanPayload);
+    try {
+      const existingRaw = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
+      const existing: LatestBannerItem[] = existingRaw ? JSON.parse(existingRaw) : [];
+      const next = [cleanPayload, ...existing.filter((b) => b.id !== cleanPayload.id)];
+      updateLatestBannersCache(next);
+    } catch {
+      localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `latest_banners/${banner.id}`);
   }
@@ -315,7 +394,13 @@ export async function deleteLatestBannerFromFirestore(bannerId: string): Promise
   try {
     const docRef = doc(db, 'latest_banners', bannerId);
     await deleteDoc(docRef);
-    localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
+    try {
+      const existingRaw = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
+      const existing: LatestBannerItem[] = existingRaw ? JSON.parse(existingRaw) : [];
+      updateLatestBannersCache(existing.filter((b) => b.id !== bannerId));
+    } catch {
+      localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `latest_banners/${bannerId}`);
   }
