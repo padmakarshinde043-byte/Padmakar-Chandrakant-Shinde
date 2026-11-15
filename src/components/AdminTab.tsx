@@ -222,7 +222,7 @@ const ADMIN_PERMISSION_OPTIONS: AdminPermissionOption[] = [
   {
     key: 'manageCloudinary',
     label: 'क्लाउड स्टोरेज',
-    description: 'फोटो व फाइल क्लाउड स्टोरेज (Cloudinary) सेटिंग्ज',
+    description: 'फोटो व फाइल मीडिया स्टोरेज सेटिंग्ज',
     activeCardClass: 'bg-cyan-50/80 border-cyan-300 shadow-xs',
     checkboxClass: 'text-cyan-600 focus:ring-cyan-500',
     badgeClass: 'bg-cyan-100 text-cyan-900',
@@ -329,8 +329,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setBannerImageUrl(url);
     } catch (err: any) {
       setBannerErrorMsg(
-        'फोटो Cloudinary वर अपलोड करताना त्रुटी आली: ' +
-          (err?.message || 'कृपया इंटरनेट किंवा Cloudinary सेटिंग तपासा.')
+        'फोटो अपलोड करताना त्रुटी आली: ' +
+          (err?.message || 'कृपया इंटरनेट कनेक्शन किंवा स्टोरेज सेटिंग तपासा.')
       );
     } finally {
       setIsUploadingBanner(false);
@@ -363,7 +363,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setBannerSuccessMsg('');
 
     if (isUploadingBanner) {
-      setBannerErrorMsg('फोटो Cloudinary वर अपलोड होत आहे, कृपया काही सेकंद थांबा.');
+      setBannerErrorMsg('फोटो अपलोड होत आहे, कृपया काही सेकंद थांबा.');
       return;
     }
 
@@ -400,8 +400,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
       setBannerSuccessMsg(
         editingBannerId
-          ? 'ताज्या घडामोडी बॅनरमधील बदल Cloudinary लिंकसह Firebase वर सेव्ह झाले असून मुख्य पानावर अद्ययावत झाले आहेत!'
-          : 'ताज्या घडामोडी फोटो Cloudinary वर आणि माहिती Firebase मध्ये यशस्वीरीत्या सेव्ह झाली असून मुख्य पानावर प्रसिद्ध झाली आहे!'
+          ? 'ताज्या घडामोडी बॅनरमधील बदल सेव्ह झाले असून मुख्य पानावर अद्ययावत झाले आहेत!'
+          : 'ताज्या घडामोडी व फोटो यशस्वीरीत्या सेव्ह झाले असून मुख्य पानावर प्रसिद्ध झाले आहेत!'
       );
       setEditingBannerId(null);
       setBannerTitle('');
@@ -410,7 +410,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setBannerDate(new Date().toISOString().split('T')[0]);
     } catch (err: any) {
       setBannerErrorMsg(
-        'Firebase मध्ये सेव्ह करताना त्रुटी आली: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.')
+        'माहिती सेव्ह करताना त्रुटी आली: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.')
       );
     } finally {
       setIsSavingBanner(false);
@@ -429,7 +429,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       if (editingBannerId === bannerId) {
         handleCancelEditBanner();
       }
-      setBannerSuccessMsg('ताज्या घडामोडी बॅनर Firebase मधून यशस्वीरीत्या हटवण्यात आला!');
+      setBannerSuccessMsg('ताज्या घडामोडी बॅनर यशस्वीरीत्या हटवण्यात आला!');
     } catch (err: any) {
       setBannerErrorMsg('बॅनर डिलीट करताना त्रुटी आली: ' + (err?.message || 'Error'));
     } finally {
@@ -589,7 +589,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isPurgingGhosts, setIsPurgingGhosts] = useState(false);
   const [activeCircleAction, setActiveCircleAction] = useState<'resequence' | 'reset' | null>(null);
   const handleResetCounter = async () => {
-    if (!window.confirm('तुम्हाला नक्की सदस्य क्रमांक काउंटर Firebase वरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा आहे का? यामुळे पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.')) {
+    if (!window.confirm('तुम्हाला नक्की सदस्य क्रमांक काउंटर सर्व्हरवरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा आहे का? यामुळे पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.')) {
       return;
     }
     setIsResettingCounter(true);
@@ -607,7 +607,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handlePurgeDeletedGhosts = async () => {
     if (
       !window.confirm(
-        'पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा Firebase व कॅशमधून कायमचा काढून टाकायचा का? यामुळे त्या सदस्यांना पुन्हा अर्ज भरताना कोणतीही अडचण येणार नाही.'
+        'पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा सिस्टम व कॅशमधून कायमचा काढून टाकायचा का? यामुळे त्या सदस्यांना पुन्हा अर्ज भरताना कोणतीही अडचण येणार नाही.'
       )
     ) {
       return;
@@ -627,7 +627,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleDeleteWithFeedback = async (app: MembershipApplication) => {
     if (
       !window.confirm(
-        `${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone}) यांचा हा अर्ज Firebase आणि सर्व कॅशमधून कायमचा डिलीट करायचा का? डिलीट केल्यानंतर ते पुन्हा अर्ज भरू शकतील.`
+        `${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone}) यांचा हा अर्ज सिस्टम आणि सर्व कॅशमधून कायमचा डिलीट करायचा का? डिलीट केल्यानंतर ते पुन्हा अर्ज भरू शकतील.`
       )
     ) {
       return;
@@ -2243,7 +2243,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       onClick={handlePurgeDeletedGhosts}
                       disabled={isPurgingGhosts}
                       className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-                      title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड Firebase मधून स्वच्छ करा"
+                      title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड सिस्टममधून स्वच्छ करा"
                     >
                       <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
                       <span>{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुने डिलीट डाटा स्वच्छ करा'}</span>
@@ -2512,7 +2512,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     type="button"
                                     onClick={() => handleDeleteWithFeedback(app)}
                                     className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1.5 rounded text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
-                                    title="हा अर्ज Firebase मधून कायमचा डिलीट करा"
+                                    title="हा अर्ज कायमचा डिलीट करा"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -3460,7 +3460,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mb-5">
-                    येथे जोडलेला फोटो थेट Cloudinary वर सेव्ह होतो व त्याची लिंक Firebase द्वारे मुख्य पानावरील 'ताज्या घडामोडी' मध्ये सर्वात समोर दिसते.
+                    येथे जोडलेला फोटो व बातमी मुख्य पानावरील 'ताज्या घडामोडी' विभागात सर्वात समोर दिसते.
                   </p>
 
                   {bannerSuccessMsg && (
@@ -3504,20 +3504,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          छायाचित्र (Cloudinary Upload / URL) <span className="text-rose-600">*</span>
+                          छायाचित्र (Upload / URL) <span className="text-rose-600">*</span>
                         </label>
                         <div className="flex gap-2 items-center">
                           <input
                             type="text"
                             required
-                            placeholder="https://... किंवा फाइल निवडा (Cloudinary)"
+                            placeholder="https://... किंवा फाइल निवडा"
                             value={bannerImageUrl}
                             onChange={(e) => setBannerImageUrl(e.target.value)}
                             className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
                           />
                           <label className={`shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBanner ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
                             <Upload className="w-4 h-4" />
-                            <span>{isUploadingBanner ? 'Cloudinary अपलोड...' : 'फाइल निवडा'}</span>
+                            <span>{isUploadingBanner ? 'अपलोड होत आहे...' : 'फाइल निवडा'}</span>
                             <input
                               type="file"
                               accept="image/*"
@@ -3535,9 +3535,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <img src={bannerImageUrl} alt="Preview" className="w-20 h-16 object-contain rounded bg-white border border-slate-300" />
                         <div className="min-w-0 flex-1">
                           <span className="text-xs text-emerald-700 font-bold block">
-                            {bannerImageUrl.includes('cloudinary.com')
-                              ? '✓ फोटो Cloudinary वर सेव्ह झाला (Firebase वर फक्त लिंक सेव्ह होईल)'
-                              : '✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.'}
+                            ✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.
                           </span>
                         </div>
                       </div>
@@ -3563,7 +3561,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <PlusCircle className="w-4 h-4 text-amber-400" />
                         <span>
                           {isSavingBanner
-                            ? 'Firebase वर सेव्ह होत आहे...'
+                            ? 'सेव्ह होत आहे...'
                             : editingBannerId
                             ? 'बदल सेव्ह करा'
                             : 'ताज्या घडामोडी बॅनर प्रसिद्ध करा'}

@@ -336,7 +336,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const handlePurgeGhostRecords = async () => {
     if (
       !window.confirm(
-        'तुम्हाला नक्की पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा Firebase व कॅशमधून कायमचा स्वच्छ करायचा आहे का? (मंजूर सदस्य पूर्णपणे सुरक्षित राहतील.)'
+        'तुम्हाला नक्की पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित घोस्ट अर्जांचा सर्व डाटा सिस्टम व कॅशमधून कायमचा स्वच्छ करायचा आहे का? (मंजूर सदस्य पूर्णपणे सुरक्षित राहतील.)'
       )
     ) {
       return;
@@ -384,7 +384,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             onClick={handlePurgeGhostRecords}
             disabled={isPurgingGhosts}
             className="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-            title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड Firebase मधून कायमचे काढून टाका"
+            title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड सिस्टममधून कायमचे काढून टाका"
           >
             <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
             <span>{isPurgingGhosts ? 'स्वच्छता सुरू आहे...' : 'जुने डिलीट / घोस्ट डाटा स्वच्छ करा'}</span>
