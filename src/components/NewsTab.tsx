@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, Tag, ArrowRight, X, Search, FileText, RefreshCw, ChevronRight, ShieldCheck, Megaphone, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { NewsItem, GovOrder, INITIAL_GOV_ORDERS, INITIAL_NEWS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
@@ -24,13 +25,25 @@ export const NewsTab: React.FC<NewsTabProps> = ({
   const modalBodyRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (selectedNews) {
-      if (modalBodyRef.current) {
-        modalBodyRef.current.scrollTop = 0;
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!selectedNews) return;
+    if (modalBodyRef.current) {
+      modalBodyRef.current.scrollTop = 0;
     }
-  }, [selectedNews]);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedNews(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedNews, setSelectedNews]);
 
   // पहिला विभाग (Section 1 Filters: सर्व, अधिकृत घोषणा, अधिकृत वृत्त, संघटना वृत्त, अभिनंदन, टॅगलाईन फोटो)
   const section1Categories = ['सर्व', 'अधिकृत घोषणा', 'अधिकृत वृत्त', 'संघटना घडामोडी', 'संघटना वृत्त', 'अभिनंदन', 'टॅगलाईन फोटो'];
@@ -346,27 +359,34 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         </div>
       </div>
 
-      {/* Read News / View Photo Modal (सविस्तर बातमी व वर फोटो) */}
-      {selectedNews && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden relative my-auto">
-            <div className="sticky top-0 z-20 p-4 sm:p-5 bg-[#0b1e36] text-white flex items-center justify-between shrink-0 shadow-md">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-amber-400" />
-                <span className="text-xs sm:text-sm font-semibold text-amber-300">
+      {/* Read News / View Photo Modal (सविस्तर बातमी व वर फोटो) — Rendered via Portal directly in document.body so it stays centered on mobile & above Header */}
+      {selectedNews && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedNews(null);
+          }}
+          className="mhs-modal-enter fixed inset-0 z-[120] bg-black/75 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4"
+        >
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] max-h-[90dvh] flex flex-col overflow-hidden relative">
+            <div className="p-4 sm:p-5 bg-[#0b1e36] text-white flex items-center justify-between shrink-0 shadow-md">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="w-5 h-5 text-amber-400 shrink-0" />
+                <span className="text-xs sm:text-sm font-semibold text-amber-300 truncate">
                   {selectedNews.category} · {toEnglishDigits(selectedNews.date)}
                 </span>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedNews(null)}
-                className="text-slate-300 hover:text-white p-1.5 rounded-full hover:bg-white/15 transition-colors cursor-pointer"
+                className="text-white bg-white/15 hover:bg-red-600 p-1.5 rounded-full transition-colors cursor-pointer shrink-0 ml-2"
                 title="बंद करा"
+                aria-label="बंद करा"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div ref={modalBodyRef} className="p-4 sm:p-6 overflow-y-auto space-y-4">
+            <div ref={modalBodyRef} className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-4 flex-1">
               {/* वर फोटो (Photo on Top) */}
               {(selectedNews.imageUrl || selectedNews.image) && (
                 <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xs">
@@ -412,19 +432,21 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
-              <span className="text-[11px] text-slate-500 font-mono">
+            <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500 font-mono truncate mr-2">
                 {selectedNews.id}
               </span>
               <button
+                type="button"
                 onClick={() => setSelectedNews(null)}
-                className="bg-[#0b1e36] hover:bg-[#132f52] text-white text-xs font-bold px-5 py-2 rounded-lg"
+                className="bg-[#0b1e36] hover:bg-[#132f52] text-white text-xs sm:text-sm font-bold px-5 py-2 rounded-lg shrink-0 cursor-pointer"
               >
                 बंद करा
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
