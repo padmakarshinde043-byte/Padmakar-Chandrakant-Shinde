@@ -48,6 +48,7 @@ import {
   classifyGhostApplicationsToPurge,
   DeleteTargetMeta,
 } from './utils/applicationCleanup';
+import { isSqlBackendActive, sqlApiRequest } from './api/sqlBridge';
 
 const app = initializeApp(firebaseConfig);
 
@@ -152,6 +153,10 @@ export function markFirestoreQuotaExceeded(error?: unknown): void {
 
 // Session-cached connection verification (Runs only once per session to save quota)
 export async function testConnectionOncePerSession(): Promise<boolean> {
+  if (await isSqlBackendActive()) {
+    if (typeof window !== 'undefined') sessionStorage.setItem('fb_conn_ok', 'true');
+    return true;
+  }
   if (typeof window !== 'undefined' && sessionStorage.getItem('fb_conn_ok')) {
     return true;
   }
@@ -194,6 +199,15 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
         // Cache is valid - ZERO reads from Firestore!
         return sortNewsDescending(JSON.parse(cachedData));
       }
+    }
+
+    if (await isSqlBackendActive()) {
+      const data = await sqlApiRequest<{ items: NewsItem[] }>('/api/db/news');
+      const items = Array.isArray(data?.items) && data.items.length > 0 ? data.items : INITIAL_NEWS;
+      const sortedSql = sortNewsDescending(items);
+      safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(sortedSql));
+      safeStorageSet(NEWS_CACHE_TIME_KEY, Date.now().toString());
+      return sortedSql;
     }
 
     if (!forceRefresh && isFirestoreQuotaInCooldown()) {
@@ -316,6 +330,16 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
       }
     }
 
+    if (await isSqlBackendActive()) {
+      const data = await sqlApiRequest<{ items: LatestBannerItem[] }>('/api/db/latest-banners');
+      const rawItems = Array.isArray(data?.items) ? data.items : [];
+      const sortedSql = sortLatestBannersDescending(
+        rawItems.filter((b) => !LEGACY_STUCK_BANNER_IDS.has(b?.id))
+      );
+      updateLatestBannersCache(sortedSql);
+      return sortedSql;
+    }
+
     if (!forceRefresh && isFirestoreQuotaInCooldown()) {
       if (cachedData) {
         const parsed = JSON.parse(cachedData);
@@ -375,8 +399,15 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
 export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Promise<void> {
   try {
     const cleanPayload = cleanLatestBannerPayload(banner);
-    const docRef = doc(db, 'latest_banners', cleanPayload.id);
-    await setDoc(docRef, cleanPayload);
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest('/api/db/latest-banners', {
+        method: 'POST',
+        body: JSON.stringify(cleanPayload),
+      });
+    } else {
+      const docRef = doc(db, 'latest_banners', cleanPayload.id);
+      await setDoc(docRef, cleanPayload);
+    }
     try {
       const existingRaw = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
       const existing: LatestBannerItem[] = existingRaw ? JSON.parse(existingRaw) : [];
@@ -392,8 +423,14 @@ export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Pro
 
 export async function deleteLatestBannerFromFirestore(bannerId: string): Promise<void> {
   try {
-    const docRef = doc(db, 'latest_banners', bannerId);
-    await deleteDoc(docRef);
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest(`/api/db/latest-banners/${encodeURIComponent(bannerId)}`, {
+        method: 'DELETE',
+      });
+    } else {
+      const docRef = doc(db, 'latest_banners', bannerId);
+      await deleteDoc(docRef);
+    }
     try {
       const existingRaw = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
       const existing: LatestBannerItem[] = existingRaw ? JSON.parse(existingRaw) : [];
@@ -506,7 +543,14 @@ export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
   };
 
   try {
-    await setDoc(doc(db, 'news', news.id), newsWithCreated);
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest('/api/db/news', {
+        method: 'POST',
+        body: JSON.stringify(newsWithCreated),
+      });
+    } else {
+      await setDoc(doc(db, 'news', news.id), newsWithCreated);
+    }
     // Immediately invalidate and update local cache with newest at top
     const currentCached = safeStorageGet(NEWS_CACHE_KEY);
     const list: NewsItem[] = currentCached ? JSON.parse(currentCached) : [];
@@ -536,6 +580,15 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
                     if (Array.isArray(parsed)) return parsed;
                 }
             }
+        }
+
+        if (await isSqlBackendActive()) {
+            const data = await sqlApiRequest<{ items: GovOrder[] }>('/api/db/gov-orders');
+            const list = Array.isArray(data?.items) ? data.items : [];
+            const sortedSql = list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(sortedSql));
+            safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
+            return sortedSql;
         }
 
         if (!forceRefresh && isFirestoreQuotaInCooldown()) {
@@ -576,7 +629,14 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
 }
 
 export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void> {
-    await setDoc(doc(db, 'gov_orders', govOrder.id), govOrder);
+    if (await isSqlBackendActive()) {
+        await sqlApiRequest('/api/db/gov-orders', {
+            method: 'POST',
+            body: JSON.stringify(govOrder),
+        });
+    } else {
+        await setDoc(doc(db, 'gov_orders', govOrder.id), govOrder);
+    }
     try {
         const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
         const list: GovOrder[] = cached ? JSON.parse(cached) : [];
@@ -590,7 +650,13 @@ export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void>
 }
 
 export async function deleteGovOrderFromFirestore(id: string): Promise<void> {
-    await deleteDoc(doc(db, 'gov_orders', id));
+    if (await isSqlBackendActive()) {
+        await sqlApiRequest(`/api/db/gov-orders/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+        });
+    } else {
+        await deleteDoc(doc(db, 'gov_orders', id));
+    }
     try {
         const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
         if (cached) {
@@ -608,8 +674,14 @@ export async function deleteNewsFromFirestore(newsId: string): Promise<void> {
   const path = `news/${newsId}`;
   console.log('Attempting to delete news item:', newsId);
   try {
-    await deleteDoc(doc(db, 'news', newsId));
-    console.log('Successfully deleted news item from Firestore:', newsId);
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest(`/api/db/news/${encodeURIComponent(newsId)}`, {
+        method: 'DELETE',
+      });
+    } else {
+      await deleteDoc(doc(db, 'news', newsId));
+    }
+    console.log('Successfully deleted news item:', newsId);
     const currentCached = safeStorageGet(NEWS_CACHE_KEY);
     const list: NewsItem[] = currentCached ? JSON.parse(currentCached) : [];
     const updated = list.filter((x) => x.id !== newsId);
@@ -619,7 +691,7 @@ export async function deleteNewsFromFirestore(newsId: string): Promise<void> {
       window.dispatchEvent(new CustomEvent('mahasangh_news_updated', { detail: updated }));
     }
   } catch (error) {
-    console.error('Failed to delete news item from Firestore:', newsId, error);
+    console.error('Failed to delete news item:', newsId, error);
     handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
@@ -644,6 +716,13 @@ export async function saveApplicationToFirestore(app: MembershipApplication): Pr
   const path = `applications/${app.id}`;
   try {
     const cleaned = cleanForFirestore(app);
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest('/api/db/applications', {
+        method: 'POST',
+        body: JSON.stringify(cleaned),
+      });
+      return;
+    }
     await setDoc(doc(db, 'applications', app.id), cleaned, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
@@ -656,6 +735,17 @@ export async function trackSingleApplicationDetailed(
 ): Promise<{ app: MembershipApplication | null; verifiedFromServer: boolean }> {
   const queryTerm = toEnglishDigits(identifier.trim());
   if (!queryTerm) return { app: null, verifiedFromServer: false };
+
+  if (await isSqlBackendActive()) {
+    try {
+      return await sqlApiRequest<{ app: MembershipApplication | null; verifiedFromServer: boolean }>(
+        `/api/db/applications/track?q=${encodeURIComponent(queryTerm)}`
+      );
+    } catch (error) {
+      console.warn('SQL track query error:', error);
+      return { app: null, verifiedFromServer: false };
+    }
+  }
 
   let verifiedFromServer = false;
 
@@ -763,6 +853,21 @@ export async function findExistingApplicationInFirestore(params: {
   match: { app: MembershipApplication; matchedBy: 'phone' | 'email' } | null;
   verifiedFromServer: boolean;
 }> {
+  if (await isSqlBackendActive()) {
+    try {
+      return await sqlApiRequest<{
+        match: { app: MembershipApplication; matchedBy: 'phone' | 'email' } | null;
+        verifiedFromServer: boolean;
+      }>('/api/db/applications/find-existing', {
+        method: 'POST',
+        body: JSON.stringify(params),
+      });
+    } catch (error) {
+      console.warn('Duplicate check SQL query error:', error);
+      return { match: null, verifiedFromServer: false };
+    }
+  }
+
   let verifiedFromServer = false;
 
   const getDocsServerFirst = async (q: ReturnType<typeof query>) => {
@@ -869,6 +974,20 @@ export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<M
       }
     }
 
+    if (await isSqlBackendActive()) {
+      const data = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications');
+      const list = Array.isArray(data?.items) ? data.items : [];
+      list.sort(
+        (a, b) =>
+          new Date(b.createdAt || '').getTime() -
+          new Date(a.createdAt || '').getTime()
+      );
+      adminAppsMemoryCache = { list, timestamp: Date.now() };
+      safeStorageSet(ADMIN_APPS_CACHE_KEY, JSON.stringify(stripHeavyPhotosForStorage(list)));
+      safeStorageSet(ADMIN_APPS_TIME_KEY, Date.now().toString());
+      return list;
+    }
+
     const appsCol = collection(db, 'applications');
     let snap;
     if (forceRefresh) {
@@ -917,30 +1036,61 @@ export function subscribeToApplicationsForAdmin(
   onSuccess: (apps: MembershipApplication[]) => void,
   onError?: (error: unknown) => void
 ): () => void {
-  const appsCol = collection(db, 'applications');
-  return onSnapshot(
-    appsCol,
-    (snap: QuerySnapshot<DocumentData>) => {
-      const list: MembershipApplication[] = [];
-      snap.forEach((d) => {
-        const data = d.data() as MembershipApplication;
-        list.push({ ...data, id: d.id || data.id });
-      });
-      list.sort(
-        (a, b) =>
-          new Date(b.createdAt || '').getTime() -
-          new Date(a.createdAt || '').getTime()
+  let cancelled = false;
+  let unsubscribeFirestore: (() => void) | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  isSqlBackendActive()
+    .then((useSql) => {
+      if (cancelled) return;
+      if (useSql) {
+        const pull = async () => {
+          try {
+            const list = await fetchApplicationsForAdmin(true);
+            if (!cancelled) onSuccess(list);
+          } catch (err) {
+            if (!cancelled && onError) onError(err);
+          }
+        };
+        pull();
+        pollTimer = setInterval(pull, 30000);
+        return;
+      }
+
+      const appsCol = collection(db, 'applications');
+      unsubscribeFirestore = onSnapshot(
+        appsCol,
+        (snap: QuerySnapshot<DocumentData>) => {
+          const list: MembershipApplication[] = [];
+          snap.forEach((d) => {
+            const data = d.data() as MembershipApplication;
+            list.push({ ...data, id: d.id || data.id });
+          });
+          list.sort(
+            (a, b) =>
+              new Date(b.createdAt || '').getTime() -
+              new Date(a.createdAt || '').getTime()
+          );
+          onSuccess(list);
+        },
+        (error: any) => {
+          console.warn('Realtime applications listener error:', error);
+          if (onError) onError(error);
+        }
       );
-      onSuccess(list);
-    },
-    (error: any) => {
-      console.warn('Realtime applications listener error:', error);
-      if (onError) onError(error);
-    }
-  );
+    })
+    .catch((err) => {
+      if (!cancelled && onError) onError(err);
+    });
+
+  return () => {
+    cancelled = true;
+    if (pollTimer) clearInterval(pollTimer);
+    if (unsubscribeFirestore) unsubscribeFirestore();
+  };
 }
 
-// Admin only: Full Member Edit / Update (updates memberNumber & all profile fields permanently in Firestore + caches)
+// Admin only: Full Member Edit / Update (updates memberNumber & all profile fields permanently in Firestore/SQL + caches)
 export async function updateMemberInFirestore(member: MembershipApplication): Promise<void> {
   const path = `applications/${member.id}`;
   try {
@@ -960,6 +1110,14 @@ export async function updateMemberInFirestore(member: MembershipApplication): Pr
       approvedAt: member.status === 'approved' ? (member.approvedAt || new Date().toISOString()) : (member.approvedAt || ''),
       updatedAt: new Date().toISOString(),
     });
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest('/api/db/applications', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      syncSingleMemberInCaches(member);
+      return;
+    }
     await setDoc(doc(db, 'applications', member.id), payload, { merge: true });
     syncSingleMemberInCaches(member);
   } catch (error) {
@@ -967,13 +1125,32 @@ export async function updateMemberInFirestore(member: MembershipApplication): Pr
   }
 }
 
-// Admin only: Approve application (saves permanently to Firestore with merge)
+// Admin only: Approve application (saves permanently with merge)
 export async function approveApplicationInFirestore(
   appId: string,
   memberNumber: string
 ): Promise<void> {
   const path = `applications/${appId}`;
   try {
+    if (await isSqlBackendActive()) {
+      const existing = await sqlApiRequest<{ app: MembershipApplication | null }>(
+        `/api/db/applications/track?q=${encodeURIComponent(appId)}`
+      );
+      const base = existing?.app || ({ id: appId } as Partial<MembershipApplication>);
+      const sqlPayload = cleanForFirestore({
+        ...base,
+        id: appId,
+        status: 'approved',
+        memberNumber,
+        approvedAt: base.approvedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      await sqlApiRequest('/api/db/applications', {
+        method: 'POST',
+        body: JSON.stringify(sqlPayload),
+      });
+      return;
+    }
     const payload = cleanForFirestore({
       status: 'approved',
       memberNumber,
@@ -986,13 +1163,20 @@ export async function approveApplicationInFirestore(
   }
 }
 
-// Admin only: Reject application (saves permanently to Firestore with merge)
+// Admin only: Reject application (saves permanently with merge)
 export async function rejectApplicationInFirestore(
   appId: string,
   reason?: string
 ): Promise<void> {
   const path = `applications/${appId}`;
   try {
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest(`/api/db/applications/${encodeURIComponent(appId)}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: reason || '' }),
+      });
+      return;
+    }
     const payload = cleanForFirestore({
       status: 'rejected',
       rejectReason: reason || '',
@@ -1005,13 +1189,26 @@ export async function rejectApplicationInFirestore(
   }
 }
 
-// Admin only: Delete application permanently from Firestore (including mismatched IDs & non-approved ghosts) + all local caches
+// Admin only: Delete application permanently (including mismatched IDs & non-approved ghosts) + all local caches
 export async function deleteApplicationFromFirestore(
   appId: string,
   targetMeta?: Partial<DeleteTargetMeta>
 ): Promise<{ deletedDocIds: string[]; removedAllForPhone: boolean }> {
   const path = `applications/${appId}`;
   try {
+    if (await isSqlBackendActive()) {
+      const res = await sqlApiRequest<{ deletedDocIds: string[]; removedAllForPhone: boolean }>(
+        `/api/db/applications/${encodeURIComponent(appId)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify(targetMeta || {}),
+        }
+      );
+      removeMemberFromCaches(appId, targetMeta, {
+        removeAllMatchingPhone: res?.removedAllForPhone ?? true,
+      });
+      return res;
+    }
     const appsCol = collection(db, 'applications');
     let resolvedMeta: DeleteTargetMeta = {
       id: appId,
@@ -1162,6 +1359,15 @@ const APPROVED_CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes smart cache
  * If counter doesn't exist yet, initializes it seamlessly based on current highest approved count.
  */
 export async function getMemberCounter(): Promise<MemberCounterData> {
+  if (await isSqlBackendActive()) {
+    try {
+      const res = await sqlApiRequest<MemberCounterData>('/api/db/member-counter');
+      safeStorageSet(MEMBER_COUNTER_CACHE_KEY, JSON.stringify(res));
+      return res;
+    } catch (err) {
+      console.warn('SQL counter read warning:', err);
+    }
+  }
   const counterDocRef = doc(db, 'settings', 'member_counter');
   try {
     const snap = await getDoc(counterDocRef);
@@ -1291,6 +1497,24 @@ export async function allocateNextMemberNumber(
   district?: string,
   knownRecords?: Array<{ memberNumber?: string | null }>
 ): Promise<{ memberNumber: string; seqNumber: number }> {
+  if (await isSqlBackendActive()) {
+    const res = await sqlApiRequest<{ memberNumber: string; seqNumber: number }>(
+      '/api/db/member-counter/allocate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ district }),
+      }
+    );
+    safeStorageSet(
+      MEMBER_COUNTER_CACHE_KEY,
+      JSON.stringify({
+        totalApproved: res.seqNumber,
+        lastMemberNumber: res.seqNumber,
+        lastUpdated: new Date().toISOString(),
+      })
+    );
+    return res;
+  }
   const counterDocRef = doc(db, 'settings', 'member_counter');
   const trueHighest = await getTrueHighestApprovedSeqFromFirestore();
   let floorSeq = Math.max(getKnownHighestSeqFromStorage(knownRecords), trueHighest);
@@ -1361,6 +1585,28 @@ export async function approveApplicationAtomicInFirestore(params: {
   application: MembershipApplication;
 }> {
   const { appId, district, extraUpdates = {}, knownRecords } = params;
+  if (await isSqlBackendActive()) {
+    const txResult = await sqlApiRequest<{
+      memberNumber: string;
+      seqNumber: number;
+      alreadyApproved: boolean;
+      application: MembershipApplication;
+    }>('/api/db/applications/approve-atomic', {
+      method: 'POST',
+      body: JSON.stringify({ appId, district, extraUpdates }),
+    });
+    if (!txResult.alreadyApproved && txResult.seqNumber > 0) {
+      safeStorageSet(
+        MEMBER_COUNTER_CACHE_KEY,
+        JSON.stringify({
+          totalApproved: txResult.seqNumber,
+          lastMemberNumber: txResult.seqNumber,
+          lastUpdated: new Date().toISOString(),
+        })
+      );
+    }
+    return txResult;
+  }
   const appRef = doc(db, 'applications', appId);
   const counterDocRef = doc(db, 'settings', 'member_counter');
   const trueHighest = await getTrueHighestApprovedSeqFromFirestore();
@@ -1490,6 +1736,25 @@ export async function approveApplicationAtomicInFirestore(params: {
  */
 export async function syncMemberCounter(highestKnownCount: number): Promise<void> {
   if (!highestKnownCount || highestKnownCount <= 0) return;
+  if (await isSqlBackendActive()) {
+    try {
+      await sqlApiRequest('/api/db/member-counter/sync', {
+        method: 'POST',
+        body: JSON.stringify({ highestKnownCount }),
+      });
+      safeStorageSet(
+        MEMBER_COUNTER_CACHE_KEY,
+        JSON.stringify({
+          totalApproved: highestKnownCount,
+          lastMemberNumber: highestKnownCount,
+          lastUpdated: new Date().toISOString(),
+        })
+      );
+    } catch (err) {
+      console.warn('Sync SQL member counter error:', err);
+    }
+    return;
+  }
   const counterDocRef = doc(db, 'settings', 'member_counter');
   try {
     const newVal = await runTransaction(db, async (tx) => {
@@ -1542,6 +1807,26 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
           return parsed;
         }
       }
+    }
+
+    if (await isSqlBackendActive()) {
+      const res = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications?status=approved');
+      const list = Array.isArray(res?.items) ? res.items : [];
+      list.sort(
+        (a, b) =>
+          new Date(b.approvedAt || b.createdAt || '').getTime() -
+          new Date(a.approvedAt || a.createdAt || '').getTime()
+      );
+      const lightweightSql = list.map((item) => {
+        if (item.photo && item.photo.length > 2000 && item.photo.startsWith('data:image')) {
+          const { photo, ...rest } = item;
+          return rest;
+        }
+        return item;
+      });
+      safeStorageSet(APPROVED_MEMBERS_CACHE_KEY, JSON.stringify(lightweightSql));
+      safeStorageSet(APPROVED_MEMBERS_CACHE_TIME_KEY, Date.now().toString());
+      return list;
     }
 
     if (!forceRefresh && isFirestoreQuotaInCooldown()) {
@@ -1847,6 +2132,29 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
     }
 
     try {
+      if (await isSqlBackendActive()) {
+        const res = await sqlApiRequest<VisitorStats>('/api/db/site-stats/visit', {
+          method: 'POST',
+          body: JSON.stringify({ increment: !hasCountedToday }),
+        });
+        if (!hasCountedToday) {
+          try {
+            localStorage.setItem(VISITOR_DAILY_COUNTED_DATE_KEY, todayDateStr);
+          } catch {}
+        }
+        try {
+          localStorage.setItem(
+            VISITOR_LOCAL_KEY,
+            JSON.stringify({
+              ...res,
+              date: todayDateStr,
+              updatedAtMs: Date.now(),
+            })
+          );
+        } catch {}
+        return res;
+      }
+
       const statsDocRef = doc(db, 'site_stats', 'visits');
 
       if (!hasCountedToday) {
@@ -1981,9 +2289,16 @@ export async function saveContactToFirestore(contact: ContactMessage): Promise<v
 
   const path = `contacts/${contact.id}`;
   try {
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest('/api/db/contacts', {
+        method: 'POST',
+        body: JSON.stringify(contact),
+      });
+      return;
+    }
     await setDoc(doc(db, 'contacts', contact.id), contact);
   } catch (error) {
-    console.warn('Saved contact locally, Firestore sync error:', error);
+    console.warn('Saved contact locally, remote sync error:', error);
   }
 }
 
@@ -1997,6 +2312,13 @@ export async function fetchContactsForAdmin(): Promise<ContactMessage[]> {
   }
 
   try {
+    if (await isSqlBackendActive()) {
+      const res = await sqlApiRequest<{ items: ContactMessage[] }>('/api/db/contacts');
+      const sqlList = Array.isArray(res?.items) ? res.items : [];
+      sqlList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(sqlList));
+      return sqlList;
+    }
     const snap = await getDocs(collection(db, 'contacts'));
     if (!snap.empty) {
       const firestoreList: ContactMessage[] = [];
@@ -2006,7 +2328,7 @@ export async function fetchContactsForAdmin(): Promise<ContactMessage[]> {
       return firestoreList;
     }
   } catch (err) {
-    console.warn('Could not read contacts from firestore, using local cache:', err);
+    console.warn('Could not read contacts from backend, using local cache:', err);
   }
 
   return list;
@@ -2025,9 +2347,15 @@ export async function deleteContactMessageFromFirestore(id: string): Promise<voi
   }
 
   try {
+    if (await isSqlBackendActive()) {
+      await sqlApiRequest(`/api/db/contacts/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      return;
+    }
     await deleteDoc(doc(db, 'contacts', id));
   } catch (err) {
-    console.warn('Deleted contact locally, Firestore delete error:', err);
+    console.warn('Deleted contact locally, remote delete error:', err);
   }
 }
 
@@ -2090,6 +2418,15 @@ export function safeCacheApplications(apps: MembershipApplication[]): void {
 
 export async function getAdminCredentials(): Promise<{ email: string; password: string }> {
   try {
+    if (await isSqlBackendActive()) {
+      const res = await sqlApiRequest<{ email: string; password: string }>('/api/db/admin-auth');
+      if (res?.password) {
+        safeStorageSet(ADMIN_PWD_CACHE_KEY, res.password);
+        safeStorageSet(ADMIN_EMAIL_CACHE_KEY, res.email || DEFAULT_ADMIN_EMAIL);
+        return { email: res.email || DEFAULT_ADMIN_EMAIL, password: res.password };
+      }
+    }
+
     // Force fetching from server to guarantee instant sync across all phones & devices
     let snap;
     try {
@@ -2118,7 +2455,7 @@ export async function getAdminCredentials(): Promise<{ email: string; password: 
       return initialCreds;
     }
   } catch (err) {
-    console.warn('Could not read admin_auth setting from Firestore:', err);
+    console.warn('Could not read admin_auth setting:', err);
   }
 
   // Fallback to local cache if offline
@@ -2136,12 +2473,19 @@ export async function updateAdminCredentials(newPassword: string, newEmail?: str
   const targetEmail = newEmail?.trim() || safeStorageGet(ADMIN_EMAIL_CACHE_KEY) || DEFAULT_ADMIN_EMAIL;
   const cleanPwd = newPassword.trim();
 
-  // Save directly to Firestore cloud first to ensure all devices receive the new password
-  await setDoc(doc(db, 'settings', 'admin_auth'), {
-    email: targetEmail,
-    password: cleanPwd,
-    updatedAt: new Date().toISOString(),
-  }, { merge: true });
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/admin-auth', {
+      method: 'POST',
+      body: JSON.stringify({ password: cleanPwd, email: targetEmail }),
+    });
+  } else {
+    // Save directly to Firestore cloud first to ensure all devices receive the new password
+    await setDoc(doc(db, 'settings', 'admin_auth'), {
+      email: targetEmail,
+      password: cleanPwd,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  }
 
   safeStorageSet(ADMIN_PWD_CACHE_KEY, cleanPwd);
   safeStorageSet(ADMIN_EMAIL_CACHE_KEY, targetEmail);
@@ -2180,6 +2524,13 @@ const ADMIN_USERS_CACHE_KEY = 'mahasangh_sub_admins_v1';
 
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
   try {
+    if (await isSqlBackendActive()) {
+      const res = await sqlApiRequest<{ items: AdminUser[] }>('/api/db/sub-admins');
+      const list = Array.isArray(res?.items) ? res.items : [];
+      safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(list));
+      return list;
+    }
+
     // Force fetching fresh list from Firestore cloud so all devices see current sub-admins
     let snap;
     try {
@@ -2195,10 +2546,10 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
       return list;
     }
   } catch (err) {
-    console.warn('Could not read sub_admins from Firestore:', err);
+    console.warn('Could not read sub_admins:', err);
   }
 
-  // Fallback to local cache if Firestore fetch fails
+  // Fallback to local cache if remote fetch fails
   const cached = safeStorageGet(ADMIN_USERS_CACHE_KEY);
   if (cached) {
     try {
@@ -2211,8 +2562,15 @@ export async function fetchAdminUsers(): Promise<AdminUser[]> {
 }
 
 export async function saveAdminUser(admin: AdminUser): Promise<void> {
-  // Save to Firestore cloud first so any mobile phone can access it
-  await setDoc(doc(db, 'sub_admins', admin.id), admin);
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/sub-admins', {
+      method: 'POST',
+      body: JSON.stringify(admin),
+    });
+  } else {
+    // Save to Firestore cloud first so any mobile phone can access it
+    await setDoc(doc(db, 'sub_admins', admin.id), admin);
+  }
 
   try {
     const existing = await fetchAdminUsers();
@@ -2226,12 +2584,18 @@ export async function saveAdminUser(admin: AdminUser): Promise<void> {
     }
     safeStorageSet(ADMIN_USERS_CACHE_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.warn('Updated firestore, local cache update:', e);
+    console.warn('Local cache update notice:', e);
   }
 }
 
 export async function deleteAdminUser(adminId: string): Promise<void> {
-  await deleteDoc(doc(db, 'sub_admins', adminId));
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest(`/api/db/sub-admins/${encodeURIComponent(adminId)}`, {
+      method: 'DELETE',
+    });
+  } else {
+    await deleteDoc(doc(db, 'sub_admins', adminId));
+  }
   try {
     const existing = await fetchAdminUsers();
     const updated = existing.filter((a) => a.id !== adminId);
@@ -2280,6 +2644,21 @@ export async function resetAdminUserToFirstLogin(adminId: string): Promise<boole
  */
 export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count: number; message: string }> {
   try {
+    if (await isSqlBackendActive()) {
+      const result = await sqlApiRequest<{ count: number; message: string }>(
+        '/api/db/applications/resequence',
+        { method: 'POST' }
+      );
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(APPROVED_MEMBERS_CACHE_KEY);
+        localStorage.removeItem('mahasangh_applications');
+        localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
+        localStorage.removeItem('mahasangh_approved_cache_v1');
+        localStorage.removeItem('mahasangh_applications_v1');
+      }
+      return result;
+    }
+
     const appsCol = collection(db, 'applications');
     const snap = await getDocs(appsCol);
     if (snap.empty) {
@@ -2345,10 +2724,25 @@ export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count
 
 /**
  * Resets the central member counter strictly to the highest actual member sequence number
- * found among approved members in Firebase.
+ * found among approved members in the database.
  */
 export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq: number; message: string }> {
   try {
+    if (await isSqlBackendActive()) {
+      const result = await sqlApiRequest<{ highestSeq: number; message: string }>(
+        '/api/db/applications/reset-counter',
+        { method: 'POST' }
+      );
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(MEMBER_COUNTER_CACHE_KEY);
+        localStorage.removeItem(APPROVED_MEMBERS_CACHE_KEY);
+        localStorage.removeItem('mahasangh_applications');
+        localStorage.removeItem('mahasangh_approved_cache_v1');
+        localStorage.removeItem('mahasangh_applications_v1');
+      }
+      return result;
+    }
+
     const appsCol = collection(db, 'applications');
     const snap = await getDocs(appsCol);
     let highest = DEFAULT_COUNTER_BASELINE;
@@ -2390,7 +2784,7 @@ export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq:
 
 /**
  * Purges ALL previously deleted/rejected/corrupt/duplicate-pending ghost records
- * from live Firestore `applications` and clears every local cache across browsers.
+ * from live database `applications` and clears every local cache across browsers.
  */
 export async function purgeDeletedAndGhostApplicationsInFirestore(): Promise<{
   totalDeleted: number;
@@ -2401,6 +2795,35 @@ export async function purgeDeletedAndGhostApplicationsInFirestore(): Promise<{
   message: string;
 }> {
   try {
+    if (await isSqlBackendActive()) {
+      const result = await sqlApiRequest<{
+        totalDeleted: number;
+        rejectedOrDeletedCount: number;
+        corruptCount: number;
+        duplicateGhostCount: number;
+        remainingCount: number;
+        message: string;
+      }>('/api/db/applications/purge-ghosts', { method: 'POST' });
+
+      adminAppsMemoryCache = null;
+      if (typeof localStorage !== 'undefined') {
+        const keysToClear = [
+          APPROVED_MEMBERS_CACHE_KEY,
+          APPROVED_MEMBERS_CACHE_TIME_KEY,
+          'mahasangh_applications',
+          'mahasangh_applications_v1',
+          'mahasangh_approved_cache_v1',
+          ADMIN_APPS_CACHE_KEY,
+          ADMIN_APPS_TIME_KEY,
+          MEMBER_COUNTER_CACHE_KEY,
+        ];
+        for (const k of keysToClear) {
+          localStorage.removeItem(k);
+        }
+      }
+      return result;
+    }
+
     const appsCol = collection(db, 'applications');
     let snap;
     try {

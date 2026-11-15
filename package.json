@@ -9,6 +9,7 @@
     "build": "tsc && vite build && node scripts/build-server.mjs && python3 scripts/build-zip.py",
     "build:server": "node scripts/build-server.mjs",
     "lint": "tsc --noEmit",
+    "export:sql": "tsx scripts/export-firebase-to-sql.ts",
     "preview": "vite preview --port 3000"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.460.0",
+    "mysql2": "^3.24.6",
     "nodemailer": "^10.5.0",
     "razorpay": "^2.9.8",
     "react": "^18.3.1",

@@ -14,6 +14,8 @@ await build({
     'razorpay',
     'firebase',
     'firebase/*',
+    'mysql2',
+    'mysql2/*',
     'vite',
     'tsx',
   ],

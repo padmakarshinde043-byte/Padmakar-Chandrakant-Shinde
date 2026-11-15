@@ -25,6 +25,60 @@ import {
   computeNextSafeSeq,
   buildSequentialMemberNumber,
 } from './src/utils/memberNumberAllocator';
+import { isMysqlActive, isMysqlConfigured } from './src/db/mysqlPool';
+import {
+  mysqlListApplications,
+  mysqlUpsertApplication,
+  mysqlTrackApplication,
+  mysqlFindExistingApplication,
+  mysqlFindApplicationForPayment,
+  mysqlApproveApplicationAtomic,
+  mysqlGetMemberCounter,
+  mysqlAllocateNextMemberNumber,
+  mysqlSyncMemberCounter,
+  mysqlRejectApplication,
+  mysqlDeleteApplication,
+  mysqlResequenceApproved,
+  mysqlResetMemberCounter,
+  mysqlPurgeGhostApplications,
+  mysqlMarkEmailSent,
+  mysqlListNews,
+  mysqlSaveNews,
+  mysqlDeleteNews,
+  mysqlListLatestBanners,
+  mysqlSaveLatestBanner,
+  mysqlDeleteLatestBanner,
+  mysqlListGovOrders,
+  mysqlSaveGovOrder,
+  mysqlDeleteGovOrder,
+  mysqlListContacts,
+  mysqlSaveContact,
+  mysqlDeleteContact,
+  mysqlListSubAdmins,
+  mysqlSaveSubAdmin,
+  mysqlDeleteSubAdmin,
+  mysqlGetAdminAuth,
+  mysqlUpdateAdminAuth,
+  mysqlRecordOrReadVisit,
+  mysqlListLeaders,
+  mysqlSaveLeaders,
+  mysqlGetLeadershipVersion,
+  mysqlListOfficials,
+  mysqlSaveOfficial,
+  mysqlDeleteOfficial,
+  mysqlListDistrictPasswords,
+  mysqlSetDistrictPassword,
+  mysqlListAppointedPosts,
+  mysqlGetPresidentPassword,
+  mysqlSetPresidentPassword,
+} from './src/db/mysqlRepository';
+import {
+  collectFullFirebaseDataset,
+  exportFullFirebaseSqlDump,
+  syncFirebaseDatasetIntoMysql,
+  triggerInitialFirebaseMigrationOnBoot,
+  waitForInitialMysqlMigrationIfRunning,
+} from './src/db/firebaseMigrationExporter';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -387,6 +441,39 @@ async function approveApplicationOnServer(params: {
   orderId?: string;
   source: 'razorpay_checkout' | 'razorpay_webhook';
 }): Promise<Record<string, any> | null> {
+  if (isMysqlActive()) {
+    const foundMysql = await mysqlFindApplicationForPayment({
+      applicationId: params.applicationId,
+      orderId: params.orderId,
+      phone: params.phone,
+      email: params.email,
+      source: params.source,
+    });
+    if (!foundMysql) {
+      console.warn('Razorpay MySQL approval: matching application not found for', {
+        applicationId: params.applicationId,
+        phone: params.phone,
+        email: params.email,
+      });
+      return null;
+    }
+    const txRes = await mysqlApproveApplicationAtomic({
+      appId: foundMysql.id,
+      district: foundMysql.district,
+      extraUpdates: {
+        paymentConfirmed: true,
+        paymentRef: params.paymentId,
+        razorpayPaymentId: params.paymentId,
+        razorpayOrderId: params.orderId || foundMysql.razorpayOrderId || '',
+        approvedBy: foundMysql.approvedBy || params.source,
+      },
+    });
+    return {
+      ...txRes.application,
+      alreadyApproved: txRes.alreadyApproved,
+    };
+  }
+
   const db = getServerFirestore();
   if (!db) return null;
 
@@ -531,6 +618,21 @@ app.use(cors());
 app.use('/api/razorpay/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '10mb' }));
 
+// Ensure first-boot automatic Firebase -> MySQL migration finishes before any MySQL reads/writes/webhooks
+app.use(['/api/db', '/api/razorpay', '/api/email'], async (req, _res, next) => {
+  if (req.path === '/mode' && req.baseUrl === '/api/db') {
+    return next();
+  }
+  try {
+    if (isMysqlActive()) {
+      await waitForInitialMysqlMigrationIfRunning();
+    }
+  } catch (err) {
+    console.warn('Wait for initial migration notice:', err);
+  }
+  next();
+});
+
 // Health check endpoint (no secrets exposed)
 app.get('/api/health', (_req, res) => {
   const config = loadRazorpayConfig();
@@ -540,7 +642,17 @@ app.get('/api/health', (_req, res) => {
     razorpayConfigured: Boolean(config.keyId && config.keySecret && config.enabled),
     webhookSecretConfigured: Boolean(config.webhookSecret),
     firebaseConfigured: Boolean(getServerFirestore()),
+    mysqlConfigured: isMysqlConfigured(),
+    activeBackend: isMysqlActive() ? 'mysql' : 'firebase',
     emailConfigured: emailConfig.enabled
+  });
+});
+
+// Active DB mode endpoint (used once on client boot)
+app.get('/api/db/mode', (_req, res) => {
+  res.json({
+    backend: isMysqlActive() ? 'mysql' : 'firebase',
+    mysqlConfigured: isMysqlConfigured(),
   });
 });
 
@@ -601,18 +713,28 @@ app.post('/api/email/send-id-card', async (req, res) => {
       });
     }
 
-    const db = getServerFirestore();
-    if (!db) {
-      return res.status(500).json({ status: 'error', sent: false, message: 'Firestore अनुपलब्ध आहे.' });
+    let appData: Record<string, any> | null = null;
+    let firestoreAppRef: ReturnType<typeof doc> | null = null;
+
+    if (isMysqlActive()) {
+      const tracked = await mysqlTrackApplication(String(applicationId).trim());
+      if (!tracked.app) {
+        return res.status(404).json({ status: 'error', sent: false, message: 'अर्ज सापडला नाही.' });
+      }
+      appData = tracked.app;
+    } else {
+      const db = getServerFirestore();
+      if (!db) {
+        return res.status(500).json({ status: 'error', sent: false, message: 'Firestore अनुपलब्ध आहे.' });
+      }
+      firestoreAppRef = doc(db, 'applications', String(applicationId).trim());
+      const appSnap = await getDoc(firestoreAppRef);
+      if (!appSnap.exists()) {
+        return res.status(404).json({ status: 'error', sent: false, message: 'अर्ज सापडला नाही.' });
+      }
+      appData = appSnap.data();
     }
 
-    const appRef = doc(db, 'applications', String(applicationId).trim());
-    const appSnap = await getDoc(appRef);
-    if (!appSnap.exists()) {
-      return res.status(404).json({ status: 'error', sent: false, message: 'अर्ज सापडला नाही.' });
-    }
-
-    const appData = appSnap.data();
     if (appData.status !== 'approved' || appData.paymentConfirmed !== true) {
       return res.status(403).json({
         status: 'error',
@@ -673,14 +795,18 @@ app.post('/api/email/send-id-card', async (req, res) => {
     });
 
     if (result.sent) {
-      await setDoc(
-        appRef,
-        {
-          idCardEmailSent: true,
-          idCardEmailSentAt: new Date().toISOString()
-        },
-        { merge: true }
-      );
+      if (isMysqlActive()) {
+        await mysqlMarkEmailSent(String(appData.id || applicationId).trim(), 'idCardEmailSent');
+      } else if (firestoreAppRef) {
+        await setDoc(
+          firestoreAppRef,
+          {
+            idCardEmailSent: true,
+            idCardEmailSentAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+      }
       console.log(`✓ Sent PDF ID Card email to ${recipientEmail} (${resolvedMemberNo})`);
       return res.json({ status: 'success', sent: true, to: recipientEmail });
     }
@@ -693,6 +819,406 @@ app.post('/api/email/send-id-card', async (req, res) => {
       sent: false,
       message: 'ई-मेल पाठवताना त्रुटी: ' + (err.message || 'SMTP Error')
     });
+  }
+});
+
+// =========================================================================
+// HostKarle MySQL API Routes (/api/db/*) & Migration Exporter (/api/migration/*)
+// =========================================================================
+
+app.get('/api/migration/counts', async (_req, res) => {
+  try {
+    const db = getServerFirestore();
+    if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
+    const { counts, warnings } = await collectFullFirebaseDataset(db);
+    res.json({ status: 'ok', counts, warnings, mysqlConfigured: isMysqlConfigured() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/migration/export-sql', async (_req, res) => {
+  try {
+    const db = getServerFirestore();
+    if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
+    const { sql, counts } = await exportFullFirebaseSqlDump(db);
+    res.setHeader('Content-Type', 'application/sql; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="mahasangh_hostkarle_backup.sql"');
+    res.setHeader('X-Migration-Counts', JSON.stringify(counts));
+    res.send(sql);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'SQL Export failed' });
+  }
+});
+
+app.post('/api/migration/sync-to-mysql', async (_req, res) => {
+  try {
+    if (!isMysqlConfigured()) {
+      return res.status(400).json({ status: 'error', message: 'MySQL is not configured yet.' });
+    }
+    const db = getServerFirestore();
+    if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
+    const { dataset, warnings } = await collectFullFirebaseDataset(db);
+    const syncedCounts = await syncFirebaseDatasetIntoMysql(dataset);
+    res.json({ status: 'success', counts: syncedCounts, warnings });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'MySQL Sync failed' });
+  }
+});
+
+app.get('/api/db/applications', async (req, res) => {
+  try {
+    const onlyApproved = req.query.status === 'approved';
+    const list = await mysqlListApplications(onlyApproved);
+    res.json({ items: list });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications', async (req, res) => {
+  try {
+    await mysqlUpsertApplication(req.body || {});
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/applications/track', async (req, res) => {
+  try {
+    const q = String(req.query.q || '');
+    const result = await mysqlTrackApplication(q);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/find-existing', async (req, res) => {
+  try {
+    const result = await mysqlFindExistingApplication(req.body || {});
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/approve-atomic', async (req, res) => {
+  try {
+    const result = await mysqlApproveApplicationAtomic(req.body || {});
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/:id/reject', async (req, res) => {
+  try {
+    await mysqlRejectApplication(req.params.id, String(req.body?.reason || ''));
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/applications/:id', async (req, res) => {
+  try {
+    const result = await mysqlDeleteApplication(req.params.id, req.body || {});
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/resequence', async (_req, res) => {
+  try {
+    res.json(await mysqlResequenceApproved());
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/reset-counter', async (_req, res) => {
+  try {
+    res.json(await mysqlResetMemberCounter());
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/purge-ghosts', async (_req, res) => {
+  try {
+    res.json(await mysqlPurgeGhostApplications());
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/member-counter', async (_req, res) => {
+  try {
+    res.json(await mysqlGetMemberCounter());
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/member-counter/allocate', async (req, res) => {
+  try {
+    res.json(await mysqlAllocateNextMemberNumber(req.body?.district));
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/member-counter/sync', async (req, res) => {
+  try {
+    await mysqlSyncMemberCounter(Number(req.body?.highestKnownCount || 0));
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/news', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListNews() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/news', async (req, res) => {
+  try {
+    await mysqlSaveNews(req.body);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/news/:id', async (req, res) => {
+  try {
+    await mysqlDeleteNews(req.params.id);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/latest-banners', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListLatestBanners() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/latest-banners', async (req, res) => {
+  try {
+    await mysqlSaveLatestBanner(req.body);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/latest-banners/:id', async (req, res) => {
+  try {
+    await mysqlDeleteLatestBanner(req.params.id);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/gov-orders', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListGovOrders() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/gov-orders', async (req, res) => {
+  try {
+    await mysqlSaveGovOrder(req.body);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/gov-orders/:id', async (req, res) => {
+  try {
+    await mysqlDeleteGovOrder(req.params.id);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/contacts', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListContacts() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/contacts', async (req, res) => {
+  try {
+    await mysqlSaveContact(req.body);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/contacts/:id', async (req, res) => {
+  try {
+    await mysqlDeleteContact(req.params.id);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/sub-admins', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListSubAdmins() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/sub-admins', async (req, res) => {
+  try {
+    await mysqlSaveSubAdmin(req.body);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/sub-admins/:id', async (req, res) => {
+  try {
+    await mysqlDeleteSubAdmin(req.params.id);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/admin-auth', async (_req, res) => {
+  try {
+    res.json(await mysqlGetAdminAuth());
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/admin-auth', async (req, res) => {
+  try {
+    await mysqlUpdateAdminAuth(String(req.body?.password || ''), req.body?.email);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/site-stats/visit', async (req, res) => {
+  try {
+    const increment = Boolean(req.body?.increment);
+    res.json(await mysqlRecordOrReadVisit(increment));
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/rk/leaders', async (_req, res) => {
+  try {
+    const [items, version] = await Promise.all([mysqlListLeaders(), mysqlGetLeadershipVersion()]);
+    res.json({ items, version });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/rk/leaders', async (req, res) => {
+  try {
+    const version = await mysqlSaveLeaders(Array.isArray(req.body?.leaders) ? req.body.leaders : []);
+    res.json({ status: 'success', version });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/rk/officials', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListOfficials() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/rk/officials', async (req, res) => {
+  try {
+    await mysqlSaveOfficial(req.body);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.delete('/api/db/rk/officials/:id', async (req, res) => {
+  try {
+    await mysqlDeleteOfficial(req.params.id);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/rk/district-passwords', async (_req, res) => {
+  try {
+    res.json({ map: await mysqlListDistrictPasswords() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/rk/district-passwords', async (req, res) => {
+  try {
+    await mysqlSetDistrictPassword(String(req.body?.district || ''), String(req.body?.password || ''));
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/rk/appointed-posts', async (_req, res) => {
+  try {
+    res.json({ items: await mysqlListAppointedPosts() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/rk/president-password', async (_req, res) => {
+  try {
+    res.json({ password: await mysqlGetPresidentPassword() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/rk/president-password', async (req, res) => {
+  try {
+    await mysqlSetPresidentPassword(String(req.body?.password || ''));
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
@@ -960,16 +1486,20 @@ app.post('/api/razorpay/webhook', async (req, res) => {
                   });
 
                   if (emailRes.sent) {
-                    const db = getServerFirestore();
-                    if (db) {
-                      await setDoc(
-                        doc(db, 'applications', updated.id),
-                        {
-                          welcomeEmailSent: true,
-                          welcomeEmailSentAt: new Date().toISOString()
-                        },
-                        { merge: true }
-                      );
+                    if (isMysqlActive()) {
+                      await mysqlMarkEmailSent(updated.id, 'welcomeEmailSent');
+                    } else {
+                      const db = getServerFirestore();
+                      if (db) {
+                        await setDoc(
+                          doc(db, 'applications', updated.id),
+                          {
+                            welcomeEmailSent: true,
+                            welcomeEmailSentAt: new Date().toISOString()
+                          },
+                          { merge: true }
+                        );
+                      }
                     }
                     console.log(`✓ Sent Webhook approval link email to ${targetEmail} (${updated.memberNumber})`);
                   }
@@ -1030,6 +1560,9 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    if (isMysqlActive()) {
+      triggerInitialFirebaseMigrationOnBoot(getServerFirestore());
+    }
   });
 }
 

@@ -32,9 +32,10 @@ jobs:
 
       - name: Prepare HostKarle Node.js deployment bundle
         run: |
-          mkdir -p deploy_bundle/tmp
+          mkdir -p deploy_bundle/tmp deploy_bundle/database
           cp -r dist deploy_bundle/dist
           rm -rf deploy_bundle/dist/assets/aistudio deploy_bundle/dist/dist.zip
+          cp database/schema.sql deploy_bundle/database/schema.sql
           cp server.cjs deploy_bundle/server.cjs
           cp package.json deploy_bundle/package.json
           cp package-lock.json deploy_bundle/package-lock.json
@@ -55,5 +56,6 @@ jobs:
             node_modules/**
             razorpay-config.json
             email-config.json
+            mysql-config.json
             .env*
             .git*/**

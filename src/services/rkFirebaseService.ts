@@ -14,6 +14,7 @@ import { Leader, DEFAULT_AUTHORITATIVE_LEADERS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { db } from '../firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { isSqlBackendActive, sqlApiRequest } from '../api/sqlBridge';
 
 import {
   CACHE_KEY_OFFICIALS,
@@ -52,6 +53,14 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
 
   const runFetch = (async (): Promise<OfficialMember[]> => {
     try {
+      if (await isSqlBackendActive()) {
+        const res = await sqlApiRequest<{ items: OfficialMember[] }>('/api/db/rk/officials');
+        const list = Array.isArray(res?.items) ? res.items : [];
+        localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
+        localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+        return list;
+      }
+
       const res = await fetch(`${RTDB_BASE_URL}/officials.json`);
       if (!res.ok) {
         throw new Error(`Failed to fetch officials: ${res.statusText}`);
@@ -123,14 +132,21 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
     orderNumber: member.orderNumber || ''
   };
 
-  const res = await fetch(`${RTDB_BASE_URL}/officials/${member.id}.json`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(memberPayload)
-  });
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/rk/officials', {
+      method: 'POST',
+      body: JSON.stringify({ ...member, ...memberPayload, id: member.id }),
+    });
+  } else {
+    const res = await fetch(`${RTDB_BASE_URL}/officials/${member.id}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(memberPayload)
+    });
 
-  if (!res.ok) {
-    throw new Error(`Failed to save official: ${res.statusText}`);
+    if (!res.ok) {
+      throw new Error(`Failed to save official: ${res.statusText}`);
+    }
   }
 
   // Update local cache
@@ -141,15 +157,21 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
 }
 
 /**
- * Delete an official from the secondary Firebase RTDB.
+ * Delete an official from the database.
  */
 export async function deleteOfficialFromRtdb(id: string): Promise<void> {
-  const res = await fetch(`${RTDB_BASE_URL}/officials/${id}.json`, {
-    method: 'DELETE'
-  });
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest(`/api/db/rk/officials/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  } else {
+    const res = await fetch(`${RTDB_BASE_URL}/officials/${id}.json`, {
+      method: 'DELETE'
+    });
 
-  if (!res.ok) {
-    throw new Error(`Failed to delete official: ${res.statusText}`);
+    if (!res.ok) {
+      throw new Error(`Failed to delete official: ${res.statusText}`);
+    }
   }
 
   // Update local cache
@@ -174,6 +196,14 @@ export async function fetchDistrictPasswords(forceRefresh = false): Promise<Reco
       }
     }
 
+    if (await isSqlBackendActive()) {
+      const sqlRes = await sqlApiRequest<{ map: Record<string, string> }>('/api/db/rk/district-passwords');
+      const result = sqlRes?.map || {};
+      localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(result));
+      localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
+      return result;
+    }
+
     const res = await fetch(`${RTDB_BASE_URL}/district_passwords.json`);
     if (!res.ok) return {};
     const data = await res.json();
@@ -196,17 +226,24 @@ export async function fetchDistrictPasswords(forceRefresh = false): Promise<Reco
 }
 
 /**
- * Update district password in RTDB.
+ * Update district password in RTDB / SQL.
  */
 export async function updateDistrictPasswordInRtdb(district: string, newPass: string): Promise<void> {
-  const res = await fetch(`${RTDB_BASE_URL}/district_passwords/${encodeURIComponent(district)}.json`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newPass)
-  });
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/rk/district-passwords', {
+      method: 'POST',
+      body: JSON.stringify({ district, password: newPass }),
+    });
+  } else {
+    const res = await fetch(`${RTDB_BASE_URL}/district_passwords/${encodeURIComponent(district)}.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newPass)
+    });
 
-  if (!res.ok) {
-    throw new Error(`Failed to update password for ${district}: ${res.statusText}`);
+    if (!res.ok) {
+      throw new Error(`Failed to update password for ${district}: ${res.statusText}`);
+    }
   }
 
   try {
@@ -237,6 +274,17 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
 
   const runFetch = (async (): Promise<AppointedPostItem[]> => {
     try {
+      if (await isSqlBackendActive()) {
+        const sqlRes = await sqlApiRequest<{ items: AppointedPostItem[] }>('/api/db/rk/appointed-posts');
+        const data = sqlRes?.items;
+        if (Array.isArray(data) && data.length > 0) {
+          localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
+          localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
+          return data;
+        }
+        return DEFAULT_APPOINTED_POSTS;
+      }
+
       const res = await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`);
       if (!res.ok) return DEFAULT_APPOINTED_POSTS;
       const data = await res.json();
@@ -270,7 +318,7 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
 }
 
 /**
- * Fetch the current President password from Firebase.
+ * Fetch the current President password from SQL or Firebase.
  * If not set yet, defaults to SUPER_ADMIN_PASSWORD ('RK2026').
  * Uses cached password if available for instant response.
  */
@@ -279,6 +327,15 @@ export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
     const cached = localStorage.getItem(CACHE_KEY_PRESIDENT_PASS);
     if (cached) {
       return cached;
+    }
+
+    if (await isSqlBackendActive()) {
+      const sqlRes = await sqlApiRequest<{ password: string }>('/api/db/rk/president-password');
+      if (typeof sqlRes?.password === 'string' && sqlRes.password.trim()) {
+        localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, sqlRes.password.trim());
+        return sqlRes.password.trim();
+      }
+      return SUPER_ADMIN_PASSWORD;
     }
 
     const res = await fetch(`${RTDB_BASE_URL}/president_password.json`);
@@ -290,25 +347,32 @@ export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
       }
     }
   } catch (error) {
-    console.warn('Error fetching president password from Firebase:', error);
+    console.warn('Error fetching president password:', error);
   }
 
   return SUPER_ADMIN_PASSWORD;
 }
 
 /**
- * Update the President password in Firebase.
+ * Update the President password in SQL or Firebase.
  */
 export async function updatePresidentPasswordInFirebase(newPass: string): Promise<void> {
   const cleanPass = newPass.trim();
-  const res = await fetch(`${RTDB_BASE_URL}/president_password.json`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(cleanPass)
-  });
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/rk/president-password', {
+      method: 'POST',
+      body: JSON.stringify({ password: cleanPass }),
+    });
+  } else {
+    const res = await fetch(`${RTDB_BASE_URL}/president_password.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleanPass)
+    });
 
-  if (!res.ok) {
-    throw new Error(`Failed to update president password: ${res.statusText}`);
+    if (!res.ok) {
+      throw new Error(`Failed to update president password: ${res.statusText}`);
+    }
   }
 
   localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, cleanPass);
@@ -322,7 +386,9 @@ export async function updatePresidentPasswordInFirebase(newPass: string): Promis
  * - Only uses DEFAULT_AUTHORITATIVE_LEADERS as initial offline seed.
  */
 export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[]> {
-  // If not forcing refresh, check local cache first (30-min TTL + tiny ~13-byte version check)
+  const useSql = await isSqlBackendActive();
+
+  // If not forcing refresh, check local cache first (30-min TTL + tiny version check)
   if (!forceRefresh) {
     try {
       const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
@@ -341,26 +407,56 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
             return parsed;
           }
 
-          // Beyond 30-min TTL: check only tiny 13-byte leadership_version.json instead of downloading entire dynamic_leaders.json
-          try {
-            const verRes = await fetch(`${RTDB_BASE_URL}/leadership_version.json`, { cache: 'no-store' });
-            if (verRes.ok) {
-              const remoteVer = await verRes.json();
-              if (remoteVer && cachedVer && String(remoteVer) === String(cachedVer)) {
-                localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-                return parsed;
+          if (!useSql) {
+            // Beyond 30-min TTL in Firebase mode: check tiny 13-byte leadership_version.json
+            try {
+              const verRes = await fetch(`${RTDB_BASE_URL}/leadership_version.json`, { cache: 'no-store' });
+              if (verRes.ok) {
+                const remoteVer = await verRes.json();
+                if (remoteVer && cachedVer && String(remoteVer) === String(cachedVer)) {
+                  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+                  return parsed;
+                }
+                if (remoteVer) {
+                  localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(remoteVer));
+                }
               }
-              if (remoteVer) {
-                localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(remoteVer));
-              }
+            } catch {
+              return parsed;
             }
-          } catch {
-            // If version check fails offline, return cached safely
-            return parsed;
           }
         }
       }
     } catch {}
+  }
+
+  if (useSql) {
+    try {
+      const sqlRes = await sqlApiRequest<{ items: Leader[]; version?: string | number }>('/api/db/rk/leaders');
+      if (Array.isArray(sqlRes?.items) && sqlRes.items.length > 0) {
+        localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(sqlRes.items));
+        localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+        if (sqlRes.version !== undefined && sqlRes.version !== null) {
+          localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(sqlRes.version));
+        }
+        window.dispatchEvent(new Event('mahasangh_leadership_updated'));
+        return sqlRes.items;
+      }
+    } catch (err) {
+      console.warn('SQL dynamic leaders fetch failed:', err);
+    }
+
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+
+    return DEFAULT_AUTHORITATIVE_LEADERS;
   }
 
   // 1. Direct fetch from Firebase RTDB (only when cache missing, version changed, or forced refresh)
@@ -413,10 +509,22 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
 }
 
 /**
- * Save dynamic leaders list to Firebase and update version.
- * Saves to RTDB and dual-syncs to Firestore collection /leadership.
+ * Save dynamic leaders list to SQL or Firebase and update version.
  */
 export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<void> {
+  if (await isSqlBackendActive()) {
+    const res = await sqlApiRequest<{ status: string; version?: number }>('/api/db/rk/leaders', {
+      method: 'POST',
+      body: JSON.stringify({ leaders }),
+    });
+    const newVer = res?.version || Date.now();
+    localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(leaders));
+    localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
+    localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+    window.dispatchEvent(new Event('mahasangh_leadership_updated'));
+    return;
+  }
+
   const newVer = Date.now();
 
   // Save leaders to RTDB

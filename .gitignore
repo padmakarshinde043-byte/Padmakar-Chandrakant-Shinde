@@ -7,5 +7,7 @@ dist.zip
 dist.tar.gz
 razorpay-config.json
 email-config.json
+mysql-config.json
+database/mahasangh_full_backup.sql
 server.cjs
 tmp
