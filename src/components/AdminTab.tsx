@@ -82,6 +82,182 @@ interface AdminTabProps {
 
 const DYNAMIC_LEADERSHIP_STORAGE_KEY = 'mahasangh_dynamic_leadership_v1';
 
+type AdminSubTabKey =
+  | 'applications'
+  | 'edit_members'
+  | 'leadership'
+  | 'add_news'
+  | 'latest_banners'
+  | 'id_card_preview'
+  | 'gov_order'
+  | 'manage_admins'
+  | 'contact_messages'
+  | 'password'
+  | 'cloudinary'
+  | 'razorpay';
+
+type AdminPermissionKey = keyof AdminPermissions;
+
+const ALL_ADMIN_PERMISSIONS_FALSE: AdminPermissions = {
+  approveMembers: false,
+  editMembers: false,
+  manageLeadership: false,
+  manageNews: false,
+  manageGovOrders: false,
+  manageLatestBanners: false,
+  viewIdCardPreview: false,
+  manageContactMessages: false,
+  manageAdmins: false,
+  manageRazorpay: false,
+  manageCloudinary: false,
+};
+
+const ALL_ADMIN_PERMISSIONS_TRUE: AdminPermissions = {
+  approveMembers: true,
+  editMembers: true,
+  manageLeadership: true,
+  manageNews: true,
+  manageGovOrders: true,
+  manageLatestBanners: true,
+  viewIdCardPreview: true,
+  manageContactMessages: true,
+  manageAdmins: true,
+  manageRazorpay: true,
+  manageCloudinary: true,
+};
+
+interface AdminPermissionOption {
+  key: AdminPermissionKey;
+  label: string;
+  description: string;
+  activeCardClass: string;
+  checkboxClass: string;
+  badgeClass: string;
+}
+
+const ADMIN_PERMISSION_OPTIONS: AdminPermissionOption[] = [
+  {
+    key: 'approveMembers',
+    label: 'सदस्यत्व अर्ज व मंजुरी',
+    description: 'अर्ज तपासणे, पेमेंट खात्री व सदस्य मंजुरी देणे',
+    activeCardClass: 'bg-amber-50/80 border-amber-300 shadow-xs',
+    checkboxClass: 'text-[#df6b16] focus:ring-[#df6b16]',
+    badgeClass: 'bg-amber-100 text-amber-900',
+  },
+  {
+    key: 'editMembers',
+    label: 'सदस्य एडिट',
+    description: 'मंजूर सदस्यांची माहिती एडिट व डुप्लिकेट साफ करणे',
+    activeCardClass: 'bg-indigo-50/80 border-indigo-300 shadow-xs',
+    checkboxClass: 'text-indigo-600 focus:ring-indigo-500',
+    badgeClass: 'bg-indigo-100 text-indigo-900',
+  },
+  {
+    key: 'manageLeadership',
+    label: 'नेतृत्व व पदाधिकारी',
+    description: 'कार्यकारिणी, विभागीय व जिल्हाध्यक्ष माहिती बदलणे',
+    activeCardClass: 'bg-purple-50/80 border-purple-300 shadow-xs',
+    checkboxClass: 'text-purple-600 focus:ring-purple-500',
+    badgeClass: 'bg-purple-100 text-purple-900',
+  },
+  {
+    key: 'manageNews',
+    label: 'बातम्या',
+    description: 'बातम्या, फोटो व कार्यक्रम वेबसाईटवर टाकणे',
+    activeCardClass: 'bg-blue-50/80 border-blue-300 shadow-xs',
+    checkboxClass: 'text-blue-600 focus:ring-blue-500',
+    badgeClass: 'bg-blue-100 text-blue-900',
+  },
+  {
+    key: 'manageGovOrders',
+    label: 'शासन निर्णय (GR)',
+    description: 'शासन निर्णय, न्यायालयीन आदेश व परिपत्रके टाकणे',
+    activeCardClass: 'bg-teal-50/80 border-teal-300 shadow-xs',
+    checkboxClass: 'text-teal-600 focus:ring-teal-500',
+    badgeClass: 'bg-teal-100 text-teal-900',
+  },
+  {
+    key: 'manageLatestBanners',
+    label: 'ताज्या घडामोडी बॅनर्स',
+    description: 'होमपेज ताज्या घडामोडी स्लायडर फोटो व बॅनर जोडणे',
+    activeCardClass: 'bg-emerald-50/80 border-emerald-300 shadow-xs',
+    checkboxClass: 'text-emerald-600 focus:ring-emerald-500',
+    badgeClass: 'bg-emerald-100 text-emerald-900',
+  },
+  {
+    key: 'viewIdCardPreview',
+    label: 'आय-कार्ड डिझाईन नमुना',
+    description: 'अधिकृत डिजिटल आय-कार्ड डिझाईन व नमुना PDF तपासणे',
+    activeCardClass: 'bg-sky-50/80 border-sky-300 shadow-xs',
+    checkboxClass: 'text-sky-600 focus:ring-sky-500',
+    badgeClass: 'bg-sky-100 text-sky-900',
+  },
+  {
+    key: 'manageContactMessages',
+    label: 'प्राप्त संदेश',
+    description: 'संपर्क फॉर्मद्वारे आलेले संदेश पाहणे व हटवणे',
+    activeCardClass: 'bg-orange-50/80 border-orange-300 shadow-xs',
+    checkboxClass: 'text-orange-600 focus:ring-orange-500',
+    badgeClass: 'bg-orange-100 text-orange-900',
+  },
+  {
+    key: 'manageAdmins',
+    label: 'व्यवस्थापक (Admins)',
+    description: 'नवीन सब-ॲडमिन जोडणे व अधिकार कमी-जास्त करणे',
+    activeCardClass: 'bg-rose-50/80 border-rose-300 shadow-xs',
+    checkboxClass: 'text-rose-600 focus:ring-rose-500',
+    badgeClass: 'bg-rose-100 text-rose-900',
+  },
+  {
+    key: 'manageRazorpay',
+    label: 'Razorpay व वेबहूक',
+    description: 'Razorpay पेमेंट गेटवे API Keys व Webhook सेटिंग्ज',
+    activeCardClass: 'bg-lime-50/80 border-lime-300 shadow-xs',
+    checkboxClass: 'text-lime-700 focus:ring-lime-600',
+    badgeClass: 'bg-lime-100 text-lime-900',
+  },
+  {
+    key: 'manageCloudinary',
+    label: 'क्लाउड स्टोरेज',
+    description: 'फोटो व फाइल क्लाउड स्टोरेज (Cloudinary) सेटिंग्ज',
+    activeCardClass: 'bg-cyan-50/80 border-cyan-300 shadow-xs',
+    checkboxClass: 'text-cyan-600 focus:ring-cyan-500',
+    badgeClass: 'bg-cyan-100 text-cyan-900',
+  },
+];
+
+const hasAnyAdminPermission = (perms: AdminPermissions): boolean =>
+  ADMIN_PERMISSION_OPTIONS.some((opt) => Boolean(perms[opt.key]));
+
+const normalizeAdminPermissions = (perms?: Partial<AdminPermissions>): AdminPermissions => ({
+  approveMembers: Boolean(perms?.approveMembers),
+  editMembers: Boolean(perms?.editMembers),
+  manageLeadership: Boolean(perms?.manageLeadership),
+  manageNews: Boolean(perms?.manageNews),
+  manageGovOrders: Boolean(perms?.manageGovOrders),
+  manageLatestBanners: Boolean(perms?.manageLatestBanners),
+  viewIdCardPreview: Boolean(perms?.viewIdCardPreview),
+  manageContactMessages: Boolean(perms?.manageContactMessages),
+  manageAdmins: Boolean(perms?.manageAdmins),
+  manageRazorpay: Boolean(perms?.manageRazorpay),
+  manageCloudinary: Boolean(perms?.manageCloudinary),
+});
+
+const getFirstAllowedAdminTab = (perms: AdminPermissions): AdminSubTabKey => {
+  if (perms.approveMembers) return 'applications';
+  if (perms.editMembers) return 'edit_members';
+  if (perms.manageLeadership) return 'leadership';
+  if (perms.manageNews) return 'add_news';
+  if (perms.manageGovOrders) return 'gov_order';
+  if (perms.manageLatestBanners) return 'latest_banners';
+  if (perms.viewIdCardPreview) return 'id_card_preview';
+  if (perms.manageContactMessages) return 'contact_messages';
+  if (perms.manageAdmins) return 'manage_admins';
+  if (perms.manageRazorpay) return 'razorpay';
+  if (perms.manageCloudinary) return 'cloudinary';
+  return 'password';
+};
+
 export const AdminTab: React.FC<AdminTabProps> = ({
   applications,
   onApproveApplication,
@@ -123,7 +299,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isApprovingApp, setIsApprovingApp] = useState(false);
 
   // Active view inside Admin Dashboard
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'latest_banners' | 'id_card_preview' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTabKey>('applications');
 
   // Latest Banners form state
   const [bannerTitle, setBannerTitle] = useState('');
@@ -272,21 +448,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [contactSearchQuery, setContactSearchQuery] = useState('');
   const [contactDistrictFilter, setContactDistrictFilter] = useState('');
 
-  // Manage Admins tab state (Super Admin only)
+  // Manage Admins tab state
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminPermissions, setNewAdminPermissions] = useState<AdminPermissions>({
+    ...ALL_ADMIN_PERMISSIONS_FALSE,
     approveMembers: true,
-    manageNews: false,
-    manageLeadership: false,
-    manageLatestBanners: false,
   });
   const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<AdminPermissions>({
-    approveMembers: false,
-    manageNews: false,
-    manageLeadership: false,
-    manageLatestBanners: false,
+    ...ALL_ADMIN_PERMISSIONS_FALSE,
   });
   const [isUpdatingAdminPerms, setIsUpdatingAdminPerms] = useState(false);
   const [adminActionMsg, setAdminActionMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -775,13 +946,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           email: validSuperEmail,
           name: 'मुख्य प्रशासक (Super Admin)',
           isSuperAdmin: true,
-          permissions: {
-            approveMembers: true,
-            manageNews: true,
-            manageLeadership: true,
-            manageLatestBanners: true,
-            manageAdmins: true,
-          },
+          permissions: { ...ALL_ADMIN_PERMISSIONS_TRUE },
           createdAt: '',
         };
 
@@ -825,19 +990,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setLoginError('');
 
         // Select first available tab based on their permissions
-        if (matchingSubAdmin.permissions.approveMembers) {
-          setActiveAdminSubTab('applications');
-        } else if (matchingSubAdmin.permissions.manageNews) {
-          setActiveAdminSubTab('add_news');
-        } else if (matchingSubAdmin.permissions.manageLatestBanners) {
-          setActiveAdminSubTab('latest_banners');
-        } else if (matchingSubAdmin.permissions.manageLeadership) {
-          setActiveAdminSubTab('leadership');
-        } else {
-          setActiveAdminSubTab('password');
-        }
+        setActiveAdminSubTab(getFirstAllowedAdminTab(matchingSubAdmin.permissions));
 
-        if (matchingSubAdmin.permissions.approveMembers && onFetchApplications) {
+        if ((matchingSubAdmin.permissions.approveMembers || matchingSubAdmin.permissions.editMembers) && onFetchApplications) {
           onFetchApplications();
         }
         return;
@@ -887,18 +1042,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         if (user) {
           setCurrentUser(user);
           setIsLoggedIn(true);
-          if (user.permissions.approveMembers) {
-            setActiveAdminSubTab('applications');
-          } else if (user.permissions.manageNews) {
-            setActiveAdminSubTab('add_news');
-          } else if (user.permissions.manageLatestBanners) {
-            setActiveAdminSubTab('latest_banners');
-          } else if (user.permissions.manageLeadership) {
-            setActiveAdminSubTab('leadership');
-          } else {
-            setActiveAdminSubTab('password');
-          }
-          if (user.permissions.approveMembers && onFetchApplications) {
+          setActiveAdminSubTab(getFirstAllowedAdminTab(user.permissions));
+          if ((user.permissions.approveMembers || user.permissions.editMembers) && onFetchApplications) {
             onFetchApplications();
           }
         }
@@ -979,12 +1124,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    if (
-      !newAdminPermissions.approveMembers &&
-      !newAdminPermissions.manageNews &&
-      !newAdminPermissions.manageLeadership &&
-      !newAdminPermissions.manageLatestBanners
-    ) {
+    if (!hasAnyAdminPermission(newAdminPermissions)) {
       setAdminActionMsg({ text: 'कृपया या व्यवस्थापकासाठी किमान एक अधिकार निवडा.', type: 'error' });
       return;
     }
@@ -996,7 +1136,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         email: targetEmail,
         name: newAdminName.trim() || undefined,
         isFirstLogin: true,
-        permissions: { ...newAdminPermissions },
+        permissions: normalizeAdminPermissions(newAdminPermissions),
         createdAt: new Date().toISOString(),
       };
 
@@ -1006,10 +1146,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setNewAdminEmail('');
       setNewAdminName('');
       setNewAdminPermissions({
+        ...ALL_ADMIN_PERMISSIONS_FALSE,
         approveMembers: true,
-        manageNews: false,
-        manageLeadership: false,
-        manageLatestBanners: false,
       });
       setAdminActionMsg({
         text: `व्यवस्थापक (${targetEmail}) यशस्वीपणे जोडला! ते पहिल्या लॉगिन वेळी स्वतःचा पासवर्ड तयार करू शकतील.`,
@@ -1026,23 +1164,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleStartEditPermissions = (subAdmin: AdminUser) => {
     setAdminActionMsg(null);
     setEditingAdminId(subAdmin.id);
-    setEditingPermissions({
-      approveMembers: Boolean(subAdmin.permissions.approveMembers),
-      manageNews: Boolean(subAdmin.permissions.manageNews),
-      manageLeadership: Boolean(subAdmin.permissions.manageLeadership),
-      manageLatestBanners: Boolean(subAdmin.permissions.manageLatestBanners),
-    });
+    setEditingPermissions(normalizeAdminPermissions(subAdmin.permissions));
   };
 
   // Manage Admins: Save Updated Permissions for Existing Sub-Admin
   const handleSaveAdminPermissions = async (subAdmin: AdminUser) => {
     setAdminActionMsg(null);
-    if (
-      !editingPermissions.approveMembers &&
-      !editingPermissions.manageNews &&
-      !editingPermissions.manageLeadership &&
-      !editingPermissions.manageLatestBanners
-    ) {
+    if (!hasAnyAdminPermission(editingPermissions)) {
       setAdminActionMsg({ text: 'कृपया या व्यवस्थापकासाठी किमान एक अधिकार निवडा.', type: 'error' });
       return;
     }
@@ -1051,7 +1179,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setIsUpdatingAdminPerms(true);
       const updatedAdmin: AdminUser = {
         ...subAdmin,
-        permissions: { ...editingPermissions },
+        permissions: normalizeAdminPermissions(editingPermissions),
       };
       await saveAdminUser(updatedAdmin);
       const updatedList = await fetchAdminUsers();
@@ -1075,6 +1203,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleDeleteAdmin = async (id: string, targetEmail: string) => {
     try {
       await deleteAdminUser(id);
+      if (editingAdminId === id) {
+        setEditingAdminId(null);
+      }
       const updated = await fetchAdminUsers();
       setAdminUsersList(updated);
       setAdminActionMsg({ text: `${targetEmail} यांचे व्यवस्थापक अधिकार काढण्यात आले.`, type: 'success' });
@@ -1121,10 +1252,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   useEffect(() => {
-    if (isLoggedIn && currentUser?.isSuperAdmin && (activeAdminSubTab === 'contact_messages' || contactMessages.length === 0)) {
+    if (
+      isLoggedIn &&
+      (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) &&
+      (activeAdminSubTab === 'contact_messages' || contactMessages.length === 0)
+    ) {
       loadContactMessages();
     }
-  }, [isLoggedIn, activeAdminSubTab, currentUser?.isSuperAdmin]);
+  }, [isLoggedIn, activeAdminSubTab, currentUser?.isSuperAdmin, currentUser?.permissions.manageContactMessages]);
 
   // Open Verification Modal for an Application
   const handleOpenVerification = (app: MembershipApplication) => {
@@ -1521,16 +1656,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {cloudinaryConfig.enabled && (
               <div
                 className="inline-flex items-center gap-2 bg-white/95 border border-slate-200/90 px-3 py-1.5 rounded-full text-xs shadow-2xs select-none"
-                title={currentUser?.isSuperAdmin ? "क्लाउड स्टोरेज सक्रिय आहे (सेटिंग्जसाठी क्लिक करा)" : "क्लाउड स्टोरेज सक्रिय आहे"}
+                title={(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) ? "क्लाउड स्टोरेज सक्रिय आहे (सेटिंग्जसाठी क्लिक करा)" : "क्लाउड स्टोरेज सक्रिय आहे"}
               >
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-400 shrink-0" />
                 <span className="font-semibold text-emerald-800 text-[11px] sm:text-xs">क्लाउड स्टोरेज सक्रिय</span>
-                {currentUser?.isSuperAdmin && (
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) && (
                   <button
                     type="button"
-                    onClick={() => setActiveAdminSubTab(activeAdminSubTab === 'cloudinary' ? 'applications' : 'cloudinary')}
+                    onClick={() =>
+                      setActiveAdminSubTab(
+                        activeAdminSubTab === 'cloudinary'
+                          ? (currentUser?.isSuperAdmin ? 'applications' : getFirstAllowedAdminTab(currentUser?.permissions || ALL_ADMIN_PERMISSIONS_FALSE))
+                          : 'cloudinary'
+                      )
+                    }
                     className="text-slate-400 hover:text-[#df6b16] ml-0.5 p-0.5 rounded transition-colors"
-                    title="क्लाउड स्टोरेज सेटिंग्ज (फक्त मुख्य प्रशासक)"
+                    title="क्लाउड स्टोरेज सेटिंग्ज"
                   >
                     <Settings className="w-3.5 h-3.5" />
                   </button>
@@ -1771,7 +1912,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </button>
                 )}
 
-                {currentUser?.isSuperAdmin && (
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.editMembers) && (
                   <button
                     type="button"
                     onClick={() => setActiveAdminSubTab('edit_members')}
@@ -1802,32 +1943,33 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 )}
 
                 {(currentUser?.isSuperAdmin || currentUser?.permissions.manageNews) && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('add_news')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'add_news'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span>बातम्या</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('gov_order')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'gov_order'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <FileText className="w-4 h-4" />
-                      <span>शासन निर्णय</span>
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('add_news')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'add_news'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>बातम्या</span>
+                  </button>
+                )}
+
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageGovOrders) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('gov_order')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'gov_order'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>शासन निर्णय</span>
+                  </button>
                 )}
 
                 {(currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners) && (
@@ -1845,57 +1987,64 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </button>
                 )}
 
-                {currentUser?.isSuperAdmin && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('id_card_preview')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'id_card_preview'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Award className="w-4 h-4 text-amber-400" />
-                      <span>आय-कार्ड डिझाईन नमुना</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('manage_admins')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'manage_admins'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Shield className="w-4 h-4" />
-                      <span>व्यवस्थापक (Admins)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('razorpay')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'razorpay'
-                          ? 'bg-emerald-700 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <KeyRound className="w-4 h-4 text-emerald-400" />
-                      <span>Razorpay व वेबहूक (Webhook)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('contact_messages')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'contact_messages'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>प्राप्त संदेश</span>
-                    </button>
-                  </>
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('id_card_preview')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'id_card_preview'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Award className="w-4 h-4 text-amber-400" />
+                    <span>आय-कार्ड डिझाईन नमुना</span>
+                  </button>
+                )}
+
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageAdmins) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('manage_admins')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'manage_admins'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>व्यवस्थापक (Admins)</span>
+                  </button>
+                )}
+
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageRazorpay) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('razorpay')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'razorpay'
+                        ? 'bg-emerald-700 text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <KeyRound className="w-4 h-4 text-emerald-400" />
+                    <span>Razorpay व वेबहूक (Webhook)</span>
+                  </button>
+                )}
+
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('contact_messages')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'contact_messages'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>प्राप्त संदेश</span>
+                  </button>
                 )}
 
                 <button
@@ -1911,7 +2060,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <span>पासवर्ड बदला</span>
                 </button>
 
-                {currentUser?.isSuperAdmin && (
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) && (
                   <button
                     type="button"
                     onClick={() => setActiveAdminSubTab('cloudinary')}
@@ -2295,7 +2444,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 1B: Dedicated Member Edit & Duplicate Cleanup (सदस्य एडिट) */}
-            {activeAdminSubTab === 'edit_members' && currentUser?.isSuperAdmin && (
+            {activeAdminSubTab === 'edit_members' && (currentUser?.isSuperAdmin || currentUser?.permissions.editMembers) && (
               <MemberEditManager
                 applications={applications}
                 onUpdateMember={async (updated) => {
@@ -3364,7 +3513,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab: ID Card Sample Preview (आय-कार्ड डिझाईन नमुना) */}
-            {activeAdminSubTab === 'id_card_preview' && currentUser?.isSuperAdmin && (
+            {activeAdminSubTab === 'id_card_preview' && (currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview) && (
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-md space-y-4">
                   <div className="flex items-center justify-between pb-4 border-b border-slate-200">
@@ -3439,7 +3588,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 3.5: Gov Orders */}
-            {activeAdminSubTab === 'gov_order' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageNews) && (
+            {activeAdminSubTab === 'gov_order' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageGovOrders) && (
               <div className="space-y-6">
               <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
                 <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-5">
@@ -3511,7 +3660,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab: Manage Admins (Role-Based Access Control) */}
-            {activeAdminSubTab === 'manage_admins' && currentUser?.isSuperAdmin && (
+            {activeAdminSubTab === 'manage_admins' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageAdmins) && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-2">
@@ -3521,7 +3670,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         व्यवस्थापक प्रशासन (Manage Admins & Roles)
                       </h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        सदस्य मंजुरी, बातम्या टाकणे आणि नेतृत्व माहिती बदलण्याचे काम वेगवेगळ्या व्यक्तींना सोपवा.
+                        ॲडमिन पॅनेलमधील सर्व सब-मेनू व सुविधांचे अधिकार आवश्यकतेनुसार वेगवेगळ्या व्यक्तींना द्या किंवा नंतर कमी-जास्त करा.
                       </p>
                     </div>
                   </div>
@@ -3544,7 +3693,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   )}
 
                   {/* Add Admin Form */}
-                  <form onSubmit={handleAddAdminUser} className="space-y-4 max-w-4xl bg-slate-50/70 p-5 rounded-xl border border-slate-200 text-xs">
+                  <form onSubmit={handleAddAdminUser} className="space-y-4 max-w-5xl bg-slate-50/70 p-5 rounded-xl border border-slate-200 text-xs">
                     <h4 className="font-bold text-[#09243f] text-sm flex items-center gap-1.5 border-b border-slate-200 pb-2">
                       <UserPlus className="w-4 h-4 text-[#df6b16]" />
                       नवीन व्यवस्थापक जोडा (Add New Sub-Admin)
@@ -3579,124 +3728,64 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       </div>
                     </div>
 
-                    {/* Permissions Checkboxes */}
+                    {/* Permissions Checkboxes - All Admin Sub-Menus & Facilities */}
                     <div className="pt-2">
-                      <label className="font-bold text-slate-800 block mb-2">
-                        या ॲडमिनला द्यावयाचे अधिकार निवडा (Select Permissions): <span className="text-rose-600">*</span>
-                      </label>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <label
-                          className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                            newAdminPermissions.approveMembers
-                              ? 'bg-amber-50/80 border-amber-300 shadow-xs'
-                              : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={newAdminPermissions.approveMembers}
-                            onChange={(e) =>
-                              setNewAdminPermissions({
-                                ...newAdminPermissions,
-                                approveMembers: e.target.checked,
-                              })
-                            }
-                            className="mt-0.5 w-4 h-4 text-[#df6b16] rounded border-slate-300 focus:ring-[#df6b16]"
-                          />
-                          <div>
-                            <strong className="text-slate-800 block text-xs">
-                              सदस्य पडताळणी व मंजुरी
-                            </strong>
-                            <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                              अर्ज तपासणे, फी खात्री व मंजुरी देणे
-                            </span>
-                          </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                        <label className="font-bold text-slate-800 block">
+                          या ॲडमिनला द्यावयाचे अधिकार निवडा (सर्व {toEnglishDigits(ADMIN_PERMISSION_OPTIONS.length)} सुविधा): <span className="text-rose-600">*</span>
                         </label>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setNewAdminPermissions({ ...ALL_ADMIN_PERMISSIONS_TRUE })}
+                            className="text-[11px] font-bold text-[#17366d] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded transition-colors"
+                          >
+                            सर्व निवडा
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewAdminPermissions({ ...ALL_ADMIN_PERMISSIONS_FALSE })}
+                            className="text-[11px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded transition-colors"
+                          >
+                            सर्व काढा
+                          </button>
+                        </div>
+                      </div>
 
-                        <label
-                          className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                            newAdminPermissions.manageNews
-                              ? 'bg-blue-50/80 border-blue-300 shadow-xs'
-                              : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={newAdminPermissions.manageNews}
-                            onChange={(e) =>
-                              setNewAdminPermissions({
-                                ...newAdminPermissions,
-                                manageNews: e.target.checked,
-                              })
-                            }
-                            className="mt-0.5 w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                          />
-                          <div>
-                            <strong className="text-slate-800 block text-xs">
-                              बातम्या व परिपत्रके
-                            </strong>
-                            <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                              बातम्या, GR व फोटो वेबसाईटवर टाकणे
-                            </span>
-                          </div>
-                        </label>
-
-                        <label
-                          className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                            newAdminPermissions.manageLatestBanners
-                              ? 'bg-emerald-50/80 border-emerald-300 shadow-xs'
-                              : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={Boolean(newAdminPermissions.manageLatestBanners)}
-                            onChange={(e) =>
-                              setNewAdminPermissions({
-                                ...newAdminPermissions,
-                                manageLatestBanners: e.target.checked,
-                              })
-                            }
-                            className="mt-0.5 w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                          />
-                          <div>
-                            <strong className="text-slate-800 block text-xs">
-                              ताज्या घडामोडी बॅनर्स
-                            </strong>
-                            <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                              होमपेज ताज्या घडामोडी फोटो व बॅनर जोडणे
-                            </span>
-                          </div>
-                        </label>
-
-                        <label
-                          className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
-                            newAdminPermissions.manageLeadership
-                              ? 'bg-purple-50/80 border-purple-300 shadow-xs'
-                              : 'bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={newAdminPermissions.manageLeadership}
-                            onChange={(e) =>
-                              setNewAdminPermissions({
-                                ...newAdminPermissions,
-                                manageLeadership: e.target.checked,
-                              })
-                            }
-                            className="mt-0.5 w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
-                          />
-                          <div>
-                            <strong className="text-slate-800 block text-xs">
-                              नेतृत्व व्यवस्थापन
-                            </strong>
-                            <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
-                              कार्यकारिणी व जिल्हाध्यक्ष माहिती बदलणे
-                            </span>
-                          </div>
-                        </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        {ADMIN_PERMISSION_OPTIONS.map((opt) => {
+                          const isChecked = Boolean(newAdminPermissions[opt.key]);
+                          return (
+                            <label
+                              key={opt.key}
+                              className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-2.5 ${
+                                isChecked
+                                  ? opt.activeCardClass
+                                  : 'bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) =>
+                                  setNewAdminPermissions({
+                                    ...newAdminPermissions,
+                                    [opt.key]: e.target.checked,
+                                  })
+                                }
+                                className={`mt-0.5 w-4 h-4 rounded border-slate-300 ${opt.checkboxClass}`}
+                              />
+                              <div>
+                                <strong className="text-slate-800 block text-xs">
+                                  {opt.label}
+                                </strong>
+                                <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                                  {opt.description}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -3717,7 +3806,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                 {/* Sub-Admins List Table */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-4 pb-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
                     <span>सक्रिय व्यवस्थापक व अधिकार यादी ({toEnglishDigits(adminUsersList.length)})</span>
                     <span className="text-[11px] font-sans font-normal text-slate-500">
                       मुख्य प्रशासक: {DEFAULT_ADMIN_EMAIL} (सर्व अधिकार)
@@ -3738,183 +3827,191 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <th className="p-3">व्यवस्थापक ई-मेल व नाव</th>
                             <th className="p-3">दिलेले अधिकार (Permissions)</th>
                             <th className="p-3">स्थिती</th>
-                            <th className="p-3 text-center">कृती</th>
+                            <th className="p-3 text-center">कृती (अधिकार बदला / हटवा)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {adminUsersList.map((subAdmin, index) => {
                             const isEditing = editingAdminId === subAdmin.id;
+                            const activeBadges = ADMIN_PERMISSION_OPTIONS.filter((opt) =>
+                              Boolean(subAdmin.permissions?.[opt.key])
+                            );
                             return (
-                            <tr key={subAdmin.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="p-3 text-center font-mono font-bold text-slate-500">
-                                {toEnglishDigits(index + 1)}
-                              </td>
-                              <td className="p-3">
-                                <div className="font-bold text-[#09243f] font-mono">
-                                  {subAdmin.email}
-                                </div>
-                                {subAdmin.name && (
-                                  <div className="text-slate-500 text-[11px]">
-                                    {subAdmin.name}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="p-3">
-                                {isEditing ? (
-                                  <div className="flex flex-wrap gap-2 py-0.5">
-                                    <label className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 px-2 py-1 rounded text-[11px] font-bold text-amber-900 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={editingPermissions.approveMembers}
-                                        onChange={(e) =>
-                                          setEditingPermissions({
-                                            ...editingPermissions,
-                                            approveMembers: e.target.checked,
-                                          })
-                                        }
-                                        className="w-3.5 h-3.5 text-[#df6b16] rounded border-slate-300"
-                                      />
-                                      सदस्य मंजुरी
-                                    </label>
-                                    <label className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-1 rounded text-[11px] font-bold text-blue-900 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={editingPermissions.manageNews}
-                                        onChange={(e) =>
-                                          setEditingPermissions({
-                                            ...editingPermissions,
-                                            manageNews: e.target.checked,
-                                          })
-                                        }
-                                        className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300"
-                                      />
-                                      बातम्या व परिपत्रके
-                                    </label>
-                                    <label className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded text-[11px] font-bold text-emerald-900 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={Boolean(editingPermissions.manageLatestBanners)}
-                                        onChange={(e) =>
-                                          setEditingPermissions({
-                                            ...editingPermissions,
-                                            manageLatestBanners: e.target.checked,
-                                          })
-                                        }
-                                        className="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300"
-                                      />
-                                      ताज्या घडामोडी बॅनर्स
-                                    </label>
-                                    <label className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 px-2 py-1 rounded text-[11px] font-bold text-purple-900 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={editingPermissions.manageLeadership}
-                                        onChange={(e) =>
-                                          setEditingPermissions({
-                                            ...editingPermissions,
-                                            manageLeadership: e.target.checked,
-                                          })
-                                        }
-                                        className="w-3.5 h-3.5 text-purple-600 rounded border-slate-300"
-                                      />
-                                      नेतृत्व व्यवस्थापन
-                                    </label>
-                                  </div>
-                                ) : (
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {subAdmin.permissions.approveMembers && (
-                                      <span key="approveMembers" className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded text-[10px] font-bold">
-                                        सदस्य मंजुरी
-                                      </span>
+                              <React.Fragment key={subAdmin.id}>
+                                <tr className={`transition-colors ${isEditing ? 'bg-blue-50/70' : 'hover:bg-slate-50'}`}>
+                                  <td className="p-3 text-center font-mono font-bold text-slate-500">
+                                    {toEnglishDigits(index + 1)}
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="font-bold text-[#09243f] font-mono">
+                                      {subAdmin.email}
+                                    </div>
+                                    {subAdmin.name && (
+                                      <div className="text-slate-500 text-[11px]">
+                                        {subAdmin.name}
+                                      </div>
                                     )}
-                                    {subAdmin.permissions.manageNews && (
-                                      <span key="manageNews" className="bg-blue-100 text-blue-900 px-2 py-0.5 rounded text-[10px] font-bold">
-                                        बातम्या व परिपत्रके
-                                      </span>
-                                    )}
-                                    {subAdmin.permissions.manageLatestBanners && (
-                                      <span key="manageLatestBanners" className="bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded text-[10px] font-bold">
-                                        ताज्या घडामोडी बॅनर्स
-                                      </span>
-                                    )}
-                                    {subAdmin.permissions.manageLeadership && (
-                                      <span key="manageLeadership" className="bg-purple-100 text-purple-900 px-2 py-0.5 rounded text-[10px] font-bold">
-                                        नेतृत्व व्यवस्थापन
-                                      </span>
-                                    )}
-                                    {!subAdmin.permissions.approveMembers &&
-                                      !subAdmin.permissions.manageNews &&
-                                      !subAdmin.permissions.manageLatestBanners &&
-                                      !subAdmin.permissions.manageLeadership && (
-                                        <span key="noPermissions" className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {activeBadges.length > 0 ? (
+                                        activeBadges.map((opt) => (
+                                          <span
+                                            key={opt.key}
+                                            className={`${opt.badgeClass} px-2 py-0.5 rounded text-[10px] font-bold`}
+                                          >
+                                            {opt.label}
+                                          </span>
+                                        ))
+                                      ) : (
+                                        <span className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
                                       )}
-                                  </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    {subAdmin.isFirstLogin || !subAdmin.password ? (
+                                      <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        पहिले लॉगिन प्रलंबित
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold">
+                                        <Check className="w-3 h-3 text-emerald-600" />
+                                        पासवर्ड सक्रिय
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-center whitespace-nowrap">
+                                    {isEditing ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingAdminId(null)}
+                                        className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-2.5 py-1 rounded text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                        बंद करा
+                                      </button>
+                                    ) : (
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleStartEditPermissions(subAdmin)}
+                                          className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-[11px] font-bold transition-colors inline-flex items-center gap-1"
+                                          title="दिलेले अधिकार कमी-जास्त करा (Edit Permissions)"
+                                        >
+                                          <Edit3 className="w-3.5 h-3.5" />
+                                          <span>अधिकार बदला</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleResetSubAdmin(subAdmin.id, subAdmin.email)}
+                                          className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded transition-colors inline-flex items-center"
+                                          title="पासवर्ड रिसेट करा (पुन्हा नवीन पासवर्ड सेट करू द्या)"
+                                        >
+                                          <RotateCcw className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteAdmin(subAdmin.id, subAdmin.email)}
+                                          className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors inline-flex items-center"
+                                          title="व्यवस्थापक अधिकार काढून टाका"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                                {isEditing && (
+                                  <tr className="bg-blue-50/50 border-b border-blue-200">
+                                    <td colSpan={5} className="p-4">
+                                      <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-xs space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                                          <div>
+                                            <h5 className="font-bold text-[#17366d] text-xs sm:text-sm">
+                                              {subAdmin.email} यांचे अधिकार कमी-जास्त करा (Edit Permissions)
+                                            </h5>
+                                            <p className="text-[11px] text-slate-500">
+                                              खालील यादीतून हवे ते अधिकार निवडा किंवा काढा आणि 'अधिकार सेव्ह करा' वर क्लिक करा.
+                                            </p>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingPermissions({ ...ALL_ADMIN_PERMISSIONS_TRUE })}
+                                              className="text-[11px] font-bold text-[#17366d] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded transition-colors"
+                                            >
+                                              सर्व निवडा
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => setEditingPermissions({ ...ALL_ADMIN_PERMISSIONS_FALSE })}
+                                              className="text-[11px] font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded transition-colors"
+                                            >
+                                              सर्व काढा
+                                            </button>
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                          {ADMIN_PERMISSION_OPTIONS.map((opt) => {
+                                            const isChecked = Boolean(editingPermissions[opt.key]);
+                                            return (
+                                              <label
+                                                key={opt.key}
+                                                className={`p-2.5 rounded-lg border cursor-pointer transition-all flex items-start gap-2 ${
+                                                  isChecked
+                                                    ? opt.activeCardClass
+                                                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                                                }`}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isChecked}
+                                                  onChange={(e) =>
+                                                    setEditingPermissions({
+                                                      ...editingPermissions,
+                                                      [opt.key]: e.target.checked,
+                                                    })
+                                                  }
+                                                  className={`mt-0.5 w-4 h-4 rounded border-slate-300 ${opt.checkboxClass}`}
+                                                />
+                                                <div>
+                                                  <strong className="text-slate-800 block text-xs">
+                                                    {opt.label}
+                                                  </strong>
+                                                  <span className="text-[10px] text-slate-500 block leading-tight mt-0.5">
+                                                    {opt.description}
+                                                  </span>
+                                                </div>
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingAdminId(null)}
+                                            className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
+                                          >
+                                            रद्द करा
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={isUpdatingAdminPerms}
+                                            onClick={() => handleSaveAdminPermissions(subAdmin)}
+                                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-colors"
+                                          >
+                                            <Check className="w-4 h-4" />
+                                            <span>{isUpdatingAdminPerms ? 'सेव्ह होत आहे...' : 'अधिकार सेव्ह करा'}</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 )}
-                              </td>
-                              <td className="p-3">
-                                {subAdmin.isFirstLogin || !subAdmin.password ? (
-                                  <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold">
-                                    पहिले लॉगिन प्रलंबित
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold">
-                                    <Check className="w-3 h-3 text-emerald-600" />
-                                    पासवर्ड सक्रिय
-                                  </span>
-                                )}
-                              </td>
-                              <td className="p-3 text-center whitespace-nowrap">
-                                {isEditing ? (
-                                  <>
-                                    <button
-                                      type="button"
-                                      disabled={isUpdatingAdminPerms}
-                                      onClick={() => handleSaveAdminPermissions(subAdmin)}
-                                      className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-2.5 py-1 rounded text-[11px] font-bold mr-1 inline-flex items-center gap-1 transition-colors"
-                                      title="अधिकार सेव्ह करा"
-                                    >
-                                      <Check className="w-3.5 h-3.5" />
-                                      सेव्ह करा
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingAdminId(null)}
-                                      className="text-slate-600 hover:text-slate-800 hover:bg-slate-100 p-1.5 rounded transition-colors inline-flex items-center"
-                                      title="रद्द करा"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStartEditPermissions(subAdmin)}
-                                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-1.5 rounded transition-colors mr-1 inline-flex items-center"
-                                      title="अधिकार बदला (Edit Permissions)"
-                                    >
-                                      <Edit3 className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleResetSubAdmin(subAdmin.id, subAdmin.email)}
-                                      className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded transition-colors mr-1 inline-flex items-center"
-                                      title="पासवर्ड रिसेट करा (पुन्हा नवीन पासवर्ड सेट करू द्या)"
-                                    >
-                                      <RotateCcw className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteAdmin(subAdmin.id, subAdmin.email)}
-                                      className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors inline-flex items-center"
-                                      title="व्यवस्थापक अधिकार काढून टाका"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
-                              </td>
-                            </tr>
-                          );
+                              </React.Fragment>
+                            );
                           })}
                         </tbody>
                       </table>
@@ -4006,7 +4103,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 5: Contact Inquiries & Messages */}
-            {activeAdminSubTab === 'contact_messages' && currentUser?.isSuperAdmin && (
+            {activeAdminSubTab === 'contact_messages' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) && (
               <div className="space-y-4">
                 {/* Header & Filter Bar */}
                 <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -4186,19 +4283,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Super Admin Only: Minimal Cloud Storage Config (Hidden from all other sub-admins) */}
-            {activeAdminSubTab === 'cloudinary' && currentUser?.isSuperAdmin && (
+            {/* Cloud Storage Config */}
+            {activeAdminSubTab === 'cloudinary' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary) && (
               <div className="bg-white p-6 rounded-xl border border-slate-300 shadow-md space-y-4 max-w-lg mx-auto">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
                     <h3 className="font-serifDevanagari text-base font-bold text-[#17366d]">
-                      क्लाउड स्टोरेज व्यवस्थापन (फक्त मुख्य प्रशासक)
+                      क्लाउड स्टोरेज व्यवस्थापन
                     </h3>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setActiveAdminSubTab('applications')}
+                    onClick={() => setActiveAdminSubTab(currentUser?.isSuperAdmin ? 'applications' : getFirstAllowedAdminTab(currentUser?.permissions || ALL_ADMIN_PERMISSIONS_FALSE))}
                     className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                     title="बंद करा"
                   >
@@ -4287,8 +4384,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Super Admin Only: Razorpay Payment Gateway & Webhook Config */}
-            {activeAdminSubTab === 'razorpay' && currentUser?.isSuperAdmin && (
+            {/* Razorpay Payment Gateway & Webhook Config */}
+            {activeAdminSubTab === 'razorpay' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageRazorpay) && (
               <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-300 shadow-md space-y-6 max-w-2xl mx-auto">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                   <div className="flex items-center gap-2.5">
@@ -4306,7 +4403,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setActiveAdminSubTab('applications')}
+                    onClick={() => setActiveAdminSubTab(currentUser?.isSuperAdmin ? 'applications' : getFirstAllowedAdminTab(currentUser?.permissions || ALL_ADMIN_PERMISSIONS_FALSE))}
                     className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                     title="बंद करा"
                   >
