@@ -112,20 +112,323 @@ export async function getLogoDataUrl(): Promise<string> {
 let cachedQrBase64: string | null = null;
 export async function getQrCodeDataUrl(): Promise<string> {
   if (cachedQrBase64) return cachedQrBase64;
-  try {
-    const res = await fetch('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fmahasangh.in');
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        cachedQrBase64 = reader.result as string;
-        resolve(cachedQrBase64);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fmahasangh.in';
+  const urls = [
+    'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=1&ecc=M&data=https%3A%2F%2Fmahasangh.in',
+    'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fmahasangh.in',
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('QR read error'));
+        reader.readAsDataURL(blob);
+      });
+      cachedQrBase64 = dataUrl;
+      return dataUrl;
+    } catch {
+      // Try fallback URL
+    }
   }
+  return urls[1];
+}
+
+function loadHtmlImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = (err) => reject(err);
+    img.src = src;
+  });
+}
+
+function applyUnsharpSharpen(canvas: HTMLCanvasElement, amount = 0.28): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const { width, height } = canvas;
+  if (width < 4 || height < 4) return;
+
+  const srcData = ctx.getImageData(0, 0, width, height);
+  const dstData = ctx.createImageData(width, height);
+  const s = srcData.data;
+  const d = dstData.data;
+
+  // Copy boundary & alpha first
+  d.set(s);
+
+  const centerWeight = 1 + 4 * amount;
+  for (let y = 1; y < height - 1; y++) {
+    const rowOffset = y * width;
+    for (let x = 1; x < width - 1; x++) {
+      const idx = (rowOffset + x) * 4;
+      if (s[idx + 3] < 20) continue; // preserve clean outer alpha edge
+
+      const top = idx - width * 4;
+      const bot = idx + width * 4;
+      const left = idx - 4;
+      const right = idx + 4;
+
+      for (let c = 0; c < 3; c++) {
+        const val =
+          s[idx + c] * centerWeight -
+          (s[top + c] + s[bot + c] + s[left + c] + s[right + c]) * amount;
+        d[idx + c] = val < 0 ? 0 : val > 255 ? 255 : Math.round(val);
+      }
+    }
+  }
+  ctx.putImageData(dstData, 0, 0);
+}
+
+let cachedSharpLogoDataUrl: string | null = null;
+/**
+ * Crops the slight white outer margin of /logo.png into a crisp circular emblem,
+ * performs multi-step high-quality downscaling + gentle edge sharpening so small
+ * Marathi letters inside the emblem print razor-sharp with zero blur.
+ */
+export async function getSharpLogoDataUrl(targetSize = 560): Promise<string> {
+  if (cachedSharpLogoDataUrl) return cachedSharpLogoDataUrl;
+  try {
+    const rawUrl = await getLogoDataUrl();
+    const img = await loadHtmlImage(rawUrl);
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return rawUrl;
+
+    // /logo.png has ~2.2% outer white padding around the circular gold emblem
+    const cropRatio = 0.022;
+    const sx = w * cropRatio;
+    const sy = h * cropRatio;
+    const sw = w * (1 - cropRatio * 2);
+    const sh = h * (1 - cropRatio * 2);
+
+    // Multi-step high-quality downscaling avoids single-pass browser blur
+    const midSize = Math.max(targetSize, Math.round(Math.min(sw, sh) * 0.6));
+    const midCanvas = document.createElement('canvas');
+    midCanvas.width = midSize;
+    midCanvas.height = midSize;
+    const midCtx = midCanvas.getContext('2d');
+    if (midCtx) {
+      midCtx.imageSmoothingEnabled = true;
+      midCtx.imageSmoothingQuality = 'high';
+      midCtx.drawImage(img, sx, sy, sw, sh, 0, 0, midSize, midSize);
+    }
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = targetSize;
+    outCanvas.height = targetSize;
+    const outCtx = outCanvas.getContext('2d');
+    if (!outCtx) return rawUrl;
+
+    outCtx.fillStyle = '#ffffff';
+    outCtx.fillRect(0, 0, targetSize, targetSize);
+    outCtx.save();
+    outCtx.beginPath();
+    outCtx.arc(targetSize / 2, targetSize / 2, targetSize / 2, 0, Math.PI * 2);
+    outCtx.clip();
+    outCtx.imageSmoothingEnabled = true;
+    outCtx.imageSmoothingQuality = 'high';
+    outCtx.drawImage(midCanvas, 0, 0, midSize, midSize, 0, 0, targetSize, targetSize);
+    outCtx.restore();
+
+    applyUnsharpSharpen(outCanvas, 0.3);
+    cachedSharpLogoDataUrl = outCanvas.toDataURL('image/png');
+    return cachedSharpLogoDataUrl;
+  } catch {
+    return getLogoDataUrl();
+  }
+}
+
+let cachedTransparentSignDataUrl: string | null = null;
+/**
+ * Converts /sign.jpg (blue ink on white background) into a crisp, transparent-background
+ * PNG so html2canvas never renders an opaque white box over the footer swoosh.
+ */
+async function getTransparentSignDataUrl(): Promise<string> {
+  if (cachedTransparentSignDataUrl) return cachedTransparentSignDataUrl;
+  try {
+    const rawUrl = await getSignDataUrl();
+    const img = await loadHtmlImage(rawUrl);
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    if (!w || !h) return rawUrl;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return rawUrl;
+
+    ctx.drawImage(img, 0, 0, w, h);
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const px = imageData.data;
+
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i];
+      const g = px[i + 1];
+      const b = px[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+      if (lum >= 232) {
+        px[i + 3] = 0;
+      } else if (lum > 175) {
+        const t = (232 - lum) / (232 - 175);
+        px[i + 3] = Math.round(t * 255);
+        // Deepen ink color slightly for crisp print
+        px[i] = Math.max(8, Math.round(r * 0.72));
+        px[i + 1] = Math.max(24, Math.round(g * 0.76));
+        px[i + 2] = Math.min(200, Math.round(b * 0.96));
+      } else {
+        px[i] = Math.max(6, Math.round(r * 0.7));
+        px[i + 1] = Math.max(20, Math.round(g * 0.74));
+        px[i + 2] = Math.min(200, Math.round(b * 0.98));
+        px[i + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    cachedTransparentSignDataUrl = canvas.toDataURL('image/png');
+    return cachedTransparentSignDataUrl;
+  } catch {
+    return getSignDataUrl();
+  }
+}
+
+let cachedIdCardWaveBgDataUrl: string | null = null;
+/**
+ * Rasterizes the Official Straight Gold-and-Navy Header/Footer layout directly via
+ * the browser vector engine at 3424x2160 (1016 DPI CR80) into a lossless PNG background,
+ * guaranteeing zero html2canvas SVG filter/gradient artifacts when printing.
+ */
+async function getIdCardWaveBackgroundDataUrl(width = 3424, height = 2160): Promise<string> {
+  if (cachedIdCardWaveBgDataUrl) return cachedIdCardWaveBgDataUrl;
+  const svgMarkup = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 404" width="${width}" height="${height}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="idTopBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#041434" />
+          <stop offset="45%" stop-color="#0c347a" />
+          <stop offset="75%" stop-color="#1449a3" />
+          <stop offset="100%" stop-color="#05183d" />
+        </linearGradient>
+        <radialGradient id="idTopBlueGlow" cx="62%" cy="42%" r="48%">
+          <stop offset="0%" stop-color="#2262cc" stop-opacity="0.45" />
+          <stop offset="100%" stop-color="#041434" stop-opacity="0" />
+        </radialGradient>
+        <linearGradient id="idTopGoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#a16207" />
+          <stop offset="18%" stop-color="#f5c842" />
+          <stop offset="48%" stop-color="#fef08a" />
+          <stop offset="75%" stop-color="#eab308" />
+          <stop offset="100%" stop-color="#92400e" />
+        </linearGradient>
+        <filter id="idGoldDropShadow" x="-2%" y="-10%" width="104%" height="160%">
+          <feDropShadow dx="0" dy="1.8" stdDeviation="2" flood-color="#091e42" flood-opacity="0.22" />
+        </filter>
+        <linearGradient id="idBottomGoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#92400e" />
+          <stop offset="28%" stop-color="#f5c842" />
+          <stop offset="55%" stop-color="#fef08a" />
+          <stop offset="82%" stop-color="#eab308" />
+          <stop offset="100%" stop-color="#a16207" />
+        </linearGradient>
+        <linearGradient id="idBottomBlueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#041434" />
+          <stop offset="50%" stop-color="#124294" />
+          <stop offset="100%" stop-color="#041434" />
+        </linearGradient>
+      </defs>
+
+      <rect x="0" y="0" width="640" height="404" fill="#ffffff" />
+
+      <!-- Top Navy Header strictly above straight gold line -->
+      <rect x="0" y="0" width="640" height="95" fill="url(#idTopBlueGrad)" />
+      <rect x="0" y="0" width="640" height="95" fill="url(#idTopBlueGlow)" />
+      <!-- Straight Top Metallic Gold Divider Line -->
+      <rect x="0" y="95" width="640" height="7" fill="url(#idTopGoldGrad)" filter="url(#idGoldDropShadow)" />
+      <rect x="0" y="95.4" width="640" height="1" fill="#fef9c3" opacity="0.7" />
+      <rect x="0" y="101.2" width="640" height="0.8" fill="#854d0e" opacity="0.85" />
+
+      <!-- Bottom Straight Metallic Gold Line & Navy Blue Footer Band strictly below it -->
+      <rect x="0" y="368" width="640" height="6" fill="url(#idBottomGoldGrad)" />
+      <rect x="0" y="368.3" width="640" height="0.9" fill="#fef9c3" opacity="0.65" />
+      <rect x="0" y="374" width="640" height="30" fill="url(#idBottomBlueGrad)" />
+    </svg>
+  `.trim();
+
+  try {
+    const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
+    const img = await loadHtmlImage(svgDataUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return svgDataUrl;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
+    cachedIdCardWaveBgDataUrl = canvas.toDataURL('image/png');
+    return cachedIdCardWaveBgDataUrl;
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Pre-crops member passport photo to exact cover aspect (object-position: top center)
+ * because html2canvas does not reliably respect CSS object-fit: cover.
+ */
+async function cropPhotoToCoverDataUrl(
+  photoUrl: string,
+  targetW = 468,
+  targetH = 576
+): Promise<string> {
+  if (!photoUrl) return '';
+  try {
+    const img = await loadHtmlImage(photoUrl);
+    const sw = img.naturalWidth || img.width;
+    const sh = img.naturalHeight || img.height;
+    if (!sw || !sh) return photoUrl;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return photoUrl;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, targetW, targetH);
+
+    const scale = Math.max(targetW / sw, targetH / sh);
+    const drawW = sw * scale;
+    const drawH = sh * scale;
+    const dx = (targetW - drawW) / 2;
+    const dy = 0; // object-position: top center
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, dx, dy, drawW, drawH);
+
+    if (sw < targetW) {
+      applyUnsharpSharpen(canvas, 0.16);
+    }
+    return canvas.toDataURL('image/png');
+  } catch {
+    return photoUrl;
+  }
+}
+
+function escapeCardHtml(value: string | number | undefined | null): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Preload immediately on script load
@@ -157,9 +460,13 @@ function getWorkingPlaceDisplay(m: OfficialMember): { cadre: string; details: st
 const DEFAULT_ORG_TITLE = 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ';
 
 async function waitForFontsAndImages(root: HTMLElement): Promise<void> {
-  if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+  if (typeof document !== 'undefined' && (document as any).fonts) {
     try {
-      await (document as any).fonts.ready;
+      await Promise.allSettled([
+        (document as any).fonts.load('900 24px Montserrat'),
+        (document as any).fonts.load('800 24px Montserrat'),
+        (document as any).fonts.ready,
+      ]);
     } catch {
       // Ignore font readiness fallback
     }
@@ -528,142 +835,165 @@ export async function generateStatewideRegistryPdf(
 /**
  * 4. Official Lifetime Membership ID Card (आजीवन सभासद आय-कार्ड PDF)
  * - Standard CR80 ID Card dimensions (85.6mm x 54mm)
- * - Top-Left: Circular Logo (/logo.png)
- * - Header: "महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" (नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427)
- * - Golden Badge: ⭐ आजीवन सभासद ⭐
- * - Passport Photo, Member ID, Full Name, Cadre, District & Taluka, Mobile Number
- * - Bottom-Right: Founder State President Shri Rajendra Khairnar signature (/sign.jpg)
+ * - Rendered at 856x540px * 3 = 2568x1620px (762 DPI Print Quality) with lossless PNG embedding
+ * - Curved Gold & Navy Blue Header/Footer Wave design matching approved preview
+ * - Multi-step sharpened Circular Logo (/logo.png)
+ * - Transparent crisp Blue Ink Signature (/sign.jpg)
+ * - High-contrast 600x600 QR Code + Accurate Member Details
  */
 async function buildMembershipIdCardPdfDocument(
-  app: MembershipApplication
+  app: MembershipApplication,
+  options: { forEmail?: boolean } = {}
 ): Promise<{ pdf: JsPdfType; downloadFileName: string; emailFileName: string }> {
-  const [logoUrl, signUrl, qrUrl, safePhotoUrl] = await Promise.all([
-    getLogoDataUrl(),
-    getSignDataUrl(),
+  const { forEmail = false } = options;
+
+  const [sharpLogoUrl, transparentSignUrl, qrUrl, waveBgUrl, safePhotoRawUrl] = await Promise.all([
+    getSharpLogoDataUrl(720),
+    getTransparentSignDataUrl(),
     getQrCodeDataUrl(),
-    resolveImageUrlForPdf(app.photo)
+    getIdCardWaveBackgroundDataUrl(3424, 2160),
+    resolveImageUrlForPdf(app.photo),
   ]);
 
-  let memberNo = app.memberNumber?.trim();
+  const croppedPhotoUrl = safePhotoRawUrl
+    ? await cropPhotoToCoverDataUrl(safePhotoRawUrl, 624, 768)
+    : '';
+
+  let memberNo = toEnglishDigits((app.memberNumber || '').trim());
   if (!memberNo) {
-    const rawDigits = (app.applicationNumber || '').replace(/\D/g, '');
+    const rawDigits = toEnglishDigits(app.applicationNumber || '').replace(/\D/g, '');
     const seq = parseInt(rawDigits.slice(-4) || '1', 10) || 1;
     memberNo = formatSequentialMemberNumber(app.district || 'नाशिक', seq);
   }
 
-  const cadre = app.professional || 'केंद्रप्रमुख / विस्तार अधिकारी';
+  const salutation = (app.salutation || '').trim();
+  const rawFullName = (app.fullName || '').trim();
+  const displayName = `${salutation ? salutation + ' ' : ''}${rawFullName}`.trim() || 'सदस्य';
+  const cadre = (app.professional || 'केंद्रप्रमुख / विस्तार अधिकारी').trim();
+  const district = (app.district || '').trim();
+  const taluka = (app.taluka || '').trim();
+  const areaText = `${district}${taluka ? ` (ता. ${taluka})` : ''}` || '-';
+  const phoneText = toEnglishDigits((app.phone || '').trim()) || '-';
+
+  // Dynamic font safeguards for extra-long names, area strings, or member numbers
+  const nameFontPx = displayName.length > 34 ? 25.0 : displayName.length > 27 ? 27.5 : 30.4;
+  const detailFontPx = areaText.length > 34 ? 17.8 : 19.7;
+  const memberNoFontPx = memberNo.length > 21 ? 19.5 : memberNo.length > 18 ? 21.8 : 23.8;
 
   const wrapper = document.createElement('div');
   wrapper.style.position = 'fixed';
   wrapper.style.left = '-9999px';
   wrapper.style.top = '0';
-  wrapper.style.width = '640px';
-  wrapper.style.height = '404px';
+  wrapper.style.width = '856px';
+  wrapper.style.height = '540px';
   wrapper.style.background = '#ffffff';
   wrapper.style.zIndex = '999999';
   wrapper.style.overflow = 'hidden';
 
   const cardHtml = `
-    <div style="width: 640px; height: 404px; padding: 4px; background: #ffffff; color: #1e293b; box-sizing: border-box; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
-      <div style="border: 2.5px solid #0b1e33; height: 100%; box-sizing: border-box; border-radius: 10px; background: linear-gradient(180deg, #ffffff 0%, #fffdf8 100%); overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
-        
-        <!-- 1. GLOSSY NAVY BLUE HEADER BAR WITH PERFECTLY BALANCED SPACING -->
-        <div style="background: linear-gradient(135deg, #0b1e33 0%, #1e3a8a 50%, #091d36 100%); padding: 8px 14px 10px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2.5px solid #d4af37; box-shadow: 0 2px 6px rgba(0,0,0,0.25); min-height: 98px;">
-          <!-- Extra Large Top Left Circular Logo -->
-          <div style="width: 80px; height: 80px; border-radius: 50%; border: 2.5px solid #d4af37; background: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">
-            <img src="${logoUrl}" alt="महासंघ लोगो" style="width: 100%; height: 100%; object-fit: contain; display: block; padding: 1px;">
-          </div>
-          
-          <!-- Perfectly Center-Aligned Title Box with Balanced Spacing Between All 3 Lines -->
-          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-left: 10px;">
-            <div style="font-size: 11.5pt; font-weight: 800; color: #fde047; letter-spacing: 1px; margin-top: -2px; margin-bottom: 3px; text-transform: uppercase;">
-              महाराष्ट्र राज्य
-            </div>
-            <div style="font-size: 21.5pt; font-weight: 900; color: #ffffff; line-height: 1.25; text-shadow: 0 2px 5px rgba(0,0,0,0.7); letter-spacing: 0.4px; margin-bottom: 5px;">
-              केंद्रप्रमुख व अधिकारी महासंघ
-            </div>
-            <div style="font-size: 8.5pt; font-weight: 700; color: #e2e8f0; margin-top: 2px; letter-spacing: 0.2px;">
-              नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427
-            </div>
+    <div style="width: 856px; height: 540px; position: relative; background: #ffffff; border-radius: 21px; border: 3.3px solid #0a2a5e; box-sizing: border-box; overflow: hidden; font-family: 'Noto Sans Devanagari', sans-serif; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.85);">
+      ${
+        waveBgUrl
+          ? `<img src="${waveBgUrl}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none;" />`
+          : ''
+      }
+
+      <!-- 1. TOP-LEFT SHARP CIRCULAR LOGO (Inside straight top navy header) -->
+      <div style="position: absolute; left: 2.8%; top: 1.4%; width: 114px; height: 114px; border-radius: 50%; border: 3.6px solid #eab308; background: #ffffff; overflow: hidden; box-sizing: border-box; box-shadow: 0 3px 8px rgba(0,0,0,0.45), 0 0 0 1.8px rgba(255,255,255,0.72);">
+        <img src="${sharpLogoUrl}" alt="महासंघ लोगो" style="width: 100%; height: 100%; display: block;" />
+      </div>
+
+      <!-- 2. HEADER 3 TITLE LINES (Centered inside straight navy header above straight gold line) -->
+      <div style="position: absolute; left: 16.5%; right: 6%; top: 2.6%; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 800; font-size: 20px; color: #fde047; letter-spacing: 0.4px; line-height: 1.18; text-shadow: 0 1.3px 3.4px rgba(0,0,0,0.5);">
+          महाराष्ट्र राज्य
+        </div>
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; font-size: 33px; color: #ffffff; line-height: 1.22; letter-spacing: -0.2px; margin-top: 1.8px; text-shadow: 0 2.1px 5.1px rgba(0,0,0,0.65); white-space: nowrap;">
+          केंद्रप्रमुख व अधिकारी महासंघ
+        </div>
+        <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 700; font-size: 15px; color: #f1f5f9; line-height: 1.25; margin-top: 7.5px; letter-spacing: 0.2px;">
+          नोंदणी क्र. श्रमिक संघ - महा/एनएसके/एन/2427
+        </div>
+      </div>
+
+      <!-- 3. SUB-HEADER: 'आजीवन सदस्य' (Below straight top gold line) -->
+      <div style="position: absolute; left: 27%; width: 41%; top: 27.6%; text-align: center;">
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; font-size: 28.6px; color: #1e293b; line-height: 1.25; white-space: nowrap;">
+          आजीवन सदस्य
+        </div>
+      </div>
+
+      <!-- 4. ENLARGED & BOLD MEMBER NUMBER (Distinct Geometric Font below straight top gold line) -->
+      <div style="position: absolute; right: 1.6%; top: 26.8%; width: 31%; text-align: center; line-height: 1.18;">
+        <div style="font-weight: 800; color: #1e293b; font-size: 21px;">
+          सदस्य क्र:
+        </div>
+        <div style="font-family: 'Montserrat', 'Arial Black', 'Segoe UI', sans-serif; font-weight: 900; color: #091e42; font-size: ${memberNoFontPx}px; white-space: nowrap; letter-spacing: -0.2px; margin-top: 3px;">
+          ${escapeCardHtml(memberNo)}
+        </div>
+      </div>
+
+      <!-- 5. LEFT PASSPORT PHOTO WITH GOLDEN BORDER -->
+      <div style="position: absolute; left: 3.6%; top: 31.2%; width: 154px; height: 189px; border-radius: 12px; border: 3.85px solid #d4af37; background: #f1f5f9; overflow: hidden; box-sizing: border-box; box-shadow: 0 3.4px 8.5px rgba(0,0,0,0.2); display: flex; align-items: center; justify-content: center;">
+        ${
+          croppedPhotoUrl
+            ? `<img src="${croppedPhotoUrl}" alt="${escapeCardHtml(displayName)}" style="width: 100%; height: 100%; display: block;" />`
+            : `<div style="text-align: center; color: #94a3b8; font-size: 15px; font-weight: 700;">फोटो</div>`
+        }
+      </div>
+
+      <!-- 6. MIDDLE MEMBER DETAILS (Cleanly spaced between photo & QR) -->
+      <div style="position: absolute; left: 24.2%; top: 38.0%; width: 51%; display: flex; flex-direction: column; justify-content: center;">
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; font-size: ${nameFontPx}px; color: #b91c1c; line-height: 1.22; margin-bottom: 13px; word-break: break-word;">
+          ${escapeCardHtml(displayName)}
+        </div>
+        <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 700; color: #0f172a; font-size: ${detailFontPx}px; line-height: 1.52; display: flex; flex-direction: column; gap: 7.3px;">
+          <div>पद: ${escapeCardHtml(cadre)}</div>
+          <div>कार्यक्षेत्र: ${escapeCardHtml(areaText)}</div>
+          <div>
+            मोबाईल: <span style="font-family: 'Courier New', ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; letter-spacing: 0.2px;">${escapeCardHtml(phoneText)}</span>
           </div>
         </div>
+      </div>
 
-        <!-- 2. SUB-HEADER BAR: CENTERED BOLD 'आजीवन सदस्य' WITH DISTINCT DEEP NAVY COLOR & GOLDEN UNDERLINE -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 16px 2px 16px;">
-          <div style="width: 120px;"></div>
+      <!-- 7. RIGHT SCANNABLE QR CODE (Moved Lower for Clear Gap Below Member No & Above Signature) -->
+      <div style="position: absolute; right: 4.2%; top: 43.2%; width: 140px; height: 140px; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 2px; box-sizing: border-box;">
+        <img src="${qrUrl}" alt="mahasangh.in QR Code" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block;" />
+      </div>
 
-          <!-- Centered Large Dark Navy Bold Text with Golden Underline: आजीवन सदस्य (Distinct Navy Blue color #0b1e33) -->
-          <div style="font-size: 15.5pt; font-weight: 900; color: #0b1e33; text-align: center; letter-spacing: 0.5px; flex: 1;">
-            <span style="border-bottom: 2.5px solid #d4af37; padding-bottom: 2px; display: inline-block;">आजीवन सदस्य</span>
-          </div>
-
-          <!-- Right: Member Number (No Border Box) -->
-          <div style="width: 170px; text-align: right; font-size: 11pt; font-weight: 900; color: #0b1e33; font-family: monospace;">
-            सदस्य क्र: ${memberNo}
-          </div>
+      <!-- 8. BOTTOM-LEFT FOOTER TEXT (Cleanly above straight bottom gold line) -->
+      <div style="position: absolute; left: 3.8%; bottom: 11.4%; line-height: 1.35;">
+        <div style="font-weight: 800; color: #0b2559; font-size: 17.3px;">
+          महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
         </div>
-
-        <!-- 3. MAIN BODY SECTION: PHOTO (LEFT) + DETAILS (MIDDLE WITH SPACING & DISTINCT CRIMSON COLOR FOR NAME) + LARGE QR CODE (RIGHT) -->
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 4px 16px; flex: 1;">
-          
-          <!-- Left Column: Passport Photo -->
-          <div style="width: 115px; height: 138px; border: 2.5px solid #d4af37; border-radius: 8px; overflow: hidden; background: #ffffff; flex-shrink: 0; box-shadow: 0 3px 8px rgba(0,0,0,0.18); display: flex; align-items: center; justify-content: center;">
-            ${
-              safePhotoUrl
-                ? `<img src="${safePhotoUrl}" alt="${app.fullName}" style="width: 100%; height: 100%; object-fit: cover; display: block;">`
-                : `<div style="text-align: center; color: #94a3b8; font-size: 8.5pt; font-weight: 700; padding: 4px;">फोटो</div>`
-            }
-          </div>
-
-          <!-- Middle Column: Member Details (Distinct Crimson Color for Name, Increased Spacing between 4 lines) -->
-          <div style="flex: 1; font-size: 11.5pt; line-height: 1.6; color: #0f172a; padding: 0 4px;">
-            <div style="font-size: 17pt; font-weight: 900; color: #991b1b; margin-bottom: 8px; line-height: 1.25;">
-              ${app.salutation} ${app.fullName}
-            </div>
-            <div style="font-weight: 800; color: #1e293b; margin-bottom: 6px;">
-              <span style="color: #475569; font-weight: 900;">पद:</span> <strong style="color: #0b1e33;">${cadre}</strong>
-            </div>
-            <div style="font-weight: 800; color: #1e293b; margin-bottom: 6px;">
-              <span style="color: #475569; font-weight: 900;">कार्यक्षेत्र:</span> <strong style="color: #0b1e33;">${app.district}${app.taluka ? ' (ता. ' + app.taluka + ')' : ''}</strong>
-            </div>
-            <div style="font-weight: 800; color: #1e293b; margin-bottom: 2px;">
-              <span style="color: #475569; font-weight: 900;">मोबाईल:</span> <span style="font-family: monospace; font-size: 12pt; font-weight: 900; color: #0b1e33;">${app.phone}</span>
-            </div>
-          </div>
-
-          <!-- Right Column: Large Scannable QR Code -->
-          <div style="width: 115px; height: 115px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
-            <img src="${qrUrl}" alt="mahasangh.in QR Code" style="width: 115px; height: 115px; object-fit: contain; display: block;">
-          </div>
-
+        <div style="font-weight: 900; color: #991b1b; font-size: 18.2px;">
+          आजीवन डिजिटल आय-कार्ड
         </div>
+      </div>
 
-        <!-- 4. BOTTOM FOOTER BAR -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; border-top: 1.5px solid #cbd5e1; padding: 4px 16px 8px 16px; background: #ffffff;">
-          <div style="font-size: 8.5pt; font-weight: 800; color: #475569; line-height: 1.35;">
-            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ<br>
-            <span style="color: #851216; font-weight: 900;">आजीवन डिजिटल आय-कार्ड</span>
-          </div>
-
-          <div style="text-align: center; min-width: 140px; position: relative;">
-            <img src="${signUrl}" alt="स्वाक्षरी" style="height: 34px; max-width: 125px; object-fit: contain; display: block; margin: 0 auto -2px auto; mix-blend-mode: multiply; filter: contrast(160%);">
-            <div style="font-size: 10pt; font-weight: 900; color: #000000; line-height: 1.1; margin-top: 1px;">श्री. राजेंद्र खैरनार</div>
-            <div style="font-size: 8pt; font-weight: 800; color: #334155;">(संस्थापक राज्याध्यक्ष)</div>
-          </div>
+      <!-- 9. BOTTOM-RIGHT TRANSPARENT BLUE INK SIGNATURE & DESIGNATION (Above straight gold line, clear of QR) -->
+      <div style="position: absolute; right: 3.2%; bottom: 10.1%; min-width: 23%; text-align: center; display: flex; flex-direction: column; align-items: center;">
+        <img src="${transparentSignUrl}" alt="स्वाक्षरी" style="height: 42.5px; width: auto; max-width: 158px; object-fit: contain; display: block; margin: 0 auto -3px auto;" />
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; color: #000000; font-size: 20.2px; line-height: 1.18; white-space: nowrap;">
+          श्री. राजेंद्र खैरनार
         </div>
-
+        <div style="font-weight: 700; color: #1e293b; font-size: 14.2px; line-height: 1.18; white-space: nowrap;">
+          (संस्थापक राज्याध्यक्ष)
+        </div>
       </div>
     </div>
   `;
 
   wrapper.innerHTML = cardHtml;
   document.body.appendChild(wrapper);
-  await new Promise((r) => setTimeout(r, 60));
 
   try {
+    await waitForFontsAndImages(wrapper);
+
     const { jsPDF, html2canvas } = await loadPdfEngines();
-    const canvas = await html2canvas(wrapper, {
-      scale: 2.0, // High definition 300 DPI canvas
+    const cardEl = wrapper.firstElementChild as HTMLElement;
+    const canvas = await html2canvas(cardEl, {
+      scale: 4, // 856x540 * 4 = 3424x2160px (1016 DPI Ultra-HD print resolution)
       useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -671,29 +1001,94 @@ async function buildMembershipIdCardPdfDocument(
       scrollY: 0,
       x: 0,
       y: 0,
-      width: 640,
-      height: 404,
-      windowWidth: 640,
-      windowHeight: 404,
-      logging: false
+      width: 856,
+      height: 540,
+      windowWidth: 856,
+      windowHeight: 540,
+      logging: false,
     });
 
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: [85.6, 54], // Standard CR80 landscape ID card format
-      compress: true
-    });
+    const createPdfInstance = () =>
+      new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [85.6, 54], // Standard CR80 landscape ID card format
+        compress: true,
+      });
 
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    pdf.addImage(imgData, 'JPEG', 0, 0, 85.6, 54, undefined, 'FAST');
+    const minTargetBytes = forEmail ? 1_900_000 : 2_050_000; // >= 2.0 MB for download
+    const maxTargetBytes = forEmail ? 2_650_000 : 2_980_000; // Strictly <= 3.0 MB
 
+    const buildWithImage = (dataUrl: string, fmt: 'PNG' | 'JPEG', compression: 'SLOW' | 'FAST') => {
+      const docPdf = createPdfInstance();
+      docPdf.addImage(dataUrl, fmt, 0, 0, 85.6, 54, undefined, compression);
+      return { docPdf, bytes: docPdf.output('arraybuffer').byteLength };
+    };
+
+    const downsampleCanvas = (src: HTMLCanvasElement, targetScale: number) => {
+      const targetW = Math.round(856 * targetScale);
+      const targetH = Math.round(540 * targetScale);
+      const out = document.createElement('canvas');
+      out.width = targetW;
+      out.height = targetH;
+      const ctx = out.getContext('2d');
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(src, 0, 0, targetW, targetH);
+      }
+      return out;
+    };
+
+    // 1. Try 1016 DPI (4x) lossless PNG with SLOW zlib compression
+    const pngData4x = canvas.toDataURL('image/png');
+    let best = buildWithImage(pngData4x, 'PNG', 'SLOW');
+
+    if (best.bytes < minTargetBytes) {
+      // Lossless PNG compressed very tightly; check FAST zlib or full-res JPEG 1.0 to land in [2 MB, 3 MB]
+      const fast4x = buildWithImage(pngData4x, 'PNG', 'FAST');
+      if (fast4x.bytes >= minTargetBytes && fast4x.bytes <= maxTargetBytes) {
+        best = fast4x;
+      } else {
+        const jpeg100 = buildWithImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 'SLOW');
+        if (jpeg100.bytes >= minTargetBytes && jpeg100.bytes <= maxTargetBytes) {
+          best = jpeg100;
+        } else if (fast4x.bytes <= maxTargetBytes && fast4x.bytes > best.bytes) {
+          best = fast4x;
+        }
+      }
+    } else if (best.bytes > maxTargetBytes) {
+      // Over 3 MB at 4x SLOW PNG: try 3.5x (889 DPI) lossless PNG inside [2 MB, 3 MB] first
+      const canvas35x = downsampleCanvas(canvas, 3.5);
+      const png35x = buildWithImage(canvas35x.toDataURL('image/png'), 'PNG', 'SLOW');
+      if (png35x.bytes >= minTargetBytes && png35x.bytes <= maxTargetBytes) {
+        best = png35x;
+      } else {
+        // Pick the highest quality JPEG on full 4x (1016 DPI) canvas that fits inside <= 3 MB
+        let picked = false;
+        for (const q of [1.0, 0.99, 0.98, 0.96, 0.94, 0.92, 0.88, 0.84]) {
+          const candidate = buildWithImage(canvas.toDataURL('image/jpeg', q), 'JPEG', 'SLOW');
+          if (candidate.bytes <= maxTargetBytes) {
+            best = candidate;
+            picked = true;
+            break;
+          }
+        }
+        if (!picked) {
+          best = png35x.bytes <= maxTargetBytes
+            ? png35x
+            : buildWithImage(canvas35x.toDataURL('image/jpeg', 0.92), 'JPEG', 'SLOW');
+        }
+      }
+    }
+
+    const pdf = best.docPdf;
     const cleanName = (app.fullName || 'सदस्य').replace(/\s+/g, '_');
     const cleanMemberId = memberNo.replace(/[^a-zA-Z0-9_-]/g, '_');
     return {
       pdf,
       downloadFileName: `आय_कार्ड_${cleanName}.pdf`,
-      emailFileName: `Mahasangh_ID_${cleanMemberId}.pdf`
+      emailFileName: `Mahasangh_ID_${cleanMemberId}.pdf`,
     };
   } finally {
     document.body.removeChild(wrapper);
@@ -701,14 +1096,14 @@ async function buildMembershipIdCardPdfDocument(
 }
 
 export async function generateMembershipIdCardPdf(app: MembershipApplication): Promise<void> {
-  const { pdf, downloadFileName } = await buildMembershipIdCardPdfDocument(app);
+  const { pdf, downloadFileName } = await buildMembershipIdCardPdfDocument(app, { forEmail: false });
   pdf.save(downloadFileName);
 }
 
 export async function generateMembershipIdCardPdfBase64(
   app: MembershipApplication
 ): Promise<{ base64: string; fileName: string }> {
-  const { pdf, emailFileName } = await buildMembershipIdCardPdfDocument(app);
+  const { pdf, emailFileName } = await buildMembershipIdCardPdfDocument(app, { forEmail: true });
   const dataUri = pdf.output('datauristring');
   const commaIdx = dataUri.indexOf(',');
   const base64 = commaIdx >= 0 ? dataUri.slice(commaIdx + 1) : dataUri;

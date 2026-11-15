@@ -54,6 +54,7 @@ import {
     deleteGovOrderFromFirestore
 } from '../firebase';
 import { MemberEditManager } from './MemberEditManager';
+import { MembershipIdCardPreview } from './MembershipIdCardPreview';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
@@ -122,7 +123,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isApprovingApp, setIsApprovingApp] = useState(false);
 
   // Active view inside Admin Dashboard
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'latest_banners' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<'applications' | 'edit_members' | 'leadership' | 'add_news' | 'latest_banners' | 'id_card_preview' | 'gov_order' | 'manage_admins' | 'contact_messages' | 'password' | 'cloudinary' | 'razorpay'>('applications');
 
   // Latest Banners form state
   const [bannerTitle, setBannerTitle] = useState('');
@@ -497,15 +498,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   // Editing existing news / GR / Photo
   const [editingNewsItem, setEditingNewsItem] = useState<NewsItem | null>(null);
-  const [newsManageMode, setNewsManageMode] = useState<'form' | 'photo_only' | 'gov_order' | 'list'>('form');
+  const [newsManageMode, setNewsManageMode] = useState<'form' | 'gov_order' | 'list'>('form');
   const [previewNewsItem, setPreviewNewsItem] = useState<NewsItem | null>(null);
-
-  // Quick Photo Only state
-  const [photoOnlyTitle, setPhotoOnlyTitle] = useState('');
-  const [photoOnlyDate, setPhotoOnlyDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-  const [photoOnlyImageUrl, setPhotoOnlyImageUrl] = useState('');
-  const [photoOnlyCategory, setPhotoOnlyCategory] = useState('ताज्या घडामोडी');
-  const [isUploadingPhotoOnly, setIsUploadingPhotoOnly] = useState(false);
 
   // News search query in admin
   const [newsSearchQuery, setNewsSearchQuery] = useState('');
@@ -544,38 +538,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         console.warn('News image compression failed:', err);
       } finally {
         setIsCompressingNewsImg(false);
-      }
-    }
-  };
-
-  const handlePhotoOnlySelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
-      setIsUploadingPhotoOnly(true);
-      setNewsError('');
-      try {
-        const result = await uploadToCloudinary(file, cloudinaryConfig);
-        setPhotoOnlyImageUrl(result.url);
-      } catch (err: any) {
-        console.warn('Cloudinary upload error for photo-only:', err);
-        try {
-          const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
-          setPhotoOnlyImageUrl(base64);
-          setNewsError('सर्व्हर अपलोड त्रुटी (' + (err.message || '') + '), स्थानिक इमेज निवडली.');
-        } catch {
-          setNewsError('फोटो कॉम्प्रेस करताना अडचण आली.');
-        }
-      } finally {
-        setIsUploadingPhotoOnly(false);
-      }
-    } else {
-      try {
-        const { base64 } = await compressImageFile(file, 1000, 750, 0.75);
-        setPhotoOnlyImageUrl(base64);
-      } catch (err) {
-        console.warn('Photo compression failed:', err);
       }
     }
   };
@@ -1086,10 +1048,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   useEffect(() => {
-    if (isLoggedIn && (activeAdminSubTab === 'contact_messages' || contactMessages.length === 0)) {
+    if (isLoggedIn && currentUser?.isSuperAdmin && (activeAdminSubTab === 'contact_messages' || contactMessages.length === 0)) {
       loadContactMessages();
     }
-  }, [isLoggedIn, activeAdminSubTab]);
+  }, [isLoggedIn, activeAdminSubTab, currentUser?.isSuperAdmin]);
 
   // Open Verification Modal for an Application
   const handleOpenVerification = (app: MembershipApplication) => {
@@ -1327,7 +1289,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       content: toEnglishDigits(newsContent.trim()),
       image: newsImageUrl || undefined,
       imageUrl: newsImageUrl || undefined,
-      featured: newsCategory === 'ताज्या घडामोडी' || newsCategory === 'टॅगलाईन फोटो',
+      featured: false,
       createdAt: new Date().toISOString(),
     };
 
@@ -1378,39 +1340,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       } catch (err: any) {
           alert('हटवताना त्रुटी: ' + err.message);
       }
-  };
-
-  // Quick Photo Only Publish (with Tagline Photo support)
-  const handleCreatePhotoOnly = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!photoOnlyTitle.trim() || !photoOnlyImageUrl) {
-      setNewsError('कृपया फोटोचे शीर्षक प्रविष्ट करा आणि फोटो निवडा.');
-      return;
-    }
-    setNewsError('');
-
-    const displayDate = formatPublishDateToDisplay(photoOnlyDate);
-    const publishDateStr = photoOnlyDate || new Date().toISOString().split('T')[0];
-    const photoPost: NewsItem = {
-      id: `photo-${Date.now()}`,
-      title: toEnglishDigits(photoOnlyTitle.trim()),
-      date: displayDate,
-      publishDate: publishDateStr,
-      category: photoOnlyCategory || 'ताज्या घडामोडी',
-      summary: toEnglishDigits(photoOnlyTitle.trim()),
-      content: '', // Empty content indicates photo-only mode
-      image: photoOnlyImageUrl,
-      imageUrl: photoOnlyImageUrl,
-      featured: photoOnlyCategory === 'ताज्या घडामोडी' || photoOnlyCategory === 'टॅगलाईन फोटो',
-      createdAt: new Date().toISOString(),
-    };
-
-    onAddNews(photoPost);
-    setNewsCreatedSuccess(true);
-    setPhotoOnlyTitle('');
-    setPhotoOnlyImageUrl('');
-    setPhotoOnlyDate(new Date().toISOString().split('T')[0]);
-    setTimeout(() => setNewsCreatedSuccess(false), 4000);
   };
 
   // Start Editing News
@@ -1465,25 +1394,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       content: newsContent.trim(),
       image: newsImageUrl || undefined,
       imageUrl: newsImageUrl || undefined,
-    });
-  };
-
-  const handleOpenPhotoOnlyPreview = () => {
-    if (!photoOnlyTitle.trim()) {
-      setNewsError('प्रिव्ह्यू पाहण्यासाठी कृपया फोटोचे शीर्षक प्रविष्ट करा.');
-      return;
-    }
-    setNewsError('');
-    setPreviewNewsItem({
-      id: 'preview-photo-temp',
-      title: photoOnlyTitle.trim(),
-      category: photoOnlyCategory || 'अधिकृत छायाचित्र / परिपत्रक',
-      date: formatPublishDateToDisplay(photoOnlyDate),
-      publishDate: photoOnlyDate,
-      summary: 'अधिकृत छायाचित्र / परिपत्रक',
-      content: '',
-      image: photoOnlyImageUrl || undefined,
-      imageUrl: photoOnlyImageUrl || undefined,
     });
   };
 
@@ -1773,36 +1683,37 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {/* Sub-tabs Navigation Bar (Always at top after login) */}
             <div className="bg-white p-2 rounded-xl border border-slate-200 shadow-xs">
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-                {currentUser?.permissions.approveMembers && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('applications')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'applications'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Users className="w-4 h-4" />
-                      <span>सदस्यत्व अर्ज ({totalCount})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('edit_members')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'edit_members'
-                          ? 'bg-indigo-700 text-white shadow-xs'
-                          : 'text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200'
-                      }`}
-                    >
-                      <Edit3 className="w-4 h-4" />
-                      <span>सदस्य एडिट</span>
-                    </button>
-                  </>
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.approveMembers) && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('applications')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'applications'
+                        ? 'bg-[#17366d] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>सदस्यत्व अर्ज ({totalCount})</span>
+                  </button>
                 )}
 
-                {currentUser?.permissions.manageLeadership && (
+                {currentUser?.isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveAdminSubTab('edit_members')}
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                      activeAdminSubTab === 'edit_members'
+                        ? 'bg-indigo-700 text-white shadow-xs'
+                        : 'text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200'
+                    }`}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>सदस्य एडिट</span>
+                  </button>
+                )}
+
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
                   <button
                     type="button"
                     onClick={() => setActiveAdminSubTab('leadership')}
@@ -1817,7 +1728,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </button>
                 )}
 
-                {currentUser?.permissions.manageNews && (
+                {(currentUser?.isSuperAdmin || currentUser?.permissions.manageNews) && (
                   <>
                     <button
                       type="button"
@@ -1830,18 +1741,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     >
                       <FileText className="w-4 h-4" />
                       <span>बातम्या</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveAdminSubTab('latest_banners')}
-                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                        activeAdminSubTab === 'latest_banners'
-                          ? 'bg-[#17366d] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      <span>ताज्या घडामोडी बॅनर्स</span>
                     </button>
                     <button
                       type="button"
@@ -1860,6 +1759,30 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                 {currentUser?.isSuperAdmin && (
                   <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('latest_banners')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'latest_banners'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                      <span>ताज्या घडामोडी बॅनर्स</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('id_card_preview')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'id_card_preview'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Award className="w-4 h-4 text-amber-400" />
+                      <span>आय-कार्ड डिझाईन नमुना</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => setActiveAdminSubTab('manage_admins')}
@@ -1884,21 +1807,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <KeyRound className="w-4 h-4 text-emerald-400" />
                       <span>Razorpay व वेबहूक (Webhook)</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveAdminSubTab('contact_messages')}
+                      className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                        activeAdminSubTab === 'contact_messages'
+                          ? 'bg-[#17366d] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>प्राप्त संदेश</span>
+                    </button>
                   </>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() => setActiveAdminSubTab('contact_messages')}
-                  className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                    activeAdminSubTab === 'contact_messages'
-                      ? 'bg-[#17366d] text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span>प्राप्त संदेश</span>
-                </button>
 
                 <button
                   type="button"
@@ -1931,7 +1853,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             </div>
 
             {/* Sub-tab 1: Applications */}
-            {activeAdminSubTab === 'applications' && (
+            {activeAdminSubTab === 'applications' && (currentUser?.isSuperAdmin || currentUser?.permissions.approveMembers) && (
               <div className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                   <div>
@@ -1943,7 +1865,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </p>
                   </div>
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    {/* 1. Tiny Colored Circle: Resequence */}
+                    {currentUser?.isSuperAdmin && (
+                      <>
                     <div className="relative">
                       <button
                         type="button"
@@ -2015,6 +1938,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
                       <span>{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुने डिलीट डाटा स्वच्छ करा'}</span>
                     </button>
+                      </>
+                    )}
 
                     {onFetchApplications && (
                       <button
@@ -2294,7 +2219,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 1B: Dedicated Member Edit & Duplicate Cleanup (सदस्य एडिट) */}
-            {activeAdminSubTab === 'edit_members' && (
+            {activeAdminSubTab === 'edit_members' && currentUser?.isSuperAdmin && (
               <MemberEditManager
                 applications={applications}
                 onUpdateMember={async (updated) => {
@@ -2309,7 +2234,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 2: Leadership Management (Point 7) */}
-            {activeAdminSubTab === 'leadership' && (
+            {activeAdminSubTab === 'leadership' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-6">
                 <div>
                   <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
@@ -2717,8 +2642,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab 3: News / Circular / Photo Management */}
-            {activeAdminSubTab === 'add_news' && (
+            {/* Sub-tab 3: News / Circular Management */}
+            {activeAdminSubTab === 'add_news' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageNews) && (
               <div className="space-y-6">
                 {/* Mode Selector Tabs */}
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap gap-2 items-center justify-between">
@@ -2737,22 +2662,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     >
                       <PlusCircle className="w-4 h-4" />
                       <span>{editingNewsItem ? '✏️ बातमी संपादन करा' : '📰 सविस्तर बातमी / शासन निर्णय'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewsManageMode('photo_only');
-                        setNewsError('');
-                      }}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                        newsManageMode === 'photo_only'
-                          ? 'bg-[#df6b16] text-white shadow-xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                      <span>🖼️ ताज्या घडामोडी बॅनर्स (Latest Updates)</span>
                     </button>
 
                     <button
@@ -2884,7 +2793,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <option value="अधिकृत वृत्त">अधिकृत वृत्त</option>
                             <option value="संघटना वृत्त">संघटना वृत्त</option>
                             <option value="अभिनंदन">अभिनंदन</option>
-                            <option value="ताज्या घडामोडी">ताज्या घडामोडी (मुख्यपृष्ठ बॅनर्स)</option>
                             <option value="शासन निर्णय (GR)">शासन निर्णय (GR)</option>
                             <option value="बैठक अहवाल">बैठक अहवाल</option>
                             <option value="जिल्हा वृत्त">जिल्हा वृत्त</option>
@@ -3010,144 +2918,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </div>
                 )}
 
-                {/* MODE 2: Quick Photo-Only Upload ("केवळ फोटो अपलोड करा") */}
-                {newsManageMode === 'photo_only' && (
-                  <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-2xl">
-                    <div className="pb-4 mb-5 border-b border-slate-100">
-                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
-                        <ImageIcon className="w-5 h-5 text-[#df6b16]" />
-                        Tagline Photo - मुख्यपृष्ठ ताज्या घडामोडी फोटो अपलोड
-                      </h3>
-                      <p className="text-xs text-slate-500 mt-1">
-                        येथे अपलोड केलेला फोटो थेट हाय-स्पीड मिडिया सर्व्हरवर सेव्ह होतो आणि मुख्यपृष्ठावर <strong>'ताज्या घडामोडी'</strong> सेक्शनमध्ये मोठ्या आकारात स्क्रीनच्या पूर्ण रुंदीत दर्शविला जातो.
-                      </p>
-                    </div>
-
-
-
-                    <form onSubmit={handleCreatePhotoOnly} className="space-y-4 text-xs">
-                      <div>
-                        <label className="font-bold text-slate-700 block mb-1">
-                          १. फोटोचे किंवा परिपत्रकाचे शीर्षक <span className="text-rose-600">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="उदा. राज्यस्तरीय शैक्षणिक परिषद २०२६ छायाचित्र / शासन निर्णय पत्र..."
-                          value={photoOnlyTitle}
-                          onChange={(e) => setPhotoOnlyTitle(e.target.value)}
-                          className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-sm"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="font-bold text-slate-700 block mb-1 flex items-center gap-1">
-                            <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
-                            <span>२. प्रसिद्धी दिनांक (Publication Date)</span> <span className="text-rose-600">*</span>
-                          </label>
-                          <input
-                            type="date"
-                            required
-                            value={photoOnlyDate}
-                            onChange={(e) => setPhotoOnlyDate(e.target.value)}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-bold bg-white"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="font-bold text-slate-700 block mb-1">
-                            ३. प्रकार / श्रेणी (Category) <span className="text-rose-600">*</span>
-                          </label>
-                          <select
-                            value={photoOnlyCategory}
-                            onChange={(e) => setPhotoOnlyCategory(e.target.value)}
-                            className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-semibold"
-                          >
-                            <option value="ताज्या घडामोडी">📷 ताज्या घडामोडी (मुख्यपृष्ठ बॅनर्स)</option>
-                            <option value="अधिकृत वृत्त">📰 अधिकृत वृत्त</option>
-                            <option value="संघटना वृत्त">🚩 संघटना वृत्त</option>
-                            <option value="अभिनंदन">💐 अभिनंदन</option>
-                            <option value="अधिकृत छायाचित्र / परिपत्रक">🖼️ अधिकृत छायाचित्र / परिपत्रक</option>
-                            <option value="अधिकृत घोषणा">📢 अधिकृत घोषणा</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="font-bold text-slate-700 block mb-1">
-                          ३. फोटो निवडा (Direct Photo Upload) <span className="text-rose-600">*</span>
-                        </label>
-                        <div className="space-y-3">
-                          <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold rounded-lg shadow-xs transition-colors">
-                            <Upload className="w-4 h-4" />
-                            <span>
-                              {isUploadingPhotoOnly
-                                ? 'डायरेक्ट सर्व्हरवर अपलोड होत आहे...'
-                                : 'मोबाईल किंवा संगणकावरून फोटो निवडा'}
-                            </span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handlePhotoOnlySelect}
-                              className="hidden"
-                              disabled={isUploadingPhotoOnly}
-                            />
-                          </label>
-
-                          {photoOnlyImageUrl && (
-                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-3">
-                                <img
-                                  src={photoOnlyImageUrl}
-                                  alt="Preview"
-                                  className="w-16 h-16 object-cover rounded-lg border border-slate-300"
-                                />
-                                <div>
-                                  <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5" /> फोटो सज्ज आहे
-                                  </span>
-                                  <p className="text-[10px] text-slate-500 font-mono truncate max-w-xs">
-                                    {photoOnlyImageUrl}
-                                  </p>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setPhotoOnlyImageUrl('')}
-                                className="text-xs text-rose-600 hover:underline font-semibold"
-                              >
-                                फोटो बदला
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 pt-3">
-                        <button
-                          type="button"
-                          onClick={handleOpenPhotoOnlyPreview}
-                          className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-                        >
-                          <Eye className="w-4 h-4 text-emerald-400" />
-                          <span>प्रिव्ह्यू पहा (Live Preview)</span>
-                        </button>
-
-                        <button
-                          type="submit"
-                          disabled={!photoOnlyTitle.trim() || !photoOnlyImageUrl || isUploadingPhotoOnly}
-                          className="bg-[#df6b16] hover:bg-[#c85c0e] disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-lg text-xs transition-colors shadow-xs flex items-center gap-1.5"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>फोटो वेबसाईटवर प्रसिद्ध करा</span>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-
-                {/* MODE 3: Published News & GR List with Edit & Delete */}
+                {/* MODE 2: Published News & GR List with Edit & Delete */}
                 {newsManageMode === 'list' && (
                   <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-3">
@@ -3360,7 +3131,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab: Latest Banners Management (ताज्या घडामोडी बॅनर्स) */}
-            {activeAdminSubTab === 'latest_banners' && (
+            {activeAdminSubTab === 'latest_banners' && currentUser?.isSuperAdmin && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
                   <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-1.5 flex items-center gap-2">
@@ -3516,8 +3287,83 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
+            {/* Sub-tab: ID Card Sample Preview (आय-कार्ड डिझाईन नमुना) */}
+            {activeAdminSubTab === 'id_card_preview' && currentUser?.isSuperAdmin && (
+              <div className="space-y-6 max-w-3xl mx-auto">
+                <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-md space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                    <div>
+                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                        <Award className="w-5 h-5 text-[#df6b16]" />
+                        नवीन आय-कार्ड डिझाईन नमुना व प्रिंट क्वालिटी तपासणी
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        सदस्य नोंदणी आणि 'अर्जाची स्थिती पहा' मधून सर्व नवीन व मागील सदस्यांसाठी हेच अधिकृत सरळ गोल्डन-निळे, शार्प व प्रिंट-रेडी (1016 DPI Ultra-HD, 2–3 MB) नवीन आय-कार्ड डिझाईन सक्रिय करण्यात आले आहे.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sample ID Card Render — Exact 640x404 CR80 Official Straight Gold-Blue Replica with Sharp Logo */}
+                  <div className="flex justify-center py-4">
+                    <MembershipIdCardPreview
+                      app={{
+                        salutation: 'श्री',
+                        fullName: 'राजेंद्र शिवाजी खैरनार',
+                        professional: 'केंद्रप्रमुख',
+                        district: 'नाशिक',
+                        taluka: 'मालेगाव',
+                        phone: '9860704098',
+                        memberNumber: 'MS/2026/NASH/0001',
+                        photo: '/president.jpg',
+                      }}
+                    />
+                  </div>
+
+                  {/* Live Print Test Action Bar */}
+                  <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <p className="text-xs text-emerald-950 font-medium">
+                      ✓ हे नवीन डिझाईन आता संपूर्ण वेबसाईटवर (नवीन नोंदणी, ई-मेल आणि अर्जाची स्थिती पहा) सक्रिय आहे. कलर प्रिंटची स्पष्टता तपासण्यासाठी खालील बटनावरून नमुना PDF डाऊनलोड करा:
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          generateMembershipIdCardPdf({
+                            id: 'sample-preview',
+                            applicationNumber: 'APP-2026-0001',
+                            salutation: 'श्री',
+                            fullName: 'राजेंद्र शिवाजी खैरनार',
+                            phone: '9860704098',
+                            email: 'president@mahasangh.in',
+                            address: 'मालेगाव, नाशिक',
+                            district: 'नाशिक',
+                            taluka: 'मालेगाव',
+                            centerName: 'मालेगाव',
+                            familyMembers: '4',
+                            hobby: 'वाचन',
+                            education: 'M.A., B.Ed.',
+                            professionalQualification: 'M.Ed.',
+                            professional: 'केंद्रप्रमुख',
+                            photo: '/president.jpg',
+                            createdAt: new Date().toISOString(),
+                            status: 'approved',
+                            memberNumber: 'MS/2026/NASH/0001',
+                          })
+                        }
+                        className="bg-[#0b1e33] hover:bg-[#1e3a8a] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>नमुना प्रिंट-रेडी PDF डाऊनलोड करा</span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
             {/* Sub-tab 3.5: Gov Orders */}
-            {activeAdminSubTab === 'gov_order' && (
+            {activeAdminSubTab === 'gov_order' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageNews) && (
               <div className="space-y-6">
               <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
                 <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-5">
@@ -3589,7 +3435,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab: Manage Admins (Role-Based Access Control) */}
-            {activeAdminSubTab === 'manage_admins' && (
+            {activeAdminSubTab === 'manage_admins' && currentUser?.isSuperAdmin && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-2">
@@ -3953,7 +3799,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 5: Contact Inquiries & Messages */}
-            {activeAdminSubTab === 'contact_messages' && (
+            {activeAdminSubTab === 'contact_messages' && currentUser?.isSuperAdmin && (
               <div className="space-y-4">
                 {/* Header & Filter Bar */}
                 <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -4615,93 +4461,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             </div>
 
             {/* ID Card Box Container */}
-            <div className="border-2 border-[#0b1e33] rounded-xl overflow-hidden bg-gradient-to-b from-white to-[#fffdf8] shadow-md text-slate-800 font-serifDevanagari">
-              
-              {/* Glossy Navy Blue Header */}
-              <div className="bg-gradient-to-r from-[#0b1e33] via-[#1e3a8a] to-[#091d36] p-3 border-b-2 border-[#d4af37] flex items-center justify-between gap-3">
-                <div className="w-16 h-16 rounded-full border-2 border-[#d4af37] bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-md">
-                  <img src="/logo.png" alt="महासंघ लोगो" className="w-full h-full object-contain p-0.5" />
-                </div>
-                <div className="flex-1 text-center">
-                  <div className="text-[11px] font-extrabold text-yellow-300 tracking-wider uppercase">
-                    महाराष्ट्र राज्य
-                  </div>
-                  <div className="text-lg md:text-xl font-black text-white leading-tight drop-shadow-md">
-                    केंद्रप्रमुख व अधिकारी महासंघ
-                  </div>
-                  <div className="text-[9px] font-bold text-slate-200 mt-0.5">
-                    नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427
-                  </div>
-                </div>
-              </div>
-
-              {/* Title Bar */}
-              <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200">
-                <div className="w-20"></div>
-                <div className="flex-1 text-center">
-                  <span className="text-base font-black text-[#0b1e33] border-b-2 border-[#d4af37] pb-0.5 inline-block">
-                    आजीवन सदस्य
-                  </span>
-                </div>
-                <div className="w-28 text-right font-mono font-black text-xs text-[#0b1e33]">
-                  सदस्य क्र: {certModalApp.memberNumber || 'MS/2026/0001'}
-                </div>
-              </div>
-
-              {/* Main Content Row */}
-              <div className="p-4 flex items-center justify-between gap-4">
-                {/* Photo */}
-                <div className="w-24 h-28 border-2 border-[#d4af37] rounded-lg overflow-hidden bg-slate-100 shrink-0 shadow-xs flex items-center justify-center">
-                  {certModalApp.photo ? (
-                    <img src={certModalApp.photo} alt={certModalApp.fullName} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="text-center text-slate-400 text-xs font-bold">फोटो</div>
-                  )}
-                </div>
-
-                {/* Details */}
-                <div className="flex-1 space-y-1.5 text-xs text-slate-800">
-                  <div className="text-lg font-black text-[#991b1b] leading-tight">
-                    {certModalApp.salutation} {certModalApp.fullName}
-                  </div>
-                  <div className="font-extrabold text-slate-700">
-                    <span className="text-slate-500 font-bold">पद:</span> <strong className="text-[#0b1e33]">{certModalApp.professional || 'केंद्रप्रमुख / विस्तार अधिकारी'}</strong>
-                  </div>
-                  <div className="font-extrabold text-slate-700">
-                    <span className="text-slate-500 font-bold">कार्यक्षेत्र:</span> <strong className="text-[#0b1e33]">{certModalApp.district}{certModalApp.taluka ? ` (ता. ${certModalApp.taluka})` : ''}</strong>
-                  </div>
-                  <div className="font-extrabold text-slate-700">
-                    <span className="text-slate-500 font-bold">मोबाईल:</span> <span className="font-mono font-black text-[#0b1e33]">{certModalApp.phone}</span>
-                  </div>
-                </div>
-
-                {/* QR Code */}
-                <div className="w-24 h-24 shrink-0 flex items-center justify-center bg-white p-1 rounded-lg">
-                  <img
-                    src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fmahasangh.in"
-                    alt="mahasangh.in QR Code"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-4 py-2 border-t border-slate-200 bg-white flex items-end justify-between text-[10px]">
-                <div className="font-bold text-slate-600 leading-tight">
-                  महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ<br />
-                  <span className="text-[#851216] font-extrabold">आजीवन डिजिटल आय-कार्ड</span>
-                </div>
-                <div className="text-center">
-                  <img
-                    src="/sign.jpg"
-                    alt="स्वाक्षरी"
-                    className="h-8 max-w-[110px] object-contain mx-auto mix-blend-multiply contrast-150 mb-0.5"
-                  />
-                  <div className="font-black text-[#000000]">श्री. राजेंद्र खैरनार</div>
-                  <div className="text-slate-500 font-bold text-[9px]">(संस्थापक राज्याध्यक्ष)</div>
-                </div>
-              </div>
-
+            <div className="flex justify-center">
+              <MembershipIdCardPreview app={certModalApp} photoFallbackUrl="" />
             </div>
 
             {/* Modal Buttons */}

@@ -109,10 +109,54 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
+const QUOTA_COOLDOWN_KEY = 'fb_quota_cooldown_until_v1';
+const QUOTA_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown after resource-exhausted
+let memoryQuotaCooldownUntil = 0;
+
+export function isQuotaExceededError(error: unknown): boolean {
+  if (!error) return false;
+  const code = String((error as any)?.code || '').toLowerCase();
+  const msg = String((error as any)?.message || error || '').toLowerCase();
+  return (
+    code === 'resource-exhausted' ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('quota exceeded')
+  );
+}
+
+export function isFirestoreQuotaInCooldown(): boolean {
+  const now = Date.now();
+  if (memoryQuotaCooldownUntil > now) return true;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      const stored = Number(sessionStorage.getItem(QUOTA_COOLDOWN_KEY) || 0);
+      if (stored > now) {
+        memoryQuotaCooldownUntil = stored;
+        return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
+export function markFirestoreQuotaExceeded(error?: unknown): void {
+  if (error && !isQuotaExceededError(error)) return;
+  const until = Date.now() + QUOTA_COOLDOWN_MS;
+  memoryQuotaCooldownUntil = until;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(QUOTA_COOLDOWN_KEY, String(until));
+    }
+  } catch {}
+}
+
 // Session-cached connection verification (Runs only once per session to save quota)
 export async function testConnectionOncePerSession(): Promise<boolean> {
   if (typeof window !== 'undefined' && sessionStorage.getItem('fb_conn_ok')) {
     return true;
+  }
+  if (isFirestoreQuotaInCooldown()) {
+    return false;
   }
   try {
     const connPromise = getDocFromServer(doc(db, 'test', 'connection'));
@@ -123,6 +167,9 @@ export async function testConnectionOncePerSession(): Promise<boolean> {
     if (typeof window !== 'undefined') sessionStorage.setItem('fb_conn_ok', 'true');
     return true;
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      markFirestoreQuotaExceeded(error);
+    }
     console.warn('Firebase connection notice (operating in graceful offline/cached mode):', error);
     if (typeof window !== 'undefined') sessionStorage.setItem('fb_conn_ok', 'true');
     return false;
@@ -147,6 +194,11 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
         // Cache is valid - ZERO reads from Firestore!
         return sortNewsDescending(JSON.parse(cachedData));
       }
+    }
+
+    if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+      if (cachedData) return sortNewsDescending(JSON.parse(cachedData));
+      return sortNewsDescending(INITIAL_NEWS);
     }
 
     // Cache expired or force refresh: fetch from Firestore
@@ -175,6 +227,7 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
     safeStorageSet(NEWS_CACHE_TIME_KEY, Date.now().toString());
     return sorted;
   } catch (error) {
+    if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
     console.warn('Using cached/default news due to network:', error);
     const cachedData = safeStorageGet(NEWS_CACHE_KEY);
     if (cachedData) {
@@ -201,6 +254,11 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
       if (age < CACHE_DURATION_MS) {
         return JSON.parse(cachedData);
       }
+    }
+
+    if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+      if (cachedData) return JSON.parse(cachedData);
+      return INITIAL_LATEST_BANNERS;
     }
 
     const colRef = collection(db, 'latest_banners');
@@ -231,6 +289,7 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
     safeStorageSet(LATEST_BANNERS_CACHE_TIME_KEY, Date.now().toString());
     return sorted;
   } catch (error) {
+    if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
     console.warn('Using cached latest banners:', error);
     const cachedData = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
     if (cachedData) {
@@ -394,6 +453,14 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
             }
         }
 
+        if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+            const cachedData = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+            if (cachedData) {
+                try { return JSON.parse(cachedData); } catch {}
+            }
+            return [];
+        }
+
         const snap = await getDocs(collection(db, 'gov_orders'));
         if (snap.empty) {
             safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify([]));
@@ -409,6 +476,7 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
         safeStorageSet(GOV_ORDERS_CACHE_TIME_KEY, Date.now().toString());
         return sorted;
     } catch (error) {
+        if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
         console.warn('Could not read gov_orders from firestore:', error);
         const cachedData = safeStorageGet(GOV_ORDERS_CACHE_KEY);
         if (cachedData) {
@@ -1069,23 +1137,34 @@ export async function getMemberCounter(): Promise<MemberCounterData> {
   return initData;
 }
 
+let highestApprovedSeqMemoryCache: { value: number; timestamp: number } | null = null;
+
 async function getTrueHighestApprovedSeqFromFirestore(): Promise<number> {
+  if (highestApprovedSeqMemoryCache && Date.now() - highestApprovedSeqMemoryCache.timestamp < 60000) {
+    return highestApprovedSeqMemoryCache.value;
+  }
+  if (isFirestoreQuotaInCooldown()) {
+    return highestApprovedSeqMemoryCache?.value || DEFAULT_COUNTER_BASELINE;
+  }
   try {
     const appsCol = collection(db, 'applications');
-    const snap = await getDocs(appsCol);
+    const approvedQ = query(appsCol, where('status', '==', 'approved'));
+    const snap = await getDocs(approvedQ);
     let highest = DEFAULT_COUNTER_BASELINE;
     snap.forEach((d) => {
       const app = d.data() as MembershipApplication;
-      if (app.status === 'approved' && app.memberNumber) {
+      if (app.memberNumber) {
         const seq = parseMemberNumberSeq(app.memberNumber);
         if (seq > highest) {
           highest = seq;
         }
       }
     });
+    highestApprovedSeqMemoryCache = { value: highest, timestamp: Date.now() };
     return highest;
-  } catch {
-    return DEFAULT_COUNTER_BASELINE;
+  } catch (err) {
+    if (isQuotaExceededError(err)) markFirestoreQuotaExceeded(err);
+    return highestApprovedSeqMemoryCache?.value || DEFAULT_COUNTER_BASELINE;
   }
 }
 
@@ -1380,34 +1459,32 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
       }
     }
 
-    // Use standard cached getDocs on normal load, and getDocsFromServer only on explicit manual Refresh
+    if (!forceRefresh && isFirestoreQuotaInCooldown()) {
+      if (cachedData) return JSON.parse(cachedData);
+      return [];
+    }
+
+    // Query only approved records (avoids scanning pending/rejected documents)
+    const approvedQuery = query(collection(db, 'applications'), where('status', '==', 'approved'));
     let snap;
     if (forceRefresh) {
       try {
-        snap = await getDocsFromServer(collection(db, 'applications'));
+        snap = await getDocsFromServer(approvedQuery);
       } catch {
-        snap = await getDocs(collection(db, 'applications'));
+        snap = await getDocs(approvedQuery);
       }
     } else {
-      snap = await getDocs(collection(db, 'applications'));
+      snap = await getDocs(approvedQuery);
     }
 
     let list: MembershipApplication[] = [];
     if (snap && !snap.empty) {
       snap.forEach((d) => {
         const item = d.data() as MembershipApplication;
-        const isApproved =
-          item.status === 'approved' ||
-          (typeof item.status === 'string' && item.status.toLowerCase() === 'approved') ||
-          Boolean(item.memberNumber && item.memberNumber.trim() !== '') ||
-          Boolean(item.approvedAt);
-
-        if (isApproved) {
-          list.push({
-            ...item,
-            id: d.id
-          });
-        }
+        list.push({
+          ...item,
+          id: d.id
+        });
       });
     }
 
@@ -1432,6 +1509,7 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
 
     return list;
   } catch (error) {
+    if (isQuotaExceededError(error)) markFirestoreQuotaExceeded(error);
     console.warn('Using cached approved members due to network / quota:', error);
     const cachedData = safeStorageGet(APPROVED_MEMBERS_CACHE_KEY);
     if (cachedData) {
@@ -1627,6 +1705,13 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
 
   const hasRecordedSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem(VISITOR_SESSION_FLAG);
 
+  if (isFirestoreQuotaInCooldown()) {
+    if (!hasRecordedSession && typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
+    }
+    return localStats;
+  }
+
   try {
     const statsDocRef = doc(db, 'site_stats', 'visits');
 
@@ -1635,43 +1720,42 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
         sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
       }
 
-      // Transaction to safely sync, take max of Firestore, local, and MIN_VISITOR_BASELINE (5155), and increment
-      const resultStats = await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(statsDocRef);
-        let fsTotal = 0;
-        let fsToday = 0;
-        let fsDate = todayDateStr;
+      // Single lightweight getDoc + non-retrying setDoc (avoids runTransaction retry loops on quota exhaustion)
+      const snap = await getDoc(statsDocRef);
+      let fsTotal = 0;
+      let fsToday = 0;
+      let fsDate = todayDateStr;
 
-        if (snap.exists()) {
-          const data = snap.data();
-          fsTotal = typeof data.total === 'number' ? data.total : 0;
-          fsToday = typeof data.today === 'number' ? data.today : 0;
-          fsDate = data.lastDate || todayDateStr;
-        }
+      if (snap.exists()) {
+        const data = snap.data();
+        fsTotal = typeof data.total === 'number' ? data.total : 0;
+        fsToday = typeof data.today === 'number' ? data.today : 0;
+        fsDate = data.lastDate || todayDateStr;
+      }
 
-        const baseTotal = Math.max(fsTotal, localStats.total, MIN_VISITOR_BASELINE);
-        const baseToday = (fsDate === todayDateStr) ? Math.max(fsToday, localStats.today) : Math.max(localStats.today, 900);
+      const baseTotal = Math.max(fsTotal, localStats.total, MIN_VISITOR_BASELINE);
+      const baseToday = (fsDate === todayDateStr) ? Math.max(fsToday, localStats.today) : Math.max(localStats.today, 900);
 
-        const newTotal = baseTotal + 1;
-        const newToday = (fsDate === todayDateStr) ? baseToday + 1 : 1;
+      const newTotal = baseTotal + 1;
+      const newToday = (fsDate === todayDateStr) ? baseToday + 1 : 1;
 
-        transaction.set(statsDocRef, {
-          total: newTotal,
-          today: newToday,
-          lastDate: todayDateStr,
-          lastUpdated: new Date().toISOString()
-        }, { merge: true });
-
-        return { today: newToday, total: newTotal };
+      setDoc(statsDocRef, {
+        total: newTotal,
+        today: newToday,
+        lastDate: todayDateStr,
+        lastUpdated: new Date().toISOString()
+      }, { merge: true }).catch((writeErr) => {
+        if (isQuotaExceededError(writeErr)) markFirestoreQuotaExceeded(writeErr);
       });
 
+      const resultStats = { today: newToday, total: newTotal };
       localStorage.setItem(VISITOR_LOCAL_KEY, JSON.stringify({
         ...resultStats,
         date: todayDateStr
       }));
       return resultStats;
     } else {
-      // Already recorded in this session, fetch latest live count from Firestore and sync
+      // Already recorded in this session, fetch latest cached/live count from Firestore cleanly
       const snap = await getDoc(statsDocRef);
       if (snap.exists()) {
         const data = snap.data();
@@ -1690,6 +1774,7 @@ export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
       return localStats;
     }
   } catch (err) {
+    if (isQuotaExceededError(err)) markFirestoreQuotaExceeded(err);
     console.warn('Visitor counter sync notice:', err);
     if (!hasRecordedSession && typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem(VISITOR_SESSION_FLAG, 'true');
