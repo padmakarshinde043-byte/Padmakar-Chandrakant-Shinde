@@ -17,7 +17,7 @@ import {
   DEFAULT_AUTHORITATIVE_LEADERS,
   MAHARASHTRA_DISTRICTS
 } from '../data/mahasanghData';
-import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatters';
+import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import {
   getAdminCredentials,
   updateAdminCredentials,
@@ -433,7 +433,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [photoOnlyTitle, setPhotoOnlyTitle] = useState('');
   const [photoOnlyDate, setPhotoOnlyDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [photoOnlyImageUrl, setPhotoOnlyImageUrl] = useState('');
-  const [photoOnlyCategory, setPhotoOnlyCategory] = useState('टॅगलाईन फोटो');
+  const [photoOnlyCategory, setPhotoOnlyCategory] = useState('ताज्या घडामोडी');
   const [isUploadingPhotoOnly, setIsUploadingPhotoOnly] = useState(false);
 
   // News search query in admin
@@ -1436,7 +1436,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
 
   return (
-    <div className="bg-[#f6f8fc] py-8 md:py-12 min-h-screen">
+    <div className="allow-copy bg-[#f6f8fc] py-8 md:py-12 min-h-screen">
       <div className="max-w-[1100px] mx-auto px-4">
         {/* Top Navigation Bar */}
         <div className="border-b border-slate-300 pb-5 mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2095,6 +2095,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               {app.applicationNumber}
                               <span className="block font-sans font-normal text-[11px] text-slate-500">
                                 {formatDateWithEnglishDigits(app.createdAt)}
+                                {app.createdAt && (
+                                  <span className="block font-mono text-[10px] text-amber-700 font-semibold">
+                                    {formatTimeOnly(app.createdAt)}
+                                  </span>
+                                )}
                               </span>
                             </td>
                             <td className="py-3 px-4 font-bold text-slate-900">
@@ -2664,7 +2669,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <ImageIcon className="w-4 h-4" />
-                      <span>🖼️ Tagline Photo (टॅगलाईन फोटो)</span>
+                      <span>🖼️ ताज्या घडामोडी बॅनर्स (Latest Updates)</span>
                     </button>
 
                     <button
@@ -2796,7 +2801,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <option value="अधिकृत वृत्त">अधिकृत वृत्त</option>
                             <option value="संघटना वृत्त">संघटना वृत्त</option>
                             <option value="अभिनंदन">अभिनंदन</option>
-                            <option value="टॅगलाईन फोटो">टॅगलाईन फोटो (मुख्यपृष्ठ ताज्या घडामोडी)</option>
+                            <option value="ताज्या घडामोडी">ताज्या घडामोडी (मुख्यपृष्ठ बॅनर्स)</option>
                             <option value="शासन निर्णय (GR)">शासन निर्णय (GR)</option>
                             <option value="बैठक अहवाल">बैठक अहवाल</option>
                             <option value="जिल्हा वृत्त">जिल्हा वृत्त</option>
@@ -2976,7 +2981,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             onChange={(e) => setPhotoOnlyCategory(e.target.value)}
                             className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-xs font-semibold"
                           >
-                            <option value="टॅगलाईन फोटो">📷 टॅगलाईन फोटो (मुख्यपृष्ठ ताज्या घडामोडी)</option>
+                            <option value="ताज्या घडामोडी">📷 ताज्या घडामोडी (मुख्यपृष्ठ बॅनर्स)</option>
                             <option value="अधिकृत वृत्त">📰 अधिकृत वृत्त</option>
                             <option value="संघटना वृत्त">🚩 संघटना वृत्त</option>
                             <option value="अभिनंदन">💐 अभिनंदन</option>

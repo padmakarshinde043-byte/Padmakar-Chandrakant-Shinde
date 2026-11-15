@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowRight, ShieldCheck, Users, School, Award, ChevronRight,
@@ -180,6 +180,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
           </div>
         </div>
       </section>
+
+      {/* Section 1.5: ताज्या घडामोडी (Latest Updates Banner Carousel) */}
+      <LatestUpdatesCarousel newsList={list} onSelectNews={onSelectNews} setFullScreenPhoto={setFullScreenPhoto} />
 
       {/* Section 2: Four Core Interactive Portal Hubs */}
       <section className="py-8 sm:py-10 max-w-[1240px] mx-auto px-4 sm:px-6">
@@ -381,67 +384,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
         </div>
       </section>
 
-      {/* Section 4: Latest News / Tagline Photo Spotlight */}
-      <section className="py-6 sm:py-10 max-w-[1240px] mx-auto px-4 sm:px-6">
-        <div className="mb-4 pb-2 border-b border-slate-200">
-          <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-            अधिकृत प्रसिद्धी
-          </span>
-          <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-            ताज्या घडामोडी
-          </h3>
-        </div>
-
-        {(() => {
-          // Identify Tagline Photo: either category is 'टॅगलाईन फोटो', or featured is true, or fallback to newest photo/item
-          const taglinePhotoItem =
-            list.find((item) => (item.category || '').includes('टॅगलाईन') && (item.imageUrl || item.image)) ||
-            list.find((item) => item.featured && (item.imageUrl || item.image)) ||
-            list.find((item) => Boolean(item.imageUrl || item.image)) ||
-            list[0];
-
-          const imgUrl = taglinePhotoItem?.imageUrl || taglinePhotoItem?.image;
-
-          if (imgUrl) {
-            return (
-              <div className="w-full bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div
-                  onClick={() => setFullScreenPhoto(imgUrl)}
-                  className="w-full bg-slate-100 flex items-center justify-center cursor-pointer transition-opacity hover:opacity-95"
-                >
-                  <img
-                    src={imgUrl}
-                    alt={taglinePhotoItem?.title || 'ताज्या घडामोडी'}
-                    className="w-full h-auto block object-contain mx-auto"
-                    loading="eager"
-                  />
-                </div>
-
-                {taglinePhotoItem?.title && (
-                  <div className="py-3 px-3 sm:px-4 bg-slate-50 border-t border-slate-200 text-center">
-                    <p
-                      className="text-base sm:text-lg font-bold text-[#0b1e36] truncate"
-                      title={taglinePhotoItem.title}
-                    >
-                      {toEnglishDigits(taglinePhotoItem.title)}
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          return (
-            <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-500">
-              <p className="font-bold text-base text-slate-700">सध्या कोणताही टॅगलाईन फोटो उपलब्ध नाही.</p>
-              <p className="text-sm text-slate-500 mt-1">
-                ॲडमिन पॅनलमध्ये बातम्या व परिपत्रके सेक्शनमध्ये 'Tagline Photo' जोडा.
-              </p>
-            </div>
-          );
-        })()}
-      </section>
-
       {/* Full-Screen Original Size Photo Lightbox Modal — Rendered via Portal directly in document.body */}
       {fullScreenPhoto && typeof document !== 'undefined' && createPortal(
         <div
@@ -481,4 +423,140 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
     </div>
   );
 };
+
+function LatestUpdatesCarousel({ newsList, onSelectNews, setFullScreenPhoto }: { newsList: NewsItem[]; onSelectNews: (news: NewsItem) => void; setFullScreenPhoto: (url: string) => void }) {
+  const banners = useMemo(() => {
+    return newsList.filter((item) => {
+      const cat = (item.category || '').toLowerCase();
+      return cat.includes('ताज्या घडामोडी') || cat.includes('टॅगलाईन') || cat.includes('tagline') || Boolean(item.imageUrl || item.image);
+    });
+  }, [newsList]);
+
+  const activeBanners = banners.length > 0 ? banners : (newsList.length > 0 ? newsList.slice(0, 5) : INITIAL_NEWS.slice(0, 3));
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Touch swipe state
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) {
+      nextBanner();
+    } else if (isRightSwipe) {
+      prevBanner();
+    }
+  };
+
+  const nextBanner = () => {
+    setCurrentIndex((prev) => (prev + 1) % activeBanners.length);
+  };
+
+  const prevBanner = () => {
+    setCurrentIndex((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
+  };
+
+  if (activeBanners.length === 0) return null;
+
+  const current = activeBanners[currentIndex];
+  const imgUrl = current.imageUrl || current.image;
+
+  return (
+    <section className="py-6 sm:py-8 max-w-[1240px] mx-auto px-4 sm:px-6">
+      <div className="mb-4 pb-2 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
+            अधिकृत प्रसिद्धी व बॅनर्स
+          </span>
+          <h2 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#0b1e36] mt-0.5">
+            ताज्या घडामोडी
+          </h2>
+        </div>
+      </div>
+
+      <div 
+        className="relative w-full bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-lg overflow-hidden group select-none"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Banner Image Container */}
+        <div 
+          onClick={() => imgUrl && setFullScreenPhoto(imgUrl)}
+          className="relative w-full aspect-[16/9] sm:aspect-[21/9] bg-slate-950 flex items-center justify-center cursor-pointer overflow-hidden"
+        >
+          <img
+            src={imgUrl}
+            alt={current.title || 'ताज्या घडामोडी'}
+            className="w-full h-full object-cover object-center transition-transform duration-500 hover:scale-102"
+            loading="lazy"
+          />
+
+          {/* Gradient overlay for text readability */}
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent pt-14 pb-4 px-4 sm:px-6 flex flex-col justify-end">
+            <span className="text-amber-300 font-semibold text-xs sm:text-sm mb-1">
+              {current.category || 'ताज्या घडामोडी'} · {toEnglishDigits(current.date)}
+            </span>
+            <h3 className="font-serifDevanagari text-white text-lg sm:text-2xl font-bold leading-snug drop-shadow-md line-clamp-2">
+              {toEnglishDigits(current.title)}
+            </h3>
+          </div>
+        </div>
+
+        {/* Navigation Arrows */}
+        {activeBanners.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); prevBanner(); }}
+              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer border border-white/20 z-10 font-bold text-lg"
+              aria-label="मागील फोटो"
+              title="मागील फोटो"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); nextBanner(); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer border border-white/20 z-10 font-bold text-lg"
+              aria-label="पुढील फोटो"
+              title="पुढील फोटो"
+            >
+              ›
+            </button>
+          </>
+        )}
+
+        {/* Indicator Dots */}
+        {activeBanners.length > 1 && (
+          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-xs px-3 py-1 rounded-full flex items-center gap-1.5 z-10 border border-white/20">
+            {activeBanners.map((_: NewsItem, idx: number) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setCurrentIndex(idx)}
+                className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex ? 'bg-amber-400 w-4' : 'bg-white/50 hover:bg-white'}`}
+                aria-label={`Slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 

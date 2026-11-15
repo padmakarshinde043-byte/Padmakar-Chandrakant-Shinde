@@ -24,7 +24,7 @@ import {
   formatSequentialMemberNumber,
 } from '../data/mahasanghData';
 import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
-import { formatDateWithEnglishDigits, toEnglishDigits } from '../utils/formatters';
+import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { syncMemberCounter, purgeDeletedAndGhostApplicationsInFirestore } from '../firebase';
@@ -605,6 +605,11 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       </span>
                       <span className="block text-[10px] text-slate-400">
                         {formatDateWithEnglishDigits(app.createdAt)}
+                        {app.createdAt && (
+                          <span className="block font-mono text-[10px] text-amber-700 font-semibold">
+                            {formatTimeOnly(app.createdAt)}
+                          </span>
+                        )}
                       </span>
                     </td>
 

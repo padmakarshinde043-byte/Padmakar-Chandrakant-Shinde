@@ -53,6 +53,11 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
           © 2026 {ORG_DETAILS.name}. सर्व हक्क राखीव.
         </div>
 
+        {/* Technical Assistance & Web Creation Credit */}
+        <div className="text-center text-slate-400 text-xs sm:text-sm font-medium">
+          तांत्रिक सहाय्य व वेब निर्मिती: <span className="text-amber-300/90 font-semibold">श्री. पदमाकर चंद्रकांत शिंदे</span>, केंद्रप्रमुख माजलगाव बीड
+        </div>
+
         {/* Minimal High-Efficiency Zero-Quota Visitor Counter */}
         <div className="flex items-center gap-2 bg-[#081526] px-4 py-2 rounded-xl border border-slate-700/80 text-xs sm:text-sm shadow-inner">
           <div className="flex items-center gap-1.5 text-amber-400 font-bold">

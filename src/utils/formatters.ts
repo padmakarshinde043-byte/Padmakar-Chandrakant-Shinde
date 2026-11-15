@@ -34,3 +34,18 @@ export function formatDateWithEnglishDigits(dateInput: string | Date | undefined
 
   return `${day} ${month} ${year}`;
 }
+
+/**
+  * Formats a Date or date string into time only (e.g. "10:35 AM").
+  */
+export function formatTimeOnly(dateInput: string | Date | undefined | null): string {
+  if (!dateInput) return '';
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return '';
+    return toEnglishDigits(d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }));
+  } catch {
+    return '';
+  }
+}
+
