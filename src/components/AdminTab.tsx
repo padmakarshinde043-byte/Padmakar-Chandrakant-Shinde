@@ -1695,7 +1695,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       label: 'नेतृत्व व पदाधिकारी',
       shortLabel: 'नेतृत्व',
       icon: <Award className="w-4 h-4 shrink-0" />,
-      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership),
+      allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
       key: 'add_news',
@@ -2652,7 +2652,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             )}
 
             {/* Sub-tab 2: Leadership Management (Point 7) */}
-            {activeAdminSubTab === 'leadership' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
+            {activeAdminSubTab === 'leadership' && currentUser?.isSuperAdmin && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-6">
                 <div>
                   <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">

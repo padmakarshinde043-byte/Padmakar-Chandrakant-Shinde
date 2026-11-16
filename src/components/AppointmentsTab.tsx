@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search, ShieldCheck, Award, FileText, Share2,
   Lock, Unlock, Plus, Trash2, Edit3, RefreshCw, KeyRound, CheckCircle2,
-  AlertCircle, ChevronRight, Phone, MapPin, Building, Calendar, Users, Download, X, Eye, EyeOff
+  AlertCircle, ChevronRight, Phone, MapPin, Building, Calendar, Users, Download, X, Eye, EyeOff, ImageIcon
 } from 'lucide-react';
+import { uploadToCloudinary, getCloudinaryConfig } from '../utils/cloudinary';
+import { compressImageFile } from '../utils/imageCompressor';
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
   SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
@@ -111,6 +113,47 @@ export const AppointmentsTab: React.FC = () => {
   const [formWorkingPlace, setFormWorkingPlace] = useState<string>('');
   const [formWorkingTaluka, setFormWorkingTaluka] = useState<string>('');
   const [formMobile, setFormMobile] = useState<string>('');
+  const [formPhoto, setFormPhoto] = useState<string>('');
+  const [formPhotoUrl, setFormPhotoUrl] = useState<string>('');
+  const [isUploadingMemberPhoto, setIsUploadingMemberPhoto] = useState<boolean>(false);
+
+  const handleMemberPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showToast('कृपया वैध फोटो फाईल (JPG किंवा PNG) निवडा.', 'error');
+      return;
+    }
+    const config = getCloudinaryConfig();
+    if (config.enabled && config.cloudName && config.uploadPreset) {
+      setIsUploadingMemberPhoto(true);
+      try {
+        const result = await uploadToCloudinary(file, config);
+        setFormPhoto(result.url);
+        setFormPhotoUrl(result.url);
+        showToast('✓ फोटो थेट क्लाउडवर यशस्वीरीत्या अपलोड झाला!', 'success');
+      } catch (err: any) {
+        try {
+          const { base64 } = await compressImageFile(file, 240, 240, 0.72);
+          setFormPhoto(base64);
+          setFormPhotoUrl('');
+          showToast('सर्व्हर त्रुटी, स्थानिक कॉम्प्रेशन वापरले.', 'error');
+        } catch {
+          showToast('फोटो अपलोड करताना अडचण आली.', 'error');
+        }
+      } finally {
+        setIsUploadingMemberPhoto(false);
+      }
+    } else {
+      try {
+        const { base64 } = await compressImageFile(file, 240, 240, 0.72);
+        setFormPhoto(base64);
+        setFormPhotoUrl('');
+      } catch (err: any) {
+        showToast('फोटो कॉम्प्रेस करताना अडचण आली.', 'error');
+      }
+    }
+  };
 
   // Change Password Modal
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState<boolean>(false);
@@ -507,6 +550,8 @@ export const AppointmentsTab: React.FC = () => {
     setFormWorkingPlace('');
     setFormWorkingTaluka('');
     setFormMobile('');
+    setFormPhoto('');
+    setFormPhotoUrl('');
     setIsMemberModalOpen(true);
   };
 
@@ -535,6 +580,8 @@ export const AppointmentsTab: React.FC = () => {
     setFormWorkingPlace(m.workingPlace || '');
     setFormWorkingTaluka(m.taluka || '');
     setFormMobile(m.mobile || '');
+    setFormPhoto(m.photo || '');
+    setFormPhotoUrl(m.photo && m.photo.startsWith('http') ? m.photo : '');
     setIsMemberModalOpen(true);
   };
 
@@ -569,6 +616,7 @@ export const AppointmentsTab: React.FC = () => {
       currentCadre: finalCadre,
       workingPlace: formWorkingPlace.trim(),
       mobile: toEnglishDigits(formMobile.trim()),
+      photo: formPhoto.trim(),
       updatedAt: new Date().toISOString()
     };
 
@@ -1039,26 +1087,33 @@ export const AppointmentsTab: React.FC = () => {
                     const details = m.workingPlace || '';
 
                     return (
-                      <div key={m.id} className="p-3.5 flex flex-col gap-1.5">
-                        <div className="flex items-start gap-2.5">
-                          <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 pt-0.5 tabular-nums">
-                            {idx + 1}.
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-base font-bold text-[#193568] leading-snug">
-                              {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
-                            </div>
-                            <div className="mt-1">
-                              <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
-                                {displayPost}
-                              </span>
-                            </div>
+                      <div key={m.id} className="p-3.5 flex items-center gap-3">
+                        <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 tabular-nums">
+                          {idx + 1}.
+                        </span>
+                        {m.photo ? (
+                          <img
+                            src={m.photo}
+                            alt={m.firstName}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-2xs shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                            <ImageIcon className="w-6 h-6" />
                           </div>
-                        </div>
-
-                        <div className="text-sm text-slate-600 leading-relaxed pl-8">
-                          <span className="text-slate-800 font-semibold">सध्याचे पद:</span> {cadre}
-                          {details && <span className="text-slate-500"> · {details}</span>}
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-base font-bold text-[#193568] leading-snug truncate">
+                            {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                          </div>
+                          <div className="mt-0.5">
+                            <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                              {displayPost}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-600 mt-1">
+                            {cadre} {details ? `· ${details}` : ''}
+                          </div>
                         </div>
                       </div>
                     );
@@ -1087,13 +1142,26 @@ export const AppointmentsTab: React.FC = () => {
                               {idx + 1}
                             </td>
                             <td className="py-3 px-4 border-r border-slate-200">
-                              <div className="flex flex-col items-start gap-1">
-                                <span className="font-bold text-[#193568] text-sm sm:text-base leading-snug">
-                                  {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
-                                </span>
-                                <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
-                                  {displayPost}
-                                </span>
+                              <div className="flex items-center gap-3">
+                                {m.photo ? (
+                                  <img
+                                    src={m.photo}
+                                    alt={m.firstName}
+                                    className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-2xs shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                                    <ImageIcon className="w-6 h-6" />
+                                  </div>
+                                )}
+                                <div className="flex flex-col items-start gap-1 min-w-0">
+                                  <span className="font-bold text-[#193568] text-sm sm:text-base leading-snug truncate">
+                                    {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
+                                  </span>
+                                  <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
+                                    {displayPost}
+                                  </span>
+                                </div>
                               </div>
                             </td>
                             <td className="py-3 px-4 text-slate-600">
@@ -2288,6 +2356,45 @@ export const AppointmentsTab: React.FC = () => {
                   onChange={(e) => setFormMobile(toEnglishDigits(e.target.value))}
                   className="w-full p-2 border border-slate-300 rounded-md font-semibold font-mono focus:outline-none focus:border-[#193568]"
                 />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">पासपोर्ट फोटो (फोटोज लावण्यासाठी)</label>
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleMemberPhotoSelect}
+                    disabled={isUploadingMemberPhoto}
+                    className="w-full p-2 border border-slate-300 rounded-md bg-white text-xs"
+                  />
+                  {isUploadingMemberPhoto && (
+                    <div className="text-xs text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                      <span>फोटो क्लाउडवर अपलोड होत आहे...</span>
+                    </div>
+                  )}
+                  {formPhoto && !isUploadingMemberPhoto && (
+                    <div className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-200 rounded-md">
+                      <img src={formPhoto} alt="प्रीव्ह्यू" className="w-11 h-11 rounded-full object-cover border border-[#efb24b]" />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-xs font-semibold text-slate-800 block truncate">
+                          फोटो यशस्वीरीत्या जोडला गेला
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormPhoto('');
+                          setFormPhotoUrl('');
+                        }}
+                        className="text-xs text-rose-600 font-bold hover:underline cursor-pointer"
+                      >
+                        काढा
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-200">
