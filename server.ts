@@ -71,6 +71,7 @@ import {
   mysqlListDistrictPasswords,
   mysqlSetDistrictPassword,
   mysqlListAppointedPosts,
+  mysqlSetAppointedPosts,
   mysqlGetPresidentPassword,
   mysqlSetPresidentPassword,
 } from './src/db/mysqlRepository';
@@ -1240,6 +1241,16 @@ app.post('/api/db/rk/district-passwords', async (req, res) => {
 app.get('/api/db/rk/appointed-posts', async (_req, res) => {
   try {
     res.json({ items: await mysqlListAppointedPosts() });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/rk/appointed-posts', async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    await mysqlSetAppointedPosts(items);
+    res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }

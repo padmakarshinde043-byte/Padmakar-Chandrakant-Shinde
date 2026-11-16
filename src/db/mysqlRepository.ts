@@ -1337,6 +1337,30 @@ export async function mysqlListAppointedPosts(): Promise<AppointedPostItem[]> {
   });
 }
 
+export async function mysqlSetAppointedPosts(posts: AppointedPostItem[]): Promise<void> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute('DELETE FROM `appointed_posts`');
+    for (let i = 0; i < posts.length; i++) {
+      const p = posts[i];
+      const level = p.isTaluka ? 'taluka' : 'district';
+      await conn.execute(
+        'INSERT INTO `appointed_posts` (id, title, level, sort_order, extra_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [`post-${i}-${Date.now()}`, p.name, level, i + 1, JSON.stringify(p), new Date().toISOString()]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 export async function mysqlGetPresidentPassword(): Promise<string> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();

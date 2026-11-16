@@ -160,6 +160,62 @@ export async function uploadBannerPhotoToCloudinary(
 }
 
 /**
+ * Uploads a short video (strictly <= 3MB) to Cloudinary via unsigned upload preset.
+ * Enforces the strict 3MB size limit requested by the user.
+ */
+export async function uploadBannerVideoToCloudinary(
+  file: File,
+  overrideConfig?: CloudinaryConfig
+): Promise<{ url: string; sizeKb: number }> {
+  const MAX_VIDEO_BYTES = 3 * 1024 * 1024; // strictly 3 MB
+  if (file.size > MAX_VIDEO_BYTES) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    throw new Error(`व्हिडिओचा आकार ३ MB पेक्षा जास्त आहे (${sizeMb} MB). कृपया ३ MB किंवा त्यापेक्षा लहान आकाराचा शॉर्ट व्हिडिओ निवडा.`);
+  }
+
+  const baseConfig = overrideConfig || getCloudinaryConfig();
+  const cleanCloudName = baseConfig.cloudName?.trim() || 'fdrjsgjy';
+  const cleanPreset = baseConfig.uploadPreset?.trim() || 'mahasangh';
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', cleanPreset);
+
+  // Try video/upload endpoint, fallback to auto/upload
+  const endpoint = `https://api.cloudinary.com/v1_1/${cleanCloudName}/video/upload`;
+  let response = await fetch(endpoint, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const autoEndpoint = `https://api.cloudinary.com/v1_1/${cleanCloudName}/auto/upload`;
+    response = await fetch(autoEndpoint, {
+      method: 'POST',
+      body: formData
+    });
+  }
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMsg = errorData?.error?.message || `व्हिडिओ अपलोड अयशस्वी झाले (Status: ${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  const data = await response.json();
+  const secureUrl = data.secure_url || data.url;
+
+  if (!secureUrl) {
+    throw new Error('Cloudinary कडून व्हिडिओ URL प्राप्त झाली नाही.');
+  }
+
+  return {
+    url: secureUrl,
+    sizeKb: Math.round(file.size / 1024)
+  };
+}
+
+/**
  * Compresses member passport photo to <30KB first, then uploads to Cloudinary.
  * Automatically falls back to the tiny compressed Base64 if Cloudinary is disabled or offline,
  * guaranteeing registration and member edits NEVER fail.

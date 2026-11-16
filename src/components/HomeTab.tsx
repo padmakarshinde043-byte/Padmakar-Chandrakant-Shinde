@@ -534,19 +534,34 @@ function LatestUpdatesCarousel({ banners, setFullScreenPhoto }: { banners: Lates
           )}
         </div>
 
-        {/* मधला भाग: पूर्णपणे स्वच्छ व न कापलेला फोटो (Zero text overlay on image) */}
-        <div className="relative w-full bg-slate-100 flex items-center justify-center">
-          <div
-            onClick={() => imgUrl && setFullScreenPhoto(imgUrl)}
-            className="w-full flex items-center justify-center cursor-pointer p-2"
-          >
-            <img
-              src={imgUrl}
-              alt={current.title || 'ताज्या घडामोडी'}
-              className="w-full h-auto max-h-[75vh] object-contain mx-auto block"
-              loading="eager"
-            />
-          </div>
+        {/* मधला भाग: छायाचित्र किंवा इनलाईन शॉर्ट व्हिडिओ (Zero external player, plays inline) */}
+        <div className="relative w-full bg-slate-950/5 flex items-center justify-center">
+          {current.mediaType === 'video' || current.videoUrl ? (
+            <div className="w-full flex items-center justify-center p-2 bg-black/90">
+              <video
+                src={current.videoUrl || current.imageUrl}
+                controls
+                playsInline
+                preload="metadata"
+                poster={current.imageUrl && current.imageUrl !== current.videoUrl ? current.imageUrl : undefined}
+                className="w-full h-auto max-h-[75vh] object-contain mx-auto block rounded"
+              >
+                आपला ब्राऊझर या व्हिडिओला सपोर्ट करत नाही.
+              </video>
+            </div>
+          ) : (
+            <div
+              onClick={() => imgUrl && setFullScreenPhoto(imgUrl)}
+              className="w-full flex items-center justify-center cursor-pointer p-2"
+            >
+              <img
+                src={imgUrl}
+                alt={current.title || 'ताज्या घडामोडी'}
+                className="w-full h-auto max-h-[75vh] object-contain mx-auto block"
+                loading="eager"
+              />
+            </div>
+          )}
 
           {/* ठळक डावे व उजवे बाण (फक्त बाजूला, मजकूर नसलेले) */}
           {activeBanners.length > 1 && (

@@ -5,7 +5,7 @@ import {
   Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download, List,
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
-  ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu
+  ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -18,6 +18,7 @@ import {
   DEFAULT_AUTHORITATIVE_LEADERS,
   MAHARASHTRA_DISTRICTS
 } from '../data/mahasanghData';
+import { DEFAULT_DISTRICT_PASSWORD } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import {
   getAdminCredentials,
@@ -42,12 +43,19 @@ import {
 } from '../firebase';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
-import { saveDynamicLeadersToFirebase, fetchDynamicLeaders, updateDistrictPasswordInRtdb } from '../services/rkFirebaseService';
+import {
+  saveDynamicLeadersToFirebase,
+  fetchDynamicLeaders,
+  updateDistrictPasswordInRtdb,
+  fetchDistrictPasswords,
+  saveAppointedPostsToRtdb
+} from '../services/rkFirebaseService';
 import {
   getCloudinaryConfig,
   saveCloudinaryConfig,
   uploadToCloudinary,
   uploadBannerPhotoToCloudinary,
+  uploadBannerVideoToCloudinary,
   uploadDataUrlToCloudinary,
   CloudinaryConfig
 } from '../utils/cloudinary';
@@ -332,6 +340,57 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     ];
   });
   const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>({});
+  const [isLoadingDistrictPasswords, setIsLoadingDistrictPasswords] = useState<boolean>(false);
+  const [selectedDistrictForReset, setSelectedDistrictForReset] = useState<string>('अहिल्यानगर');
+  const [isResettingDistrictPassword, setIsResettingDistrictPassword] = useState<boolean>(false);
+  const [districtSearchFilter, setDistrictSearchFilter] = useState<string>('');
+  const [customResetPassword, setCustomResetPassword] = useState<string>('');
+
+  const loadAllDistrictPasswords = async (force = true) => {
+    setIsLoadingDistrictPasswords(true);
+    try {
+      const data = await fetchDistrictPasswords(force);
+      if (data && typeof data === 'object') {
+        setDistrictPasswords(data);
+      }
+    } catch (err) {
+      console.warn('Failed to load district passwords:', err);
+    } finally {
+      setIsLoadingDistrictPasswords(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeAdminSubTab === 'master_studio') {
+      loadAllDistrictPasswords(true);
+    }
+  }, [activeAdminSubTab]);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      loadAllDistrictPasswords(false);
+    };
+    window.addEventListener('mahasangh_district_passwords_updated', handleUpdate);
+    return () => window.removeEventListener('mahasangh_district_passwords_updated', handleUpdate);
+  }, []);
+
+  const handleResetDistrictToAD2026 = async (distName: string) => {
+    if (!distName) return;
+    setIsResettingDistrictPassword(true);
+    try {
+      await updateDistrictPasswordInRtdb(distName, DEFAULT_DISTRICT_PASSWORD);
+      setDistrictPasswords((prev) => ({
+        ...prev,
+        [distName]: DEFAULT_DISTRICT_PASSWORD,
+      }));
+      window.dispatchEvent(new Event('mahasangh_district_passwords_updated'));
+      showAdminFeedback(`'${distName}' जिल्ह्याचा पासवर्ड पूर्ववत '${DEFAULT_DISTRICT_PASSWORD}' वर रिसेट करण्यात आला आहे! संबंधित जिल्हाध्यक्ष आता '${DEFAULT_DISTRICT_PASSWORD}' ने लॉगिन करून स्वतःचा नवीन पासवर्ड तयार करू शकतात.`, 'success');
+    } catch (err: any) {
+      showAdminFeedback(`पासवर्ड रिसेट करताना त्रुटी आली: ${err?.message || ''}`, 'error');
+    } finally {
+      setIsResettingDistrictPassword(false);
+    }
+  };
 
   // Latest Banners form state
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
@@ -339,7 +398,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [bannerSummary, setBannerSummary] = useState('');
   const [bannerDate, setBannerDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [bannerImageUrl, setBannerImageUrl] = useState('');
+  const [bannerMediaType, setBannerMediaType] = useState<'image' | 'video'>('image');
+  const [bannerVideoUrl, setBannerVideoUrl] = useState('');
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
+  const [isUploadingBannerVideo, setIsUploadingBannerVideo] = useState(false);
   const [isSavingBanner, setIsSavingBanner] = useState(false);
   const [deletingBannerId, setDeletingBannerId] = useState<string | null>(null);
   const [isRefreshingBanners, setIsRefreshingBanners] = useState(false);
@@ -366,6 +428,37 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  const handleBannerVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBannerErrorMsg('');
+    setBannerSuccessMsg('');
+
+    const MAX_VIDEO_BYTES = 3 * 1024 * 1024;
+    if (file.size > MAX_VIDEO_BYTES) {
+      const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+      setBannerErrorMsg(`व्हिडिओचा आकार ३ MB पेक्षा जास्त आहे (${sizeMb} MB). कृपया ३ MB किंवा त्यापेक्षा लहान आकाराचा शॉर्ट व्हिडिओ निवडा.`);
+      e.target.value = '';
+      return;
+    }
+
+    setIsUploadingBannerVideo(true);
+    try {
+      const { url } = await uploadBannerVideoToCloudinary(file, cloudinaryConfig);
+      setBannerVideoUrl(url);
+      setBannerMediaType('video');
+      if (!bannerImageUrl) {
+        setBannerImageUrl(url);
+      }
+      setBannerSuccessMsg('✓ शॉर्ट व्हिडिओ Cloudinary वर यशस्वीरीत्या अपलोड झाला!');
+    } catch (err: any) {
+      setBannerErrorMsg(err?.message || 'व्हिडिओ अपलोड करताना त्रुटी आली.');
+    } finally {
+      setIsUploadingBannerVideo(false);
+      e.target.value = '';
+    }
+  };
+
   const handleStartEditBanner = (banner: LatestBannerItem) => {
     setBannerErrorMsg('');
     setBannerSuccessMsg('');
@@ -373,6 +466,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setBannerTitle(banner.title || '');
     setBannerSummary(banner.summary || '');
     setBannerImageUrl(banner.imageUrl || '');
+    setBannerVideoUrl(banner.videoUrl || '');
+    setBannerMediaType(banner.mediaType || (banner.videoUrl ? 'video' : 'image'));
     setBannerDate(parseDateStringToYYYYMMDD(banner.date));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -382,6 +477,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setBannerTitle('');
     setBannerSummary('');
     setBannerImageUrl('');
+    setBannerVideoUrl('');
+    setBannerMediaType('image');
     setBannerDate(new Date().toISOString().split('T')[0]);
   };
 
@@ -390,20 +487,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setBannerErrorMsg('');
     setBannerSuccessMsg('');
 
-    if (isUploadingBanner) {
-      setBannerErrorMsg('फोटो अपलोड होत आहे, कृपया काही सेकंद थांबा.');
+    if (isUploadingBanner || isUploadingBannerVideo) {
+      setBannerErrorMsg('मीडिया अपलोड होत आहे, कृपया काही सेकंद थांबा.');
       return;
     }
 
-    if (!bannerTitle.trim() || !bannerImageUrl.trim()) {
-      setBannerErrorMsg('कृपया ताज्या घडामोडीचे शीर्षक आणि फोटो आवश्यक भरा.');
+    if (!bannerTitle.trim()) {
+      setBannerErrorMsg('कृपया ताज्या घडामोडीचे शीर्षक आवश्यक भरा.');
+      return;
+    }
+
+    if (bannerMediaType === 'video' && !bannerVideoUrl.trim()) {
+      setBannerErrorMsg('कृपया ३ MB मर्यादेतील शॉर्ट व्हिडिओ निवडा किंवा लिंक प्रविष्ट करा.');
+      return;
+    }
+
+    if (bannerMediaType === 'image' && !bannerImageUrl.trim()) {
+      setBannerErrorMsg('कृपया ताज्या घडामोडी छायाचित्र निवडा किंवा अपलोड करा.');
       return;
     }
 
     setIsSavingBanner(true);
     try {
       let finalImageUrl = bannerImageUrl.trim();
-      // If user somehow pasted or had a base64 Data URL, upload to Cloudinary first so only URL is saved in Firebase
       if (finalImageUrl.startsWith('data:image/')) {
         finalImageUrl = await uploadDataUrlToCloudinary(finalImageUrl, `latest_banner_${Date.now()}`, cloudinaryConfig);
         setBannerImageUrl(finalImageUrl);
@@ -413,11 +519,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         ? latestBanners.find((b) => b.id === editingBannerId)
         : undefined;
 
+      const isVideo = bannerMediaType === 'video';
       const newBanner: LatestBannerItem = {
         id: editingBannerId || `banner-${Date.now()}`,
         title: bannerTitle.trim(),
         ...(bannerSummary.trim() ? { summary: bannerSummary.trim() } : {}),
-        imageUrl: finalImageUrl,
+        imageUrl: isVideo ? (finalImageUrl || bannerVideoUrl.trim()) : finalImageUrl,
+        ...(isVideo ? { videoUrl: bannerVideoUrl.trim(), mediaType: 'video' } : { mediaType: 'image' }),
         date: formatDateWithEnglishDigits(bannerDate),
         createdAt: existingBanner?.createdAt || new Date().toISOString(),
       };
@@ -429,12 +537,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setBannerSuccessMsg(
         editingBannerId
           ? 'ताज्या घडामोडी बॅनरमधील बदल सेव्ह झाले असून मुख्य पानावर अद्ययावत झाले आहेत!'
+          : isVideo
+          ? 'शॉर्ट व्हिडिओ यशस्वीरीत्या सेव्ह झाला असून मुख्य पानावर प्रसिद्ध झाला आहे!'
           : 'ताज्या घडामोडी व फोटो यशस्वीरीत्या सेव्ह झाले असून मुख्य पानावर प्रसिद्ध झाले आहेत!'
       );
       setEditingBannerId(null);
       setBannerTitle('');
       setBannerSummary('');
       setBannerImageUrl('');
+      setBannerVideoUrl('');
+      setBannerMediaType('image');
       setBannerDate(new Date().toISOString().split('T')[0]);
     } catch (err: any) {
       setBannerErrorMsg(
@@ -3103,25 +3215,36 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="space-y-8">
                     {/* Part 1: Post Management */}
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                      <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] mb-2">
-                        1. बहाल करावयाची पदे व्यवस्थापन (Post Management)
-                      </h4>
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <h4 className="font-serifDevanagari font-bold text-base text-[#17366d]">
+                          1. बहाल करावयाची पदे व्यवस्थापन (Post Management)
+                        </h4>
+                        <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                          एकूण पदे: {postsList.length}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-600 mb-4">
-                        नियुक्ती पत्रासाठी व अर्जांसाठी उपलब्ध असणारी पदे जोडा, क्रम बदला किंवा वगळा.
+                        नियुक्ती पत्रासाठी व अर्जांसाठी उपलब्ध असणारी पदे जोडा, क्रम बदला किंवा वगळा. हे बदल थेट सर्व्हर डेटाबेसमध्ये सेव्ह होतात.
                       </p>
                       
-                      <form onSubmit={(e) => {
+                      <form onSubmit={async (e) => {
                         e.preventDefault();
-                        const nameInput = (e.currentTarget.elements.namedItem('newPostName') as HTMLInputElement)?.value?.trim();
-                        const levelInput = (e.currentTarget.elements.namedItem('newPostLevel') as HTMLSelectElement)?.value;
+                        const form = e.currentTarget;
+                        const nameInput = (form.elements.namedItem('newPostName') as HTMLInputElement)?.value?.trim();
+                        const levelInput = (form.elements.namedItem('newPostLevel') as HTMLSelectElement)?.value;
                         if (!nameInput) return;
                         const isTaluka = levelInput === 'taluka';
                         const updatedPosts = [...postsList, { name: nameInput, isTaluka }];
                         setPostsList(updatedPosts);
                         localStorage.setItem('mahasangh_posts_v1', JSON.stringify(updatedPosts));
                         window.dispatchEvent(new Event('mahasangh_posts_updated'));
-                        showAdminFeedback(`पद '${nameInput}' यशस्वीरीत्या जोडले गेले!`, 'success');
-                        e.currentTarget.reset();
+                        try {
+                          await saveAppointedPostsToRtdb(updatedPosts);
+                        } catch (err) {
+                          console.warn('Failed to sync posts to DB:', err);
+                        }
+                        showAdminFeedback(`पद '${nameInput}' यशस्वीरीत्या जोडले गेले व सेव्ह झाले!`, 'success');
+                        form.reset();
                       }} className="flex flex-col sm:flex-row gap-3 items-end">
                         <div className="flex-1 w-full">
                           <label className="font-bold text-slate-700 text-xs block mb-1">नवीन पदाचे नाव:</label>
@@ -3163,7 +3286,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <button
                                   type="button"
                                   disabled={idx === 0}
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const arr = [...postsList];
                                     const temp = arr[idx];
                                     arr[idx] = arr[idx - 1];
@@ -3171,6 +3294,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     setPostsList(arr);
                                     localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
                                     window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                                    try {
+                                      await saveAppointedPostsToRtdb(arr);
+                                    } catch {}
                                   }}
                                   className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold"
                                   title="वर सरकवा"
@@ -3180,7 +3306,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <button
                                   type="button"
                                   disabled={idx === postsList.length - 1}
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const arr = [...postsList];
                                     const temp = arr[idx];
                                     arr[idx] = arr[idx + 1];
@@ -3188,6 +3314,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     setPostsList(arr);
                                     localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
                                     window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                                    try {
+                                      await saveAppointedPostsToRtdb(arr);
+                                    } catch {}
                                   }}
                                   className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold"
                                   title="खाली सरकवा"
@@ -3196,11 +3325,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const arr = postsList.filter((_, i) => i !== idx);
                                     setPostsList(arr);
                                     localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
                                     window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                                    try {
+                                      await saveAppointedPostsToRtdb(arr);
+                                    } catch {}
                                     showAdminFeedback(`पद '${p.name}' वगळण्यात आले आहे.`, 'success');
                                   }}
                                   className="p-1.5 hover:bg-rose-50 text-rose-600 rounded cursor-pointer"
@@ -3216,52 +3348,166 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
 
                     {/* Part 2: District Password Reset */}
-                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                      <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] mb-2">
-                        2. जिल्हा पासवर्ड रिसेट (Master District Password Reset)
-                      </h4>
-                      <p className="text-xs text-slate-600 mb-4">
-                        कोणत्याही जिल्ह्यासाठी नवीन गुप्त पासवर्ड सेट करा.
-                      </p>
-                      
-                      <form onSubmit={async (e) => {
-                        e.preventDefault();
-                        const dist = (e.currentTarget.elements.namedItem('masterResetDist') as HTMLSelectElement)?.value;
-                        const pwd = (e.currentTarget.elements.namedItem('masterResetPwd') as HTMLInputElement)?.value?.trim();
-                        if (!dist || !pwd || pwd.length < 4) {
-                          showAdminFeedback('कृपया वैध जिल्हा आणि किमान ४ अक्षरी पासवर्ड प्रविष्ट करा.', 'error');
-                          return;
-                        }
-                        try {
-                          await updateDistrictPasswordInRtdb(dist, pwd);
-                          showAdminFeedback(`'${dist}' जिल्ह्याचा पासवर्ड यशस्वीरीत्या अपडेट करण्यात आला!`, 'success');
-                          e.currentTarget.reset();
-                        } catch (err: any) {
-                          showAdminFeedback('पासवर्ड अपडेट करताना त्रुटी आली: ' + err.message, 'error');
-                        }
-                      }} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-                        <div>
-                          <label className="font-bold text-slate-700 text-xs block mb-1">जिल्हा निवडा:</label>
-                          <select name="masterResetDist" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs">
-                            {MAHARASHTRA_DISTRICTS.map((d) => (
-                              <option key={d} value={d}>{d}</option>
-                            ))}
-                          </select>
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
+                      <div>
+                        <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] flex items-center gap-2">
+                          <KeyRound className="w-4 h-4 text-amber-600" />
+                          2. जिल्हा पासवर्ड रिसेट (District Password Reset - Default AD2026)
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-1">
+                          जिल्ह्याचा पासवर्ड रिसेट केल्यास तो पूर्ववत <strong>'{DEFAULT_DISTRICT_PASSWORD}'</strong> होतो. त्यानंतर संबंधित जिल्हाध्यक्ष पहिल्यांदा <strong>'{DEFAULT_DISTRICT_PASSWORD}'</strong> टाकून लॉगिन करतील, तेव्हा त्यांना स्वतःचा नवीन पासवर्ड तयार करण्याचा स्क्रीन आपोआप उघडेल आणि त्यानंतर ते त्याच नवीन पासवर्डने लॉगिन करू शकतील.
+                        </p>
+                      </div>
+
+                      {/* Quick Reset Box */}
+                      <div className="p-4 bg-white border border-slate-300 rounded-xl space-y-3 shadow-2xs">
+                        <div className="text-xs font-bold text-slate-800">
+                          ⚡ तत्काळ जिल्हा पासवर्ड पूर्ववत 'AD2026' करा:
                         </div>
-                        <div>
-                          <label className="font-bold text-slate-700 text-xs block mb-1">नवीन पासवर्ड:</label>
-                          <input
-                            type="text"
-                            name="masterResetPwd"
-                            required
-                            placeholder="किमान ४ अक्षरी पासवर्ड"
-                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
-                          />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                          <div className="sm:col-span-1">
+                            <label className="font-bold text-slate-700 text-xs block mb-1">जिल्हा निवडा:</label>
+                            <select
+                              value={selectedDistrictForReset}
+                              onChange={(e) => setSelectedDistrictForReset(e.target.value)}
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold"
+                            >
+                              {MAHARASHTRA_DISTRICTS.map((d) => (
+                                <option key={d} value={d}>{d}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={isResettingDistrictPassword}
+                              onClick={() => handleResetDistrictToAD2026(selectedDistrictForReset)}
+                              className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                            >
+                              <RotateCcw className={`w-3.5 h-3.5 ${isResettingDistrictPassword ? 'animate-spin' : ''}`} />
+                              <span>
+                                {isResettingDistrictPassword ? 'रिसेट होत आहे...' : `'${selectedDistrictForReset}' चा पासवर्ड पुन्हा AD2026 करा`}
+                              </span>
+                            </button>
+                          </div>
                         </div>
-                        <button type="submit" className="bg-[#17366d] hover:bg-[#12284c] text-white font-bold px-5 py-2.5 rounded-lg text-xs cursor-pointer">
-                          पासवर्ड सेव्ह करा
-                        </button>
-                      </form>
+
+                        {/* Optional Direct Manual Override */}
+                        <form onSubmit={async (e) => {
+                          e.preventDefault();
+                          const dist = selectedDistrictForReset;
+                          const pwd = customResetPassword.trim();
+                          if (!dist || !pwd || pwd.length < 4) {
+                            showAdminFeedback('कृपया किमान ४ अक्षरी पासवर्ड प्रविष्ट करा.', 'error');
+                            return;
+                          }
+                          setIsResettingDistrictPassword(true);
+                          try {
+                            await updateDistrictPasswordInRtdb(dist, pwd);
+                            setDistrictPasswords((prev) => ({ ...prev, [dist]: pwd }));
+                            window.dispatchEvent(new Event('mahasangh_district_passwords_updated'));
+                            showAdminFeedback(`'${dist}' जिल्ह्यासाठी नवीन पासवर्ड यशस्वीरीत्या सेव्ह झाला!`, 'success');
+                            setCustomResetPassword('');
+                          } catch (err: any) {
+                            showAdminFeedback('त्रुटी: ' + err.message, 'error');
+                          } finally {
+                            setIsResettingDistrictPassword(false);
+                          }
+                        }} className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row gap-2 items-end">
+                          <div className="flex-1 w-full">
+                            <label className="text-[11px] text-slate-600 block mb-1">
+                              किंवा थेट कोणताही नवीन पासवर्ड सेट करा (Optional Override):
+                            </label>
+                            <input
+                              type="text"
+                              value={customResetPassword}
+                              onChange={(e) => setCustomResetPassword(e.target.value)}
+                              placeholder={`'${selectedDistrictForReset}' साठी नवीन पासवर्ड (किमान ४ अक्षरे)`}
+                              className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={isResettingDistrictPassword || !customResetPassword.trim()}
+                            className="bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white font-bold px-4 py-2 rounded-lg text-xs cursor-pointer"
+                          >
+                            थेट सेव्ह करा
+                          </button>
+                        </form>
+                      </div>
+
+                      {/* Complete 36 Districts Interactive Table & Status */}
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h5 className="font-bold text-xs text-slate-800">
+                            📋 सर्व ३६ जिल्हे व पासवर्ड स्थिती:
+                          </h5>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="🔍 जिल्हा शोधा..."
+                              value={districtSearchFilter}
+                              onChange={(e) => setDistrictSearchFilter(e.target.value)}
+                              className="p-1.5 bg-white border border-slate-300 rounded-lg text-xs w-36 sm:w-48"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => loadAllDistrictPasswords(true)}
+                              disabled={isLoadingDistrictPasswords}
+                              className="p-1.5 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 text-xs flex items-center gap-1 cursor-pointer"
+                              title="पासवर्ड स्थिती ताजी करा"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDistrictPasswords ? 'animate-spin' : ''}`} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-80 overflow-y-auto pr-1">
+                          {MAHARASHTRA_DISTRICTS
+                            .filter((d) => !districtSearchFilter.trim() || d.includes(districtSearchFilter.trim()))
+                            .map((dist) => {
+                              const currentPass =
+                                districtPasswords[dist] ||
+                                (dist === 'अहिल्यानगर' ? districtPasswords['अहमदनगर'] : null) ||
+                                DEFAULT_DISTRICT_PASSWORD;
+                              const isDefault = currentPass === DEFAULT_DISTRICT_PASSWORD;
+
+                              return (
+                                <div
+                                  key={dist}
+                                  className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs hover:border-slate-300 transition-colors shadow-2xs"
+                                >
+                                  <div className="min-w-0 pr-2">
+                                    <div className="font-bold text-slate-900 truncate">
+                                      {dist}
+                                    </div>
+                                    <div className="mt-0.5">
+                                      {isDefault ? (
+                                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                          🟡 डिफॉल्ट (AD2026)
+                                        </span>
+                                      ) : (
+                                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                          🟢 नवीन पासवर्ड सक्रिय
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={isResettingDistrictPassword}
+                                    onClick={() => handleResetDistrictToAD2026(dist)}
+                                    className="shrink-0 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                                    title="पासवर्ड पुन्हा AD2026 करा"
+                                  >
+                                    <RotateCcw className="w-3 h-3 text-rose-600" />
+                                    <span>AD2026 करा</span>
+                                  </button>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Part 3: Letter Studio Info */}
@@ -3803,6 +4049,39 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   )}
 
                   <form onSubmit={handleCreateLatestBannerSubmit} className="space-y-4 text-xs sm:text-sm">
+                    {/* Media Type Switcher: Photo vs Short Video */}
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        माध्यम प्रकार (Media Type) निवडा:
+                      </label>
+                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg max-w-sm">
+                        <button
+                          type="button"
+                          onClick={() => setBannerMediaType('image')}
+                          className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            bannerMediaType === 'image'
+                              ? 'bg-white text-[#17366d] shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>📸 छायाचित्र (Photo)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBannerMediaType('video')}
+                          className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            bannerMediaType === 'video'
+                              ? 'bg-white text-rose-700 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          <Video className="w-3.5 h-3.5 text-rose-600" />
+                          <span>🎥 शॉर्ट व्हिडिओ (Max 3 MB)</span>
+                        </button>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="font-bold text-slate-700 block mb-1">
                         बॅनर / बातमी शीर्षक (Title) <span className="text-rose-600">*</span>
@@ -3828,35 +4107,72 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         />
                       </div>
 
-                      <div>
-                        <label className="font-bold text-slate-700 block mb-1">
-                          छायाचित्र (Upload / URL) <span className="text-rose-600">*</span>
-                        </label>
-                        <div className="flex gap-2 items-center">
-                          <input
-                            type="text"
-                            required
-                            placeholder="https://... किंवा फाइल निवडा"
-                            value={bannerImageUrl}
-                            onChange={(e) => setBannerImageUrl(e.target.value)}
-                            className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
-                          />
-                          <label className={`shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBanner ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
-                            <Upload className="w-4 h-4" />
-                            <span>{isUploadingBanner ? 'अपलोड होत आहे...' : 'फाइल निवडा'}</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              disabled={isUploadingBanner}
-                              className="hidden"
-                              onChange={handleBannerImageUpload}
-                            />
+                      {bannerMediaType === 'image' ? (
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            छायाचित्र (Upload / URL) <span className="text-rose-600">*</span>
                           </label>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              required
+                              placeholder="https://... किंवा फाइल निवडा"
+                              value={bannerImageUrl}
+                              onChange={(e) => setBannerImageUrl(e.target.value)}
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
+                            />
+                            <label className={`shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBanner ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
+                              <Upload className="w-4 h-4" />
+                              <span>{isUploadingBanner ? 'अपलोड होत आहे...' : 'फाइल निवडा'}</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                disabled={isUploadingBanner}
+                                className="hidden"
+                                onChange={handleBannerImageUpload}
+                              />
+                            </label>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="font-bold text-slate-700 block">
+                              शॉर्ट व्हिडिओ <span className="text-rose-600">*</span>
+                            </label>
+                            <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                              मर्यादा: कमाल ३ MB
+                            </span>
+                          </div>
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              required
+                              placeholder="https://... किंवा फाइल निवडा"
+                              value={bannerVideoUrl}
+                              onChange={(e) => {
+                                setBannerVideoUrl(e.target.value);
+                                if (!bannerImageUrl) setBannerImageUrl(e.target.value);
+                              }}
+                              className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d] font-mono text-xs"
+                            />
+                            <label className={`shrink-0 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBannerVideo ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
+                              <Upload className="w-4 h-4" />
+                              <span>{isUploadingBannerVideo ? 'व्हिडिओ अपलोड...' : 'व्हिडिओ निवडा (Max 3MB)'}</span>
+                              <input
+                                type="file"
+                                accept="video/mp4,video/webm,video/*"
+                                disabled={isUploadingBannerVideo}
+                                className="hidden"
+                                onChange={handleBannerVideoUpload}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {bannerImageUrl && (
+                    {bannerMediaType === 'image' && bannerImageUrl && (
                       <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-4">
                         <img src={bannerImageUrl} alt="Preview" className="w-20 h-16 object-contain rounded bg-white border border-slate-300" />
                         <div className="min-w-0 flex-1">
@@ -3864,6 +4180,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             ✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.
                           </span>
                         </div>
+                      </div>
+                    )}
+
+                    {bannerMediaType === 'video' && bannerVideoUrl && (
+                      <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4" />
+                            ✓ शॉर्ट व्हिडिओ यशस्वीरीत्या जोडला गेला आहे (Cloudinary CDN)
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            मुख्य पानावर इनलाईन प्ले होईल
+                          </span>
+                        </div>
+                        <video
+                          src={bannerVideoUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="w-full max-h-56 rounded bg-black object-contain mx-auto"
+                        />
                       </div>
                     )}
 
@@ -3881,7 +4218,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="flex flex-wrap items-center gap-3">
                       <button
                         type="submit"
-                        disabled={isUploadingBanner || isSavingBanner}
+                        disabled={isUploadingBanner || isUploadingBannerVideo || isSavingBanner}
                         className="bg-[#17366d] hover:bg-[#09243f] disabled:opacity-60 text-white font-bold px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer"
                       >
                         <PlusCircle className="w-4 h-4 text-amber-400" />
@@ -3890,6 +4227,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             ? 'सेव्ह होत आहे...'
                             : editingBannerId
                             ? 'बदल सेव्ह करा'
+                            : bannerMediaType === 'video'
+                            ? 'शॉर्ट व्हिडिओ प्रसिद्ध करा'
                             : 'ताज्या घडामोडी बॅनर प्रसिद्ध करा'}
                         </span>
                       </button>
@@ -3934,7 +4273,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       {latestBanners.map((banner) => (
                         <div key={banner.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3.5 min-w-0">
-                            {banner.imageUrl ? (
+                            {banner.mediaType === 'video' || banner.videoUrl ? (
+                              <div className="w-16 h-12 bg-slate-900 rounded flex flex-col items-center justify-center text-rose-400 shrink-0 border border-slate-700">
+                                <Video className="w-5 h-5 text-rose-400" />
+                                <span className="text-[9px] font-bold text-white mt-0.5">व्हिडिओ</span>
+                              </div>
+                            ) : banner.imageUrl ? (
                               <img src={banner.imageUrl} alt="" className="w-16 h-12 object-contain rounded bg-white border border-slate-200 shrink-0" />
                             ) : (
                               <div className="w-16 h-12 bg-slate-200 rounded flex items-center justify-center text-slate-400 shrink-0">
@@ -3942,9 +4286,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </div>
                             )}
                             <div className="min-w-0">
-                              <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
-                                दिनांक: {banner.date}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                                  दिनांक: {banner.date}
+                                </span>
+                                {(banner.mediaType === 'video' || banner.videoUrl) && (
+                                  <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
+                                    🎥 ३ MB व्हिडिओ
+                                  </span>
+                                )}
+                              </div>
                               <h5 className="font-bold text-slate-900 text-sm truncate mt-0.5">{banner.title}</h5>
                               {banner.summary && <p className="text-xs text-slate-600 truncate mt-0.5">{banner.summary}</p>}
                             </div>

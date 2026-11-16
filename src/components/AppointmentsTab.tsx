@@ -4,7 +4,12 @@ import {
   Lock, Unlock, Plus, Trash2, Edit3, RefreshCw, KeyRound, CheckCircle2,
   AlertCircle, ChevronRight, Phone, MapPin, Building, Calendar, Users, Download, X, Eye, EyeOff, ImageIcon
 } from 'lucide-react';
-import { uploadToCloudinary, getCloudinaryConfig } from '../utils/cloudinary';
+import {
+  uploadToCloudinary,
+  getCloudinaryConfig,
+  uploadCompressedPhotoToCloudinaryOrFallback,
+  uploadDataUrlToCloudinary
+} from '../utils/cloudinary';
 import { compressImageFile } from '../utils/imageCompressor';
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
@@ -121,37 +126,24 @@ export const AppointmentsTab: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      showToast('कृपया वैध फोटो फाईल (JPG किंवा PNG) निवडा.', 'error');
+      showToast('कृपया वैध फोटो फाईल (JPG, PNG किंवा WEBP) निवडा.', 'error');
       return;
     }
-    const config = getCloudinaryConfig();
-    if (config.enabled && config.cloudName && config.uploadPreset) {
-      setIsUploadingMemberPhoto(true);
-      try {
-        const result = await uploadToCloudinary(file, config);
-        setFormPhoto(result.url);
-        setFormPhotoUrl(result.url);
+    setIsUploadingMemberPhoto(true);
+    try {
+      const { urlOrBase64, storageType } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 400, 500, 0.85);
+      setFormPhoto(urlOrBase64);
+      setFormPhotoUrl(urlOrBase64.startsWith('http') ? urlOrBase64 : '');
+      if (storageType === 'cloudinary') {
         showToast('✓ फोटो थेट क्लाउडवर यशस्वीरीत्या अपलोड झाला!', 'success');
-      } catch (err: any) {
-        try {
-          const { base64 } = await compressImageFile(file, 240, 240, 0.72);
-          setFormPhoto(base64);
-          setFormPhotoUrl('');
-          showToast('सर्व्हर त्रुटी, स्थानिक कॉम्प्रेशन वापरले.', 'error');
-        } catch {
-          showToast('फोटो अपलोड करताना अडचण आली.', 'error');
-        }
-      } finally {
-        setIsUploadingMemberPhoto(false);
+      } else {
+        showToast('✓ फोटो यशस्वीरीत्या जोडला गेला!', 'success');
       }
-    } else {
-      try {
-        const { base64 } = await compressImageFile(file, 240, 240, 0.72);
-        setFormPhoto(base64);
-        setFormPhotoUrl('');
-      } catch (err: any) {
-        showToast('फोटो कॉम्प्रेस करताना अडचण आली.', 'error');
-      }
+    } catch (err: any) {
+      showToast('फोटो अपलोड करताना अडचण आली: ' + (err?.message || ''), 'error');
+    } finally {
+      setIsUploadingMemberPhoto(false);
+      e.target.value = '';
     }
   };
 
@@ -178,6 +170,14 @@ export const AppointmentsTab: React.FC = () => {
   // Load Initial Data on Mount (Cache-first, non-blocking: public list never waits on Firestore or passwords)
   useEffect(() => {
     loadData(false);
+
+    const handleDistrictPasswordsUpdated = () => {
+      fetchDistrictPasswords(true)
+        .then((passwordsData) => setDistrictPasswords(passwordsData))
+        .catch(() => {});
+    };
+    window.addEventListener('mahasangh_district_passwords_updated', handleDistrictPasswordsUpdated);
+    return () => window.removeEventListener('mahasangh_district_passwords_updated', handleDistrictPasswordsUpdated);
   }, []);
 
   // Lazy-load approved registered members ONLY when President Letters / Status Matrix is opened
@@ -368,18 +368,32 @@ export const AppointmentsTab: React.FC = () => {
     }
 
     // 2. District specific password
-    const distPass =
+    let distPass =
       districtPasswords[currentDistrict] ||
       (currentDistrict === 'अहिल्यानगर' ? districtPasswords['अहमदनगर'] : null) ||
       DEFAULT_DISTRICT_PASSWORD;
 
-    // Check if initial login with AD2026
+    // If input is AD2026, verify with fresh fetch if cached distPass is not AD2026 (in case admin just reset it!)
+    if (input === DEFAULT_DISTRICT_PASSWORD && distPass !== DEFAULT_DISTRICT_PASSWORD) {
+      try {
+        const fresh = await fetchDistrictPasswords(true);
+        if (fresh) {
+          setDistrictPasswords(fresh);
+          distPass =
+            fresh[currentDistrict] ||
+            (currentDistrict === 'अहिल्यानगर' ? fresh['अहमदनगर'] : null) ||
+            DEFAULT_DISTRICT_PASSWORD;
+        }
+      } catch {}
+    }
+
+    // Check if initial login or reset with AD2026
     if (distPass === DEFAULT_DISTRICT_PASSWORD && input === DEFAULT_DISTRICT_PASSWORD) {
       setIsSettingInitialPassword(true);
       return;
     }
 
-    // Check if matches custom saved password from Firebase RTDB
+    // Check if matches custom saved password from MySQL / Firebase RTDB
     if (input === distPass) {
       setIsManageUnlocked(true);
       setLockedDistrictName(currentDistrict);
@@ -393,8 +407,8 @@ export const AppointmentsTab: React.FC = () => {
   // Save Initial New Password for District
   const handleSaveInitialPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newInitialPass1.trim() || newInitialPass1.trim() === DEFAULT_DISTRICT_PASSWORD) {
-      setDistrictLoginError('कृपया वैध नवीन पासवर्ड प्रविष्ट करा!');
+    if (!newInitialPass1.trim() || newInitialPass1.trim().length < 4 || newInitialPass1.trim() === DEFAULT_DISTRICT_PASSWORD) {
+      setDistrictLoginError(`कृपया किमान ४ अक्षरी सुरक्षित पासवर्ड तयार करा (डिफॉल्ट '${DEFAULT_DISTRICT_PASSWORD}' वगळता)!`);
       return;
     }
     if (newInitialPass1.trim() !== newInitialPass2.trim()) {
@@ -406,12 +420,15 @@ export const AppointmentsTab: React.FC = () => {
       const newPass = newInitialPass1.trim();
       await updateDistrictPasswordInRtdb(currentDistrict, newPass);
       setDistrictPasswords((prev) => ({ ...prev, [currentDistrict]: newPass }));
+      window.dispatchEvent(new Event('mahasangh_district_passwords_updated'));
       setIsManageUnlocked(true);
       setLockedDistrictName(currentDistrict);
       setShowDistrictLoginModal(false);
       setIsSettingInitialPassword(false);
+      setNewInitialPass1('');
+      setNewInitialPass2('');
       setActiveSubTab('manage');
-      showToast(`'${currentDistrict}' जिल्ह्यासाठी नवीन पासवर्ड सेट झाला आहे!`, 'success');
+      showToast(`'${currentDistrict}' जिल्ह्यासाठी नवीन पासवर्ड यशस्वीरीत्या तयार झाला आहे! पुढील वेळी याच पासवर्डने लॉगिन करा.`, 'success');
     } catch (err: any) {
       setDistrictLoginError('त्रुटी: ' + err.message);
     }
@@ -604,6 +621,15 @@ export const AppointmentsTab: React.FC = () => {
     const finalTaluka = isPostNeedsTaluka ? formTaluka.trim() : '';
 
     const memberId = editingMemberId || String(Date.now());
+    let finalPhoto = formPhoto.trim();
+    if (finalPhoto.startsWith('data:image/')) {
+      try {
+        finalPhoto = await uploadDataUrlToCloudinary(finalPhoto, `official_${memberId}`);
+      } catch (e) {
+        console.warn('Could not upload data url to cloudinary:', e);
+      }
+    }
+
     const memberObj: OfficialMember = {
       id: memberId,
       salutation: formSalutation,
@@ -616,7 +642,7 @@ export const AppointmentsTab: React.FC = () => {
       currentCadre: finalCadre,
       workingPlace: formWorkingPlace.trim(),
       mobile: toEnglishDigits(formMobile.trim()),
-      photo: formPhoto.trim(),
+      photo: finalPhoto,
       updatedAt: new Date().toISOString()
     };
 
@@ -1096,6 +1122,8 @@ export const AppointmentsTab: React.FC = () => {
                             src={m.photo}
                             alt={m.firstName}
                             loading="lazy"
+                            crossOrigin="anonymous"
+                            referrerPolicy="no-referrer"
                             className="w-14 h-18 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0 bg-slate-100"
                           />
                         ) : (
@@ -1149,6 +1177,8 @@ export const AppointmentsTab: React.FC = () => {
                                     src={m.photo}
                                     alt={m.firstName}
                                     loading="lazy"
+                                    crossOrigin="anonymous"
+                                    referrerPolicy="no-referrer"
                                     className="w-16 h-20 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0 bg-slate-100"
                                   />
                                 ) : (

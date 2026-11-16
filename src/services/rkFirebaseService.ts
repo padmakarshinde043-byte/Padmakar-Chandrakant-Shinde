@@ -346,6 +346,28 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
 }
 
 /**
+ * Save custom appointed posts to SQL and RTDB.
+ */
+export async function saveAppointedPostsToRtdb(posts: AppointedPostItem[]): Promise<void> {
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/rk/appointed-posts', {
+      method: 'POST',
+      body: JSON.stringify({ items: posts }),
+    });
+  } else {
+    if (await isFirebaseAllowedInCurrentEnvironment()) {
+      await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(posts)
+      });
+    }
+  }
+  localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(posts));
+  localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
+}
+
+/**
  * Fetch the current President password from SQL or Firebase.
  * If not set yet, defaults to SUPER_ADMIN_PASSWORD ('RK2026').
  * Uses cached password if available for instant response.
