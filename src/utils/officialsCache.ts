@@ -93,6 +93,15 @@ export function filterAndSortDistrictOfficials(
       ? postsList.map((p) => p.name)
       : DEFAULT_APPOINTED_POSTS.map((p) => p.name);
 
+  const getLevelPriority = (postName: string) => {
+    if (!postName) return 3;
+    const p = postName.trim();
+    if (p.includes('राज्य')) return 1;
+    if (p.includes('विभाग') || p.includes('विभागीय')) return 2;
+    if (p.includes('तालुका')) return 4;
+    return 3; // district
+  };
+
   const getRank = (postName: string) => {
     if (!postName) return 999;
     const cleanPost = postName.trim();
@@ -104,9 +113,23 @@ export function filterAndSortDistrictOfficials(
   };
 
   return [...list].sort((a, b) => {
+    const levelA = getLevelPriority(a.appointedPost);
+    const levelB = getLevelPriority(b.appointedPost);
+    if (levelA !== levelB) return levelA - levelB;
+
     const rankA = getRank(a.appointedPost);
     const rankB = getRank(b.appointedPost);
     if (rankA !== rankB) return rankA - rankB;
+
+    // If same post / level, newest added / updated first (newest timestamp / id first)
+    const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    if (timeA !== timeB && timeA > 0 && timeB > 0) return timeB - timeA;
+
+    const idA = parseInt(a.id) || 0;
+    const idB = parseInt(b.id) || 0;
+    if (idA !== idB) return idB - idA;
+
     const nameA = `${a.firstName} ${a.lastName}`;
     const nameB = `${b.firstName} ${b.lastName}`;
     return nameA.localeCompare(nameB, 'mr');

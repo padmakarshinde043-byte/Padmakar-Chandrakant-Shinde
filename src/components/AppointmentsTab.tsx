@@ -7,7 +7,7 @@ import {
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
   SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
-  DEFAULT_APPOINTED_POSTS, formatAppointedPostWithTaluka, isTalukaLevelPost
+  DEFAULT_APPOINTED_POSTS, formatAppointedPostWithTaluka, isTalukaLevelPost, getPostLevelLabel, getPostLevel
 } from '../data/rkMaharashtraData';
 import {
   fetchOfficials, saveOfficialToRtdb, deleteOfficialFromRtdb,
@@ -2018,7 +2018,15 @@ export const AppointmentsTab: React.FC = () => {
 
                 {/* Subject */}
                 <div className="font-bold text-xs sm:text-sm text-slate-900 mb-3">
-                  विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...
+                  विषय: महासंघाच्या{' '}
+                  {getPostLevel(selectedOfficialForLetter.appointedPost) === 'state'
+                    ? 'राज्य'
+                    : getPostLevel(selectedOfficialForLetter.appointedPost) === 'division'
+                      ? 'विभाग'
+                      : getPostLevel(selectedOfficialForLetter.appointedPost) === 'taluka'
+                        ? 'तालुका'
+                        : 'जिल्हा'}{' '}
+                  कार्येकारिणीवर नियुक्तीबाबत...
                 </div>
 
                 {/* Body Paragraphs */}
@@ -2036,8 +2044,16 @@ export const AppointmentsTab: React.FC = () => {
                 <div className="my-5 p-3.5 rounded-md border border-[#b8860b] bg-[#fffdf7] text-center">
                   <p className="text-xs sm:text-sm text-slate-700 font-semibold">
                     महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या{' '}
-                    <strong className="text-slate-950 text-base">{selectedOfficialForLetter.district}</strong>{' '}
-                    जिल्हा कार्यकारिणीवर
+                    <strong className="text-slate-950 text-base">
+                      {getPostLevel(selectedOfficialForLetter.appointedPost) === 'state'
+                        ? 'राज्य स्तर'
+                        : getPostLevel(selectedOfficialForLetter.appointedPost) === 'division'
+                          ? 'विभाग स्तर'
+                          : getPostLevel(selectedOfficialForLetter.appointedPost) === 'taluka'
+                            ? `${selectedOfficialForLetter.taluka ? selectedOfficialForLetter.taluka + ' तालुका, ' : ''}${selectedOfficialForLetter.district} तालुका`
+                            : `${selectedOfficialForLetter.district} जिल्हा`}
+                    </strong>{' '}
+                    कार्येकारिणीवर
                   </p>
 
                   <div className="my-2 inline-block font-serifDevanagari text-xl sm:text-2xl font-bold text-[#851216] tracking-wide">
@@ -2235,7 +2251,7 @@ export const AppointmentsTab: React.FC = () => {
                   >
                     {postsList.map((p) => (
                       <option key={p.name} value={p.name}>
-                        {p.name} {p.isTaluka ? '(तालुका स्तर)' : '(जिल्हा स्तर)'}
+                        {p.name} ({getPostLevelLabel(p.name)})
                       </option>
                     ))}
                   </select>

@@ -1,4 +1,4 @@
-import { OfficialMember, formatAppointedPostWithTaluka } from '../data/rkMaharashtraData';
+import { OfficialMember, formatAppointedPostWithTaluka, getPostLevel } from '../data/rkMaharashtraData';
 import { MembershipApplication } from '../data/mahasanghData';
 import { toEnglishDigits } from './formatters';
 
@@ -257,6 +257,16 @@ export function buildSingleAppointmentLetterHtml(params: {
   const wpDetails = member.workingPlace || '';
   const displayPost = formatAppointedPostWithTaluka(member.appointedPost, member.taluka);
 
+  const postLevel = getPostLevel(member.appointedPost);
+  const subjectLevelText = postLevel === 'state' ? 'राज्य' : postLevel === 'division' ? 'विभाग' : postLevel === 'taluka' ? 'तालुका' : 'जिल्हा';
+  const jurisdictionAreaText = postLevel === 'state'
+    ? 'राज्य स्तर'
+    : postLevel === 'division'
+      ? 'विभाग स्तर'
+      : postLevel === 'taluka'
+        ? `${member.taluka ? escapePdfHtml(member.taluka) + ' तालुका, ' : ''}${escapePdfHtml(member.district)} तालुका`
+        : `${escapePdfHtml(member.district)} जिल्हा`;
+
   return `
     <div style="width: ${A4_PX_WIDTH}px; height: ${A4_PX_HEIGHT}px; padding: 24px 36px 26px 36px; background: #ffffff; color: #0f172a; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: ${REPORT_FONT_FAMILY}; font-variant-numeric: tabular-nums;">
       <div>
@@ -287,7 +297,7 @@ export function buildSingleAppointmentLetterHtml(params: {
 
         <!-- विषय -->
         <div style="font-size: 11.5pt; font-weight: 700; color: #0f172a; margin-bottom: 10px;">
-          विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...
+          विषय: महासंघाच्या ${subjectLevelText} कार्यकारिणीवर नियुक्तीबाबत...
         </div>
 
         <!-- मुख्य मजकूर -->
@@ -301,10 +311,10 @@ export function buildSingleAppointmentLetterHtml(params: {
           </p>
         </div>
 
-        <!-- अधिकृत पद चौकट (स्टार इमोजी व ग्रेडियंट शिवाय) -->
+        <!-- अधिकृत पद चौकट -->
         <div style="padding: 12px 16px; text-align: center; margin: 12px 0; border: 1.5px solid #0f172a; background: #f8fafc; border-radius: 4px;">
           <div style="font-size: 11pt; color: #334155; font-weight: 600;">
-            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या <strong style="color: #0f172a;">${escapePdfHtml(member.district)}</strong> जिल्हा कार्यकारिणीवर
+            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या <strong style="color: #0f172a;">${jurisdictionAreaText}</strong> कार्यकारिणीवर
           </div>
           <div style="font-size: 17pt; font-weight: 800; color: #0f172a; margin: 6px 0; line-height: 1.35;">
             « ${escapePdfHtml(displayPost)} »

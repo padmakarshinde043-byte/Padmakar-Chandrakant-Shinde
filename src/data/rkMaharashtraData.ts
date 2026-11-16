@@ -163,6 +163,25 @@ export interface OfficialMember {
   orderNumber?: string;
 }
 
+export type PostLevelType = 'state' | 'division' | 'district' | 'taluka';
+
+export function getPostLevel(postName?: string): PostLevelType {
+  if (!postName) return 'district';
+  const p = postName.trim();
+  if (p.includes('राज्य')) return 'state';
+  if (p.includes('विभाग') || p.includes('विभागीय')) return 'division';
+  if (p.includes('तालुका')) return 'taluka';
+  return 'district';
+}
+
+export function getPostLevelLabel(postName?: string): string {
+  const lvl = getPostLevel(postName);
+  if (lvl === 'state') return 'राज्य स्तर';
+  if (lvl === 'division') return 'विभाग स्तर';
+  if (lvl === 'taluka') return 'तालुका स्तर';
+  return 'जिल्हा स्तर';
+}
+
 /**
  * Determines whether an appointed post is specifically at the taluka level.
  * State, division, or district posts must NEVER be classified as taluka level.
