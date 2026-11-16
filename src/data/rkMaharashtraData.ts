@@ -163,11 +163,92 @@ export interface OfficialMember {
   orderNumber?: string;
 }
 
-export type PostLevelType = 'state' | 'division' | 'district' | 'taluka';
+export type PostLevelType = 'mahila' | 'state' | 'division' | 'district' | 'taluka';
+
+export interface AppointmentCommitteeInfo {
+  level: PostLevelType;
+  committeeName: string;
+  subjectCommitteeText: string;
+  subjectText: string;
+  calloutHeader: string;
+  fullCalloutLine: string;
+}
+
+/**
+ * Determines exact executive committee level and wording for appointment letters:
+ * - Taluka: तालुका कार्यकारिणी वर आपली निवड
+ * - District: जिल्हा कार्यकारिणीवर
+ * - Division: विभाग कार्यकारिणीवर
+ * - Mahila Aghadi: महिला आघाडी राज्य कार्यकारिणीवर
+ * - State Rep: महाराष्ट्र राज्य कार्यकारिणीवर
+ */
+export function getAppointmentCommitteeInfo(postName?: string, taluka?: string): AppointmentCommitteeInfo {
+  const p = (postName || '').trim();
+  const t = (taluka || '').trim();
+
+  // 1. महिला आघाडी: पद महिला आघाडीचे असेल तर महिला आघाडी राज्य कार्यकारिणीवर
+  if (p.includes('महिला')) {
+    return {
+      level: 'mahila',
+      committeeName: 'महिला आघाडी राज्य कार्यकारिणी',
+      subjectCommitteeText: 'महिला आघाडी राज्य कार्यकारिणीवर',
+      subjectText: 'विषय: महासंघाच्या महिला आघाडी राज्य कार्यकारिणीवर नियुक्तीबाबत...',
+      calloutHeader: 'महिला आघाडी राज्य कार्यकारिणीवर आपली निवड',
+      fullCalloutLine: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या महिला आघाडी राज्य कार्यकारिणीवर आपली निवड'
+    };
+  }
+
+  // 2. राज्य प्रतिनिधी: पद राज्य प्रतिनिधी असेल तर महाराष्ट्र राज्य कार्यकारिणीवर
+  if (p.includes('राज्य')) {
+    return {
+      level: 'state',
+      committeeName: 'महाराष्ट्र राज्य कार्यकारिणी',
+      subjectCommitteeText: 'महाराष्ट्र राज्य कार्यकारिणीवर',
+      subjectText: 'विषय: महासंघाच्या महाराष्ट्र राज्य कार्यकारिणीवर नियुक्तीबाबत...',
+      calloutHeader: 'महाराष्ट्र राज्य कार्यकारिणीवर आपली निवड',
+      fullCalloutLine: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या महाराष्ट्र राज्य कार्यकारिणीवर आपली निवड'
+    };
+  }
+
+  // 3. विभाग: पद विभागाचे असेल तर विभाग कार्यकारिणीवर
+  if (p.includes('विभाग') || p.includes('विभागीय')) {
+    return {
+      level: 'division',
+      committeeName: 'विभाग कार्यकारिणी',
+      subjectCommitteeText: 'विभाग कार्यकारिणीवर',
+      subjectText: 'विषय: महासंघाच्या विभाग कार्यकारिणीवर नियुक्तीबाबत...',
+      calloutHeader: 'विभाग कार्यकारिणीवर आपली निवड',
+      fullCalloutLine: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या विभाग कार्यकारिणीवर आपली निवड'
+    };
+  }
+
+  // 4. तालुका: जर तालुक्याचे पद असेल तर तालुका कार्यकारिणीवर आपली निवड
+  if (p.includes('तालुका') || isTalukaLevelPost(p)) {
+    return {
+      level: 'taluka',
+      committeeName: 'तालुका कार्यकारिणी',
+      subjectCommitteeText: 'तालुका कार्यकारिणीवर',
+      subjectText: 'विषय: महासंघाच्या तालुका कार्यकारिणीवर नियुक्तीबाबत...',
+      calloutHeader: 'तालुका कार्यकारिणीवर आपली निवड',
+      fullCalloutLine: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या तालुका कार्यकारिणीवर आपली निवड'
+    };
+  }
+
+  // 5. जिल्हा: पद जिल्ह्याचे असेल तर जिल्हा कार्यकारिणीवर
+  return {
+    level: 'district',
+    committeeName: 'जिल्हा कार्यकारिणी',
+    subjectCommitteeText: 'जिल्हा कार्यकारिणीवर',
+    subjectText: 'विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...',
+    calloutHeader: 'जिल्हा कार्यकारिणीवर आपली निवड',
+    fullCalloutLine: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या जिल्हा कार्यकारिणीवर आपली निवड'
+  };
+}
 
 export function getPostLevel(postName?: string): PostLevelType {
   if (!postName) return 'district';
   const p = postName.trim();
+  if (p.includes('महिला')) return 'mahila';
   if (p.includes('राज्य')) return 'state';
   if (p.includes('विभाग') || p.includes('विभागीय')) return 'division';
   if (p.includes('तालुका')) return 'taluka';
@@ -176,6 +257,7 @@ export function getPostLevel(postName?: string): PostLevelType {
 
 export function getPostLevelLabel(postName?: string): string {
   const lvl = getPostLevel(postName);
+  if (lvl === 'mahila') return 'महिला आघाडी';
   if (lvl === 'state') return 'राज्य स्तर';
   if (lvl === 'division') return 'विभाग स्तर';
   if (lvl === 'taluka') return 'तालुका स्तर';

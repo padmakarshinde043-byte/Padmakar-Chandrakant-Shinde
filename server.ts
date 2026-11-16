@@ -1195,9 +1195,9 @@ app.post('/api/db/rk/leaders', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/officials', async (_req, res) => {
+app.get('/api/db/rk/officials', async (req, res) => {
   try {
-    res.json({ items: await mysqlListOfficials() });
+    sendFreshJson(req, res, { items: await mysqlListOfficials() });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -1221,9 +1221,9 @@ app.delete('/api/db/rk/officials/:id', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/district-passwords', async (_req, res) => {
+app.get('/api/db/rk/district-passwords', async (req, res) => {
   try {
-    res.json({ map: await mysqlListDistrictPasswords() });
+    sendFreshJson(req, res, { map: await mysqlListDistrictPasswords() });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -1238,9 +1238,9 @@ app.post('/api/db/rk/district-passwords', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/appointed-posts', async (_req, res) => {
+app.get('/api/db/rk/appointed-posts', async (req, res) => {
   try {
-    res.json({ items: await mysqlListAppointedPosts() });
+    sendFreshJson(req, res, { items: await mysqlListAppointedPosts() });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -1256,9 +1256,9 @@ app.post('/api/db/rk/appointed-posts', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/president-password', async (_req, res) => {
+app.get('/api/db/rk/president-password', async (req, res) => {
   try {
-    res.json({ password: await mysqlGetPresidentPassword() });
+    sendFreshJson(req, res, { password: await mysqlGetPresidentPassword() });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }

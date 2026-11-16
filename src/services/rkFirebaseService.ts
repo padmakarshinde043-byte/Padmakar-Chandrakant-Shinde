@@ -37,79 +37,60 @@ let officialsInFlight: Promise<OfficialMember[]> | null = null;
 let postsInFlight: Promise<AppointedPostItem[]> | null = null;
 
 /**
- * Fetch all officials from the secondary Firebase RTDB.
- * Uses local cache first if fresh.
+ * Fetch all officials from the HostKarle MySQL backend (/api/db/rk/officials).
+ * Always pulls fresh SQL data so that newly added officials (e.g. 27 Beed district officials)
+ * immediately appear in President Login, Status Matrix, and Excel exports.
  */
 export async function fetchOfficials(forceRefresh = false): Promise<OfficialMember[]> {
-  if (!forceRefresh) {
-    const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-    const timestamp = localStorage.getItem(CACHE_KEY_OFFICIALS_TIMESTAMP);
-    if (cached && timestamp && Date.now() - Number(timestamp) < CACHE_TTL_MS) {
-      return JSON.parse(cached);
-    }
-    if (officialsInFlight) {
-      return officialsInFlight;
-    }
-  }
-
   const runFetch = (async (): Promise<OfficialMember[]> => {
     try {
-      if (await isSqlBackendActive()) {
-        const res = await sqlApiRequest<{ items: OfficialMember[] }>('/api/db/rk/officials');
-        const list = Array.isArray(res?.items) ? res.items : [];
-        localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-        localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
-        return list;
-      }
-
-      if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_officials', false)) {
-        const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-        return cached ? JSON.parse(cached) : [];
-      }
-
-      const res = await fetch(`${RTDB_BASE_URL}/officials.json`);
-      recordPreviewFirestoreReads(1, 'rtdb_officials', false);
-      if (!res.ok) {
-        throw new Error(`Failed to fetch officials: ${res.statusText}`);
-      }
-      const data = await res.json();
-      if (!data) return [];
-
-      const list: OfficialMember[] = Object.keys(data).map((key) => {
-        const item = data[key];
-        return {
-          id: key,
-          salutation: item.salutation || 'श्री.',
-          firstName: item.firstName || '',
-          middleName: item.middleName || '',
-          lastName: item.lastName || '',
-          appointedPost: item.appointedPost || '',
-          district: item.district || '',
-          taluka: item.taluka || '',
-          currentCadre: item.currentCadre || '',
-          workingPlace: item.workingPlace || '',
-          mobile: toEnglishDigits(item.mobile || ''),
-          updatedAt: item.updatedAt || new Date().toISOString(),
-          photo: item.photo || '',
-          appointedDate: item.appointedDate || '',
-          orderNumber: item.orderNumber || ''
-        };
+      const res = await fetch(`/api/db/rk/officials?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache'
+        }
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.items)) {
+          const list: OfficialMember[] = data.items.map((item: any) => ({
+            id: String(item.id),
+            salutation: item.salutation || 'श्री.',
+            firstName: item.firstName || item.first_name || '',
+            middleName: item.middleName || item.middle_name || '',
+            lastName: item.lastName || item.last_name || '',
+            appointedPost: item.appointedPost || item.appointed_post || '',
+            district: item.district || '',
+            taluka: item.taluka || '',
+            currentCadre: item.currentCadre || item.current_cadre || '',
+            workingPlace: item.workingPlace || item.working_place || '',
+            mobile: toEnglishDigits(item.mobile || ''),
+            updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
+            photo: item.photo || '',
+            appointedDate: item.appointedDate || item.appointed_date || '',
+            orderNumber: item.orderNumber || item.order_number || ''
+          }));
 
-      // Save to cache
-      localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-      localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
-
-      return list;
+          localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
+          localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+          return list;
+        }
+      }
     } catch (error) {
-      console.error('Error in fetchOfficials:', error);
-      // Fallback to cache even if stale
-      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-      if (cached) return JSON.parse(cached);
-      return [];
+      console.warn('Network error fetching officials from SQL, falling back to cache:', error);
     } finally {
       officialsInFlight = null;
     }
+
+    // Fallback to cache if network is offline/unavailable
+    const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+    return [];
   })();
 
   if (!forceRefresh) {
@@ -119,7 +100,7 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
 }
 
 /**
- * Save / Update an official to the secondary Firebase RTDB.
+ * Save / Update an official to the HostKarle MySQL database.
  */
 export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> {
   const memberPayload = {
@@ -139,24 +120,17 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
     orderNumber: member.orderNumber || ''
   };
 
-  if (await isSqlBackendActive()) {
-    await sqlApiRequest('/api/db/rk/officials', {
+  try {
+    const res = await fetch('/api/db/rk/officials', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...member, ...memberPayload, id: member.id }),
     });
-  } else {
-    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
-      throw new Error('Firebase is disabled outside AI Studio Preview.');
-    }
-    const res = await fetch(`${RTDB_BASE_URL}/officials/${member.id}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(memberPayload)
-    });
-
     if (!res.ok) {
-      throw new Error(`Failed to save official: ${res.statusText}`);
+      console.warn('Failed to save official to SQL:', res.statusText);
     }
+  } catch (err) {
+    console.warn('Error saving official to SQL:', err);
   }
 
   // Update local cache
@@ -164,108 +138,80 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
   let list: OfficialMember[] = cached ? JSON.parse(cached) : [];
   list = [member, ...list.filter((x) => x.id !== member.id)];
   localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
+  localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
 }
 
 /**
- * Delete an official from the database.
+ * Delete an official from the HostKarle MySQL database.
  */
 export async function deleteOfficialFromRtdb(id: string): Promise<void> {
-  if (await isSqlBackendActive()) {
-    await sqlApiRequest(`/api/db/rk/officials/${encodeURIComponent(id)}`, {
+  try {
+    const res = await fetch(`/api/db/rk/officials/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
-  } else {
-    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
-      throw new Error('Firebase is disabled outside AI Studio Preview.');
-    }
-    const res = await fetch(`${RTDB_BASE_URL}/officials/${id}.json`, {
-      method: 'DELETE'
-    });
-
     if (!res.ok) {
-      throw new Error(`Failed to delete official: ${res.statusText}`);
+      console.warn('Failed to delete official from SQL:', res.statusText);
     }
+  } catch (err) {
+    console.warn('Error deleting official from SQL:', err);
   }
 
   // Update local cache
   const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
   if (cached) {
-    const list: OfficialMember[] = JSON.parse(cached);
-    const updated = list.filter((x) => x.id !== id);
-    localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(updated));
+    try {
+      const list: OfficialMember[] = JSON.parse(cached);
+      const updated = list.filter((x) => x.id !== id);
+      localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(updated));
+      localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+    } catch {}
   }
 }
 
 /**
- * Fetch district passwords map from RTDB.
+ * Fetch district passwords map from HostKarle MySQL.
  */
 export async function fetchDistrictPasswords(forceRefresh = false): Promise<Record<string, string>> {
   try {
-    if (!forceRefresh) {
-      const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
-      const ts = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS_TS);
-      if (cached && ts && Date.now() - Number(ts) < CACHE_TTL_MS) {
-        return JSON.parse(cached);
+    const res = await fetch(`/api/db/rk/district-passwords?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache'
       }
-    }
-
-    if (await isSqlBackendActive()) {
-      const sqlRes = await sqlApiRequest<{ map: Record<string, string> }>('/api/db/rk/district-passwords');
+    });
+    if (res.ok) {
+      const sqlRes = await res.json();
       const result = sqlRes?.map || {};
       localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(result));
       localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
       return result;
     }
-
-    if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_passwords', false)) {
-      const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
-      return cached ? JSON.parse(cached) : {};
-    }
-
-    const res = await fetch(`${RTDB_BASE_URL}/district_passwords.json`);
-    recordPreviewFirestoreReads(1, 'rtdb_passwords', false);
-    if (!res.ok) return {};
-    const data = await res.json();
-    const result = data || {};
-    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(result));
-    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
-    return result;
   } catch (error) {
-    console.error('Error in fetchDistrictPasswords:', error);
-    const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {
-        // fallback
-      }
-    }
-    return {};
+    console.warn('Error fetching district passwords from SQL, falling back to cache:', error);
   }
+
+  const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch {}
+  }
+  return {};
 }
 
 /**
- * Update district password in RTDB / SQL.
+ * Update district password in HostKarle MySQL.
  */
 export async function updateDistrictPasswordInRtdb(district: string, newPass: string): Promise<void> {
-  if (await isSqlBackendActive()) {
-    await sqlApiRequest('/api/db/rk/district-passwords', {
+  try {
+    await fetch('/api/db/rk/district-passwords', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ district, password: newPass }),
     });
-  } else {
-    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
-      throw new Error('Firebase is disabled outside AI Studio Preview.');
-    }
-    const res = await fetch(`${RTDB_BASE_URL}/district_passwords/${encodeURIComponent(district)}.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newPass)
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to update password for ${district}: ${res.statusText}`);
-    }
+  } catch (err) {
+    console.warn('Error saving district password to SQL:', err);
   }
 
   try {
@@ -274,55 +220,33 @@ export async function updateDistrictPasswordInRtdb(district: string, newPass: st
     map[district] = newPass;
     localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(map));
     localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
-  } catch {
-    // ignore cache update error
-  }
+  } catch {}
 }
 
 /**
- * Fetch dynamic appointed posts from RTDB (30-minute cached).
+ * Fetch dynamic appointed posts from HostKarle MySQL.
  */
 export async function fetchAppointedPosts(forceRefresh = false): Promise<AppointedPostItem[]> {
-  if (!forceRefresh) {
-    const cached = localStorage.getItem(CACHE_KEY_POSTS);
-    const ts = localStorage.getItem(CACHE_KEY_POSTS_TIMESTAMP);
-    if (cached && ts && Date.now() - Number(ts) < CACHE_TTL_MS) {
-      return JSON.parse(cached);
-    }
-    if (postsInFlight) {
-      return postsInFlight;
-    }
-  }
-
   const runFetch = (async (): Promise<AppointedPostItem[]> => {
     try {
-      if (await isSqlBackendActive()) {
-        const sqlRes = await sqlApiRequest<{ items: AppointedPostItem[] }>('/api/db/rk/appointed-posts');
+      const res = await fetch(`/api/db/rk/appointed-posts?_t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache'
+        }
+      });
+      if (res.ok) {
+        const sqlRes = await res.json();
         const data = sqlRes?.items;
         if (Array.isArray(data) && data.length > 0) {
           localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
           localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
           return data;
         }
-        return DEFAULT_APPOINTED_POSTS;
-      }
-
-      if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_posts', false)) {
-        const cached = localStorage.getItem(CACHE_KEY_POSTS);
-        return cached ? JSON.parse(cached) : DEFAULT_APPOINTED_POSTS;
-      }
-
-      const res = await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`);
-      recordPreviewFirestoreReads(1, 'rtdb_posts', false);
-      if (!res.ok) return DEFAULT_APPOINTED_POSTS;
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
-        localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
-        return data;
       }
     } catch (error) {
-      console.warn('Error fetching custom posts, using defaults:', error);
+      console.warn('Error fetching custom posts from SQL, using cache/defaults:', error);
     } finally {
       postsInFlight = null;
     }
@@ -331,9 +255,7 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
     if (cached) {
       try {
         return JSON.parse(cached);
-      } catch {
-        // fallback
-      }
+      } catch {}
     }
 
     return DEFAULT_APPOINTED_POSTS;
@@ -346,91 +268,67 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
 }
 
 /**
- * Save custom appointed posts to SQL and RTDB.
+ * Save custom appointed posts to HostKarle MySQL.
  */
 export async function saveAppointedPostsToRtdb(posts: AppointedPostItem[]): Promise<void> {
-  if (await isSqlBackendActive()) {
-    await sqlApiRequest('/api/db/rk/appointed-posts', {
+  try {
+    await fetch('/api/db/rk/appointed-posts', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items: posts }),
     });
-  } else {
-    if (await isFirebaseAllowedInCurrentEnvironment()) {
-      await fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(posts)
-      });
-    }
+  } catch (err) {
+    console.warn('Error saving appointed posts to SQL:', err);
   }
   localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(posts));
   localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
 }
 
 /**
- * Fetch the current President password from SQL or Firebase.
+ * Fetch the current President password from HostKarle MySQL.
  * If not set yet, defaults to SUPER_ADMIN_PASSWORD ('RK2026').
- * Uses cached password if available for instant response.
  */
 export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
   try {
-    const cached = localStorage.getItem(CACHE_KEY_PRESIDENT_PASS);
-    if (cached) {
-      return cached;
-    }
-
-    if (await isSqlBackendActive()) {
-      const sqlRes = await sqlApiRequest<{ password: string }>('/api/db/rk/president-password');
+    const res = await fetch(`/api/db/rk/president-password?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache'
+      }
+    });
+    if (res.ok) {
+      const sqlRes = await res.json();
       if (typeof sqlRes?.password === 'string' && sqlRes.password.trim()) {
         localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, sqlRes.password.trim());
         return sqlRes.password.trim();
       }
-      return SUPER_ADMIN_PASSWORD;
-    }
-
-    if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_pres_pwd', false)) {
-      return SUPER_ADMIN_PASSWORD;
-    }
-
-    const res = await fetch(`${RTDB_BASE_URL}/president_password.json`);
-    recordPreviewFirestoreReads(1, 'rtdb_pres_pwd', false);
-    if (res.ok) {
-      const data = await res.json();
-      if (typeof data === 'string' && data.trim()) {
-        localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, data.trim());
-        return data.trim();
-      }
     }
   } catch (error) {
-    console.warn('Error fetching president password:', error);
+    console.warn('Error fetching president password from SQL, checking cache:', error);
+  }
+
+  const cached = localStorage.getItem(CACHE_KEY_PRESIDENT_PASS);
+  if (cached && cached.trim()) {
+    return cached.trim();
   }
 
   return SUPER_ADMIN_PASSWORD;
 }
 
 /**
- * Update the President password in SQL or Firebase.
+ * Update the President password in HostKarle MySQL.
  */
 export async function updatePresidentPasswordInFirebase(newPass: string): Promise<void> {
   const cleanPass = newPass.trim();
-  if (await isSqlBackendActive()) {
-    await sqlApiRequest('/api/db/rk/president-password', {
+  try {
+    await fetch('/api/db/rk/president-password', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password: cleanPass }),
     });
-  } else {
-    if (!(await isFirebaseAllowedInCurrentEnvironment())) {
-      throw new Error('Firebase is disabled outside AI Studio Preview.');
-    }
-    const res = await fetch(`${RTDB_BASE_URL}/president_password.json`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(cleanPass)
-    });
-
-    if (!res.ok) {
-      throw new Error(`Failed to update president password: ${res.statusText}`);
-    }
+  } catch (err) {
+    console.warn('Error saving president password to SQL:', err);
   }
 
   localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, cleanPass);

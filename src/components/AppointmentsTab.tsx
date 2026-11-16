@@ -14,7 +14,8 @@ import { compressImageFile } from '../utils/imageCompressor';
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
   SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
-  DEFAULT_APPOINTED_POSTS, formatAppointedPostWithTaluka, isTalukaLevelPost, getPostLevelLabel, getPostLevel
+  DEFAULT_APPOINTED_POSTS, formatAppointedPostWithTaluka, isTalukaLevelPost, getPostLevelLabel, getPostLevel,
+  getAppointmentCommitteeInfo
 } from '../data/rkMaharashtraData';
 import {
   fetchOfficials, saveOfficialToRtdb, deleteOfficialFromRtdb,
@@ -39,6 +40,7 @@ import {
   getDistrictPasswordsFromStorageSync,
   getPresidentPasswordFromStorageSync,
   filterAndSortDistrictOfficials,
+  matchesDistrictName,
 } from '../utils/officialsCache';
 
 export const AppointmentsTab: React.FC = () => {
@@ -718,38 +720,64 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // Excel Export 1: District Executive List
-  const handleDownloadDistrictExecutiveExcel = () => {
+  // Fresh SQL Data Synchronizer for Exports & Matrix (Direct from HostKarle MySQL)
+  const ensureFreshSqlData = async (): Promise<{
+    freshOfficials: OfficialMember[];
+    freshApps: MembershipApplication[];
+  }> => {
     try {
-      exportDistrictExecutiveExcel(currentDistrict, districtOfficials);
-      showToast(`'${currentDistrict}' जिल्हा कार्यकारिणी एक्सेल फाइल यशस्वीरीत्या डाऊनलोड झाली!`, 'success');
-    } catch (err: any) {
-      showToast('एक्सेल फाइल तयार करताना त्रुटी: ' + err.message, 'error');
+      const [officialsRes, appsRes] = await Promise.all([
+        fetch(`/api/db/rk/officials?_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' }
+        }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+        fetch(`/api/db/applications?status=approved&summary=1&_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' }
+        }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      ]);
+
+      let updatedOfficials = officials;
+      if (Array.isArray(officialsRes?.items)) {
+        updatedOfficials = officialsRes.items.map((item: any) => ({
+          id: String(item.id),
+          salutation: item.salutation || 'श्री.',
+          firstName: item.firstName || item.first_name || '',
+          middleName: item.middleName || item.middle_name || '',
+          lastName: item.lastName || item.last_name || '',
+          appointedPost: item.appointedPost || item.appointed_post || '',
+          district: item.district || '',
+          taluka: item.taluka || '',
+          currentCadre: item.currentCadre || item.current_cadre || '',
+          workingPlace: item.workingPlace || item.working_place || '',
+          mobile: toEnglishDigits(item.mobile || ''),
+          updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
+          photo: item.photo || '',
+          appointedDate: item.appointedDate || item.appointed_date || '',
+          orderNumber: item.orderNumber || item.order_number || ''
+        }));
+        setOfficials(updatedOfficials);
+      }
+
+      let updatedApps = registeredApplications;
+      if (Array.isArray(appsRes?.items)) {
+        updatedApps = appsRes.items;
+        setRegisteredApplications(updatedApps);
+      }
+
+      return { freshOfficials: updatedOfficials, freshApps: updatedApps };
+    } catch (err) {
+      console.warn('Error fetching fresh SQL data before export:', err);
+      return { freshOfficials: officials, freshApps: registeredApplications };
     }
   };
 
-  // Excel Export 2: Statewide Master Registry
-  const handleDownloadStatewideRegistryExcel = () => {
-    try {
-      exportStatewideRegistryExcel(officials);
-      showToast('राज्यस्तरीय नियुक्त्या व नोंदवही एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
-    } catch (err: any) {
-      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
-    }
-  };
-
-  // 36 Districts Organizational Status Matrix Calculation (Point 8, 10)
-  const districtMatrixStats = useMemo(() => {
+  // 36 Districts Organizational Status Matrix Computation
+  const computeMatrixForData = (officialsList: OfficialMember[], appsList: MembershipApplication[]) => {
     return MAHARASHTRA_36_DISTRICTS.map((dist) => {
-      const distOfficials = officials.filter((o) => {
+      const distOfficials = officialsList.filter((o) => {
         if (!o || !o.district) return false;
-        const d = o.district.trim();
-        if (d === dist) return true;
-        if (dist === 'अहिल्यानगर' && (d === 'अहमदनगर' || d.toLowerCase().includes('ahmed'))) return true;
-        if (dist === 'अहमदनगर' && (d === 'अहिल्यानगर' || d.toLowerCase().includes('ahmed'))) return true;
-        if (dist.includes('संभाजीनगर') && (d.includes('संभाजीनगर') || d.includes('औरंगाबाद'))) return true;
-        if (dist.includes('धाराशिव') && (d.includes('धाराशिव') || d.includes('उस्मानाबाद'))) return true;
-        return false;
+        return matchesDistrictName(o.district, dist);
       });
 
       let stateRep = 0;
@@ -759,26 +787,21 @@ export const AppointmentsTab: React.FC = () => {
 
       distOfficials.forEach((o) => {
         const p = (o.appointedPost || '').trim();
-        const t = (o.taluka || '').trim();
         if (p.includes('राज्य')) {
           stateRep++;
-        } else if (p.includes('विभागीय')) {
+        } else if (p.includes('विभाग') || p.includes('विभागीय')) {
           divRep++;
-        } else if (p.includes('तालुका') || Boolean(t)) {
+        } else if (p.includes('तालुका') || isTalukaLevelPost(p)) {
           talukaOfficial++;
         } else {
+          // District president (जिल्हाध्यक्ष), District Secretary, and other district posts
           distOfficial++;
         }
       });
 
-      const distApprovedApps = registeredApplications.filter((a) => {
+      const distApprovedApps = appsList.filter((a) => {
         if (!a || a.status !== 'approved') return false;
-        const d = (a.district || '').trim();
-        if (d === dist) return true;
-        if (dist === 'अहिल्यानगर' && (d === 'अहमदनगर' || d.toLowerCase().includes('ahmed'))) return true;
-        if (dist.includes('संभाजीनगर') && (d.includes('संभाजीनगर') || d.includes('औरंगाबाद'))) return true;
-        if (dist.includes('धाराशिव') && (d.includes('धाराशिव') || d.includes('उस्मानाबाद'))) return true;
-        return false;
+        return matchesDistrictName(a.district, dist);
       });
 
       let beoCount = 0;
@@ -814,6 +837,10 @@ export const AppointmentsTab: React.FC = () => {
         rowTotal
       };
     });
+  };
+
+  const districtMatrixStats = useMemo(() => {
+    return computeMatrixForData(officials, registeredApplications);
   }, [officials, registeredApplications]);
 
   const matrixTotals = useMemo(() => {
@@ -845,20 +872,46 @@ export const AppointmentsTab: React.FC = () => {
     );
   }, [districtMatrixStats]);
 
-  // Excel Export 3: Organization Status Matrix
-  const handleDownloadStatusMatrixExcel = () => {
+  // Excel Export 1: District Executive List (Pulls fresh SQL data)
+  const handleDownloadDistrictExecutiveExcel = async () => {
     try {
-      exportOrganizationStatusExcel(districtMatrixStats);
+      const { freshOfficials } = await ensureFreshSqlData();
+      const currentList = filterAndSortDistrictOfficials(freshOfficials, currentDistrict, postsList);
+      exportDistrictExecutiveExcel(currentDistrict, currentList);
+      showToast(`'${currentDistrict}' जिल्हा कार्यकारिणी एक्सेल फाइल यशस्वीरीत्या डाऊनलोड झाली!`, 'success');
+    } catch (err: any) {
+      showToast('एक्सेल फाइल तयार करताना त्रुटी: ' + err.message, 'error');
+    }
+  };
+
+  // Excel Export 2: Statewide Master Registry (Pulls fresh SQL data)
+  const handleDownloadStatewideRegistryExcel = async () => {
+    try {
+      const { freshOfficials } = await ensureFreshSqlData();
+      exportStatewideRegistryExcel(freshOfficials);
+      showToast('राज्यस्तरीय नियुक्त्या व नोंदवही एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
+    } catch (err: any) {
+      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
+    }
+  };
+
+  // Excel Export 3: Organization Status Matrix (Pulls fresh SQL data)
+  const handleDownloadStatusMatrixExcel = async () => {
+    try {
+      const { freshOfficials, freshApps } = await ensureFreshSqlData();
+      const freshStats = computeMatrixForData(freshOfficials, freshApps);
+      exportOrganizationStatusExcel(freshStats);
       showToast('संघटकीय सद्यस्थिती अहवाल एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
       showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
     }
   };
 
-  // Excel Export 4: District Presidents List
-  const handleDownloadDistrictPresidentsExcel = () => {
+  // Excel Export 4: District Presidents List (Pulls fresh SQL data)
+  const handleDownloadDistrictPresidentsExcel = async () => {
     try {
-      const distPresidents = officials
+      const { freshOfficials } = await ensureFreshSqlData();
+      const distPresidents = freshOfficials
         .filter((o) => (o.appointedPost || '').includes('जिल्हाध्यक्ष'))
         .map((m) => ({
           district: m.district,
@@ -874,10 +927,11 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // Excel Export 5: Taluka Presidents List
-  const handleDownloadTalukaPresidentsExcel = () => {
+  // Excel Export 5: Taluka Presidents List (Pulls fresh SQL data)
+  const handleDownloadTalukaPresidentsExcel = async () => {
     try {
-      const talukaPresidents = officials
+      const { freshOfficials } = await ensureFreshSqlData();
+      const talukaPresidents = freshOfficials
         .filter((o) => (o.appointedPost || '').includes('तालुका अध्यक्ष'))
         .map((m) => ({
           district: m.district,
@@ -894,10 +948,11 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // Excel Export 6: Approved Registered Members List
-  const handleDownloadRegisteredMembersExcel = () => {
+  // Excel Export 6: Approved Registered Members List (Pulls fresh SQL data)
+  const handleDownloadRegisteredMembersExcel = async () => {
     try {
-      const approvedApps = registeredApplications.filter((a) => a.status === 'approved');
+      const { freshApps } = await ensureFreshSqlData();
+      const approvedApps = freshApps.filter((a) => a.status === 'approved');
       exportRegisteredMembersExcel(approvedApps);
       showToast('नोंदणीकृत सदस्य यादी एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
@@ -911,6 +966,7 @@ export const AppointmentsTab: React.FC = () => {
     const serialPadded = String(serial).padStart(2, '0');
     const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`;
     const place = isTalukaLevelPost(m.appointedPost) && m.taluka ? `${m.taluka}, जिल्हा - ${m.district}` : `जिल्हा - ${m.district}`;
+    const committeeInfo = getAppointmentCommitteeInfo(m.appointedPost, m.taluka);
 
     const text = `*महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ*\n\n` +
       `॥ *अधिकृत नियुक्ती पत्र* ॥\n` +
@@ -918,7 +974,7 @@ export const AppointmentsTab: React.FC = () => {
       `हार्दिक अभिनंदन! 🎉\n` +
       `*${fullName}*\n` +
       `कार्यक्षेत्र: ${place}\n\n` +
-      `आपली महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या कार्यकारिणीवर:\n` +
+      `आपली महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या *${committeeInfo.subjectCommitteeText} आपली निवड*:\n` +
       `⭐ *« ${formatAppointedPostWithTaluka(m.appointedPost, m.taluka)} »* ⭐\n` +
       `या अत्यंत सन्मानाच्या व जबाबदारीच्या पदावर गौरवपूर्ण नियुक्ती करण्यात आली आहे.\n\n` +
       `आपणास मनःपूर्वक शुभेच्छा!\n` +
@@ -1430,7 +1486,10 @@ export const AppointmentsTab: React.FC = () => {
               <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowStatusMatrixModal(true)}
+                  onClick={() => {
+                    setShowStatusMatrixModal(true);
+                    ensureFreshSqlData();
+                  }}
                   className="bg-[#193568] hover:bg-[#11254a] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
                   title="महाराष्ट्रातील सर्व 34 जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता पहा व डाऊनलोड करा"
                 >
@@ -2114,15 +2173,7 @@ export const AppointmentsTab: React.FC = () => {
 
                 {/* Subject */}
                 <div className="font-bold text-xs sm:text-sm text-slate-900 mb-3">
-                  विषय: महासंघाच्या{' '}
-                  {getPostLevel(selectedOfficialForLetter.appointedPost) === 'state'
-                    ? 'राज्य'
-                    : getPostLevel(selectedOfficialForLetter.appointedPost) === 'division'
-                      ? 'विभाग'
-                      : getPostLevel(selectedOfficialForLetter.appointedPost) === 'taluka'
-                        ? 'तालुका'
-                        : 'जिल्हा'}{' '}
-                  कार्येकारिणीवर नियुक्तीबाबत...
+                  {getAppointmentCommitteeInfo(selectedOfficialForLetter.appointedPost, selectedOfficialForLetter.taluka).subjectText}
                 </div>
 
                 {/* Body Paragraphs */}
@@ -2141,15 +2192,9 @@ export const AppointmentsTab: React.FC = () => {
                   <p className="text-xs sm:text-sm text-slate-700 font-semibold">
                     महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या{' '}
                     <strong className="text-slate-950 text-base">
-                      {getPostLevel(selectedOfficialForLetter.appointedPost) === 'state'
-                        ? 'राज्य स्तर'
-                        : getPostLevel(selectedOfficialForLetter.appointedPost) === 'division'
-                          ? 'विभाग स्तर'
-                          : getPostLevel(selectedOfficialForLetter.appointedPost) === 'taluka'
-                            ? `${selectedOfficialForLetter.taluka ? selectedOfficialForLetter.taluka + ' तालुका, ' : ''}${selectedOfficialForLetter.district} तालुका`
-                            : `${selectedOfficialForLetter.district} जिल्हा`}
+                      {getAppointmentCommitteeInfo(selectedOfficialForLetter.appointedPost, selectedOfficialForLetter.taluka).subjectCommitteeText}
                     </strong>{' '}
-                    कार्येकारिणीवर
+                    आपली निवड
                   </p>
 
                   <div className="my-2 inline-block font-serifDevanagari text-xl sm:text-2xl font-bold text-[#851216] tracking-wide">

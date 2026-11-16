@@ -120,4 +120,76 @@ test('buildSingleTablePageHtml and buildSingleAppointmentLetterHtml contain zero
   assert.ok(!letterHtml.includes('monospace'));
   assert.ok(letterHtml.includes('MS/2026/01'));
   assert.ok(letterHtml.includes('पुणे'));
+  assert.ok(letterHtml.includes('विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...'));
+  assert.ok(letterHtml.includes('जिल्हा कार्यकारिणीवर आपली निवड'));
 });
+
+test('buildSingleAppointmentLetterHtml correctly selects executive committee level across all 5 categories', () => {
+  const baseMember = {
+    id: '201',
+    salutation: 'श्री.',
+    firstName: 'सुभाष',
+    lastName: 'देशमुख',
+    district: 'नाशिक',
+    currentCadre: 'केंद्रप्रमुख',
+    workingPlace: 'केंद्र येवला',
+    mobile: '9876543210',
+    updatedAt: '2026-11-16T00:00:00.000Z',
+  };
+
+  // 1. Taluka
+  const talukaHtml = buildSingleAppointmentLetterHtml({
+    member: { ...baseMember, appointedPost: 'तालुका अध्यक्ष', taluka: 'येवला' },
+    serialPadded: '02',
+    todayStr: '16/11/2026',
+    hedingUrl: '/heding.jpg',
+    signUrl: '/sign.jpg',
+  });
+  assert.ok(talukaHtml.includes('विषय: महासंघाच्या तालुका कार्यकारिणीवर नियुक्तीबाबत...'));
+  assert.ok(talukaHtml.includes('तालुका कार्यकारिणीवर आपली निवड'));
+
+  // 2. District
+  const districtHtml = buildSingleAppointmentLetterHtml({
+    member: { ...baseMember, appointedPost: 'जिल्हा सरचिटणीस' },
+    serialPadded: '03',
+    todayStr: '16/11/2026',
+    hedingUrl: '/heding.jpg',
+    signUrl: '/sign.jpg',
+  });
+  assert.ok(districtHtml.includes('विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...'));
+  assert.ok(districtHtml.includes('जिल्हा कार्यकारिणीवर आपली निवड'));
+
+  // 3. Division
+  const divisionHtml = buildSingleAppointmentLetterHtml({
+    member: { ...baseMember, appointedPost: 'विभाग प्रतिनिधी' },
+    serialPadded: '04',
+    todayStr: '16/11/2026',
+    hedingUrl: '/heding.jpg',
+    signUrl: '/sign.jpg',
+  });
+  assert.ok(divisionHtml.includes('विषय: महासंघाच्या विभाग कार्यकारिणीवर नियुक्तीबाबत...'));
+  assert.ok(divisionHtml.includes('विभाग कार्यकारिणीवर आपली निवड'));
+
+  // 4. Mahila Aghadi
+  const mahilaHtml = buildSingleAppointmentLetterHtml({
+    member: { ...baseMember, salutation: 'सौ.', firstName: 'अनिता', appointedPost: 'महिला आघाडी अध्यक्ष' },
+    serialPadded: '05',
+    todayStr: '16/11/2026',
+    hedingUrl: '/heding.jpg',
+    signUrl: '/sign.jpg',
+  });
+  assert.ok(mahilaHtml.includes('विषय: महासंघाच्या महिला आघाडी राज्य कार्यकारिणीवर नियुक्तीबाबत...'));
+  assert.ok(mahilaHtml.includes('महिला आघाडी राज्य कार्यकारिणीवर आपली निवड'));
+
+  // 5. State Representative
+  const stateHtml = buildSingleAppointmentLetterHtml({
+    member: { ...baseMember, appointedPost: 'राज्य प्रतिनिधी' },
+    serialPadded: '06',
+    todayStr: '16/11/2026',
+    hedingUrl: '/heding.jpg',
+    signUrl: '/sign.jpg',
+  });
+  assert.ok(stateHtml.includes('विषय: महासंघाच्या महाराष्ट्र राज्य कार्यकारिणीवर नियुक्तीबाबत...'));
+  assert.ok(stateHtml.includes('महाराष्ट्र राज्य कार्यकारिणीवर आपली निवड'));
+});
+

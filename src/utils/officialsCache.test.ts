@@ -10,6 +10,7 @@ import {
   getDistrictPasswordsFromStorageSync,
   getPresidentPasswordFromStorageSync,
   filterAndSortDistrictOfficials,
+  matchesDistrictName,
 } from './officialsCache';
 import { OfficialMember, DEFAULT_APPOINTED_POSTS } from '../data/rkMaharashtraData';
 
@@ -103,4 +104,25 @@ test('filterAndSortDistrictOfficials handles Ahilyanagar/Ahmadnagar alias and po
   assert.equal(sorted.length, 2);
   assert.equal(sorted[0].appointedPost, 'जिल्हाध्यक्ष');
   assert.equal(sorted[1].appointedPost, 'तालुका अध्यक्ष');
+});
+
+test('matchesDistrictName correctly matches Beed and other aliases in all variations', () => {
+  assert.equal(matchesDistrictName('बीड', 'बीड'), true);
+  assert.equal(matchesDistrictName('beed', 'बीड'), true);
+  assert.equal(matchesDistrictName('Beed', 'बीड'), true);
+  assert.equal(matchesDistrictName('bid', 'बीड'), true);
+  assert.equal(matchesDistrictName('बीड', 'beed'), true);
+  assert.equal(matchesDistrictName('  बीड  ', 'बीड'), true);
+
+  // Other district aliases
+  assert.equal(matchesDistrictName('अहमदनगर', 'अहिल्यानगर'), true);
+  assert.equal(matchesDistrictName('अहिल्यानगर', 'अहमदनगर'), true);
+  assert.equal(matchesDistrictName('औरंगाबाद', 'छत्रपती संभाजीनगर'), true);
+  assert.equal(matchesDistrictName('छत्रपती संभाजीनगर', 'औरंगाबाद'), true);
+  assert.equal(matchesDistrictName('उस्मानाबाद', 'धाराशिव'), true);
+  assert.equal(matchesDistrictName('धाराशिव', 'उस्मानाबाद'), true);
+
+  // Mismatches
+  assert.equal(matchesDistrictName('पुणे', 'बीड'), false);
+  assert.equal(matchesDistrictName('लातूर', 'बीड'), false);
 });

@@ -71,14 +71,44 @@ export function getPresidentPasswordFromStorageSync(
   }
 }
 
-export function matchesDistrictName(memberDistrict: string, selectedDistrict: string): boolean {
-  if (memberDistrict === selectedDistrict) return true;
+export function matchesDistrictName(memberDistrict?: string, selectedDistrict?: string): boolean {
+  if (!memberDistrict || !selectedDistrict) return false;
+  const md = memberDistrict.trim().toLowerCase();
+  const sd = selectedDistrict.trim().toLowerCase();
+  if (md === sd) return true;
+
+  // Ahilyanagar / Ahmednagar
   if (
-    (selectedDistrict === 'अहिल्यानगर' && memberDistrict === 'अहमदनगर') ||
-    (selectedDistrict === 'अहमदनगर' && memberDistrict === 'अहिल्यानगर')
+    (sd === 'अहिल्यानगर' && (md === 'अहमदनगर' || md.includes('ahmed'))) ||
+    (sd === 'अहमदनगर' && (md === 'अहिल्यानगर' || md.includes('ahmed')))
   ) {
     return true;
   }
+
+  // Beed / बीड / Bid
+  if (
+    (sd === 'बीड' && (md === 'beed' || md === 'bid' || md === 'बीड')) ||
+    (sd === 'beed' && (md === 'बीड' || md === 'bid'))
+  ) {
+    return true;
+  }
+
+  // Chhatrapati Sambhajinagar / Aurangabad
+  if (
+    (sd.includes('संभाजीनगर') && (md.includes('संभाजीनगर') || md.includes('औरंगाबाद') || md.includes('aurangabad'))) ||
+    (sd.includes('औरंगाबाद') && (md.includes('संभाजीनगर') || md.includes('औरंगाबाद') || md.includes('aurangabad')))
+  ) {
+    return true;
+  }
+
+  // Dharashiv / Osmanabad
+  if (
+    (sd.includes('धाराशिव') && (md.includes('धाराशिव') || md.includes('उस्मानाबाद') || md.includes('osmanabad'))) ||
+    (sd.includes('उस्मानाबाद') && (md.includes('धाराशिव') || md.includes('उस्मानाबाद') || md.includes('osmanabad')))
+  ) {
+    return true;
+  }
+
   return false;
 }
 
