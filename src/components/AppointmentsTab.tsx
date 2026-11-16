@@ -821,7 +821,8 @@ export const AppointmentsTab: React.FC = () => {
 
       const membersTotal = beoCount + extOfficerCount + headmasterCount;
       const officialsTotal = stateRep + divRep + distOfficial + talukaOfficial;
-      const rowTotal = officialsTotal + membersTotal;
+      // अंतिम बेरीज ही सदस्य संख्ये एवढीच असावी (पदाधिकारी आधीच सदस्य असल्याने दुबार बेरीज नको)
+      const rowTotal = membersTotal;
 
       return {
         district: dist,

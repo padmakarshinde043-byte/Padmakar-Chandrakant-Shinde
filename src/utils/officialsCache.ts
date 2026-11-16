@@ -109,6 +109,16 @@ export function matchesDistrictName(memberDistrict?: string, selectedDistrict?: 
     return true;
   }
 
+  // Washim / वाशीम / वाशिम
+  if (
+    (sd === 'वाशीम' && (md === 'वाशिम' || md === 'washim' || md === 'वाशीम')) ||
+    (sd === 'वाशिम' && (md === 'वाशीम' || md === 'washim' || md === 'वाशिम')) ||
+    (sd === 'washim' && (md === 'वाशीम' || md === 'वाशिम')) ||
+    sd.replace('शी', 'शि') === md.replace('शी', 'शि')
+  ) {
+    return true;
+  }
+
   return false;
 }
 

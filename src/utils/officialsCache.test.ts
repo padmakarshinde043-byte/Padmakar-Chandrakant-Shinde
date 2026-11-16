@@ -122,7 +122,15 @@ test('matchesDistrictName correctly matches Beed and other aliases in all variat
   assert.equal(matchesDistrictName('उस्मानाबाद', 'धाराशिव'), true);
   assert.equal(matchesDistrictName('धाराशिव', 'उस्मानाबाद'), true);
 
+  // Washim aliases
+  assert.equal(matchesDistrictName('वाशीम', 'वाशीम'), true);
+  assert.equal(matchesDistrictName('वाशिम', 'वाशीम'), true);
+  assert.equal(matchesDistrictName('वाशीम', 'वाशिम'), true);
+  assert.equal(matchesDistrictName('washim', 'वाशीम'), true);
+  assert.equal(matchesDistrictName('Washim', 'वाशीम'), true);
+
   // Mismatches
   assert.equal(matchesDistrictName('पुणे', 'बीड'), false);
   assert.equal(matchesDistrictName('लातूर', 'बीड'), false);
+  assert.equal(matchesDistrictName('वाशीम', 'अकोला'), false);
 });
