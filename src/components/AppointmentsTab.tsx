@@ -1087,7 +1087,7 @@ export const AppointmentsTab: React.FC = () => {
                     const details = m.workingPlace || '';
 
                     return (
-                      <div key={m.id} className="p-3.5 flex items-center gap-3">
+                      <div key={m.id} className="p-4 flex items-center gap-3.5">
                         <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 tabular-nums">
                           {idx + 1}.
                         </span>
@@ -1095,10 +1095,11 @@ export const AppointmentsTab: React.FC = () => {
                           <img
                             src={m.photo}
                             alt={m.firstName}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-2xs shrink-0"
+                            loading="lazy"
+                            className="w-14 h-18 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0 bg-slate-100"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                          <div className="w-14 h-18 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
                             <ImageIcon className="w-6 h-6" />
                           </div>
                         )}
@@ -1106,8 +1107,8 @@ export const AppointmentsTab: React.FC = () => {
                           <div className="text-base font-bold text-[#193568] leading-snug truncate">
                             {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                           </div>
-                          <div className="mt-0.5">
-                            <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">
+                          <div className="mt-1">
+                            <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2.5 py-0.5 rounded text-xs font-semibold">
                               {displayPost}
                             </span>
                           </div>
@@ -1125,9 +1126,9 @@ export const AppointmentsTab: React.FC = () => {
                   <table className="w-full text-left text-sm border-collapse">
                     <thead className="bg-slate-100 text-[#193568] font-bold border-b border-slate-300">
                       <tr>
-                        <th className="py-2.5 px-4 w-20 text-center border-r border-slate-200">अनु. क्र.</th>
-                        <th className="py-2.5 px-4 text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
-                        <th className="py-2.5 px-4 text-sm">सध्याचे पद व कार्यक्षेत्र</th>
+                        <th className="py-3 px-4 w-20 text-center border-r border-slate-200">अनु. क्र.</th>
+                        <th className="py-3 px-4 text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
+                        <th className="py-3 px-4 text-sm">सध्याचे पद व कार्यक्षेत्र</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
@@ -1138,27 +1139,28 @@ export const AppointmentsTab: React.FC = () => {
 
                         return (
                           <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-3 px-4 text-center font-semibold text-slate-600 font-mono tabular-nums border-r border-slate-200">
+                            <td className="py-4 px-4 text-center font-semibold text-slate-600 font-mono tabular-nums border-r border-slate-200">
                               {idx + 1}
                             </td>
-                            <td className="py-3 px-4 border-r border-slate-200">
-                              <div className="flex items-center gap-3">
+                            <td className="py-4 px-4 border-r border-slate-200">
+                              <div className="flex items-center gap-3.5">
                                 {m.photo ? (
                                   <img
                                     src={m.photo}
                                     alt={m.firstName}
-                                    className="w-12 h-12 rounded-full object-cover border-2 border-amber-400 shadow-2xs shrink-0"
+                                    loading="lazy"
+                                    className="w-16 h-20 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0 bg-slate-100"
                                   />
                                 ) : (
-                                  <div className="w-12 h-12 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                                  <div className="w-16 h-20 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
                                     <ImageIcon className="w-6 h-6" />
                                   </div>
                                 )}
                                 <div className="flex flex-col items-start gap-1 min-w-0">
-                                  <span className="font-bold text-[#193568] text-sm sm:text-base leading-snug truncate">
+                                  <span className="font-bold text-[#193568] text-base leading-snug truncate">
                                     {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
                                   </span>
-                                  <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2 py-0.5 rounded text-xs sm:text-sm font-semibold">
+                                  <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2.5 py-0.5 rounded text-sm font-semibold">
                                     {displayPost}
                                   </span>
                                 </div>

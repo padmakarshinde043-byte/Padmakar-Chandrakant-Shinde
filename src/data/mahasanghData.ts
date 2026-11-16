@@ -481,6 +481,8 @@ export interface LatestBannerItem {
   title: string;
   summary?: string;
   imageUrl: string;
+  videoUrl?: string;
+  mediaType?: 'image' | 'video';
   date: string;
   createdAt?: string;
 }

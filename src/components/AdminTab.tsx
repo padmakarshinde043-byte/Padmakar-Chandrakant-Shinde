@@ -1692,8 +1692,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     },
     {
       key: 'leadership',
-      label: 'नेतृत्व व पदाधिकारी',
-      shortLabel: 'नेतृत्व',
+      label: 'पदाधिकारी व्यवस्थापन',
+      shortLabel: 'व्यवस्थापन',
       icon: <Award className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
