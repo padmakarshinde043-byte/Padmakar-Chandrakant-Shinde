@@ -10,7 +10,7 @@ import { isAiStudioPreviewHostname } from '../utils/previewFirebaseGuard';
 
 export type ActiveBackendMode = 'mysql' | 'firebase';
 
-let resolvedMode: ActiveBackendMode | null = null;
+let resolvedMode: ActiveBackendMode | null = 'mysql';
 let modeCheckPromise: Promise<ActiveBackendMode> | null = null;
 
 export function isAiStudioPreviewEnvironment(): boolean {
@@ -19,7 +19,10 @@ export function isAiStudioPreviewEnvironment(): boolean {
 }
 
 export async function getActiveBackendMode(): Promise<ActiveBackendMode> {
-  if (resolvedMode) return resolvedMode;
+  if (resolvedMode && resolvedMode === 'mysql') {
+    // Verify async in background or return mysql
+    return resolvedMode;
+  }
   if (modeCheckPromise) return modeCheckPromise;
 
   const isPreview = isAiStudioPreviewEnvironment();
@@ -41,8 +44,8 @@ export async function getActiveBackendMode(): Promise<ActiveBackendMode> {
         }
       }
     } catch {
-      // Production hosts must NEVER silently fall back to Firebase on transient fetch timeouts
       if (!isPreview) {
+        resolvedMode = 'mysql';
         return 'mysql';
       }
     }
@@ -71,7 +74,7 @@ export async function isFirebaseAllowedInCurrentEnvironment(): Promise<boolean> 
 }
 
 export function isFirebaseAllowedSync(): boolean {
-  return isAiStudioPreviewEnvironment() && resolvedMode !== 'mysql';
+  return resolvedMode === 'firebase';
 }
 
 export async function sqlApiRequest<T = any>(
