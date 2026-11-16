@@ -2469,6 +2469,7 @@ export interface ContactMessage {
   subject?: string;
   message: string;
   createdAt: string;
+  isRead?: boolean;
 }
 
 const CONTACTS_CACHE_KEY = 'mahasangh_contacts_cache_v1';

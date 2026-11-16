@@ -41,14 +41,15 @@ import {
   resetMemberCounterToActualHighest,
   purgeDeletedAndGhostApplicationsInFirestore
 } from '../firebase';
-import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
+import { generateMembershipIdCardPdf, generateDistrictBatchIdCardsPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
 import {
   saveDynamicLeadersToFirebase,
   fetchDynamicLeaders,
   updateDistrictPasswordInRtdb,
   fetchDistrictPasswords,
-  saveAppointedPostsToRtdb
+  saveAppointedPostsToRtdb,
+  updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
 import {
   getCloudinaryConfig,
@@ -100,6 +101,7 @@ type AdminSubTabKey =
   | 'master_studio'
   | 'add_news'
   | 'latest_banners'
+  | 'print_id_cards'
   | 'id_card_preview'
   | 'gov_order'
   | 'manage_admins'
@@ -343,6 +345,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isLoadingDistrictPasswords, setIsLoadingDistrictPasswords] = useState<boolean>(false);
   const [selectedDistrictForReset, setSelectedDistrictForReset] = useState<string>('अहिल्यानगर');
   const [isResettingDistrictPassword, setIsResettingDistrictPassword] = useState<boolean>(false);
+  const [isResettingPresidentPassword, setIsResettingPresidentPassword] = useState<boolean>(false);
   const [districtSearchFilter, setDistrictSearchFilter] = useState<string>('');
   const [customResetPassword, setCustomResetPassword] = useState<string>('');
 
@@ -389,6 +392,119 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       showAdminFeedback(`पासवर्ड रिसेट करताना त्रुटी आली: ${err?.message || ''}`, 'error');
     } finally {
       setIsResettingDistrictPassword(false);
+    }
+  };
+
+  // Appointment Letter Studio states in Master Studio Part 3
+  const [showLetterHeader, setShowLetterHeader] = useState(false);
+  const [showOutward, setShowOutward] = useState(true);
+  const [showTitle, setShowTitle] = useState(true);
+  const [showRecipient, setShowRecipient] = useState(true);
+  const [showSubject, setShowSubject] = useState(true);
+  const [showBody, setShowBody] = useState(true);
+  const [showCallout, setShowCallout] = useState(true);
+  const [showPara3, setShowPara3] = useState(true);
+  const [showSign1, setShowSign1] = useState(true);
+  const [showSign2, setShowSign2] = useState(true);
+
+  const [letterBgUrl, setLetterBgUrl] = useState('');
+  const [letterCustomImgUrl, setLetterCustomImgUrl] = useState('');
+  const [letterSign1Name, setLetterSign1Name] = useState('( श्री. विजय सावंत )');
+  const [letterSign1Role, setLetterSign1Role] = useState('राज्य सरचिटणीस\nमहाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ');
+  const [letterSign2Name, setLetterSign2Name] = useState('( श्री. राजेंद्र खैरनार )');
+  const [letterSign2Role, setLetterSign2Role] = useState('संस्थापक राज्याध्यक्ष\nमहाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ');
+  const [letterSignImg, setLetterSignImg] = useState('');
+  const [letterFontSize, setLetterFontSize] = useState(15);
+  const [letterLineHeight, setLetterLineHeight] = useState(1.6);
+  const [letterTextColor, setLetterTextColor] = useState('#111111');
+  const [letterSubjectText, setLetterSubjectText] = useState('महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...');
+  const [letterPara1Text, setLetterPara1Text] = useState('महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ हा राज्यातील शिक्षण क्षेत्राच्या रुपांतरणासाठी झटणाऱ्या केंद्रप्रमुख व विस्तार अधिकारी संघटनांच्या हक्क-हक्कासाठी, व्यावसायिक स्वाभिमानासाठी आणि गुणवत्तापूर्ण शिक्षणासाठी कटिबद्ध असलेली अग्रगण्य संघटना आहे. महासंघाच्या गूगल फॉर्म द्वारे प्राप्त झालेल्या सर्व सदस्यांच्या उत्स्फूर्त प्रतिसादानुसार आणि जिल्हा सभेत निवड प्रक्रियेत लोकशाहीच्या मूल्यांचा आदर करत सर्वानुमते हा निर्णय घेण्यात आला आहे.');
+  const [letterPara2Text, setLetterPara2Text] = useState('आपला प्रदीर्घ आणि निष्कलंक सेवाप्रवास, शाळा-शिक्षणाविषयी असलेली तल्लीनता, उत्कृष्ट प्रशासकीय समन्वय आणि संघटनकौशल्यावरील आपली अढळ निष्ठा आम्ही अत्यंत जवळून अनुभवली आहे. सहकाऱ्यांच्या अडीअडचणीत धावून जाण्याची आपली वृत्ती आणि नेतृत्वगुणांची सार्थ दखल घेत, सर्व सदस्यांच्या बहुमताने व राज्य कार्यकारिणीच्या निर्णयानुसार आपणास—');
+  const [letterPara3Text, setLetterPara3Text] = useState('हे पद केवळ सन्मानाचे प्रतीक नसून महासंघाच्या पवित्र विचारांचे धोरण आहे. केंद्रप्रमुख व विस्तार अधिकारी संवर्गाचे न्याय प्रश्न सोडवणे, आत्मसन्मान जपणे आणि सर्व सहकाऱ्यांच्या पाठीशी खंबीरपणे उभे राहणे हीच आपली मुख्य जबाबदारी आहे. सर्व सदस्यांनी आपल्यावर दाखवलेला हा विश्वास आणि आपल्या दूरदर्शी नेतृत्वाखाली संघटनेची पताका निश्चितच अभिमानाने गगनभरारी घेईल, हा ठाम विश्वास आहे. या मानाच्या नियुक्तीबद्दल आपले मनःपूर्वक अभिनंदन व भावी वाटचालीस हार्दिक शुभेच्छा!');
+  const letterStudioRef = useRef<HTMLDivElement | null>(null);
+  const [isDownloadingLetterPdf, setIsDownloadingLetterPdf] = useState(false);
+
+  // Batch print ID cards state
+  const [batchPrintDistrict, setBatchPrintDistrict] = useState<string>('अहिल्यानगर');
+  const [isGeneratingBatchPrint, setIsGeneratingBatchPrint] = useState(false);
+  const [batchPrintProgressMsg, setBatchPrintProgressMsg] = useState('');
+
+  const handleGenerateBatchPrintPdf = async () => {
+    setIsGeneratingBatchPrint(true);
+    setBatchPrintProgressMsg('आय-कार्ड पीडीएफ तयार करत आहे...');
+    try {
+      await generateDistrictBatchIdCardsPdf(
+        batchPrintDistrict,
+        applications,
+        (msg) => setBatchPrintProgressMsg(msg)
+      );
+      showAdminFeedback(`'${batchPrintDistrict}' जिल्ह्यातील सर्व सदस्यांचे आय-कार्ड पीडीएफ यशस्वीरीत्या डाऊनलोड झाले!`, 'success');
+    } catch (err: any) {
+      showAdminFeedback('आय-कार्ड पीडीएफ करताना त्रुटी आली: ' + (err?.message || ''), 'error');
+    } finally {
+      setIsGeneratingBatchPrint(false);
+      setBatchPrintProgressMsg('');
+    }
+  };
+
+  const handleBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const { base64 } = await compressImageFile(file, 1200, 1600, 0.85);
+      setLetterBgUrl(base64);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) setLetterBgUrl(ev.target.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCustomImgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result) setLetterCustomImgUrl(ev.target.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSignImgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      if (ev.target?.result) setLetterSignImg(ev.target.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDownloadLetterPdfAction = async () => {
+    if (!letterStudioRef.current) return;
+    setIsDownloadingLetterPdf(true);
+    try {
+      const { jsPDF } = await import('jspdf');
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(letterStudioRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Mahasangh_Appointment_Letter_${Date.now()}.pdf`);
+      showAdminFeedback('नमुना नियुक्ती पत्र PDF यशस्वीरीत्या डाऊनलोड झाले!', 'success');
+    } catch (err: any) {
+      showAdminFeedback('PDF डाऊनलोड करताना त्रुटी आली: ' + (err?.message || ''), 'error');
+    } finally {
+      setIsDownloadingLetterPdf(false);
     }
   };
 
@@ -1857,6 +1973,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       shortLabel: 'बॅनर्स',
       icon: <ImageIcon className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners),
+    },
+    {
+      key: 'print_id_cards',
+      label: 'नवीन आयकार्ड प्रिंट करा',
+      shortLabel: 'प्रिंट आयकार्ड',
+      icon: <Award className="w-4 h-4 shrink-0 text-amber-600" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
       key: 'id_card_preview',
@@ -3510,14 +3633,347 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       </div>
                     </div>
 
-                    {/* Part 3: Letter Studio Info */}
-                    <div className="bg-amber-50/70 p-5 rounded-xl border border-amber-300 text-xs space-y-2">
-                      <h4 className="font-serifDevanagari font-bold text-base text-[#17366d]">
-                        3. नियुक्ती पत्र डिझाईन व कस्टमायझेशन (Appointment Letter Studio)
-                      </h4>
-                      <p className="text-slate-700">
-                        नियुक्ती पत्रातील घटक (हेडर बॅनर, पत्र क्रमांक, विषय पट्टी, स्वाक्षरी, परिच्छेद) दाखवणे/लपवणे आणि मजकूर संपादन करण्याची सुविधा थेट 'पदाधिकारी व नियुक्तीपत्रे' (Appointments) टॅबमधील ॲडमिन नियंत्रण कक्षामध्ये उपलब्ध आहे.
-                      </p>
+                    {/* Part 3: State President Password Reset (राज्याध्यक्ष पासवर्ड रिसेट - Default RK2026) */}
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
+                      <div>
+                        <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] flex items-center gap-2">
+                          <Award className="w-4 h-4 text-amber-600" />
+                          राज्याध्यक्ष पासवर्ड रिसेट (State President Password Reset - Default RK2026)
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-1">
+                          संस्थापक राज्याध्यक्षांचा पासवर्ड रिसेट केल्यास तो पुन्हा <strong>'RK2026'</strong> होईल. त्यानंतर राज्याध्यक्ष 'RK2026' टाकून लॉगिन करतील तेव्हा त्यांना नवीन पासवर्ड सेट करण्याचा स्क्रीन मिळेल.
+                        </p>
+                      </div>
+
+                      <div className="p-4 bg-white border border-slate-300 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800">
+                            ⚡ राज्याध्यक्ष पासवर्ड पूर्ववत 'RK2026' करा:
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isResettingPresidentPassword}
+                          onClick={async () => {
+                            setIsResettingPresidentPassword(true);
+                            try {
+                              await updatePresidentPasswordInFirebase('RK2026');
+                              showAdminFeedback('राज्याध्यक्ष पासवर्ड यशस्वीपणे "RK2026" करण्यात आला आहे!', 'success');
+                            } catch (err: any) {
+                              showAdminFeedback('त्रुटी: ' + (err.message || 'रिसेट करता आला नाही'), 'error');
+                            } finally {
+                              setIsResettingPresidentPassword(false);
+                            }
+                          }}
+                          className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
+                        >
+                          <RotateCcw className={`w-3.5 h-3.5 ${isResettingPresidentPassword ? 'animate-spin' : ''}`} />
+                          <span>{isResettingPresidentPassword ? 'रिसेट होत आहे...' : 'राज्याध्यक्ष पासवर्ड RK2026 करा'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Part 4: Letter Studio (Appointment Letter Design & Customization Studio) */}
+                    <div className="bg-white p-5 sm:p-6 rounded-xl border border-amber-300 shadow-sm space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
+                        <div>
+                          <h4 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#17366d] flex items-center gap-2">
+                            <Award className="w-5 h-5 text-amber-600" />
+                            3. नियुक्ती पत्र डिझाईन व कस्टमायझेशन (Appointment Letter Studio)
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            येथून आपण नियुक्ती पत्राचे घटक, पार्श्वभूमी, स्वाक्षऱ्या, मजकूर आणि फॉन्ट आकार थेट कस्टमाइझ करू शकता.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDownloadLetterPdfAction}
+                          disabled={isDownloadingLetterPdf}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>{isDownloadingLetterPdf ? 'PDF तयार होत आहे...' : 'नमुना पत्र PDF डाऊनलोड'}</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                        {/* Left: Controls & Customization Form */}
+                        <div className="space-y-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200 max-h-[75vh] overflow-y-auto">
+                          {/* 1. Element Visibility */}
+                          <div className="space-y-2">
+                            <h5 className="font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                              <Eye className="w-3.5 h-3.5 text-[#17366d]" />
+                              <span>घटक दाखवा / लपवा (Element Visibility)</span>
+                            </h5>
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showLetterHeader} onChange={(e) => setShowLetterHeader(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>हेडर बॅनर (Header)</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showOutward} onChange={(e) => setShowOutward(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>पत्र क्रमांक व दिनांक</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>पत्र शीर्षक (Title)</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showRecipient} onChange={(e) => setShowRecipient(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>प्रति / व्यक्ती माहिती</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showSubject} onChange={(e) => setShowSubject(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>विषय पट्टी (Subject)</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showBody} onChange={(e) => setShowBody(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>मुख्य परिच्छेद (१ व २)</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showCallout} onChange={(e) => setShowCallout(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>पद सन्मान बॅनर</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showPara3} onChange={(e) => setShowPara3(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>परिच्छेद ३ (शुभेच्छा)</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showSign1} onChange={(e) => setShowSign1(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>स्वाक्षरी १ (सरचिटणीस)</span>
+                              </label>
+                              <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
+                                <input type="checkbox" checked={showSign2} onChange={(e) => setShowSign2(e.target.checked)} className="rounded text-[#df6b16]" />
+                                <span>स्वाक्षरी २ (राज्याध्यक्ष)</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          {/* 2. Background & Custom Images */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
+                              <ImageIcon className="w-3.5 h-3.5 text-[#17366d]" />
+                              <span>पार्श्वभूमी व लोगो (Background & Images)</span>
+                            </h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">A4 पार्श्वभूमी इमेज:</label>
+                                <input type="file" accept="image/*" onChange={handleBgUpload} className="w-full p-1.5 bg-white border border-slate-300 rounded text-[11px]" />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">इतर सानुकूल इमेज:</label>
+                                <input type="file" accept="image/*" onChange={handleCustomImgUpload} className="w-full p-1.5 bg-white border border-slate-300 rounded text-[11px]" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 3. Signature Customization */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <h5 className="font-bold text-slate-800">✍️ स्वाक्षरी व पदनाम संपादन</h5>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी १ नाव:</label>
+                                <input type="text" value={letterSign1Name} onChange={(e) => setLetterSign1Name(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी २ नाव:</label>
+                                <input type="text" value={letterSign2Name} onChange={(e) => setLetterSign2Name(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी १ पद:</label>
+                                <textarea rows={2} value={letterSign1Role} onChange={(e) => setLetterSign1Role(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी २ पद:</label>
+                                <textarea rows={2} value={letterSign2Role} onChange={(e) => setLetterSign2Role(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">राज्याध्यक्ष स्वाक्षरी शिक्का (PNG):</label>
+                              <input type="file" accept="image/*" onChange={handleSignImgUpload} className="w-full p-1.5 bg-white border border-slate-300 rounded text-[11px]" />
+                            </div>
+                          </div>
+
+                          {/* 4. Typography & Spacing */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <h5 className="font-bold text-slate-800">🔤 फॉन्ट आकार व अंतर</h5>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-600 block">फॉन्ट साईज ({letterFontSize}px)</label>
+                                <input type="range" min="12" max="20" value={letterFontSize} onChange={(e) => setLetterFontSize(Number(e.target.value))} className="w-full accent-[#df6b16]" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-600 block">लाईन हाईट ({letterLineHeight})</label>
+                                <input type="range" min="1.3" max="2.0" step="0.05" value={letterLineHeight} onChange={(e) => setLetterLineHeight(Number(e.target.value))} className="w-full accent-[#df6b16]" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] font-bold text-slate-600 block">मजकूर रंग</label>
+                                <input type="color" value={letterTextColor} onChange={(e) => setLetterTextColor(e.target.value)} className="w-full h-7 rounded border border-slate-300 cursor-pointer p-0.5 bg-white" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 5. Letter Text Editing */}
+                          <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <h5 className="font-bold text-slate-800">📝 पत्र मजकूर संपादन</h5>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">विषय ओळ:</label>
+                              <input type="text" value={letterSubjectText} onChange={(e) => setLetterSubjectText(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs font-bold" />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">परिच्छेद १:</label>
+                              <textarea rows={3} value={letterPara1Text} onChange={(e) => setLetterPara1Text(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">परिच्छेद २:</label>
+                              <textarea rows={3} value={letterPara2Text} onChange={(e) => setLetterPara2Text(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                            </div>
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">परिच्छेद ३ (शुभेच्छा):</label>
+                              <textarea rows={3} value={letterPara3Text} onChange={(e) => setLetterPara3Text(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right: Live A4 Preview Canvas */}
+                        <div className="bg-slate-200 p-3 rounded-xl flex flex-col items-center overflow-x-auto">
+                          <div className="text-[11px] font-bold text-slate-600 mb-2">
+                            👁️ लाईव्ह नियुक्ती पत्र प्रिव्ह्यू (A4 Canvas Preview)
+                          </div>
+                          
+                          <div
+                            ref={letterStudioRef}
+                            className="bg-white text-slate-900 shadow-xl relative flex flex-col justify-between"
+                            style={{
+                              width: '560px',
+                              minWidth: '560px',
+                              height: '792px',
+                              minHeight: '792px',
+                              padding: '24px',
+                              backgroundImage: letterBgUrl ? `url(${letterBgUrl})` : 'none',
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            <div className="border-2 border-[#851216] outline-1 outline-[#d4af37] outline-offset-[-4px] p-4 h-full flex flex-col justify-between relative bg-white/90 backdrop-blur-3xs">
+                              {/* Top Header */}
+                              {showLetterHeader && (
+                                <div className="text-center border-b-2 border-[#d4af37] pb-2 mb-2">
+                                  <div className="text-[10px] font-bold text-slate-600">Reg. No. MH/0000555/2026</div>
+                                  <div className="text-base font-extrabold text-[#1e3a8a]">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+                                  <div className="text-[9px] font-bold text-amber-900 bg-amber-50 inline-block px-3 py-0.5 rounded-full border border-amber-300 my-0.5">
+                                    शिक्षणासाठी समर्पित... अधिकाऱ्यांच्या हितासाठी...!
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Outward & Date */}
+                              {showOutward && (
+                                <div className="flex justify-between items-center text-xs font-bold text-slate-800 border-b border-dashed border-red-800 pb-1 mb-2">
+                                  <span>जावक क्र.: एमआरके / नियुक्ती / २०२६ / ०१</span>
+                                  <span>दिनांक: {formatDateWithEnglishDigits(new Date())}</span>
+                                </div>
+                              )}
+
+                              {/* Title */}
+                              {showTitle && (
+                                <div className="text-center my-1">
+                                  <span className="inline-block bg-[#851216] text-white text-xs font-bold px-6 py-1 rounded-full border border-[#d4af37] shadow-xs">
+                                    अधिकृत नियुक्ती पत्र
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Recipient */}
+                              {showRecipient && (
+                                <div className="text-xs font-bold text-slate-900 leading-snug my-1">
+                                  <div>प्रति,</div>
+                                  <div className="text-sm font-extrabold text-[#1e3a8a] pl-3">श्री. संतोष रमेश पाटील</div>
+                                  <div className="text-[11px] text-slate-700 pl-3">पद: जिल्हाध्यक्ष (अहिल्यानगर)</div>
+                                </div>
+                              )}
+
+                              {/* Subject */}
+                              {showSubject && (
+                                <div className="text-xs font-bold text-slate-900 my-1 bg-amber-50/80 p-1.5 rounded border border-amber-200">
+                                  <span>विषय: </span>
+                                  <span className="underline">{letterSubjectText}</span>
+                                </div>
+                              )}
+
+                              {/* Body Paragraphs */}
+                              {showBody && (
+                                <div
+                                  className="space-y-2 text-justify my-1 flex-1"
+                                  style={{
+                                    fontSize: `${letterFontSize * 0.75}px`,
+                                    lineHeight: letterLineHeight,
+                                    color: letterTextColor
+                                  }}
+                                >
+                                  <p>{letterPara1Text}</p>
+                                  <p>{letterPara2Text}</p>
+                                </div>
+                              )}
+
+                              {/* Appointment Callout */}
+                              {showCallout && (
+                                <div className="text-center my-2 py-1 bg-gradient-to-r from-amber-50 via-amber-100 to-amber-50 border-y-2 border-[#d4af37]">
+                                  <span className="text-[11px] font-bold text-slate-700 block">महासंघाच्या मान्यतेने बहाल केलेले अधिकृत पद:</span>
+                                  <span className="font-serifDevanagari text-base font-extrabold text-[#851216]">
+                                    जिल्हाध्यक्ष (अहिल्यानगर जिल्हा)
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Para 3 */}
+                              {showPara3 && (
+                                <div
+                                  className="text-justify my-1"
+                                  style={{
+                                    fontSize: `${letterFontSize * 0.75}px`,
+                                    lineHeight: letterLineHeight,
+                                    color: letterTextColor
+                                  }}
+                                >
+                                  <p>{letterPara3Text}</p>
+                                </div>
+                              )}
+
+                              {/* Custom Inserted Image */}
+                              {letterCustomImgUrl && (
+                                <div className="my-1 text-center">
+                                  <img src={letterCustomImgUrl} alt="Custom" className="max-h-24 mx-auto object-contain rounded" />
+                                </div>
+                              )}
+
+                              {/* Signatures */}
+                              <div className="flex justify-between items-end pt-2 border-t border-slate-300 mt-auto text-[11px]">
+                                {showSign1 && (
+                                  <div className="text-center">
+                                    <div className="font-bold text-slate-900">{letterSign1Name}</div>
+                                    <div className="text-[10px] text-slate-600 whitespace-pre-line">{letterSign1Role}</div>
+                                  </div>
+                                )}
+                                {letterSignImg && (
+                                  <div className="text-center">
+                                    <img src={letterSignImg} alt="Sign" className="max-h-12 object-contain mx-auto" />
+                                  </div>
+                                )}
+                                {showSign2 && (
+                                  <div className="text-center">
+                                    <div className="font-bold text-slate-900">{letterSign2Name}</div>
+                                    <div className="text-[10px] text-slate-600 whitespace-pre-line">{letterSign2Role}</div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4328,6 +4784,75 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
+            {/* Sub-tab: Print ID Cards Batch (नवीन आयकार्ड प्रिंट करा - Super Admin Only) */}
+            {activeAdminSubTab === 'print_id_cards' && currentUser?.isSuperAdmin && (
+              <div className="space-y-6 max-w-3xl mx-auto">
+                <div className="bg-white p-6 sm:p-8 rounded-2xl border border-amber-300 shadow-md space-y-5">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                    <div>
+                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                        <Award className="w-5 h-5 text-amber-600" />
+                        नवीन आयकार्ड प्रिंट करा (District Batch Print — Super Admin)
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        येथून कोणत्याही जिल्ह्याची निवड करून त्या संपूर्ण जिल्ह्यातील सर्व मंजूर सदस्यांचे नवीन आय-कार्ड्स एकाच मेगा PDF मध्ये लँडस्केप (Landscape) मांडणीत फुल साईज व उच्च प्रिंट क्वालिटीमध्ये डाऊनलोड करू शकता.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+                    <div>
+                      <label className="font-bold text-slate-700 text-xs block mb-1.5">जिल्हा निवडा (Select District):</label>
+                      <select
+                        value={batchPrintDistrict}
+                        onChange={(e) => setBatchPrintDistrict(e.target.value)}
+                        className="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm font-bold text-[#0b1e33]"
+                      >
+                        {MAHARASHTRA_DISTRICTS.map((d) => {
+                          const count = applications.filter((m) => m.status === 'approved' && m.district === d).length;
+                          return (
+                            <option key={d} value={d}>
+                              {d} ({count} मंजूर सदस्य)
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div>
+                        <strong>निवडलेला जिल्हा:</strong> {batchPrintDistrict} <br />
+                        <span className="text-slate-600">
+                          मंजूर सदस्य संख्या:{' '}
+                          <span className="font-bold text-[#0b1e33]">
+                            {applications.filter((m) => m.status === 'approved' && m.district === batchPrintDistrict).length}
+                          </span>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isGeneratingBatchPrint}
+                        onClick={handleGenerateBatchPrintPdf}
+                        className="bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-50 text-white font-bold text-xs px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2 cursor-pointer shrink-0"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>
+                          {isGeneratingBatchPrint ? batchPrintProgressMsg || 'PDF तयार होत आहे...' : `📥 ${batchPrintDistrict} सर्व आय-कार्ड्स डाऊनलोड करा`}
+                        </span>
+                      </button>
+                    </div>
+
+                    {isGeneratingBatchPrint && (
+                      <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 flex items-center gap-2 animate-pulse">
+                        <RefreshCw className="w-4 h-4 animate-spin text-sky-600 shrink-0" />
+                        <span>{batchPrintProgressMsg || 'कृपया प्रतीक्षा करा, सर्व सदस्यांचे हाई-डिफ़िंक्शन आय-कार्ड्स एकत्र केले जात आहेत...'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Sub-tab: ID Card Sample Preview (आय-कार्ड डिझाईन नमुना) */}
             {activeAdminSubTab === 'id_card_preview' && (currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview) && (
               <div className="space-y-6 max-w-3xl mx-auto">
@@ -5017,9 +5542,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   {msg.name?.charAt(0) || '👤'}
                                 </div>
                                 <div>
-                                  <h4 className="font-bold text-sm text-[#09243f] leading-snug">
-                                    {msg.name}
-                                  </h4>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-bold text-sm text-[#09243f] leading-snug">
+                                      {msg.name}
+                                    </h4>
+                                    {msg.isRead ? (
+                                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200 flex items-center gap-1">
+                                        ✅ वाचलेला (Read)
+                                      </span>
+                                    ) : (
+                                      <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300 flex items-center gap-1 animate-pulse">
+                                        🔴 नवीन (Unread)
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                                     {msg.district && (
                                       <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-slate-200">
@@ -5034,6 +5570,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </div>
 
                               <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextRead = !msg.isRead;
+                                    setContactMessages((prev) =>
+                                      prev.map((m) => (m.id === msg.id ? { ...m, isRead: nextRead } : m))
+                                    );
+                                    showAdminFeedback(nextRead ? 'संदेश वाचलेला म्हणून चिन्हांकित केला.' : 'संदेश अनरीड केला.', 'success');
+                                  }}
+                                  className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border ${
+                                    msg.isRead
+                                      ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                      : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                                  }`}
+                                  title="वाचले / न वाचले म्हणून चिन्हांकित करा"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>{msg.isRead ? 'अनरीड करा' : 'वाचले करा'}</span>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteContactMessage(msg.id)}
@@ -5472,19 +6027,36 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
               {/* Photo & Core Name Row */}
-              <div className="flex items-center gap-4 bg-[#fbf8f2] p-4 rounded-2xl border border-[#e7ded1]">
-                <div className="shrink-0 w-20 h-24 sm:w-24 sm:h-28 bg-white border-2 border-[#efb24b] rounded-xl overflow-hidden flex items-center justify-center shadow-xs">
-                  {selectedAppForVerification.photo ? (
-                    <img
-                      src={selectedAppForVerification.photo}
-                      alt={selectedAppForVerification.fullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center text-[#607184] p-2">
-                      <ImageIcon className="w-8 h-8 mx-auto opacity-50" />
-                      <span className="text-[9px]">फोटो नाही</span>
-                    </div>
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 bg-[#fbf8f2] p-4 rounded-2xl border border-[#e7ded1]">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="shrink-0 w-24 h-32 bg-white border-2 border-[#efb24b] rounded-xl overflow-hidden flex items-center justify-center shadow-xs">
+                    {selectedAppForVerification.photo ? (
+                      <img
+                        src={selectedAppForVerification.photo}
+                        alt={selectedAppForVerification.fullName}
+                        className="w-full h-full object-cover pointer-events-auto select-auto"
+                        crossOrigin="anonymous"
+                        style={{ pointerEvents: 'auto', userSelect: 'auto', WebkitUserSelect: 'auto' }}
+                      />
+                    ) : (
+                      <div className="text-center text-[#607184] p-2">
+                        <ImageIcon className="w-8 h-8 mx-auto opacity-50" />
+                        <span className="text-[9px]">फोटो नाही</span>
+                      </div>
+                    )}
+                  </div>
+                  {selectedAppForVerification.photo && (
+                    <a
+                      href={selectedAppForVerification.photo}
+                      download={`member_photo_${selectedAppForVerification.applicationNumber || 'photo'}.jpg`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full inline-flex items-center justify-center gap-1 bg-[#193568] hover:bg-[#11254a] text-white font-bold text-[10px] px-2 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                      title="फोटो राईट क्लिक किंवा डाऊनलोड करा"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>फोटो डाऊनलोड करा</span>
+                    </a>
                   )}
                 </div>
 

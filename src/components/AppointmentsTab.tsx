@@ -21,15 +21,15 @@ import {
   fetchDistrictPasswords, updateDistrictPasswordInRtdb, fetchAppointedPosts,
   fetchPresidentPasswordFromFirebase, updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
+import { generateSingleLetterPdf } from '../services/rkPdfGenerator';
 import {
-  generateSingleLetterPdf,
-  generateDistrictExecutivePdf,
-  generateStatewideRegistryPdf,
-  generateOrganizationStatusPdf,
-  generateDistrictPresidentsPdf,
-  generateTalukaPresidentsPdf,
-  generateRegisteredMembersPdf
-} from '../services/rkPdfGenerator';
+  exportDistrictExecutiveExcel,
+  exportDistrictPresidentsExcel,
+  exportTalukaPresidentsExcel,
+  exportRegisteredMembersExcel,
+  exportStatewideRegistryExcel,
+  exportOrganizationStatusExcel
+} from '../utils/excelExporter';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { ORG_DETAILS, MembershipApplication } from '../data/mahasanghData';
 import { fetchApprovedMembersCached } from '../firebase';
@@ -718,41 +718,27 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // PDF Trigger 2: District Executive Letterhead Multi-Page PDF
-  const handleDownloadDistrictExecutivePdf = async () => {
-    setIsGeneratingDirPdf(true);
-    setPdfProgressStatus('तयार होत आहे...');
+  // Excel Export 1: District Executive List
+  const handleDownloadDistrictExecutiveExcel = () => {
     try {
-      await generateDistrictExecutivePdf(currentDistrict, districtOfficials, (status) => {
-        setPdfProgressStatus(status);
-      });
-      showToast(`'${currentDistrict}' कार्यकारिणी PDF यशस्वीपणे डाऊनलोड झाली!`, 'success');
+      exportDistrictExecutiveExcel(currentDistrict, districtOfficials);
+      showToast(`'${currentDistrict}' जिल्हा कार्यकारिणी एक्सेल फाइल यशस्वीरीत्या डाऊनलोड झाली!`, 'success');
     } catch (err: any) {
-      showToast('जिल्हा कार्यकारिणी PDF तयार करताना त्रुटी: ' + err.message, 'error');
-    } finally {
-      setIsGeneratingDirPdf(false);
-      setPdfProgressStatus('');
+      showToast('एक्सेल फाइल तयार करताना त्रुटी: ' + err.message, 'error');
     }
   };
 
-  // PDF Trigger 3: Statewide Master Registry Serial PDF
-  const handleDownloadStatewideRegistryPdf = async () => {
-    setIsGeneratingRegistryPdf(true);
-    setPdfProgressStatus('तयार होत आहे...');
+  // Excel Export 2: Statewide Master Registry
+  const handleDownloadStatewideRegistryExcel = () => {
     try {
-      await generateStatewideRegistryPdf(officials, (status) => {
-        setPdfProgressStatus(status);
-      });
-      showToast('राज्य यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+      exportStatewideRegistryExcel(officials);
+      showToast('राज्यस्तरीय नियुक्त्या व नोंदवही एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
-      showToast('राज्य यादी PDF तयार करताना त्रुटी: ' + err.message, 'error');
-    } finally {
-      setIsGeneratingRegistryPdf(false);
-      setPdfProgressStatus('');
+      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
     }
   };
 
-  // 36 Districts Organizational Status Matrix Calculation (Point 8)
+  // 36 Districts Organizational Status Matrix Calculation (Point 8, 10)
   const districtMatrixStats = useMemo(() => {
     return MAHARASHTRA_36_DISTRICTS.map((dist) => {
       const distOfficials = officials.filter((o) => {
@@ -785,7 +771,7 @@ export const AppointmentsTab: React.FC = () => {
         }
       });
 
-      const members = registeredApplications.filter((a) => {
+      const distApprovedApps = registeredApplications.filter((a) => {
         if (!a || a.status !== 'approved') return false;
         const d = (a.district || '').trim();
         if (d === dist) return true;
@@ -793,10 +779,26 @@ export const AppointmentsTab: React.FC = () => {
         if (dist.includes('संभाजीनगर') && (d.includes('संभाजीनगर') || d.includes('औरंगाबाद'))) return true;
         if (dist.includes('धाराशिव') && (d.includes('धाराशिव') || d.includes('उस्मानाबाद'))) return true;
         return false;
-      }).length;
+      });
 
+      let beoCount = 0;
+      let extOfficerCount = 0;
+      let headmasterCount = 0;
+
+      distApprovedApps.forEach((a) => {
+        const prof = (a.professional || '').trim();
+        if (prof.includes('गटशिक्षणाधिकारी') || prof.toLowerCase().includes('beo')) {
+          beoCount++;
+        } else if (prof.includes('शिक्षण विस्तार अधिकारी') || prof.includes('विस्तार अधिकारी')) {
+          extOfficerCount++;
+        } else {
+          headmasterCount++;
+        }
+      });
+
+      const membersTotal = beoCount + extOfficerCount + headmasterCount;
       const officialsTotal = stateRep + divRep + distOfficial + talukaOfficial;
-      const rowTotal = officialsTotal + members;
+      const rowTotal = officialsTotal + membersTotal;
 
       return {
         district: dist,
@@ -805,7 +807,10 @@ export const AppointmentsTab: React.FC = () => {
         distOfficial,
         talukaOfficial,
         officialsTotal,
-        members,
+        beoCount,
+        extOfficerCount,
+        headmasterCount,
+        membersTotal,
         rowTotal
       };
     });
@@ -819,32 +824,39 @@ export const AppointmentsTab: React.FC = () => {
         distOfficial: acc.distOfficial + curr.distOfficial,
         talukaOfficial: acc.talukaOfficial + curr.talukaOfficial,
         officialsTotal: acc.officialsTotal + curr.officialsTotal,
-        members: acc.members + curr.members,
+        beoCount: acc.beoCount + curr.beoCount,
+        extOfficerCount: acc.extOfficerCount + curr.extOfficerCount,
+        headmasterCount: acc.headmasterCount + curr.headmasterCount,
+        membersTotal: acc.membersTotal + curr.membersTotal,
         grandTotal: acc.grandTotal + curr.rowTotal
       }),
-      { stateRep: 0, divRep: 0, distOfficial: 0, talukaOfficial: 0, officialsTotal: 0, members: 0, grandTotal: 0 }
+      {
+        stateRep: 0,
+        divRep: 0,
+        distOfficial: 0,
+        talukaOfficial: 0,
+        officialsTotal: 0,
+        beoCount: 0,
+        extOfficerCount: 0,
+        headmasterCount: 0,
+        membersTotal: 0,
+        grandTotal: 0
+      }
     );
   }, [districtMatrixStats]);
 
-  // PDF Trigger 4: Organization Status Black & White Matrix PDF (Point 8)
-  const handleDownloadStatusMatrixPdf = async () => {
-    setIsGeneratingRegistryPdf(true);
-    setPdfProgressStatus('संघटना सद्यस्थिती अहवाल PDF तयार होत आहे...');
+  // Excel Export 3: Organization Status Matrix
+  const handleDownloadStatusMatrixExcel = () => {
     try {
-      await generateOrganizationStatusPdf(districtMatrixStats, (status) => setPdfProgressStatus(status));
-      showToast('संघटना सद्यस्थिती A4 ब्लॅक & व्हाईट PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+      exportOrganizationStatusExcel(districtMatrixStats);
+      showToast('संघटकीय सद्यस्थिती अहवाल एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
-      showToast('PDF त्रुटी: ' + err.message, 'error');
-    } finally {
-      setIsGeneratingRegistryPdf(false);
-      setPdfProgressStatus('');
+      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
     }
   };
 
-  // PDF Trigger 5: District Presidents List PDF (Point 9a)
-  const handleDownloadDistrictPresidentsPdf = async () => {
-    setIsGeneratingRegistryPdf(true);
-    setPdfProgressStatus('सर्व जिल्हाध्यक्ष यादी तयार होत आहे...');
+  // Excel Export 4: District Presidents List
+  const handleDownloadDistrictPresidentsExcel = () => {
     try {
       const distPresidents = officials
         .filter((o) => (o.appointedPost || '').includes('जिल्हाध्यक्ष'))
@@ -855,20 +867,15 @@ export const AppointmentsTab: React.FC = () => {
           post: m.appointedPost,
           mobile: m.mobile || '-'
         }));
-      await generateDistrictPresidentsPdf(distPresidents, (status) => setPdfProgressStatus(status));
-      showToast('सर्व जिल्हाध्यक्ष यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+      exportDistrictPresidentsExcel(distPresidents);
+      showToast('सर्व जिल्हाध्यक्ष यादी एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
-      showToast('PDF त्रुटी: ' + err.message, 'error');
-    } finally {
-      setIsGeneratingRegistryPdf(false);
-      setPdfProgressStatus('');
+      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
     }
   };
 
-  // PDF Trigger 6: Taluka Presidents List PDF (Point 9b)
-  const handleDownloadTalukaPresidentsPdf = async () => {
-    setIsGeneratingRegistryPdf(true);
-    setPdfProgressStatus('सर्व तालुका अध्यक्ष यादी तयार होत आहे...');
+  // Excel Export 5: Taluka Presidents List
+  const handleDownloadTalukaPresidentsExcel = () => {
     try {
       const talukaPresidents = officials
         .filter((o) => (o.appointedPost || '').includes('तालुका अध्यक्ष'))
@@ -880,29 +887,21 @@ export const AppointmentsTab: React.FC = () => {
           post: m.appointedPost,
           mobile: m.mobile || '-'
         }));
-      await generateTalukaPresidentsPdf(talukaPresidents, (status) => setPdfProgressStatus(status));
-      showToast('सर्व तालुका अध्यक्ष यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+      exportTalukaPresidentsExcel(talukaPresidents);
+      showToast('सर्व तालुका अध्यक्ष यादी एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
-      showToast('PDF त्रुटी: ' + err.message, 'error');
-    } finally {
-      setIsGeneratingRegistryPdf(false);
-      setPdfProgressStatus('');
+      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
     }
   };
 
-  // PDF Trigger 7: Approved Registered Members List PDF (Point 10)
-  const handleDownloadRegisteredMembersPdf = async () => {
-    setIsGeneratingRegistryPdf(true);
-    setPdfProgressStatus('नोंदणीकृत सदस्य यादी तयार होत आहे...');
+  // Excel Export 6: Approved Registered Members List
+  const handleDownloadRegisteredMembersExcel = () => {
     try {
       const approvedApps = registeredApplications.filter((a) => a.status === 'approved');
-      await generateRegisteredMembersPdf(approvedApps, (status) => setPdfProgressStatus(status));
-      showToast('नोंदणीकृत सदस्य यादी PDF यशस्वीपणे डाऊनलोड झाली!', 'success');
+      exportRegisteredMembersExcel(approvedApps);
+      showToast('नोंदणीकृत सदस्य यादी एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
-      showToast('PDF त्रुटी: ' + err.message, 'error');
-    } finally {
-      setIsGeneratingRegistryPdf(false);
-      setPdfProgressStatus('');
+      showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
     }
   };
 
@@ -1441,57 +1440,54 @@ export const AppointmentsTab: React.FC = () => {
 
                 <button
                   type="button"
-                  onClick={handleDownloadDistrictExecutivePdf}
-                  disabled={isGeneratingDirPdf || districtOfficials.length === 0}
+                  onClick={handleDownloadDistrictExecutiveExcel}
+                  disabled={districtOfficials.length === 0}
                   className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="या जिल्ह्याची लेटरपॅडवरील स्वाक्षरीयुक्त अधिकृत कार्यकारिणी PDF"
+                  title="या जिल्ह्याची अधिकृत कार्यकारिणी Excel (XLSX) फाइल डाऊनलोड करा"
                 >
-                  <FileText className={`w-3.5 h-3.5 ${isGeneratingDirPdf ? 'animate-spin' : ''}`} />
-                  जिल्हा कार्यकारिणी यादी
+                  <FileText className="w-3.5 h-3.5" />
+                  जिल्हा कार्यकारिणी (Excel)
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleDownloadDistrictPresidentsPdf}
-                  disabled={isGeneratingRegistryPdf}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="महाराष्ट्रातील सर्व 34 जिल्हाध्यक्षांची अधिकृत यादी"
+                  onClick={handleDownloadDistrictPresidentsExcel}
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="महाराष्ट्रातील सर्व जिल्हाध्यक्षांची अधिकृत एक्सेल फाइल"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  सर्व जिल्हाध्यक्ष यादी
+                  सर्व जिल्हाध्यक्ष (Excel)
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleDownloadTalukaPresidentsPdf}
-                  disabled={isGeneratingRegistryPdf}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत यादी"
+                  onClick={handleDownloadTalukaPresidentsExcel}
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत एक्सेल फाइल"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  सर्व तालुका अध्यक्ष यादी
+                  सर्व तालुका अध्यक्ष (Excel)
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleDownloadRegisteredMembersPdf}
-                  disabled={isGeneratingRegistryPdf}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य"
+                  onClick={handleDownloadRegisteredMembersExcel}
+                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य एक्सेल फाइल"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  नोंदणीकृत सदस्य यादी
+                  नोंदणीकृत सदस्य (Excel)
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleDownloadStatewideRegistryPdf}
-                  disabled={isGeneratingRegistryPdf || officials.length === 0}
+                  onClick={handleDownloadStatewideRegistryExcel}
+                  disabled={officials.length === 0}
                   className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="राज्यस्तरीय 1 ते शेवटपर्यंत नोंदवही PDF"
+                  title="राज्यस्तरीय नियुक्त्या व नोंदवही एक्सेल फाइल"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  नियुक्ती क्रमांकानुसार माहिती
+                  नियुक्ती नोंदवही (Excel)
                 </button>
               </div>
 
@@ -2569,13 +2565,12 @@ export const AppointmentsTab: React.FC = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleDownloadStatusMatrixPdf}
-                  disabled={isGeneratingRegistryPdf}
-                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="A4 साईज मध्ये ब्लॅक अँड व्हाईट अधिकृत PDF डाऊनलोड करा"
+                  onClick={handleDownloadStatusMatrixExcel}
+                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
+                  title="संघटन सद्यस्थिती एक्सेल (XLSX) फाइल डाऊनलोड करा"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  A4 PDF डाऊनलोड
+                  Excel डाऊनलोड
                 </button>
                 <button
                   type="button"
@@ -2591,45 +2586,57 @@ export const AppointmentsTab: React.FC = () => {
             {/* Scrollable Table View */}
             <div className="overflow-auto flex-1 m-4 border border-slate-300 rounded-md">
               <table className="w-full text-left text-sm border-collapse">
-                <thead className="bg-slate-100 text-[#193568] text-xs sm:text-sm font-bold sticky top-0 z-10 border-b border-slate-300">
+                <thead className="bg-slate-100 text-[#193568] text-xs font-bold sticky top-0 z-10 border-b border-slate-300">
                   <tr>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200 w-12">अनु.</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200 w-10">अनु.</th>
                     <th className="py-2.5 px-3 border-r border-slate-200">जिल्ह्याचे नाव</th>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200">राज्य प्रतिनिधी</th>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200">विभागीय प्रतिनिधी</th>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200">जिल्हा पदाधिकारी</th>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200">तालुका पदाधिकारी</th>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200 font-bold text-[#193568]">एकूण पदाधिकारी</th>
-                    <th className="py-2.5 px-3 text-center border-r border-slate-200">सदस्य (नोंदणी)</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">राज्य प्रतिनिधी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">विभागीय प्रतिनिधी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">जिल्हा पदाधिकारी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">तालुका पदाधिकारी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200 font-bold text-[#193568]">एकूण पदाधिकारी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">गटशिक्षणाधिकारी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">शिक्षण विस्तार अधिकारी</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200">केंद्रप्रमुख</th>
+                    <th className="py-2.5 px-2 text-center border-r border-slate-200 font-bold text-[#df6b16]">एकूण सदस्य</th>
                     <th className="py-2.5 px-3 text-center font-bold text-[#9a460b]">एकूण बेरीज</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {districtMatrixStats.map((st, idx) => (
                     <tr key={st.district} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 text-center font-semibold text-slate-600 font-mono tabular-nums border-r border-slate-200">
+                      <td className="py-2 px-2 text-center font-semibold text-slate-600 font-mono tabular-nums border-r border-slate-200">
                         {idx + 1}
                       </td>
                       <td className="py-2 px-3 font-semibold text-[#193568] border-r border-slate-200">
                         {st.district}
                       </td>
-                      <td className="py-2 px-3 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.stateRep)}
                       </td>
-                      <td className="py-2 px-3 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.divRep)}
                       </td>
-                      <td className="py-2 px-3 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.distOfficial)}
                       </td>
-                      <td className="py-2 px-3 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.talukaOfficial)}
                       </td>
-                      <td className="py-2 px-3 text-center font-bold text-[#193568] bg-slate-50 font-mono tabular-nums border-r border-slate-200">
+                      <td className="py-2 px-2 text-center font-bold text-[#193568] bg-slate-50 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.officialsTotal)}
                       </td>
-                      <td className="py-2 px-3 text-center font-semibold text-[#df6b16] font-mono tabular-nums border-r border-slate-200">
-                        {toEnglishDigits(st.members)}
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                        {toEnglishDigits(st.beoCount)}
+                      </td>
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                        {toEnglishDigits(st.extOfficerCount)}
+                      </td>
+                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
+                        {toEnglishDigits(st.headmasterCount)}
+                      </td>
+                      <td className="py-2 px-2 text-center font-bold text-[#df6b16] bg-amber-50/40 font-mono tabular-nums border-r border-slate-200">
+                        {toEnglishDigits(st.membersTotal)}
                       </td>
                       <td className="py-2 px-3 text-center font-bold text-slate-900 bg-amber-50/60 font-mono tabular-nums">
                         {toEnglishDigits(st.rowTotal)}
@@ -2642,23 +2649,32 @@ export const AppointmentsTab: React.FC = () => {
                     <td colSpan={2} className="py-3 px-3 text-center border-r border-slate-700 text-sm font-bold">
                       सर्व बेरीज (Grand Total)
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.stateRep)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.divRep)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.distOfficial)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-mono tabular-nums text-slate-100">
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.talukaOfficial)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-bold font-mono tabular-nums text-[#efb24b] bg-[#11254a]">
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-bold font-mono tabular-nums text-[#efb24b] bg-[#11254a]">
                       {toEnglishDigits(matrixTotals.officialsTotal)}
                     </td>
-                    <td className="py-3 px-3 text-center border-r border-slate-700 text-sm font-bold font-mono tabular-nums text-amber-300">
-                      {toEnglishDigits(matrixTotals.members)}
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
+                      {toEnglishDigits(matrixTotals.beoCount)}
+                    </td>
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
+                      {toEnglishDigits(matrixTotals.extOfficerCount)}
+                    </td>
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
+                      {toEnglishDigits(matrixTotals.headmasterCount)}
+                    </td>
+                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-bold font-mono tabular-nums text-amber-300 bg-[#11254a]">
+                      {toEnglishDigits(matrixTotals.membersTotal)}
                     </td>
                     <td className="py-3 px-3 text-center text-sm font-bold font-mono tabular-nums text-white bg-[#0e1f3d]">
                       {toEnglishDigits(matrixTotals.grandTotal)}

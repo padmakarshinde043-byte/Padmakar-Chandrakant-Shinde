@@ -1,0 +1,3192 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - अधिकृत पोर्टल</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800;900&family=Rozha+One&family=Yantramanav:wght@400;500;700;900&family=Yatra+One&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- html2canvas and jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root {
+      --maroon: #700f13;
+      --navy: #1e3a8a;
+      --gold-dark: #b8860b;
+      --gold-border: #d4af37;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --accent: #b45309;
+      --soft-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+      --capsule-shadow: 0 3px 10px rgba(184, 134, 11, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Yantramanav', 'Noto Sans Devanagari', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: #1e293b;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      width: 100%;
+    }
+
+    header {
+      background: #ffffff;
+      padding: 0;
+      margin: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-bottom: 2px solid var(--gold-border);
+      user-select: none;
+      width: 100%;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #fffdf7;
+    }
+
+    .main-header-banner-img {
+      width: 100%;
+      max-width: 1050px;
+      height: auto;
+      max-height: 220px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 12px auto;
+      padding: 0 10px;
+      width: 100%;
+      flex: 1;
+    }
+
+    .action-panel-top {
+      background: var(--card);
+      padding: 12px 16px;
+      border-radius: 16px;
+      box-shadow: var(--soft-shadow);
+      margin-bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1.8px solid var(--gold-border);
+      width: 100%;
+    }
+
+    @media (min-width: 600px) {
+      .action-panel-top {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+
+    .district-label-bold {
+      font-weight: 900;
+      font-size: 16.5px;
+      color: var(--navy);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .select-district-field-large {
+      padding: 9px 16px;
+      border-radius: 50px;
+      border: 2px solid #cbd5e1;
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f2b48;
+      outline: none;
+      width: 100%;
+      cursor: pointer;
+      background-color: #f8fafc;
+      transition: all 0.2s;
+    }
+
+    .select-district-field-large:focus {
+      border-color: var(--accent);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.15);
+    }
+
+    .select-district-field-large:disabled {
+      background-color: #f1f5f9;
+      color: #0f2b48;
+      cursor: not-allowed;
+      border-color: #d4af37;
+    }
+
+    @media (min-width: 600px) {
+      .select-district-field-large { width: 290px; }
+    }
+
+    .tabs-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+      width: 100%;
+    }
+
+    .nav-tab {
+      flex: 1 1 calc(50% - 8px);
+      padding: 10px 10px;
+      outline: none;
+      background: #ffffff;
+      border: 1.5px solid var(--gold-border);
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #334155;
+      border-radius: 30px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    .tab-full-width-mobile { flex: 1 1 100%; }
+
+    @media (min-width: 768px) {
+      .tabs-wrapper { flex-wrap: nowrap; }
+      .nav-tab, .tab-full-width-mobile { flex: 1; }
+    }
+
+    .nav-tab.active {
+      background: linear-gradient(135deg, #d4af37, #b8860b);
+      color: #ffffff;
+      border-color: #996515;
+      box-shadow: var(--capsule-shadow);
+      transform: translateY(-1px);
+    }
+
+    .tab-lock {
+      font-size: 9px;
+      background: #ef4444;
+      color: white;
+      padding: 1px 5px;
+      border-radius: 50px;
+    }
+
+    .btn {
+      padding: 7px 16px;
+      border: none;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .btn-gold { background: linear-gradient(135deg, #d4af37, #b8860b); color: white; }
+    .btn-outline { background: #ffffff; border: 1.5px solid #334155; color: #334155; }
+    .btn-wa { background: #25D366; color: white; }
+    .btn-view { background: #0284c7; color: white; }
+    .btn-edit { background: #f59e0b; color: white; border-radius: 6px; padding: 5px 10px; font-size: 12px; }
+    .btn-del { background: #ef4444; color: white; border-radius: 6px; padding: 5px 10px; font-size: 12px; }
+
+    /* [PATCH 1 START] App-Card Layout & Responsive Table Styles */
+    .app-cards-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .member-app-card {
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 14px 16px;
+      border: 1.2px solid #e2e8f0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .member-app-card:hover {
+      border-color: var(--gold-border);
+    }
+
+    .card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .card-sr-no {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .card-name-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #0f2b48;
+      line-height: 1.3;
+      flex: 1;
+    }
+
+    .card-appointed-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      color: #851216;
+      border: 1.5px solid #d4af37;
+      padding: 4px 12px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: 800;
+      width: fit-content;
+    }
+
+    .card-meta-info {
+      font-size: 13.5px;
+      color: #475569;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .card-bottom-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px dashed #e2e8f0;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .desktop-table-view { 
+      display: none; 
+    }
+
+    @media (min-width: 820px) {
+      .desktop-table-view { display: block; }
+      .app-cards-container { display: none; }
+    }
+    /* [PATCH 1 END] */
+
+    .table-card {
+      background: var(--card);
+      border-radius: 14px;
+      overflow-x: auto;
+      box-shadow: var(--soft-shadow);
+      border: 1px solid var(--border);
+      width: 100%;
+    }
+
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 12px 14px;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    td { padding: 11px 14px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+
+    .designer-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (min-width: 900px) {
+      .designer-layout { grid-template-columns: 360px 1fr; }
+    }
+
+    .designer-controls {
+      background: #ffffff;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--soft-shadow);
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .control-sec {
+      margin-bottom: 12px;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 8px;
+    }
+
+    .control-sec h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      margin-bottom: 6px;
+    }
+
+    .control-row label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #64748b;
+    }
+
+    .control-row input, .control-row textarea, .control-row select {
+      padding: 6px 10px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12.5px;
+      outline: none;
+    }
+
+    .element-visibility-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      margin-top: 4px;
+    }
+
+    .element-check-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: #f1f5f9;
+      padding: 4px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .designer-preview-wrap {
+      background: #cbd5e1;
+      padding: 12px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: auto;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.06);
+      width: 100%;
+    }
+
+    .a4-container {
+      width: 794px;
+      height: 1123px;
+      min-width: 794px;
+      max-width: 794px;
+      min-height: 1123px;
+      max-height: 1123px;
+      padding: 24px 32px;
+      background: #ffffff;
+      margin: 0 auto;
+      box-sizing: border-box;
+      position: relative;
+      color: #111;
+      background-size: 100% 100% !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    .a4-inner {
+      border: 2px solid #851216;
+      outline: 1.5px solid #d4af37;
+      outline-offset: -5px;
+      padding: 10px 14px;
+      height: 100%;
+      width: 100%;
+      position: relative;
+      background: transparent;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .canvas-node {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      background: transparent;
+      box-sizing: border-box;
+      transition: outline 0.15s;
+    }
+
+    .canvas-node:hover { outline: 1.5px dashed var(--accent); }
+
+    .node-resize-handle {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      width: 14px;
+      height: 14px;
+      background: #0284c7;
+      border: 2px solid #ffffff;
+      border-radius: 3px;
+      cursor: se-resize;
+      display: none;
+      z-index: 25;
+    }
+
+    .canvas-node:hover .node-resize-handle { display: block; }
+
+    .node-delete-btn {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 18px;
+      height: 18px;
+      background: #ef4444;
+      color: white;
+      border: 1.5px solid white;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      z-index: 26;
+    }
+
+    .canvas-node:hover .node-delete-btn { display: flex; }
+
+    .letterhead-card-canvas {
+      position: relative;
+      background: linear-gradient(180deg, #fffcf5 0%, #faecd0 50%, #fbf3e0 100%);
+      border-radius: 8px;
+      padding: 6px 12px;
+      border: 1.5px solid #d4af37;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      text-align: center;
+      width: 100%;
+    }
+
+    .date-outward-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5pt;
+      font-weight: 800;
+      padding-bottom: 2px;
+      border-bottom: 1.5px dashed #851216;
+      width: 100%;
+    }
+
+    .certificate-title-pill { text-align: center; width: 100%; }
+
+    .certificate-title-pill span {
+      background: linear-gradient(135deg, #851216, #991b1b);
+      color: #ffffff;
+      padding: 3px 30px;
+      font-size: 13.5pt;
+      font-weight: 700;
+      border-radius: 25px;
+      border: 1.5px solid #d4af37;
+      display: inline-block;
+    }
+
+    .to-person-box { font-size: 12pt; line-height: 1.45; width: 100%; }
+
+    .to-person-box .person-name {
+      font-size: 15.5pt;
+      font-weight: 900;
+      color: #0b1e33;
+      letter-spacing: 0.3px;
+    }
+
+    .subject-banner {
+      font-size: 12.5pt;
+      font-weight: 800;
+      background: transparent !important;
+      padding: 2px 0;
+      border: none !important;
+      width: 100%;
+      color: #0f172a;
+    }
+
+    .body-text-block {
+      font-family: 'Yantramanav', 'Noto Sans Devanagari', sans-serif !important;
+      font-size: 13pt;
+      font-weight: 500;
+      line-height: 1.55;
+      text-align: justify;
+      color: #111;
+      width: 100%;
+    }
+
+    .body-text-block p {
+      margin-bottom: 6px;
+      text-indent: 20px;
+    }
+
+    .appointment-callout {
+      padding: 4px 0;
+      text-align: center;
+      width: 100%;
+    }
+
+    .appointment-callout .post-badge {
+      font-family: 'Rozha One', 'Yatra One', cursive;
+      font-size: 21pt;
+      font-weight: 800;
+      color: #851216;
+      display: block;
+      margin: 1px 0;
+    }
+
+    .single-sign-card {
+      width: 100%;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: transparent;
+    }
+
+    .uploaded-sign-img {
+      max-height: 44px;
+      object-fit: contain;
+      margin-bottom: 2px;
+      display: none;
+    }
+
+    .single-sign-card .slot-name {
+      font-size: 12pt;
+      font-weight: 700;
+      border-top: none !important;
+      padding-top: 3px;
+      color: #000;
+      width: 100%;
+    }
+
+    .single-sign-card .slot-role {
+      font-size: 10pt;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    .custom-inserted-img {
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      display: block;
+    }
+
+    .modal-wrap {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 99999;
+      padding: 8px;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 18px;
+      width: 100%;
+      max-width: 600px;
+      max-height: 94vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-content.preview-mode {
+      max-width: 840px;
+      background: #334155;
+      height: 96vh;
+      overflow: hidden;
+    }
+
+    .modal-header-bar {
+      padding: 14px 18px;
+      background: linear-gradient(135deg, #1f2937, #b8860b);
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .close-x {
+      background: transparent;
+      border: none;
+      color: white;
+      font-size: 26px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-body { padding: 18px 20px; }
+
+    .form-item { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 6px; 
+      margin-bottom: 12px; 
+    }
+    
+    .form-item label { 
+      font-size: 14.5px; 
+      font-weight: 800; 
+      color: #334155; 
+      letter-spacing: 0.2px;
+    }
+    
+    .form-item input, 
+    .form-item select,
+    .modal-body .select-district-field { 
+      padding: 10px 14px; 
+      border: 1.8px solid #cbd5e1; 
+      border-radius: 10px; 
+      font-size: 15.5px; 
+      font-weight: 600;
+      color: #0f172a;
+      outline: none; 
+      background: #ffffff;
+      transition: all 0.2s;
+    }
+
+    .form-item input:focus, 
+    .form-item select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(180, 83, 9, 0.15);
+    }
+
+    #mobilePreviewWrapper {
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 10px 0;
+      background: #475569;
+    }
+
+    #scaledLetterContainer { transform-origin: top center; }
+
+    .row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+    .row-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 10px; }
+
+    @media (max-width: 650px) {
+      .row-3, .row-2 { grid-template-columns: 1fr; }
+    }
+
+    .post-manager-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f8fafc;
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin-bottom: 5px;
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+    .post-manager-actions {
+      display: flex;
+      gap: 4px;
+    }
+    .btn-icon-xs {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 3px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .btn-icon-xs:hover { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+
+  <!-- Header Banner -->
+  <header id="mainHeaderTitle" title="३ वेळा क्लिक करा (मुख्य ॲडमिन पॅनल)">
+    <img src="heding.jpg" alt="महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" class="main-header-banner-img" onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/padmakarshinde043-byte/RK2026/main/heding.jpg';">
+  </header>
+
+  <div class="container">
+    
+    <!-- १. सर्वात वर ठळक जिल्हा निवड पॅनल -->
+    <div class="action-panel-top">
+      <div style="display:flex; align-items:center; gap:10px; width:100%; flex-wrap:wrap;">
+        <label for="districtSelect" class="district-label-bold">
+          <i class="fa-solid fa-location-dot" style="color:var(--accent); font-size:18px;"></i> जिल्हा निवडा:
+        </label>
+        <select id="districtSelect" class="select-district-field-large" onchange="onDistrictChange()">
+        </select>
+        
+        <button id="resetDistrictPassBtn" class="btn btn-outline" style="display:none; padding:6px 14px; font-size:12px; white-space:nowrap;" onclick="adminResetCurrentDistrictPassword()" title="या जिल्ह्याचा पासवर्ड AD2026 वर रिसेट करा">
+          <i class="fa-solid fa-key" style="color:#ef4444;"></i> पासवर्ड रिसेट
+        </button>
+      </div>
+      <div style="font-weight:800; color:#334155; font-size:15px; white-space:nowrap;">
+        नोंदणीकृत पदाधिकारी: <span id="memberCount" style="color:var(--accent); font-size:19px; font-weight:900;">0</span>
+      </div>
+    </div>
+
+    <!-- [PATCH 2 START] २. सुधारित नावांसह तीन प्रमुख टॅब्स + ॲडमिन टॅब -->
+    <div class="tabs-wrapper">
+      <button class="nav-tab active" onclick="switchTab('tab-directory')">
+        <i class="fa-solid fa-users"></i> पदाधिकारी
+      </button>
+      <button class="nav-tab" onclick="unlockManageTab()">
+        <i class="fa-solid fa-user-shield"></i> जिल्हाध्यक्ष लॉगिन <span class="tab-lock" id="manageLockBadge"><i class="fa-solid fa-lock"></i></span>
+      </button>
+      <button class="nav-tab tab-full-width-mobile" onclick="unlockLettersTab()">
+        <i class="fa-solid fa-crown"></i> राज्याध्यक्ष लॉगिन <span class="tab-lock" id="letterLockBadge"><i class="fa-solid fa-lock"></i></span>
+      </button>
+      
+      <button class="nav-tab tab-full-width-mobile" id="adminDesignerTabBtn" style="display:none;" onclick="switchTab('tab-designer')">
+        <i class="fa-solid fa-wand-magic-sparkles"></i> ॲडमिन पॅनल (Master Studio)
+      </button>
+    </div>
+
+    <!-- TAB 1: पदाधिकारी (सार्वजनिक यादी - ॲप कार्ड + डेस्कटॉप टेबल) -->
+    <div id="tab-directory" class="tab-view">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 id="directoryHeading" style="font-size:17px; font-weight:900; color:var(--navy);"></h3>
+      </div>
+
+      <!-- मोबाईल ॲप कार्ड व्ह्यू -->
+      <div id="directoryAppCards" class="app-cards-container"></div>
+
+      <!-- डेस्कटॉप टेबल व्ह्यू -->
+      <div class="table-card desktop-table-view">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:50px; text-align:center;">अनु.</th>
+              <th>पदाधिकाऱ्याचे संपूर्ण नाव</th>
+              <th>सध्याचे पद व कार्यक्षेत्र</th>
+              <th>महासंघातील बहाल केलेले पद</th>
+            </tr>
+          </thead>
+          <tbody id="directoryTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 2: जिल्हाध्यक्ष लॉगिन (व्यवस्थापन) -->
+    <div id="tab-manage" class="tab-view" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:8px; flex-wrap:wrap;">
+        <div>
+          <h3 style="font-size:16px; font-weight:800; color:var(--navy);">जिल्हा पदाधिकारी व्यवस्थापन</h3>
+          <small id="districtLockNotice" style="color:#047857; font-weight:800;"></small>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="logoutDistrictLock()">
+            <i class="fa-solid fa-right-from-bracket"></i> लॉगआउट करा
+          </button>
+          <button class="btn btn-gold" onclick="openAddModal()">
+            <i class="fa-solid fa-plus-circle"></i> नवीन पदाधिकारी जोडा
+          </button>
+        </div>
+      </div>
+
+      <!-- मोबाईल कार्ड व्ह्यू -->
+      <div id="manageAppCards" class="app-cards-container"></div>
+
+      <!-- डेस्कटॉप टेबल व्ह्यू -->
+      <div class="table-card desktop-table-view">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px; text-align:center;">अनु.</th>
+              <th>पदाधिकाऱ्याचे नाव</th>
+              <th>सध्याचे पद व कार्यक्षेत्र</th>
+              <th>बहाल केलेले पद</th>
+              <th>व्हॉट्सअ‍ॅप नंबर</th>
+              <th style="text-align:center; width:90px;">कृती</th>
+            </tr>
+          </thead>
+          <tbody id="manageTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB 3: राज्याध्यक्ष लॉगिन (नियुक्ती पत्रे व WhatsApp) -->
+    <div id="tab-letters" class="tab-view" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:8px; flex-wrap:wrap;">
+        <h3 style="font-size:16px; font-weight:800; color:var(--navy);">अधिकृत नियुक्ती पत्र वितरण व प्रेषण</h3>
+        <button class="btn btn-gold" id="dirDownloadBtn" onclick="downloadDirectoryMultiPagePDF()">
+          <i class="fa-solid fa-file-pdf"></i> अधिकृत जिल्हा कार्यकारिणी यादी (PDF डाऊनलोड)
+        </button>
+      </div>
+
+      <!-- मोबाईल कार्ड व्ह्यू -->
+      <div id="lettersAppCards" class="app-cards-container"></div>
+
+      <!-- डेस्कटॉप टेबल व्ह्यू -->
+      <div class="table-card desktop-table-view">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px; text-align:center;">अनु.</th>
+              <th>पदाधिकाऱ्याचे नाव</th>
+              <th>बहाल केलेले पद</th>
+              <th style="text-align:center;">प्रमाणपत्र पहा</th>
+              <th style="text-align:center;">WhatsApp वर पाठवा</th>
+            </tr>
+          </thead>
+          <tbody id="lettersTableBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- [PATCH 2 END] -->
+
+    <!-- TAB 4: ADVANCED DESIGNER STUDIO (Master Dev Admin - Pcs@3506) -->
+    <div id="tab-designer" class="tab-view" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+        <div>
+          <h3 style="font-size:16px; font-weight:800; color:var(--navy);">
+            <i class="fa-solid fa-palette" style="color:var(--accent);"></i> मुख्य ॲडमिन पॅनल (Master Studio)
+          </h3>
+          <small style="color:#64748b;">पदे व्यवस्थापन, तालुका टॅगिंग, पासवर्ड रिसेट व नियुक्तीपत्र डिझाइन.</small>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn btn-gold" onclick="saveDesignToCloud()">
+            <i class="fa-solid fa-cloud-arrow-up"></i> सेव्ह करा
+          </button>
+          <button class="btn btn-outline" onclick="resetDesignerDefaults()">
+            <i class="fa-solid fa-arrow-rotate-left"></i> रिसेट
+          </button>
+          <button class="btn btn-gold" onclick="downloadCurrentLetterPDF()">
+            <i class="fa-solid fa-file-pdf"></i> नमुना पत्र डाऊनलोड
+          </button>
+        </div>
+      </div>
+
+      <div class="designer-layout">
+        <div class="designer-controls">
+          <!-- १. बहाल करावयाची पदे व्यवस्थापन -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-sitemap"></i> बहाल करावयाची पदे व्यवस्थापन</h4>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px; background:#f1f5f9; padding:8px; border-radius:8px;">
+              <input type="text" id="newPostNameInput" placeholder="उदा. तालुका कार्याध्यक्ष" style="padding:6px 8px; font-size:12.5px; border:1px solid #cbd5e1; border-radius:6px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <label style="font-size:11.5px; font-weight:700; color:#334155; display:flex; align-items:center; gap:5px; cursor:pointer;">
+                  <input type="checkbox" id="newPostNeedsTalukaChk"> हे पद तालुक्याशी संबंधित आहे का?
+                </label>
+                <button class="btn btn-gold" style="padding:5px 14px; font-size:12px;" onclick="addNewAppointedPost()"><i class="fa-solid fa-plus"></i> पद जोडा</button>
+              </div>
+            </div>
+            <div id="postListManagerBox" style="max-height:200px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:6px;"></div>
+          </div>
+
+          <!-- २. जिल्हा पासवर्ड रिसेट -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-key"></i> जिल्हा पासवर्ड रिसेट (Master)</h4>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <select id="superAdminDistrictSelect" class="select-district-field-large" style="width:100%; padding:7px; font-size:15px;"></select>
+              <button class="btn btn-outline" style="color:#ef4444; border-color:#ef4444;" onclick="superAdminResetPassword()">
+                पासवर्ड पुन्हा AD2026 करा
+              </button>
+            </div>
+          </div>
+
+          <!-- ३. घटक दाखवा / लपवा -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-trash-can"></i> घटक दाखवा / लपवा (Delete/Restore)</h4>
+            <div class="element-visibility-grid">
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-header" onchange="toggleNodeVisibility('node-header', this.checked)"> हेडर बॅनर (अक्षरी)
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-outward" checked onchange="toggleNodeVisibility('node-outward', this.checked)"> नियुक्ती पत्र क्र. व दिनांक
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-title" checked onchange="toggleNodeVisibility('node-title', this.checked)"> पत्र शीर्षक
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-recipient" checked onchange="toggleNodeVisibility('node-recipient', this.checked)"> प्रति / व्यक्ती
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-subject" checked onchange="toggleNodeVisibility('node-subject', this.checked)"> विषय पट्टी
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-body" checked onchange="toggleNodeVisibility('node-body', this.checked)"> मुख्य मजकूर (१ व २)
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-callout" checked onchange="toggleNodeVisibility('node-callout', this.checked)"> पद सन्मान बॅनर
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-para3" checked onchange="toggleNodeVisibility('node-body-para3', this.checked)"> पॅराग्राफ ३
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-sign1" checked onchange="toggleNodeVisibility('node-sign-left', this.checked)"> स्वाक्षरी १ (सरचिटणीस)
+              </label>
+              <label class="element-check-label">
+                <input type="checkbox" id="chk-sign2" checked onchange="toggleNodeVisibility('node-sign-right', this.checked)"> स्वाक्षरी २ (राज्याध्यक्ष)
+              </label>
+            </div>
+          </div>
+
+          <!-- ४. नवीन इमेज इन्सर्ट / बॅकग्राउंड -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-file-image"></i> नवीन इमेज इन्सर्ट / बॅकग्राउंड</h4>
+            <div class="control-row">
+              <label>पार्श्वभूमी (A4 Background Image - Exact Fit):</label>
+              <input type="file" id="dsBgUpload" accept="image/*" onchange="handleBgUpload(event)">
+            </div>
+            <div class="control-row" style="margin-top: 6px;">
+              <label>नवीन इमेज इन्सर्ट करा (Insert Custom Image / Letterhead):</label>
+              <input type="file" id="dsCustomImgUpload" accept="image/*" onchange="insertNewImage(event)">
+            </div>
+          </div>
+
+          <!-- ५. स्वाक्षरी संपादन -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-signature"></i> स्वाक्षरी संपादन (दोन्ही स्वतंत्र)</h4>
+            <div class="control-row">
+              <label>स्वाक्षरी १ (सरचिटणीस) नाव:</label>
+              <input type="text" id="dsSign1Name" value="( श्री. विजय सावंत )" oninput="updateSignTexts()">
+            </div>
+            <div class="control-row">
+              <label>स्वाक्षरी १ पद व संस्था:</label>
+              <input type="text" id="dsSign1Role" value="राज्य सरचिटणीस&#10;महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" oninput="updateSignTexts()">
+            </div>
+            <div class="control-row" style="margin-top: 6px;">
+              <label>स्वाक्षरी २ (राज्याध्यक्ष) नाव:</label>
+              <input type="text" id="dsSign2Name" value="( श्री. राजेंद्र खैरनार )" oninput="updateSignTexts()">
+            </div>
+            <div class="control-row">
+              <label>स्वाक्षरी २ पद व संस्था:</label>
+              <input type="text" id="dsSign2Role" value="संस्थापक राज्याध्यक्ष&#10;महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" oninput="updateSignTexts()">
+            </div>
+            <div class="control-row">
+              <label>अध्यक्षांची स्वाक्षरी प्रतिमा (PNG):</label>
+              <input type="file" id="dsSignUpload" accept="image/*" onchange="handleSignUpload(event)">
+            </div>
+          </div>
+
+          <!-- ६. फॉन्ट व अंतर -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-font"></i> फॉन्ट व अंतर (तिन्ही परिच्छेद)</h4>
+            <div class="control-row">
+              <label>फॉन्ट आकार (Font Size - px):</label>
+              <input type="range" id="dsFontSize" min="12" max="22" value="16" oninput="updateLetterStyles()">
+            </div>
+            <div class="control-row">
+              <label>ओळीतील अंतर (Line Height):</label>
+              <input type="range" id="dsLineHeight" min="1.2" max="2.2" step="0.05" value="1.6" oninput="updateLetterStyles()">
+            </div>
+            <div class="control-row">
+              <label>मजकुराचा रंग:</label>
+              <input type="color" id="dsTextColor" value="#111111" onchange="updateLetterStyles()">
+            </div>
+          </div>
+
+          <!-- ७. मजकूर संपादन -->
+          <div class="control-sec">
+            <h4><i class="fa-solid fa-pen-to-square"></i> मजकूर संपादन</h4>
+            <div class="control-row">
+              <label>विषय ओळ:</label>
+              <input type="text" id="dsSubject" value="महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत..." oninput="updateLetterTexts()">
+            </div>
+            <div class="control-row">
+              <label>परिच्छेद १:</label>
+              <textarea id="dsPara1" rows="3" oninput="updateLetterTexts()">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ हा राज्यातील शिक्षण क्षेत्राच्या रुपांतरणासाठी झटणाऱ्या केंद्रप्रमुख व विस्तार अधिकारी संघटनांच्या हक्क-हक्कासाठी, व्यावसायिक स्वाभिमानासाठी आणि गुणवत्तापूर्ण शिक्षणासाठी कटिबद्ध असलेली अग्रगण्य संघटना आहे. महासंघाच्या गूगल फॉर्म द्वारे प्राप्त झालेल्या सर्व सदस्यांच्या उत्स्फूर्त प्रतिसादानुसार आणि जिल्हा सभेत निवड प्रक्रियेत लोकशाहीच्या मूल्यांचा आदर करत सर्वानुमते हा निर्णय घेण्यात आला आहे.</textarea>
+            </div>
+            <div class="control-row">
+              <label>परिच्छेद २:</label>
+              <textarea id="dsPara2" rows="3" oninput="updateLetterTexts()">आपला प्रदीर्घ आणि निष्कलंक सेवाप्रवास, शाळा-शिक्षणाविषयी असलेली तल्लीनता, उत्कृष्ट प्रशासकीय समन्वय आणि संघटनकौशल्यावरील आपली अढळ निष्ठा आम्ही अत्यंत जवळून अनुभवली आहे. सहकाऱ्यांच्या अडीअडचणीत धावून जाण्याची आपली वृत्ती आणि नेतृत्वगुणांची सार्थ दखल घेत, सर्व सदस्यांच्या बहुमताने व राज्य कार्यकारिणीच्या निर्णयानुसार आपणास—</textarea>
+            </div>
+            <div class="control-row">
+              <label>परिच्छेद ३ (शुभेच्छा):</label>
+              <textarea id="dsPara3" rows="4" oninput="updateLetterTexts()">हे पद केवळ सन्मानाचे प्रतीक नसून महासंघाच्या पवित्र विचारांचे धोरण आहे. केंद्रप्रमुख व विस्तार अधिकारी संवर्गाचे न्याय प्रश्न सोडवणे, आत्मसन्मान जपणे आणि सर्व सहकाऱ्यांच्या पाठीशी खंबीरपणे उभे राहणे हीच आपली मुख्य जबाबदारी आहे. सर्व सदस्यांनी आपल्यावर दाखवलेला हा विश्वास आणि आपल्या दूरदर्शी नेतृत्वाखाली संघटनेची पताका निश्चितच अभिमानाने गगनभरारी घेईल, हा ठाम विश्वास आहे. या मानाच्या नियुक्तीबद्दल आपले मनःपूर्वक अभिनंदन व भावी वाटचालीस हार्दिक शुभेच्छा!</textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Free-form A4 Workspace -->
+        <div class="designer-preview-wrap">
+          <div id="printableCertificate" class="a4-container">
+            <div class="a4-inner" id="a4CanvasArea">
+              
+              <div class="canvas-node" id="node-header" style="top: 10px; left: 14px; width: calc(100% - 28px); display: none;">
+                <button class="node-delete-btn" onclick="deleteNode('node-header')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="letterhead-card-canvas">
+                  <div style="position: absolute; top: 2px; right: 8px; font-size: 8.5pt; font-weight: 800;">Reg. No. MH/0000555/2026</div>
+                  <div style="font-size: 19pt; font-weight: 800; color:#1e3a8a; line-height: 1.05;">महाराष्ट्र राज्य</div>
+                  <div style="font-size: 21pt; font-weight: 800; color:#6b0c10; line-height: 1.1;">केंद्रप्रमुख व अधिकारी महासंघ</div>
+                  <div style="display:inline-block; background: #fffbeb; border: 1px solid #d4af37; border-radius: 20px; padding: 1px 16px; margin: 2px 0;">
+                    <span style="font-size: 9.5pt; font-weight: 700; color:#4a0404;">शिक्षणासाठी समर्पित... अधिकाऱ्यांच्या हितासाठी...!</span>
+                  </div>
+                  <div style="font-size: 11.5pt; font-weight: 800; color:#0f2b48;">श्री. राजेंद्र शिवाजी खैरनार</div>
+                  <div style="font-size: 9.5pt; font-weight: 700;">संस्थापक राज्याध्यक्ष</div>
+                  <div style="font-size: 7.5pt; color:#333; font-weight: 600;">कार्यालय : 131, पाटणे, मालेगाव ता. मालेगाव जि. नाशिक | मो. 9860704098</div>
+                </div>
+              </div>
+
+              <!-- [PATCH 4 START] नियुक्ती पत्र क्र. ओळ -->
+              <div class="canvas-node" id="node-outward" style="top: 165px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-outward')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="date-outward-row">
+                  <div><strong>नियुक्ती पत्र क्र.:</strong> <span id="prevOutward">01</span></div>
+                  <div><strong>दिनांक:</strong> <span id="prevDate"></span></div>
+                </div>
+              </div>
+              <!-- [PATCH 4 END] -->
+
+              <div class="canvas-node" id="node-title" style="top: 195px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-title')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="certificate-title-pill">
+                  <span>॥ अधिकृत नियुक्ती पत्र ॥</span>
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-recipient" style="top: 232px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-recipient')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="to-person-box">
+                  प्रति,<br>
+                  <span class="person-name" id="prevFullName">मा. {पदाधिकाऱ्याचे नाव}</span><br>
+                  <span id="prevCurrentPost">({सध्याचे पद व कार्यक्षेत्र}, जिल्हा - {जिल्हा})</span>
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-subject" style="top: 295px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-subject')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="subject-banner" id="dispSubject">
+                  विषय: महासंघाच्या जिल्हा कार्यकारिणीवर नियुक्तीबाबत...
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-body" style="top: 330px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-body')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="body-text-block" id="dispBodyContent">
+                  <p style="font-weight:700;">सस्नेह नमस्कार,</p>
+                  <p id="dispPara1">
+                    महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ हा राज्यातील शिक्षण क्षेत्राच्या रुपांतरणासाठी झटणाऱ्या केंद्रप्रमुख व विस्तार अधिकारी संघटनांच्या हक्क-हक्कासाठी, व्यावसायिक स्वाभिमानासाठी आणि गुणवत्तापूर्ण शिक्षणासाठी कटिबद्ध असलेली अग्रगण्य संघटना आहे. महासंघाच्या गूगल फॉर्म द्वारे प्राप्त झालेल्या सर्व सदस्यांच्या उत्स्फूर्त प्रतिसादानुसार आणि जिल्हा सभेत निवड प्रक्रियेत लोकशाहीच्या मूल्यांचा आदर करत सर्वानुमते हा निर्णय घेण्यात आला आहे.
+                  </p>
+                  <p id="dispPara2">
+                    आपला प्रदीर्घ आणि निष्कलंक सेवाप्रवास, शाळा-शिक्षणाविषयी असलेली तल्लीनता, उत्कृष्ट प्रशासकीय समन्वय आणि संघटनकौशल्यावरील आपली अढळ निष्ठा आम्ही अत्यंत जवळून अनुभवली आहे. सहकाऱ्यांच्या अडीअडचणीत धावून जाण्याची आपली वृत्ती आणि नेतृत्वगुणांची सार्थ दखल घेत, सर्व सदस्यांच्या बहुमताने व राज्य कार्यकारिणीच्या निर्णयानुसार आपणास—
+                  </p>
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-callout" style="top: 510px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-callout')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="appointment-callout">
+                  <div style="font-size:12pt; color:#334155; font-weight:700;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या <strong id="prevAnnounceDistrict" style="color:#000;">{जिल्हा}</strong> जिल्हा कार्यकारिणीवर</div>
+                  <div class="post-badge" id="prevPostTitle">⭐ « {बहाल पद} » ⭐</div>
+                  <div style="font-size:12pt; color:#851216; font-weight:700;">या अत्यंत सन्मानाच्या व जबाबदारीच्या पदावर गौरवपूर्ण नियुक्ती करण्यात येत आहे.</div>
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-body-para3" style="top: 615px; left: 14px; width: calc(100% - 28px);">
+                <button class="node-delete-btn" onclick="deleteNode('node-body-para3')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="body-text-block">
+                  <p id="dispPara3" style="margin: 0;">
+                    हे पद केवळ सन्मानाचे प्रतीक नसून महासंघाच्या पवित्र विचारांचे धोरण आहे. केंद्रप्रमुख व विस्तार अधिकारी संवर्गाचे न्याय प्रश्न सोडवणे, आत्मसन्मान जपणे आणि सर्व सहकाऱ्यांच्या पाठीशी खंबीरपणे उभे राहणे हीच आपली मुख्य जबाबदारी आहे. सर्व सदस्यांनी आपल्यावर दाखवलेला हा विश्वास आणि आपल्या दूरदर्शी नेतृत्वाखाली संघटनेची पताका निश्चितच अभिमानाने गगनभरारी घेईल, हा ठाम विश्वास आहे. या मानाच्या नियुक्तीबद्दल आपले मनःपूर्वक अभिनंदन व भावी वाटचालीस हार्दिक शुभेच्छा!
+                  </p>
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-sign-left" style="top: 760px; left: 20px; width: 240px;">
+                <button class="node-delete-btn" onclick="deleteNode('node-sign-left')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="single-sign-card">
+                  <div style="height:32px;"></div>
+                  <div class="slot-name" id="dispSign1Name">( श्री. विजय सावंत )</div>
+                  <div class="slot-role" id="dispSign1Role">राज्य सरचिटणीस<br>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+                </div>
+              </div>
+
+              <div class="canvas-node" id="node-sign-right" style="top: 760px; right: 20px; width: 240px;">
+                <button class="node-delete-btn" onclick="deleteNode('node-sign-right')" title="हटवा">&times;</button>
+                <div class="node-resize-handle"></div>
+                <div class="single-sign-card">
+                  <img id="presidentSignImg" class="uploaded-sign-img" alt="स्वाक्षरी">
+                  <div class="slot-name" id="dispSign2Name">( श्री. राजेंद्र खैरनार )</div>
+                  <div class="slot-role" id="dispSign2Role">संस्थापक राज्याध्यक्ष<br>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MODAL: Clean PDF Preview (पूर्वदृश्य पॉपअप) -->
+  <div id="cleanViewModal" class="modal-wrap">
+    <div class="modal-content preview-mode">
+      <div class="modal-header-bar">
+        <h3 id="cleanViewTitle" style="font-size:15px; font-weight:800;">अधिकृत नियुक्ती पत्र (A4 पूर्वदृश्य)</h3>
+        <button class="close-x" onclick="closeModal('cleanViewModal')">&times;</button>
+      </div>
+      <div id="mobilePreviewWrapper">
+        <div id="scaledLetterContainer">
+          <div id="cleanPdfContainer"></div>
+        </div>
+      </div>
+      <div style="padding:10px 16px; background:#fff; display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn btn-outline" onclick="closeModal('cleanViewModal')">बंद करा</button>
+        <button class="btn btn-gold" onclick="downloadCurrentLetterPDF()">
+          <i class="fa-solid fa-file-pdf"></i> उच्च दर्जाची PDF डाऊनलोड
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- [PATCH 3 START] MODAL: Add / Edit Official (सर्व फील्ड्स बंधनकारक + इतर पद + कार्यक्षेत्र तालुका) -->
+  <div id="memberModal" class="modal-wrap">
+    <div class="modal-content">
+      <div class="modal-header-bar">
+        <h3 id="modalTitle" style="font-size:16px; font-weight:800;">नवीन पदाधिकारी नोंदणी</h3>
+        <button class="close-x" onclick="closeModal('memberModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="memberForm" onsubmit="handleFormSubmit(event)">
+          <input type="hidden" id="editIndex" value="-1">
+
+          <div style="display:flex; gap:12px; margin-bottom:12px;">
+            <div style="width:120px;" class="form-item">
+              <label>आदरार्थी *</label>
+              <select id="salutation" required>
+                <option value="श्री.">श्री.</option>
+                <option value="श्रीमती">श्रीमती</option>
+                <option value="सौ.">सौ.</option>
+                <option value="डॉ.">डॉ.</option>
+              </select>
+            </div>
+            <div style="flex:1;" class="form-item">
+              <label>जिल्हा (लॉक):</label>
+              <input type="text" id="formDistrict" readonly style="background:#f1f5f9; font-weight:800; cursor:not-allowed;">
+            </div>
+          </div>
+
+          <div class="row-3">
+            <div class="form-item">
+              <label>प्रथम नाव *</label>
+              <input type="text" id="firstName" required>
+            </div>
+            <div class="form-item">
+              <label>मधले नाव *</label>
+              <input type="text" id="middleName" required>
+            </div>
+            <div class="form-item">
+              <label>आडनाव *</label>
+              <input type="text" id="lastName" required>
+            </div>
+          </div>
+
+          <!-- सध्याचे पद -->
+          <div class="row-2">
+            <div class="form-item">
+              <label>सध्याचे संवर्ग पद *</label>
+              <select id="currentCadre" onchange="toggleCurrentCadreOther(this.value)" required>
+                <option value="केंद्रप्रमुख">केंद्रप्रमुख</option>
+                <option value="विस्तार अधिकारी">विस्तार अधिकारी</option>
+                <option value="इतर">इतर (स्वतः टाईप करा)</option>
+              </select>
+            </div>
+            <div class="form-item" id="customCadreDiv" style="display:none;">
+              <label>सध्याचे पद टाईप करा *</label>
+              <input type="text" id="customCadreInput">
+            </div>
+          </div>
+
+          <!-- मूळ केंद्र/बीट आणि कार्यक्षेत्र तालुका -->
+          <div class="row-2">
+            <div class="form-item">
+              <label>मूळ केंद्र / बीट *</label>
+              <input type="text" id="workingPlace" required>
+            </div>
+            <div class="form-item">
+              <label>कार्यक्षेत्र तालुका निवडा *</label>
+              <select id="workingTalukaSelect" required>
+              </select>
+            </div>
+          </div>
+
+          <div class="row-2">
+            <div class="form-item">
+              <label>बहाल करण्यात येणारे पद *</label>
+              <select id="appointedPost" onchange="togglePostDetails(this.value)" required>
+              </select>
+            </div>
+
+            <!-- बहाल पदासाठी तालुका ड्रॉपडाउन -->
+            <div class="form-item" id="talukaNameDiv" style="display:none;">
+              <label>बहाल पदाचा तालुका निवडा *</label>
+              <select id="talukaSelectField">
+              </select>
+            </div>
+
+            <div class="form-item" id="customPostDiv" style="display:none;">
+              <label>पदाचे नाव टाईप करा *</label>
+              <input type="text" id="customPost">
+            </div>
+          </div>
+
+          <div class="form-item">
+            <label>व्हॉट्सअ‍ॅप मोबाईल नंबर (10 अंक इंग्रजीत) *</label>
+            <input type="tel" id="mobileNumber" pattern="[0-9]{10}" required>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+            <button type="button" class="btn btn-outline" style="padding:9px 20px;" onclick="closeModal('memberModal')">रद्द करा</button>
+            <button type="submit" class="btn btn-gold" id="saveBtn" style="padding:9px 24px;"><i class="fa-solid fa-cloud-arrow-up"></i> सेव्ह करा</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <!-- [PATCH 3 END] -->
+
+  <!-- MULTI-PAGE STRICT DIRECTORY PDF ENGINE (२१०px लेटरपॅड व ऑफिशियल फॉरमॅट) -->
+  <div style="display:none;">
+    <div id="pdfMultiPageRenderContainer" style="width: 794px; background: white; color: black; font-family: 'Yantramanav', sans-serif;">
+    </div>
+  </div>
+
+  <!-- FIREBASE REALTIME DB SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, set, remove, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8IcRu9n0XnaNpdDdoeSo277hug6HVM5c",
+      authDomain: "rk2026-207ee.firebaseapp.com",
+      databaseURL: "https://rk2026-207ee-default-rtdb.firebaseio.com",
+      projectId: "rk2026-207ee",
+      storageBucket: "rk2026-207ee.firebasestorage.app",
+      messagingSenderId: "745057745062",
+      appId: "1:745057745062:web:4417262c9468cc955bdc67",
+      measurementId: "G-80JGVSTT29"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    window.rtdb = db;
+    window.dbRef = ref;
+    window.dbSet = set;
+    window.dbRemove = remove;
+
+    onValue(ref(db, 'officials'), (snapshot) => {
+      const data = snapshot.val();
+      window.membersData = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+      window.statewideSerialMap = null; // नवीन डेटा आल्यावर कॅश रिफ्रेश करणे
+      window.renderAll();
+    });
+
+    onValue(ref(db, 'district_passwords'), (snapshot) => {
+      window.districtPasswords = snapshot.val() || {};
+    });
+
+    onValue(ref(db, 'custom_appointed_posts_v2'), (snapshot) => {
+      const posts = snapshot.val();
+      if (posts && Array.isArray(posts) && posts.length > 0) {
+        window.appointedPostsList = posts;
+      }
+      window.renderAppointedPosts();
+    });
+
+    onValue(ref(db, 'appointment_master_design'), (snapshot) => {
+      const design = snapshot.val();
+      if (design && design.layout) {
+        window.applyDesignPayload(design);
+      }
+    });
+  </script>
+
+  <script>
+    const districtTalukasMap = {
+      "अहिल्यानगर": ["नगर", "पारनेर", "श्रीगोंदा", "कर्जत", "जामखेड", "शेवगाव", "पाथर्डी", "नेवासा", "राहुरी", "संगमनेर", "अकोले", "कोपरगाव", "श्रीरामपूर", "राहाता"],
+      "अकोला": ["अकोला", "आकोट", "तेल्हारा", "बाळापूर", "पातूर", "बार्शीटाकळी", "मुर्तिजापूर"],
+      "अमरावती": ["अमरावती", "भातकुली", "नांदगाव खंडेश्वर", "दर्यापूर", "अंजनगाव सुर्जी", "अचलपूर", "चांदूर बाजार", "मोर्शी", "वरुड", "धामणगाव रेल्वे", "चांदूर रेल्वे", "तिवसा", "धारणी", "चिखलदरा"],
+      "छत्रपती संभाजीनगर": ["छत्रपती संभाजीनगर", "गंगापूर", "वैजापूर", "कन्नड", "खुलताबाद", "पैठण", "सिल्लोड", "सोयगाव", "फुलंब्री"],
+      "भंडारा": ["भंडारा", "साकोली", "लाखनी", "लाखांदूर", "पवनी", "मोहाडी", "तुमसर"],
+      "बीड": ["बीड", "पाटोदा", "आष्टी", "गेवराई", "माजलगाव", "आंबेजोगाई", "परळी", "केज", "धारूर", "वडवणी", "शिरूर (कासार)"],
+      "बुलढाणा": ["बुलढाणा", "चिखली", "देऊळगाव राजा", "मेहकर", "सिंदखेड राजा", "लोणार", "खामगाव", "शेगाव", "नांदुरा", "मलकापूर", "मोताळा", "संग्रामपूर", "जळगाव (जामोद)"],
+      "चंद्रपूर": ["चंद्रपूर", "वरोरा", "भद्रावती", "चिमूर", "नागभीड", "ब्रह्मपुरी", "सिंदेवाही", "मूल", "सावली", "पोंभुर्णा", "बल्लारपूर", "कोरपना", "राजुरा", "जिवती", "गोंडपिपरी"],
+      "धुळे": ["धुळे", "साक्री", "शिंदखेडा", "शिरपूर"],
+      "गडचिरोली": ["गडचिरोली", "आरमोरी", "कुरखेडा", "धानोरा", "चामोर्शी", "देसाईगंज (वडसा)", "अहेरी", "सिरोंचा", "एटापल्ली", "भामरागड", "कोरची", "मुलचेरा"],
+      "गोंदिया": ["गोंदिया", "तिरोडा", "गोरेगाव", "आमगाव", "सालेकसा", "देवरी", "सडक अर्जुनी", "अर्जुनी मोरगाव"],
+      "हिंगोली": ["हिंगोली", "कळमनुरी", "वसमत", "औंढा (नागनाथ)", "सेनगाव"],
+      "जळगाव": ["जळगाव", "भुसावळ", "यावल", "रावेर", "मुक्ताईनगर", "बोदवड", "जामनेर", "पाचोरा", "भडगाव", "चाळीसगाव", "एरंडोल", "धरणगाव", "पारोळा", "अमळनेर", "चोपडा"],
+      "जालना": ["जालना", "अंबड", "बदनापूर", "भोकरदन", "जाफ्राबाद", "परतूर", "मंठा", "घनसावंगी"],
+      "कोल्हापूर": ["करवीर", "कागल", "पन्हाळा", "शाहूवाडी", "राधानगरी", "भुदरगड", "आजरा", "गडहिंग्लज", "चंदगड", "हातकणंगले", "शिरोळ", "गगनबावडा"],
+      "लातूर": ["लातूर", "औसा", "रेणापूर", "उदगीर", "अहमदपूर", "चाकूर", "शिरूर (अनंतपाळ)", "निलंगा", "देवणी", "जळकोट"],
+      "मुंबई शहर": ["मुंबई शहर"],
+      "मुंबई उपनगर": ["कुर्ला", "अंधेरी", "बोरीवली"],
+      "नागपूर": ["नागपूर शहर", "नागपूर ग्रामीण", "कामठी", "हिंगणा", "काटोल", "नरखेड", "सावनेर", "कळमेश्वर", "रामटेक", "पारशिवनी", "मौदा", "उमरेड", "भिवापूर", "कुही"],
+      "नांदेड": ["नांदेड", "बिलोली", "मुखेड", "कंधार", "लोहा", "हदगाव", "भोकर", "देगलूर", "किनवट", "मुदखेड", "हिमायतनगर", "माहूर", "धर्माबाद", "उमरी", "नायगाव (खैरगाव)", "अर्धापूर"],
+      "नंदुरबार": ["नंदुरबार", "नवापूर", "शहादा", "तळोदा", "अक्राणी (धडगाव)", "अक्कलकुवा"],
+      "नाशिक": ["नाशिक", "दिंडोरी", "इगतपुरी", "त्र्यंबकेश्वर", "निफाड", "चांदवड", "सिन्नर", "येवला", "नांदगाव", "मालेगाव", "बागलाण (सटाणा)", "कळवण", "देवळा", "सुरगाणा", "पेठ"],
+      "धाराशिव": ["धाराशिव", "तुळजापूर", "उमरगा", "लोहारा", "कळंब", "भूम", "परांडा", "वाशी"],
+      "पालघर": ["पालघर", "वसई", "डहाणू", "तलासरी", "जव्हार", "मोखाडा", "वाडा", "विक्रमगड"],
+      "परभणी": ["परभणी", "जिंतूर", "सेलू", "मानवत", "पाथरी", "सोनपेठ", "गंगाखेड", "पालम", "पूर्णा"],
+      "पुणे": ["पुणे शहर", "हवेली", "मावळ", "मुळशी", "भोर", "राजगड (वेल्हे)", "जुन्नर", "खेड", "आंबेगाव", "शिरूर", "बारामती", "इंदापूर", "दौंड", "पुरंदर"],
+      "रायगड": ["अलिबाग", "पेण", "मुरुड", "रोहा", "माणगाव", "महाड", "पोलादपूर", "म्हसळा", "श्रीवर्धन", "तळा", "सुधागड (पाली)", "खालापूर", "पनवेल", "कर्जत", "उरण"],
+      "रत्नागिरी": ["रत्नागिरी", "दापोली", "खेड", "गुहागर", "चिपळूण", "संगमेश्वर", "लांजा", "राजापूर", "मंडणगड"],
+      "सांगली": ["मिरज", "तासगाव", "कवठेमहांकाळ", "जत", "खानापूर (विटा)", "आटपाडी", "शिराळा", "वाळवा (इस्लामपूर)", "पलूस", "कडेगाव"],
+      "सातारा": ["सातारा", "जावळी", "पाटण", "कऱ्हाड", "कोरेगाव", "खटाव", "माण", "फलटण", "खंडाळा", "वाई", "महाबळेश्वर"],
+      "सिंधुदुर्ग": ["कुडाळ", "मालवण", "सावंतवाडी", "वेंगुर्ला", "कणकवली", "देवगड", "दोडामार्ग", "वैभववाडी"],
+      "सोलापूर": ["सोलापूर उत्तर", "सोलापूर दक्षिण", "बार्शी", "अक्कलकोट", "मोहोळ", "पंढरपूर", "माढा", "करमाळा", "मंगळवेढा", "सांगोला", "माळशिरस"],
+      "ठाणे": ["ठाणे", "कल्याण", "भिवंडी", "उल्हासनगर", "अंबरनाथ", "मुरबाड", "शहापूर"],
+      "वर्धा": ["वर्धा", "सेलू", "देवळी", "हिंगणघाट", "समुद्रपूर", "आर्वी", "आष्टी", "कारंजा"],
+      "वाशिम": ["वाशिम", "मालेगाव", "रिसोड", "मंगरूळपीर", "कारंजा", "मानोरा"],
+      "यवतमाळ": ["यवतमाळ", "दारव्हा", "दिग्रस", "नेर", "पुसद", "उमरखेड", "महागाव", "पांढरकवडा (केळापूर)", "राळेगाव", "वणी", "मारेगाव", "झरी जामणी", "बाभूळगाव", "कळंब", "आर्णी", "घाटंजी"]
+    };
+
+    const districts = Object.keys(districtTalukasMap);
+
+    window.defaultPostsList = [
+      { name: "जिल्हाध्यक्ष", isTaluka: false },
+      { name: "जिल्हा सरचिटणीस", isTaluka: false },
+      { name: "कार्याध्यक्ष", isTaluka: false },
+      { name: "कोषाध्यक्ष", isTaluka: false },
+      { name: "महिला आघाडी अध्यक्ष", isTaluka: false },
+      { name: "प्रसिद्धी प्रमुख", isTaluka: false },
+      { name: "कायदेविषयक सल्लागार", isTaluka: false },
+      { name: "जिल्हा उपाध्यक्ष", isTaluka: false },
+      { name: "महिला आघाडी उपाध्यक्ष", isTaluka: false },
+      { name: "सह सचिव", isTaluka: false },
+      { name: "सहकोषाध्यक्ष", isTaluka: false },
+      { name: "तालुका अध्यक्ष", isTaluka: true },
+      { name: "तालुका सरचिटणीस", isTaluka: true }
+    ];
+
+    window.appointedPostsList = JSON.parse(localStorage.getItem('mahasangh_appointed_posts_v2')) || window.defaultPostsList;
+    window.membersData = [];
+    window.districtPasswords = {};
+
+    let currentDistrict = "बीड";
+    let isManageUnlocked = false;
+    let isLettersUnlocked = false;
+    let lockedDistrictName = null;
+    let isSuperAdmin = false;       // RK2026
+    let isMasterDevAdmin = false;   // Pcs@3506
+    let insertedImagesCount = 0;
+
+    let selectedMemberForLetter = null;
+    let headerClickCount = 0;
+    let headerClickTimer = null;
+
+    function getTodayFormattedDate() {
+      const today = new Date();
+      return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    }
+
+    function activateSuperAdminMode() {
+      isSuperAdmin = true;
+      isManageUnlocked = true;
+      isLettersUnlocked = true;
+      lockedDistrictName = null;
+
+      document.getElementById('manageLockBadge').style.display = 'none';
+      document.getElementById('letterLockBadge').style.display = 'none';
+      document.getElementById('districtSelect').disabled = false;
+      document.getElementById('districtLockNotice').textContent = "(राज्याध्यक्ष - सर्व ३६ जिल्हे खुले)";
+    }
+
+    function activateMasterDevAdmin() {
+      activateSuperAdminMode();
+      isMasterDevAdmin = true;
+      document.getElementById('adminDesignerTabBtn').style.display = 'inline-flex';
+      document.getElementById('resetDistrictPassBtn').style.display = 'inline-flex';
+      switchTab('tab-designer');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      populateDistricts();
+      renderAppointedPosts();
+      renderAll();
+      initFreeDragAndResize();
+
+      document.getElementById('mainHeaderTitle').addEventListener('click', () => {
+        headerClickCount++;
+        clearTimeout(headerClickTimer);
+        headerClickTimer = setTimeout(() => { headerClickCount = 0; }, 1000);
+
+        if (headerClickCount === 3) {
+          headerClickCount = 0;
+          const pass = prompt("गोपनीय मुख्य ॲडमिन पॅनल: पासवर्ड टाका:");
+          if (pass === "Pcs@3506") {
+            activateMasterDevAdmin();
+            alert("मुख्य ॲडमिन (Master Studio) ॲक्सेस सक्रिय झाला आहे!");
+          } else if (pass !== null) {
+            alert("चुकीचा पासवर्ड!");
+          }
+        }
+      });
+    });
+
+    function renderAppointedPosts() {
+      const select = document.getElementById('appointedPost');
+      if (select) {
+        select.innerHTML = window.appointedPostsList.map(p => {
+          const pName = typeof p === 'object' ? p.name : p;
+          return `<option value="${pName}">${pName}</option>`;
+        }).join('');
+      }
+
+      const managerBox = document.getElementById('postListManagerBox');
+      if (managerBox) {
+        managerBox.innerHTML = window.appointedPostsList.map((p, idx) => {
+          const pName = typeof p === 'object' ? p.name : p;
+          const isTal = typeof p === 'object' ? p.isTaluka : (pName.includes("तालुका"));
+          return `
+            <div class="post-manager-item">
+              <div>
+                <span>${idx + 1}. <strong>${pName}</strong></span>
+                <span style="font-size:10px; color:${isTal ? '#b45309' : '#64748b'}; margin-left:6px;">
+                  ${isTal ? '📌 (तालुका आवश्यक)' : '(जिल्हास्तरीय)'}
+                </span>
+              </div>
+              <div class="post-manager-actions">
+                <button class="btn-icon-xs" title="वर घ्या" onclick="moveAppointedPost(${idx}, -1)"><i class="fa-solid fa-arrow-up"></i></button>
+                <button class="btn-icon-xs" title="खाली घ्या" onclick="moveAppointedPost(${idx}, 1)"><i class="fa-solid fa-arrow-down"></i></button>
+                <button class="btn-icon-xs" style="color:#ef4444;" title="काढून टाका" onclick="deleteAppointedPost(${idx})"><i class="fa-solid fa-trash"></i></button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+    window.renderAppointedPosts = renderAppointedPosts;
+
+    async function addNewAppointedPost() {
+      const input = document.getElementById('newPostNameInput');
+      const val = input.value.trim();
+      const isTaluka = document.getElementById('newPostNeedsTalukaChk').checked;
+
+      if (!val) {
+        alert("कृपया नवीन पदाचे नाव प्रविष्ट करा.");
+        return;
+      }
+      
+      const exists = window.appointedPostsList.some(p => (typeof p === 'object' ? p.name : p) === val);
+      if (exists) {
+        alert("हे पद आधीच यादीमध्ये आहे.");
+        return;
+      }
+
+      window.appointedPostsList.push({ name: val, isTaluka: isTaluka });
+      input.value = '';
+      document.getElementById('newPostNeedsTalukaChk').checked = false;
+      await saveAppointedPostsToCloud();
+    }
+
+    async function deleteAppointedPost(idx) {
+      const item = window.appointedPostsList[idx];
+      const pName = typeof item === 'object' ? item.name : item;
+      if (confirm(`'${pName}' हे पद काढून टाकायचे का?`)) {
+        window.appointedPostsList.splice(idx, 1);
+        await saveAppointedPostsToCloud();
+      }
+    }
+
+    async function moveAppointedPost(idx, dir) {
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= window.appointedPostsList.length) return;
+      const temp = window.appointedPostsList[idx];
+      window.appointedPostsList[idx] = window.appointedPostsList[newIdx];
+      window.appointedPostsList[newIdx] = temp;
+      await saveAppointedPostsToCloud();
+    }
+
+    async function saveAppointedPostsToCloud() {
+      localStorage.setItem('mahasangh_appointed_posts_v2', JSON.stringify(window.appointedPostsList));
+      renderAppointedPosts();
+      try {
+        if (window.rtdb && window.dbSet && window.dbRef) {
+          await window.dbSet(window.dbRef(window.rtdb, 'custom_appointed_posts_v2'), window.appointedPostsList);
+        }
+      } catch (e) {
+        console.warn("Post cloud save error:", e);
+      }
+    }
+
+    function populateDistricts() {
+      const select = document.getElementById('districtSelect');
+      const superSel = document.getElementById('superAdminDistrictSelect');
+      select.innerHTML = '';
+      if(superSel) superSel.innerHTML = '';
+
+      districts.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        if(d === currentDistrict) opt.selected = true;
+        select.appendChild(opt);
+
+        if(superSel) {
+          const opt2 = document.createElement('option');
+          opt2.value = d;
+          opt2.textContent = d;
+          superSel.appendChild(opt2);
+        }
+      });
+    }
+
+   function onDistrictChange() {
+      if (lockedDistrictName && !isSuperAdmin) {
+        currentDistrict = lockedDistrictName;
+        document.getElementById('districtSelect').value = lockedDistrictName;
+        alert(`सुरक्षा सूचना: आपण '${lockedDistrictName}' जिल्ह्यामध्ये लॉगिन आहात!`);
+        return;
+      }
+
+      currentDistrict = document.getElementById('districtSelect').value;
+      renderAll();
+    }
+
+
+   // [PATCH 5 START] अधिकृत रँक हायरार्की, सलग अनुक्रमांक व फिल्टर इंजिन
+    const OFFICIAL_POST_RANKS = [
+      "राज्य प्रतिनिधी",
+      "राज्य महिला प्रतिनिधी",
+      "विभाग प्रतिनिधी",
+      "जिल्हा मार्गदर्शक",
+      "जिल्हाध्यक्ष",
+      "जिल्हा सरचिटणीस",
+      "कार्याध्यक्ष",
+      "जिल्हा कार्याध्यक्ष",
+      "जिल्हा उपाध्यक्ष",
+      "उपाध्यक्ष",
+      "महिला आघाडी अध्यक्ष",
+      "महिला आघाडी उपाध्यक्ष",
+      "कोषाध्यक्ष",
+      "जिल्हा कोषाध्यक्ष",
+      "सहकोषाध्यक्ष",
+      "सह सचिव",
+      "सहसचिव",
+      "संघटक",
+      "जिल्हा संघटक",
+      "प्रवक्ता",
+      "प्रवक्ते",
+      "प्रसिद्धी प्रमुख",
+      "कायदेविषयक सल्लागार",
+      "तालुका अध्यक्ष",
+      "तालुका कार्याध्यक्ष",
+      "तालुका सरचिटणीस",
+      "तालुका उपाध्यक्ष",
+      "तालुका संघटक",
+      "तालुका कोषाध्यक्ष",
+      "सदस्य"
+    ];
+
+    function getPostRankScore(postName) {
+      if (!postName) return 999;
+      const clean = String(postName).trim();
+      const exactIdx = OFFICIAL_POST_RANKS.indexOf(clean);
+      if (exactIdx !== -1) return exactIdx;
+
+      for (let i = 0; i < OFFICIAL_POST_RANKS.length; i++) {
+        if (clean.includes(OFFICIAL_POST_RANKS[i])) {
+          return i;
+        }
+      }
+      return 900;
+    }
+
+   // --- [डेटा-बचत करणारी अखंड जावक क्रमांक प्रणाली] ---
+
+    window.statewideSerialMap = null;
+
+    // १. सेव्ह वेळेनुसार अखंड राज्यस्तरीय क्रमवारी (मेमरी कॅशसह)
+    function rebuildStatewideSerialMap() {
+      const all = [...(window.membersData || [])];
+      
+      all.sort((a, b) => {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
+
+        if (timeA !== timeB && timeA > 0 && timeB > 0) {
+          return timeA - timeB;
+        }
+
+        const numIdA = parseInt(a.id) || 0;
+        const numIdB = parseInt(b.id) || 0;
+        if (numIdA > 0 && numIdB > 0 && numIdA !== numIdB) {
+          return numIdA - numIdB;
+        }
+
+        return String(a.id || '').localeCompare(String(b.id || ''));
+      });
+
+      const map = new Map();
+      all.forEach((member, index) => {
+        map.set(String(member.id), index + 1);
+      });
+
+      window.statewideSerialMap = map;
+      return all;
+    }
+
+    function getAllSortedMembers() {
+      return rebuildStatewideSerialMap();
+    }
+
+    // २. अखंड सलग जावक क्रमांक थेट मेमरीतून काढणे (शून्य अतिरिक्त डेटा खर्च)
+    function getMemberSerialOrder(mId) {
+      if (!window.statewideSerialMap) {
+        rebuildStatewideSerialMap();
+      }
+      return window.statewideSerialMap.get(String(mId)) || 1;
+    }
+    // ३. अहिल्यानगर व जुना अहमदनगर डेटा १००% अचूक जोडणारा फिल्टर
+    function getFilteredMembers() {
+      const rawList = window.membersData || [];
+      
+      const filtered = rawList.filter(m => {
+        if (!currentDistrict || currentDistrict === 'सर्व') return true;
+
+        const mDist = String(m.district || '').trim();
+        const curDist = String(currentDistrict).trim();
+
+        // १. अहिल्यानगर निवडल्यास जुना 'अहमदनगर', 'Ahmednagar' किंवा 'अहिल्यानगर' सर्व एकत्र आणणे
+        if (curDist === 'अहिल्यानगर' || curDist === 'अहमदनगर') {
+          return mDist === 'अहिल्यानगर' || mDist === 'अहमदनगर' || mDist.toLowerCase() === 'ahmednagar';
+        }
+
+        return mDist === curDist;
+      }).map(m => {
+        // २. स्क्रीनवर, यादीत व PDF मध्ये जुने नाव न दाखवता थेट 'अहिल्यानगर' करणे
+        const mDist = String(m.district || '').trim();
+        if (mDist === 'अहमदनगर' || mDist.toLowerCase() === 'ahmednagar') {
+          return { ...m, district: 'अहिल्यानगर' };
+        }
+        return m;
+      });
+
+      // पदानुसार वरपासून खाली अचूक उतरता क्रम (Rank Hierarchy)
+      filtered.sort((a, b) => {
+        const postA = a.appointedPost || '';
+        const postB = b.appointedPost || '';
+        const rankA = getPostRankScore(postA);
+        const rankB = getPostRankScore(postB);
+
+        if (rankA !== rankB) {
+          return rankA - rankB;
+        }
+        return (a.firstName || '').localeCompare(b.firstName || '', 'mr');
+      });
+
+      return filtered;
+    }   
+    
+    function getDisplayPost(m) {
+      const pName = m.appointedPost;
+      const tName = m.taluka ? m.taluka.trim() : '';
+      if (tName) {
+        return `${pName} (${tName} तालुका)`;
+      }
+      return pName;
+    }
+
+    function getWorkingPlaceDisplay(m) {
+      const cadre = m.currentCadre || 'केंद्रप्रमुख';
+      const wPlace = m.workingPlace || '';
+      const wTaluka = m.workingTaluka ? `ता. ${m.workingTaluka}` : '';
+      const parts = [wPlace, wTaluka].filter(Boolean).join(', ');
+      return { cadre, details: parts };
+    }
+
+    function toggleCurrentCadreOther(val) {
+      document.getElementById('customCadreDiv').style.display = (val === 'इतर') ? 'block' : 'none';
+    }
+
+    function updateWorkingTalukaDropdown(distName, selectedTaluka = '') {
+      const talukaSelect = document.getElementById('workingTalukaSelect');
+      if (!talukaSelect) return;
+      const talukas = districtTalukasMap[distName] || ["तालुका १"];
+      talukaSelect.innerHTML = `<option value="">-- कार्यक्षेत्र तालुका निवडा * --</option>` + 
+        talukas.map(t => `<option value="${t}" ${t === selectedTaluka ? 'selected' : ''}>${t}</option>`).join('');
+    }
+
+    function updateAppointedTalukaDropdown(distName, selectedTaluka = '') {
+      const talukaSelect = document.getElementById('talukaSelectField');
+      if (!talukaSelect) return;
+      const talukas = districtTalukasMap[distName] || ["तालुका १"];
+      talukaSelect.innerHTML = `<option value="">-- बहाल पदाचा तालुका निवडा * --</option>` + 
+        talukas.map(t => `<option value="${t}" ${t === selectedTaluka ? 'selected' : ''}>${t}</option>`).join('');
+    }
+
+    function renderAll() {
+      const list = getFilteredMembers();
+      document.getElementById('memberCount').textContent = list.length;
+      document.getElementById('directoryHeading').textContent = `जिल्हा कार्यकारणी सूची: ${currentDistrict}`;
+
+      // १. पहिली टॅब: पदाधिकारी (मोबाईल ॲप कार्ड + डेस्कटॉप टेबल)
+      const dirCards = document.getElementById('directoryAppCards');
+      const dirBody = document.getElementById('directoryTableBody');
+
+      if (list.length === 0) {
+        const emptyMsg = `<div style="text-align:center; padding:24px; color:#64748b; font-weight:700;">या जिल्ह्यात अजून एकही पदाधिकारी नोंदवलेला नाही.</div>`;
+        dirCards.innerHTML = emptyMsg;
+        dirBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:18px; color:#888;">माहिती उपलब्ध नाही.</td></tr>`;
+      } else {
+        dirCards.innerHTML = list.map((m, idx) => {
+          const wp = getWorkingPlaceDisplay(m);
+          return `
+            <div class="member-app-card">
+              <div class="card-top-row">
+                <div class="card-sr-no">${idx + 1}</div>
+                <div class="card-name-title">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</div>
+              </div>
+              <div class="card-meta-info">
+                <div><strong>सध्याचे पद:</strong> ${wp.cadre}</div>
+                <div style="color:#64748b;">${wp.details ? wp.details : ''}</div>
+              </div>
+              <div><span class="card-appointed-badge">⭐ ${getDisplayPost(m)}</span></div>
+            </div>`;
+        }).join('');
+
+        dirBody.innerHTML = list.map((m, idx) => {
+          const wp = getWorkingPlaceDisplay(m);
+          return `
+            <tr>
+              <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+              <td style="font-weight:700; color:#0f2b48; font-size:15px;">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</td>
+              <td><strong>${wp.cadre}</strong><br><small style="color:#64748b;">${wp.details}</small></td>
+              <td><strong style="color:var(--accent); font-size:14.5px;">${getDisplayPost(m)}</strong></td>
+            </tr>`;
+        }).join('');
+      }
+
+      // २. दुसरी टॅब: जिल्हाध्यक्ष लॉगिन
+      const manageCards = document.getElementById('manageAppCards');
+      const manageBody = document.getElementById('manageTableBody');
+      if (list.length === 0) {
+        manageCards.innerHTML = `<div style="text-align:center; padding:24px; color:#888;">माहिती उपलब्ध नाही.</div>`;
+        manageBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:#888;">माहिती उपलब्ध नाही.</td></tr>`;
+      } else {
+        manageCards.innerHTML = list.map((m, idx) => {
+          const wp = getWorkingPlaceDisplay(m);
+          return `
+            <div class="member-app-card">
+              <div class="card-top-row">
+                <div class="card-sr-no">${idx + 1}</div>
+                <div class="card-name-title">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</div>
+              </div>
+              <div class="card-meta-info">
+                <div><strong>सध्याचे पद:</strong> ${wp.cadre} (${wp.details})</div>
+                <div><strong>मोबाईल:</strong> ${m.mobile}</div>
+              </div>
+              <div><span class="card-appointed-badge">⭐ ${getDisplayPost(m)}</span></div>
+              <div class="card-bottom-actions">
+                <button class="btn btn-edit" onclick="openEditModal('${m.id}')"><i class="fa-solid fa-pen"></i> दुरुस्त करा</button>
+                <button class="btn btn-del" onclick="deleteMember('${m.id}')"><i class="fa-solid fa-trash"></i> वगळा</button>
+              </div>
+            </div>`;
+        }).join('');
+
+        manageBody.innerHTML = list.map((m, idx) => {
+          const wp = getWorkingPlaceDisplay(m);
+          return `
+            <tr>
+              <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+              <td style="font-weight:700;">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</td>
+              <td>${wp.cadre} (${wp.details})</td>
+              <td><strong>${getDisplayPost(m)}</strong></td>
+              <td>${m.mobile}</td>
+              <td style="text-align:center;">
+                <button class="btn btn-edit" onclick="openEditModal('${m.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn btn-del" onclick="deleteMember('${m.id}')"><i class="fa-solid fa-trash"></i></button>
+              </td>
+            </tr>`;
+        }).join('');
+      }
+
+      // ३. तिसरी टॅब: राज्याध्यक्ष लॉगिन
+      const lettersCards = document.getElementById('lettersAppCards');
+      const lettersBody = document.getElementById('lettersTableBody');
+      if (list.length === 0) {
+        lettersCards.innerHTML = `<div style="text-align:center; padding:24px; color:#888;">माहिती उपलब्ध नाही.</div>`;
+        lettersBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:18px; color:#888;">माहिती उपलब्ध नाही.</td></tr>`;
+      } else {
+        lettersCards.innerHTML = list.map((m, idx) => `
+          <div class="member-app-card">
+            <div class="card-top-row">
+              <div class="card-sr-no">${idx + 1}</div>
+              <div class="card-name-title">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</div>
+            </div>
+            <div><span class="card-appointed-badge">⭐ ${getDisplayPost(m)}</span></div>
+            <div class="card-bottom-actions" style="justify-content:space-between;">
+              <button class="btn btn-view" style="flex:1;" onclick="viewLetterCleanPDF('${m.id}')"><i class="fa-solid fa-eye"></i> प्रमाणपत्र पहा</button>
+              <button class="btn btn-wa" style="flex:1;" onclick="sendWhatsAppInstantDirect('${m.id}')"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+            </div>
+          </div>`).join('');
+
+        lettersBody.innerHTML = list.map((m, idx) => `
+          <tr>
+            <td style="text-align:center; font-weight:bold;">${idx + 1}</td>
+            <td style="font-weight:700;">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</td>
+            <td><strong style="color:var(--accent);">${getDisplayPost(m)}</strong></td>
+            <td style="text-align:center;"><button class="btn btn-view" onclick="viewLetterCleanPDF('${m.id}')"><i class="fa-solid fa-eye"></i> प्रमाणपत्र पहा</button></td>
+            <td style="text-align:center;"><button class="btn btn-wa" onclick="sendWhatsAppInstantDirect('${m.id}')"><i class="fa-brands fa-whatsapp"></i> WhatsApp वर पाठवा</button></td>
+          </tr>`).join('');
+      }
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-view').forEach(el => el.style.display = 'none');
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).style.display = 'block';
+
+      const buttons = document.querySelectorAll('.nav-tab');
+      if(tabId === 'tab-directory') buttons[0].classList.add('active');
+      if(tabId === 'tab-manage') buttons[1].classList.add('active');
+      if(tabId === 'tab-letters') buttons[2].classList.add('active');
+      if(tabId === 'tab-designer') document.getElementById('adminDesignerTabBtn').classList.add('active');
+
+      const selectBox = document.getElementById('districtSelect');
+      if (isSuperAdmin) {
+        selectBox.disabled = false;
+      } else if (tabId === 'tab-manage' && lockedDistrictName) {
+        selectBox.disabled = true;
+      } else {
+        selectBox.disabled = false;
+      }
+    }
+
+    async function unlockManageTab() {
+      if (isSuperAdmin) {
+        switchTab('tab-manage');
+        return;
+      }
+
+      if (isManageUnlocked) {
+        if (lockedDistrictName) {
+          currentDistrict = lockedDistrictName;
+          document.getElementById('districtSelect').value = lockedDistrictName;
+          document.getElementById('districtSelect').disabled = true;
+        }
+        renderAll();
+        switchTab('tab-manage');
+        return;
+      }
+
+      const distPass = (window.districtPasswords && (window.districtPasswords[currentDistrict] || (currentDistrict === 'अहिल्यानगर' ? window.districtPasswords['अहमदनगर'] : null))) || "AD2026";
+      const enteredPass = prompt(`'${currentDistrict}' जिल्हाध्यक्ष लॉगिन पासवर्ड प्रविष्ट करा:`);
+
+      if (enteredPass === null) return;
+
+      if (distPass === "AD2026" && enteredPass === "AD2026") {
+        alert(`हा '${currentDistrict}' जिल्ह्यासाठी पहिला लॉगिन आहे. कृपया आपला नवीन पासवर्ड सेट करा.`);
+        const newPass1 = prompt(`'${currentDistrict}' जिल्ह्यासाठी नवीन पासवर्ड टाका:`);
+        if (!newPass1 || newPass1.trim() === "" || newPass1.trim() === "AD2026") {
+          alert("कृपया वैध नवीन पासवर्ड प्रविष्ट करा!");
+          return;
+        }
+
+        const newPass2 = prompt("पुन्हा एकदा नवीन पासवर्ड टाका (Confirm Password):");
+        if (newPass1 !== newPass2) {
+          alert("दोन्ही पासवर्ड जुळले नाहीत!");
+          return;
+        }
+
+        try {
+          if (!window.districtPasswords) window.districtPasswords = {};
+          window.districtPasswords[currentDistrict] = newPass1.trim();
+
+          if (window.rtdb && window.dbSet && window.dbRef) {
+            await window.dbSet(window.dbRef(window.rtdb, 'district_passwords/' + currentDistrict), newPass1.trim());
+          }
+
+          alert(`अभिनंदन! '${currentDistrict}' जिल्ह्यासाठी नवीन पासवर्ड सेट झाला आहे.`);
+          lockCurrentDistrictSession(currentDistrict);
+        } catch (e) {
+          alert("त्रुटी: " + e.message);
+        }
+        return;
+      }
+
+      if (enteredPass === distPass) {
+        lockCurrentDistrictSession(currentDistrict);
+      } else {
+        alert(`चुकीचा पासवर्ड! आपण फक्त '${currentDistrict}' जिल्ह्याचा पासवर्ड टाकूनच संपादन करू शकता.`);
+      }
+    }
+
+    function lockCurrentDistrictSession(distName) {
+      isManageUnlocked = true;
+      isSuperAdmin = false;
+      lockedDistrictName = distName;
+      currentDistrict = distName;
+
+      document.getElementById('districtSelect').value = distName;
+      document.getElementById('districtSelect').disabled = true;
+      document.getElementById('manageLockBadge').style.display = 'none';
+      document.getElementById('districtLockNotice').textContent = `(फक्त '${distName}' जिल्हा संपादन अधिकार लॉक)`;
+
+      renderAll();
+      switchTab('tab-manage');
+      alert(`लॉगिन यशस्वी! आता आपण केवळ '${distName}' जिल्ह्यामध्ये बदल करू शकता.`);
+    }
+
+    function logoutDistrictLock() {
+      if (confirm("आपण खरोखर संपादन कार्य पूर्ण करून लॉगआउट करू इच्छिता?")) {
+        isManageUnlocked = false;
+        isSuperAdmin = false;
+        isMasterDevAdmin = false;
+        lockedDistrictName = null;
+
+        document.getElementById('districtSelect').disabled = false;
+        document.getElementById('manageLockBadge').style.display = 'inline-block';
+        document.getElementById('letterLockBadge').style.display = 'inline-block';
+        document.getElementById('adminDesignerTabBtn').style.display = 'none';
+        document.getElementById('resetDistrictPassBtn').style.display = 'none';
+        document.getElementById('districtLockNotice').textContent = '';
+
+        switchTab('tab-directory');
+        renderAll();
+      }
+    }
+
+    function unlockLettersTab() {
+      if (isLettersUnlocked || isSuperAdmin) {
+        switchTab('tab-letters');
+      } else {
+        const pass = prompt("राज्याध्यक्ष लॉगिन (मास्टर पासवर्ड):");
+        if (pass === "RK2026") {
+          activateSuperAdminMode();
+          renderAll();
+          switchTab('tab-letters');
+          alert("राज्याध्यक्ष लॉगिन यशस्वी! सर्व ३६ जिल्हे, सर्व टॅब्स व अधिकृत यादी डाऊनलोड सुविधा उपलब्ध झाली आहे.");
+        } else if (pass !== null) {
+          alert("चुकीचा पासवर्ड! केवळ संस्थापक राज्याध्यक्षच हे लॉगिन करू शकतात.");
+        }
+      }
+    }
+
+    function openAddModal() {
+      const activeDist = isSuperAdmin ? currentDistrict : (lockedDistrictName || currentDistrict);
+      document.getElementById('modalTitle').textContent = `नवीन पदाधिकारी नोंदणी (${activeDist} जिल्हा)`;
+      document.getElementById('formDistrict').value = activeDist;
+      document.getElementById('editIndex').value = "-1";
+      document.getElementById('memberForm').reset();
+      document.getElementById('formDistrict').value = activeDist;
+
+      updateWorkingTalukaDropdown(activeDist);
+      updateAppointedTalukaDropdown(activeDist);
+
+      document.getElementById('customCadreDiv').style.display = 'none';
+      document.getElementById('customPostDiv').style.display = 'none';
+      document.getElementById('talukaNameDiv').style.display = 'none';
+      
+      const firstPost = document.getElementById('appointedPost').value;
+      togglePostDetails(firstPost);
+
+      document.getElementById('memberModal').style.display = 'flex';
+    }
+
+    function openEditModal(id) {
+      const m = window.membersData.find(item => String(item.id) === String(id));
+      if(!m) return;
+
+      if (!isSuperAdmin && lockedDistrictName && m.district !== lockedDistrictName) {
+        alert(`अवैध कृती! आपणास केवळ '${lockedDistrictName}' जिल्ह्यातील पदाधिकारी संपादित करण्याचा अधिकार आहे!`);
+        return;
+      }
+
+      // १. जुना जिल्हा अहमदनगर असल्यास तालुक्यांच्या मॅपिंगसाठी तो अहिल्यानगर म्हणून ओळखणे
+      let targetDist = m.district ? m.district.trim() : '';
+      if (targetDist === 'अहमदनगर' || targetDist.toLowerCase() === 'ahmednagar') {
+        targetDist = 'अहिल्यानगर';
+      }
+
+      document.getElementById('modalTitle').textContent = `पदाधिकारी माहिती दुरुस्ती (${targetDist} जिल्हा)`;
+      document.getElementById('editIndex').value = m.id;
+      document.getElementById('formDistrict').value = targetDist;
+      document.getElementById('salutation').value = m.salutation;
+      document.getElementById('firstName').value = m.firstName;
+      document.getElementById('middleName').value = m.middleName;
+      document.getElementById('lastName').value = m.lastName;
+
+      const cadreSelect = document.getElementById('currentCadre');
+      if (m.currentCadre === "केंद्रप्रमुख" || m.currentCadre === "विस्तार अधिकारी") {
+        cadreSelect.value = m.currentCadre;
+        document.getElementById('customCadreDiv').style.display = 'none';
+      } else {
+        cadreSelect.value = "इतर";
+        document.getElementById('customCadreDiv').style.display = 'block';
+        document.getElementById('customCadreInput').value = m.currentCadre || '';
+      }
+
+      document.getElementById('workingPlace').value = m.workingPlace;
+
+      // २. योग्य जिल्ह्यानुसार कार्यक्षेत्र आणि बहाल पदाचे दोन्ही तालुका ड्रॉपडाउन अचूक लोड करणे
+      updateWorkingTalukaDropdown(targetDist, m.workingTaluka || '');
+      updateAppointedTalukaDropdown(targetDist, m.taluka || '');
+
+      document.getElementById('mobileNumber').value = m.mobile;
+
+      // ३. बहाल केलेले पद निवडणे
+      const postSelect = document.getElementById('appointedPost');
+      postSelect.value = m.appointedPost;
+
+      // ४. पदासाठी तालुका आवश्यक आहे का ते तपासून तालुक्याचा ड्रॉपडाउन दाखवणे
+      togglePostDetails(m.appointedPost);
+
+      // जर जुन्या डेटामध्ये आधीच तालुका निवडलेला असेल तर तो सिलेक्टेड ठेवणे
+      if (m.taluka) {
+        document.getElementById('talukaSelectField').value = m.taluka;
+      }
+
+      document.getElementById('memberModal').style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+
+    function togglePostDetails(val) {
+      document.getElementById('customPostDiv').style.display = 'none';
+
+      let isTalukaRequired = false;
+      const found = window.appointedPostsList.find(p => (typeof p === 'object' ? p.name : p) === val);
+      if (found) {
+        isTalukaRequired = typeof found === 'object' ? found.isTaluka : (found.includes("तालुका"));
+      }
+
+      document.getElementById('talukaNameDiv').style.display = isTalukaRequired ? 'block' : 'none';
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById('saveBtn');
+
+      const fName = document.getElementById('firstName').value.trim();
+      const mName = document.getElementById('middleName').value.trim();
+      const lName = document.getElementById('lastName').value.trim();
+      const wPlace = document.getElementById('workingPlace').value.trim();
+      const wTaluka = document.getElementById('workingTalukaSelect').value.trim();
+      const mob = document.getElementById('mobileNumber').value.trim();
+
+      if (!fName || !mName || !lName || !wPlace || !wTaluka || !mob) {
+        alert("कृपया फॉर्ममधील सर्व आवश्यक फील्ड्स अचूकपणे भरा!");
+        return;
+      }
+
+      const cadreChoice = document.getElementById('currentCadre').value;
+      const finalCadre = (cadreChoice === 'इतर') ? document.getElementById('customCadreInput').value.trim() : cadreChoice;
+      if (!finalCadre) {
+        alert("कृपया सध्याचे संवर्ग पद प्रविष्ट करा!");
+        return;
+      }
+
+      const postChoice = document.getElementById('appointedPost').value;
+      const finalPost = (postChoice === 'इतर') ? document.getElementById('customPost').value.trim() : postChoice;
+      if (!finalPost) {
+        alert("कृपया बहाल केलेले पद प्रविष्ट करा!");
+        return;
+      }
+
+      let isTalukaRequired = false;
+      const found = window.appointedPostsList.find(p => (typeof p === 'object' ? p.name : p) === finalPost);
+      if (found) {
+        isTalukaRequired = typeof found === 'object' ? found.isTaluka : (found.includes("तालुका"));
+      }
+
+      let talukaVal = "";
+      if (isTalukaRequired) {
+        talukaVal = document.getElementById('talukaSelectField').value.trim();
+        if(!talukaVal) {
+          alert("कृपया या पदासाठी बहाल पदाचा तालुका निवडा!");
+          return;
+        }
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> सेव्ह होत आहे...`;
+
+      const idVal = document.getElementById('editIndex').value;
+      const activeDist = isSuperAdmin ? document.getElementById('formDistrict').value : (lockedDistrictName || currentDistrict);
+      const docId = idVal === "-1" ? Date.now().toString() : idVal;
+
+      const memberObj = {
+        district: activeDist,
+        salutation: document.getElementById('salutation').value,
+        firstName: fName,
+        middleName: mName,
+        lastName: lName,
+        currentCadre: finalCadre,
+        workingPlace: wPlace,
+        workingTaluka: wTaluka,
+        appointedPost: finalPost,
+        taluka: talukaVal,
+        mobile: mob,
+        updatedAt: idVal === "-1" ? new Date().toISOString() : (window.membersData.find(x => x.id === idVal)?.updatedAt || new Date().toISOString())
+      };
+
+      try {
+        if (window.rtdb && window.dbSet && window.dbRef) {
+          await window.dbSet(window.dbRef(window.rtdb, 'officials/' + docId), memberObj);
+        }
+        closeModal('memberModal');
+      } catch (err) {
+        alert("डेटा सेव्ह करताना त्रुटी आली: " + err.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> सेव्ह करा`;
+      }
+    }
+
+    async function deleteMember(id) {
+      const m = window.membersData.find(item => String(item.id) === String(id));
+      if (!m) return;
+
+      if (!isSuperAdmin && lockedDistrictName && m.district !== lockedDistrictName) {
+        alert(`अवैध कृती! आपणास केवळ '${lockedDistrictName}' जिल्ह्यातील पदाधिकारी वगळण्याचा अधिकार आहे!`);
+        return;
+      }
+
+      if(confirm(`आपण खरोखर '${m.firstName} ${m.lastName}' यांना वगळू इच्छिता?`)) {
+        try {
+          if (window.rtdb && window.dbRemove && window.dbRef) {
+            await window.dbRemove(window.dbRef(window.rtdb, 'officials/' + id));
+          }
+        } catch (e) {
+          console.warn("Delete error:", e);
+        }
+      }
+    }
+
+    function populateLetter(m) {
+      selectedMemberForLetter = m;
+      const seqNo = getMemberSerialOrder(m.id);
+      const formattedSeq = String(seqNo).padStart(2, '0');
+
+      document.getElementById('prevOutward').textContent = formattedSeq;
+      document.getElementById('prevDate').textContent = getTodayFormattedDate();
+      document.getElementById('prevFullName').textContent = `मा. ${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}`;
+
+      const wp = getWorkingPlaceDisplay(m);
+      document.getElementById('prevCurrentPost').textContent = `(${wp.cadre}, ${wp.details}, जिल्हा - ${m.district})`;
+      document.getElementById('prevAnnounceDistrict').textContent = m.district;
+      
+      const fullDisplayPost = getDisplayPost(m);
+      document.getElementById('prevPostTitle').textContent = `⭐ « ${fullDisplayPost} » ⭐`;
+      document.getElementById('dispSubject').textContent = `विषय: महासंघाच्या ${m.district} जिल्हा कार्यकारिणीवर '${fullDisplayPost}' नियुक्तीबाबत...`;
+    }
+
+    function viewLetterCleanPDF(id) {
+      const m = window.membersData.find(item => String(item.id) === String(id));
+      if(!m) {
+        alert("पदाधिकाऱ्याची माहिती सापडली नाही!");
+        return;
+      }
+      populateLetter(m);
+
+      const original = document.getElementById('printableCertificate');
+      const clone = original.cloneNode(true);
+      clone.id = "cleanClonePdf";
+      
+      clone.querySelectorAll('.node-delete-btn, .node-resize-handle').forEach(el => el.remove());
+      clone.querySelectorAll('.canvas-node').forEach(node => {
+        node.style.cursor = 'default';
+        node.onmousedown = null;
+      });
+
+      const container = document.getElementById('cleanPdfContainer');
+      container.innerHTML = '';
+      container.appendChild(clone);
+
+      const screenWidth = window.innerWidth;
+      const targetWidth = 794;
+      let scaleRatio = screenWidth < 840 ? (screenWidth - 25) / targetWidth : 1;
+      
+      const scaledBox = document.getElementById('scaledLetterContainer');
+      scaledBox.style.transform = `scale(${scaleRatio})`;
+      scaledBox.style.height = `${1123 * scaleRatio + 25}px`;
+
+      document.getElementById('cleanViewTitle').textContent = `नियुक्ती पत्र - ${m.salutation} ${m.firstName} ${m.lastName}`;
+      document.getElementById('cleanViewModal').style.display = 'flex';
+    }
+
+    async function downloadCurrentLetterPDF() {
+      const btn = (typeof event !== 'undefined' && event && event.target) 
+        ? (event.target.closest('button') || document.querySelector('#cleanViewModal .btn-gold')) 
+        : document.querySelector('#cleanViewModal .btn-gold');
+      
+      let originalBtnText = "";
+      if (btn) {
+        originalBtnText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> डाऊनलोड होत आहे...`;
+      }
+
+      // 1. मोबाइल प्रीव्यू के सिकुड़े हुए (Scaled) बॉक्स को छोड़कर हमेशा मूल टेम्पलेट की फ्रेश कॉपी लेना
+      const original = document.getElementById('printableCertificate');
+      if (!original) {
+        alert("प्रमाणपत्र टेम्पलेट सापडले नाही!");
+        if (btn) { btn.disabled = false; btn.innerHTML = originalBtnText; }
+        return;
+      }
+
+      const clone = original.cloneNode(true);
+      clone.id = 'tempPdfRenderClone';
+
+      // अनावश्यक बटन्स और रिसाइज हैंडल्स हटाना
+      clone.querySelectorAll('.node-delete-btn, .node-resize-handle').forEach(el => el.remove());
+      clone.querySelectorAll('.canvas-node').forEach(node => {
+        node.style.cursor = 'default';
+      });
+
+      // 2. स्क्रीन के बाहर फिक्स A4 (794px x 1123px) का अन-स्केल्ड कंटेनर तैयार करना
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'fixed';
+      wrapper.style.left = '-9999px';
+      wrapper.style.top = '0';
+      wrapper.style.width = '794px';
+      wrapper.style.height = '1123px';
+      wrapper.style.minWidth = '794px';
+      wrapper.style.minHeight = '1123px';
+      wrapper.style.maxWidth = '794px';
+      wrapper.style.maxHeight = '1123px';
+      wrapper.style.background = '#ffffff';
+      wrapper.style.zIndex = '999999';
+      wrapper.style.overflow = 'hidden';
+
+      // मोबाइल CSS ट्रांसफॉर्म को पूरी तरह रीसेट (1:1 स्केल) करना
+      clone.style.display = 'block';
+      clone.style.transform = 'none';
+      clone.style.webkitTransform = 'none';
+      clone.style.boxShadow = 'none';
+      clone.style.margin = '0';
+      clone.style.width = '794px';
+      clone.style.height = '1123px';
+
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+
+      // इमेज पूरी तरह लोड होने की प्रतीक्षा करना
+      const allImgs = Array.from(wrapper.querySelectorAll('img'));
+      await Promise.all(allImgs.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(res => {
+          img.onload = res;
+          img.onerror = res;
+        });
+      }));
+
+      // DOM और फॉन्ट्स स्थिर होने के लिए सूक्ष्म विराम
+      await new Promise(r => setTimeout(r, 200));
+
+      try {
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          windowWidth: 794,
+          windowHeight: 1123,
+          width: 794,
+          height: 1123
+        });
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4'
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+
+        const seqNo = selectedMemberForLetter ? getMemberSerialOrder(selectedMemberForLetter.id) : 1;
+        const filename = selectedMemberForLetter 
+          ? `नियुक्ती_पत्र_क्र_${seqNo}_${selectedMemberForLetter.firstName}_${selectedMemberForLetter.lastName}.pdf`
+          : `नियुक्ती_पत्र.pdf`;
+
+        // मोबाइल ब्राउज़र के लिए सुरक्षित Blob डाउनलोड लिंक
+        const pdfBlob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(blobUrl);
+        }, 4000);
+
+      } catch (err) {
+        alert("PDF डाऊनलोड करताना त्रुटी आली: " + err.message);
+      } finally {
+        if (wrapper && wrapper.parentNode) {
+          wrapper.parentNode.removeChild(wrapper);
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalBtnText;
+        }
+      }
+    }
+    
+    async function downloadDirectoryMultiPagePDF() {
+  const list = getFilteredMembers();
+  if (!list || list.length === 0) {
+    alert("या जिल्ह्यात डाऊनलोड करण्यासाठी पदाधिकारी उपलब्ध नाहीत.");
+    return;
+  }
+
+  const btn = document.getElementById('dirDownloadBtn');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> स्वाक्षरीयुक्त PDF तयार होत आहे...`;
+
+  // === SMART PAGINATION LOGIC ===
+  // पहिल्या पानावर स्वाक्षरीसह सुरक्षित बसण्याची कमाल क्षमता = १० पदाधिकारी
+  const pages = [];
+
+  if (list.length <= 10) {
+    // १० किंवा त्यापेक्षा कमी असल्यास एकाच पानावर सहीसह १००% सुरक्षित
+    pages.push({ chunk: list, startIndex: 0, isFirst: true, isLast: true });
+  } else if (list.length <= 16) {
+    // ११ ते १६ असल्यास शेवटचे २ ते ६ पदाधिकारी दुसऱ्या पानावर नेणे, ज्यामुळे सहीला पूर्ण जागा मिळेल
+    const page1Count = Math.min(10, list.length - 2); // दुसऱ्या पानावर किमान २ सदस्य शिल्लक राहतील
+    pages.push({ chunk: list.slice(0, page1Count), startIndex: 0, isFirst: true, isLast: false });
+    pages.push({ chunk: list.slice(page1Count), startIndex: page1Count, isFirst: false, isLast: true });
+  } else {
+    // १६ पेक्षा जास्त पदाधिकाऱ्यांसाठी
+    let page1Count = 12;
+    pages.push({ chunk: list.slice(0, page1Count), startIndex: 0, isFirst: true, isLast: false });
+    let currentStart = page1Count;
+
+    while (currentStart < list.length) {
+      let remCount = list.length - currentStart;
+      if (remCount <= 14) {
+        // शेवटच्या पानावर सहीसह १४ पर्यंत सहज बसतात
+        pages.push({ chunk: list.slice(currentStart), startIndex: currentStart, isFirst: false, isLast: true });
+        break;
+      } else if (remCount <= 18) {
+        let take = Math.floor(remCount / 2);
+        pages.push({ chunk: list.slice(currentStart, currentStart + take), startIndex: currentStart, isFirst: false, isLast: false });
+        currentStart += take;
+      } else {
+        pages.push({ chunk: list.slice(currentStart, currentStart + 16), startIndex: currentStart, isFirst: false, isLast: false });
+        currentStart += 16;
+      }
+    }
+  }
+
+  const totalPages = pages.length;
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const renderWrapper = document.createElement('div');
+  renderWrapper.style.position = 'fixed';
+  renderWrapper.style.left = '-9999px';
+  renderWrapper.style.top = '0';
+  renderWrapper.style.width = '794px';
+  renderWrapper.style.background = '#ffffff';
+  renderWrapper.style.zIndex = '999999';
+  document.body.appendChild(renderWrapper);
+
+  try {
+    for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+      const pageData = pages[pIdx];
+      const isLastPage = (pIdx === totalPages - 1);
+
+      let pageHTML = `
+        <div style="width: 794px; min-height: 1123px; max-height: 1123px; padding: 18px 28px 16px 28px; background: #ffffff; color: #000000; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
+          <div>
+      `;
+
+      if (pageData.isFirst) {
+        pageHTML += `
+          <!-- मूळ रंगीत लेटरपॅड -->
+          <div style="width: 100%; text-align: center; margin-bottom: 4px;">
+            <img src="heding.jpg" crossorigin="anonymous" alt="लेटरपॅड" style="width: 100%; height: auto; max-height: 175px; object-fit: contain; display: block; margin: 0 auto;" onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/padmakarshinde043-byte/RK2026/main/heding.jpg';">
+          </div>
+          <!-- शुद्ध काळी ठळक माहिती पट्टी -->
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2.5px solid #000000; border-bottom: 2.5px solid #000000; padding: 5px 6px; margin-bottom: 10px; font-weight: 900; font-size: 12.5pt; color: #000000;">
+            <div>जिल्हा कार्यकारिणी सूची : ${currentDistrict}</div>
+            <div>एकूण पदाधिकारी: ${list.length}</div>
+            <div>दिनांक: ${getTodayFormattedDate()}</div>
+          </div>
+        `;
+      } else {
+        pageHTML += `
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #000000; padding-bottom: 5px; margin-bottom: 12px; font-weight: 900; font-size: 11.5pt; color: #000000;">
+            <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - ${currentDistrict} जिल्हा सूची (पुढे चालू)</div>
+            <div>दिनांक: ${getTodayFormattedDate()}</div>
+          </div>
+        `;
+      }
+
+      pageHTML += `
+        <!-- प्रिंटसाठी 100% स्पष्ट आणि ठळक तक्ता -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; border: 2px solid #000000;">
+          <thead>
+            <tr style="background: #f1f5f9;">
+              <th style="border: 1.8px solid #000000; padding: 6px 4px; width: 45px; text-align: center; font-size: 11pt; font-weight: 900; color: #000000;">अनु.</th>
+              <th style="border: 1.8px solid #000000; padding: 6px 8px; text-align: left; font-size: 11.5pt; font-weight: 900; color: #000000; width: 235px;">पदाधिकाऱ्याचे संपूर्ण नाव</th>
+              <th style="border: 1.8px solid #000000; padding: 6px 8px; text-align: left; font-size: 11pt; font-weight: 900; color: #000000; width: 220px;">सध्याचे पद व कार्यक्षेत्र</th>
+              <th style="border: 1.8px solid #000000; padding: 6px 8px; text-align: left; font-size: 11.5pt; font-weight: 900; color: #000000;">महासंघातील बहाल केलेले पद</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      pageData.chunk.forEach((m, cIdx) => {
+        const rowNumber = pageData.startIndex + cIdx + 1;
+        const wp = getWorkingPlaceDisplay(m);
+        pageHTML += `
+          <tr>
+            <td style="border: 1.5px solid #000000; text-align: center; font-weight: 900; padding: 5px 4px; font-size: 11pt; color: #000000;">${rowNumber}</td>
+            <td style="border: 1.5px solid #000000; font-weight: 800; padding: 5px 8px; font-size: 11.5pt; color: #000000; line-height: 1.3;">${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName}</td>
+            <td style="border: 1.5px solid #000000; padding: 5px 8px; font-size: 10.5pt; color: #000000; line-height: 1.3;">
+              <strong style="font-weight: 900; font-size: 11pt; display: block; color: #000000;">${wp.cadre}</strong>
+              <span style="font-weight: 700; color: #000000; font-size: 10pt;">${wp.details}</span>
+            </td>
+            <td style="border: 1.5px solid #000000; font-weight: 900; padding: 5px 8px; font-size: 11.5pt; color: #000000; line-height: 1.3;">${getDisplayPost(m)}</td>
+          </tr>
+        `;
+      });
+
+      pageHTML += `
+            </tbody>
+          </table>
+      `;
+
+      // शेवटच्या पानावर १००% गॅरंटीड स्वाक्षरी ब्लॉक
+      if (isLastPage) {
+        pageHTML += `
+          <div style="display: flex; justify-content: flex-end; margin-top: 14px; margin-bottom: 4px;">
+            <div style="text-align: center; min-width: 220px;">
+              <img src="sign.jpg" crossorigin="anonymous" alt="स्वाक्षरी" style="height: 52px; max-width: 180px; object-fit: contain; display: block; margin: 0 auto 2px auto;" onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/padmakarshinde043-byte/RK2026/main/sign.jpg';">
+              <div style="font-size: 11.5pt; font-weight: 900; color: #000000; line-height: 1.2;">( श्री. राजेंद्र शिवाजी खैरनार )</div>
+              <div style="font-size: 10pt; font-weight: 800; color: #000000;">संस्थापक राज्याध्यक्ष</div>
+              <div style="font-size: 9pt; font-weight: 700; color: #000000;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+            </div>
+          </div>
+        `;
+      }
+
+      pageHTML += `
+        </div>
+        <!-- तळटीप (Footer) -->
+        <div style="display: flex; justify-content: space-between; font-size: 9.5pt; font-weight: 800; color: #000000; border-top: 1.5px solid #000000; padding-top: 4px;">
+          <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+          <div>पान क्र. ${pIdx + 1} / ${totalPages}</div>
+        </div>
+      </div>
+      `;
+
+      renderWrapper.innerHTML = pageHTML;
+
+      // स्वाक्षरी इमेज लोड होण्यासाठी सुरक्षित वेळ
+      await new Promise(r => setTimeout(r, 200));
+
+      const canvas = await html2canvas(renderWrapper.firstElementChild, {
+        scale: 2.2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 794,
+        height: 1123
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      if (pIdx > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    }
+
+    pdf.save(`अधिकृत_कार्यकारिणी_यादी_${currentDistrict}.pdf`);
+  } catch (err) {
+    alert("PDF डाऊनलोड करताना त्रुटी आली: " + err.message);
+  } finally {
+    document.body.removeChild(renderWrapper);
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+    function sendWhatsAppInstantDirect(id) {
+      const m = window.membersData.find(item => String(item.id) === String(id));
+      if(!m) return;
+
+      const seqNo = getMemberSerialOrder(m.id);
+      const fullDisplayPost = getDisplayPost(m);
+
+      const message = `सस्नेह नमस्कार 🙏
+
+*महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ*
+*नियुक्ती पत्र क्र.: ${String(seqNo).padStart(2, '0')}*
+
+मा. ${m.salutation} ${m.firstName} ${m.middleName} ${m.lastName},
+आपल्या शिक्षण क्षेत्रातील प्रदीर्घ, निष्कलंक सेवा आणि संघटनात्मक कर्तृत्वाची सार्थ दखल घेऊन, राज्य कार्यकारिणीच्या सर्वसंमत निर्णयानुसार आपली *${m.district}* जिल्हा कार्यकारिणीवर:
+
+⭐ *« ${fullDisplayPost} »* ⭐
+
+या अत्यंत सन्मानाच्या व जबाबदारीच्या पदावर गौरवपूर्ण नियुक्ती करण्यात आली आहे.
+
+केंद्रप्रमुख व विस्तार अधिकारी संवर्गाच्या सन्मानासाठी व गुणवत्तेसाठी आपण खंबीरपणे कार्य कराल, हा ठाम विश्वास आहे. उदंड शुभेच्छा!
+
+*श्री. राजेंद्र शिवाजी खैरनार*
+संस्थापक राज्याध्यक्ष,
+महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+कार्यालय : 131, पाटणे, मालेगाव ता. मालेगाव जि. नाशिक
+संपर्क: 9860704098`;
+
+      const waUrl = `https://api.whatsapp.com/send?phone=91${m.mobile}&text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+    }
+    // [PATCH 5 END]
+
+    async function superAdminResetPassword() {
+      const targetDist = document.getElementById('superAdminDistrictSelect').value;
+      if (!confirm(`आपण खरोखर '${targetDist}' जिल्ह्याचा पासवर्ड पुन्हा 'AD2026' वर रिसेट करू इच्छिता?`)) return;
+
+      try {
+        if (!window.districtPasswords) window.districtPasswords = {};
+        window.districtPasswords[targetDist] = "AD2026";
+
+        if (window.rtdb && window.dbSet && window.dbRef) {
+          await window.dbSet(window.dbRef(window.rtdb, 'district_passwords/' + targetDist), "AD2026");
+        }
+        alert(`'${targetDist}' जिल्ह्याचा पासवर्ड पूर्ववत 'AD2026' झाला आहे.`);
+      } catch (e) {
+        alert("त्रुटी: " + e.message);
+      }
+    }
+
+    async function adminResetCurrentDistrictPassword() {
+      if (!confirm(`आपण खरोखर '${currentDistrict}' जिल्ह्याचा पासवर्ड पुन्हा 'AD2026' वर रिसेट करू इच्छिता?`)) return;
+
+      try {
+        if (!window.districtPasswords) window.districtPasswords = {};
+        window.districtPasswords[currentDistrict] = "AD2026";
+
+        if (window.rtdb && window.dbSet && window.dbRef) {
+          await window.dbSet(window.dbRef(window.rtdb, 'district_passwords/' + currentDistrict), "AD2026");
+        }
+        alert(`'${currentDistrict}' जिल्ह्याचा पासवर्ड पूर्ववत 'AD2026' झाला आहे.`);
+      } catch (e) {
+        alert("त्रुटी: " + e.message);
+      }
+    }
+
+    // Designer Studio Functions
+    function deleteNode(nodeId) {
+      const el = document.getElementById(nodeId);
+      if (el) {
+        el.style.display = 'none';
+        const chkId = nodeId.replace('node-', 'chk-');
+        const chk = document.getElementById(chkId);
+        if (chk) chk.checked = false;
+      }
+    }
+
+    function toggleNodeVisibility(nodeId, isVisible) {
+      const el = document.getElementById(nodeId);
+      if (el) {
+        el.style.display = isVisible ? 'block' : 'none';
+      }
+    }
+
+    function updateLetterStyles() {
+      const fontSize = document.getElementById('dsFontSize').value + 'px';
+      const lineHeight = document.getElementById('dsLineHeight').value;
+      const textColor = document.getElementById('dsTextColor').value;
+
+      document.querySelectorAll('.body-text-block').forEach(b => {
+        b.style.fontSize = fontSize;
+        b.style.lineHeight = lineHeight;
+        b.style.color = textColor;
+      });
+
+      const p1 = document.getElementById('dispPara1');
+      const p2 = document.getElementById('dispPara2');
+      const p3 = document.getElementById('dispPara3');
+
+      if (p1) { p1.style.fontSize = fontSize; p1.style.lineHeight = lineHeight; }
+      if (p2) { p2.style.fontSize = fontSize; p2.style.lineHeight = lineHeight; }
+      if (p3) { p3.style.fontSize = fontSize; p3.style.lineHeight = lineHeight; }
+    }
+
+    function updateLetterTexts() {
+      document.getElementById('dispSubject').textContent = "विषय: " + document.getElementById('dsSubject').value;
+      document.getElementById('dispPara1').textContent = document.getElementById('dsPara1').value;
+      document.getElementById('dispPara2').textContent = document.getElementById('dsPara2').value;
+      document.getElementById('dispPara3').textContent = document.getElementById('dsPara3').value;
+    }
+
+    function updateSignTexts() {
+      document.getElementById('dispSign1Name').textContent = document.getElementById('dsSign1Name').value;
+      document.getElementById('dispSign1Role').innerHTML = document.getElementById('dsSign1Role').value.replace(/\n/g, '<br>');
+      document.getElementById('dispSign2Name').textContent = document.getElementById('dsSign2Name').value;
+      document.getElementById('dispSign2Role').innerHTML = document.getElementById('dsSign2Role').value.replace(/\n/g, '<br>');
+    }
+
+    function handleBgUpload(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const cert = document.getElementById('printableCertificate');
+          cert.style.backgroundImage = `url('${evt.target.result}')`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function insertNewImage(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          insertedImagesCount++;
+          const imgId = `node-custom-img-${insertedImagesCount}`;
+
+          const div = document.createElement('div');
+          div.className = 'canvas-node custom-added-image-node';
+          div.id = imgId;
+          div.style.top = '10px';
+          div.style.left = '14px';
+          div.style.width = '738px';
+          div.style.height = '145px';
+
+          div.innerHTML = `
+            <button class="node-delete-btn" onclick="document.getElementById('${imgId}').remove()" title="हटवा">&times;</button>
+            <div class="node-resize-handle"></div>
+            <img src="${evt.target.result}" class="custom-inserted-img" alt="Inserted Image">
+          `;
+
+          document.getElementById('a4CanvasArea').appendChild(div);
+          initNodeInteractions(div);
+          alert("नवीन प्रतिमा पत्रावर जोडली गेली आहे!");
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function handleSignUpload(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          const img = document.getElementById('presidentSignImg');
+          img.src = evt.target.result;
+          img.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function initFreeDragAndResize() {
+      const canvasArea = document.getElementById('a4CanvasArea');
+      if (!canvasArea) return;
+      canvasArea.querySelectorAll('.canvas-node').forEach(node => initNodeInteractions(node));
+    }
+
+    function initNodeInteractions(node) {
+      const canvasArea = document.getElementById('a4CanvasArea');
+      if (!canvasArea) return;
+
+      node.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('node-delete-btn') || e.target.classList.contains('node-resize-handle')) {
+          return;
+        }
+        e.preventDefault();
+
+        const rect = node.getBoundingClientRect();
+        const canvasRect = canvasArea.getBoundingClientRect();
+
+        const shiftX = e.clientX - rect.left;
+        const shiftY = e.clientY - rect.top;
+
+        function onMouseMove(event) {
+          let newX = event.clientX - canvasRect.left - shiftX;
+          let newY = event.clientY - canvasRect.top - shiftY;
+
+          node.style.left = newX + 'px';
+          node.style.top = newY + 'px';
+        }
+
+        function onMouseUp() {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+
+      const handle = node.querySelector('.node-resize-handle');
+      if (handle) {
+        handle.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+
+          const startX = e.clientX;
+          const startY = e.clientY;
+          const startWidth = parseInt(document.defaultView.getComputedStyle(node).width, 10);
+          const startHeight = parseInt(document.defaultView.getComputedStyle(node).height, 10);
+
+          function doResize(event) {
+            node.style.width = (startWidth + event.clientX - startX) + 'px';
+            node.style.height = (startHeight + event.clientY - startY) + 'px';
+          }
+
+          function stopResize() {
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+          }
+
+          document.addEventListener('mousemove', doResize);
+          document.addEventListener('mouseup', stopResize);
+        });
+      }
+    }
+
+    async function saveDesignToCloud() {
+      const canvasArea = document.getElementById('a4CanvasArea');
+      const nodes = canvasArea.querySelectorAll('.canvas-node');
+
+      const layoutData = {};
+      const customImagesData = [];
+
+      nodes.forEach(node => {
+        layoutData[node.id] = {
+          top: node.style.top,
+          left: node.style.left,
+          right: node.style.right,
+          width: node.style.width,
+          height: node.style.height,
+          display: node.style.display || 'block'
+        };
+
+        if (node.classList.contains('custom-added-image-node')) {
+          const img = node.querySelector('img');
+          if (img) {
+            customImagesData.push({
+              id: node.id,
+              src: img.src,
+              top: node.style.top,
+              left: node.style.left,
+              width: node.style.width,
+              height: node.style.height
+            });
+          }
+        }
+      });
+
+      const designPayload = {
+        subject: document.getElementById('dsSubject').value,
+        para1: document.getElementById('dsPara1').value,
+        para2: document.getElementById('dsPara2').value,
+        para3: document.getElementById('dsPara3').value,
+        sign1Name: document.getElementById('dsSign1Name').value,
+        sign1Role: document.getElementById('dsSign1Role').value,
+        sign2Name: document.getElementById('dsSign2Name').value,
+        sign2Role: document.getElementById('dsSign2Role').value,
+        fontSize: document.getElementById('dsFontSize').value,
+        lineHeight: document.getElementById('dsLineHeight').value,
+        textColor: document.getElementById('dsTextColor').value,
+        layout: layoutData,
+        customImages: customImagesData,
+        bgImage: document.getElementById('printableCertificate').style.backgroundImage || '',
+        updatedAt: new Date().toISOString()
+      };
+
+      try {
+        if (window.rtdb && window.dbSet && window.dbRef) {
+          await window.dbSet(window.dbRef(window.rtdb, 'appointment_master_design'), designPayload);
+        }
+
+        try {
+          const safeLocalBackup = { ...designPayload, customImages: [], bgImage: '' };
+          localStorage.setItem('mahasangh_master_design', JSON.stringify(safeLocalBackup));
+        } catch(storageErr) {}
+
+        alert("अभिनंदन! संपूर्ण मास्टर डिझाईन आणि इन्सर्ट केलेल्या सर्व प्रतिमा Firebase वर सेव्ह झाल्या आहेत.");
+      } catch (err) {
+        alert("डिझाईन सेव्ह करताना त्रुटी आली: " + err.message);
+      }
+    }
+
+    window.applyDesignPayload = function(design) {
+      if (!design || !design.layout) return;
+      if (design.subject) document.getElementById('dsSubject').value = design.subject;
+      if (design.para1) document.getElementById('dsPara1').value = design.para1;
+      if (design.para2) document.getElementById('dsPara2').value = design.para2;
+      if (design.para3) document.getElementById('dsPara3').value = design.para3;
+      if (design.sign1Name) document.getElementById('dsSign1Name').value = design.sign1Name;
+      if (design.sign1Role) document.getElementById('dsSign1Role').value = design.sign1Role;
+      if (design.sign2Name) document.getElementById('dsSign2Name').value = design.sign2Name;
+      if (design.sign2Role) document.getElementById('dsSign2Role').value = design.sign2Role;
+      if (design.fontSize) document.getElementById('dsFontSize').value = design.fontSize;
+      if (design.lineHeight) document.getElementById('dsLineHeight').value = design.lineHeight;
+      if (design.textColor) document.getElementById('dsTextColor').value = design.textColor;
+      if (design.bgImage) document.getElementById('printableCertificate').style.backgroundImage = design.bgImage;
+
+      updateLetterTexts();
+      updateSignTexts();
+      updateLetterStyles();
+
+      document.querySelectorAll('.custom-added-image-node').forEach(el => el.remove());
+
+      if (design.customImages && Array.isArray(design.customImages)) {
+        design.customImages.forEach(imgObj => {
+          const div = document.createElement('div');
+          div.className = 'canvas-node custom-added-image-node';
+          div.id = imgObj.id;
+          div.style.top = imgObj.top;
+          div.style.left = imgObj.left;
+          div.style.width = imgObj.width;
+          div.style.height = imgObj.height;
+
+          div.innerHTML = `
+            <button class="node-delete-btn" onclick="document.getElementById('${imgObj.id}').remove()" title="हटवा">&times;</button>
+            <div class="node-resize-handle"></div>
+            <img src="${imgObj.src}" class="custom-inserted-img" alt="Inserted Image">
+          `;
+
+          document.getElementById('a4CanvasArea').appendChild(div);
+          initNodeInteractions(div);
+        });
+      }
+
+      Object.keys(design.layout).forEach(nodeId => {
+        const el = document.getElementById(nodeId);
+        const conf = design.layout[nodeId];
+        if (el && conf) {
+          if (conf.top) el.style.top = conf.top;
+          if (conf.left) el.style.left = conf.left;
+          if (conf.right) el.style.right = conf.right;
+          if (conf.width) el.style.width = conf.width;
+          if (conf.height) el.style.height = conf.height;
+          if (conf.display) {
+            el.style.display = conf.display;
+            const chk = document.getElementById(nodeId.replace('node-', 'chk-'));
+            if (chk) chk.checked = (conf.display !== 'none');
+          }
+        }
+      });
+    };
+
+    function resetDesignerDefaults() {
+      if(confirm("आपण खरोखर मूळ डिझाइन पूर्ववत करू इच्छिता?")) {
+        try { localStorage.removeItem('mahasangh_master_design'); } catch(e){}
+        location.reload();
+      }
+    }
+  </script>
+  <!-- ================= [LIVE VISITOR COUNTER SINGLE PATCH START] ================= -->
+  <!-- १. सुंदर फुटर डिझाइन -->
+  <footer style="background: #ffffff; border-top: 1.5px solid var(--gold-border); padding: 14px 10px; margin-top: 25px; text-align: center; font-size: 13.5px; color: #475569; font-weight: 700; box-shadow: 0 -2px 10px rgba(0,0,0,0.03); width: 100%;">
+    <div style="display: flex; justify-content: center; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 6px;">
+      <span style="background: #f1f5f9; padding: 6px 14px; border-radius: 25px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; gap: 7px;">
+        <i class="fa-solid fa-calendar-day" style="color: var(--accent); font-size: 15px;"></i> आजच्या भेटी: 
+        <strong id="todayVisitorsCount" style="color: #0f2b48; font-size: 16px;">...</strong>
+      </span>
+      <span style="background: #f1f5f9; padding: 6px 14px; border-radius: 25px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; gap: 7px;">
+        <i class="fa-solid fa-users-viewfinder" style="color: var(--navy); font-size: 15px;"></i> एकूण भेटी: 
+        <strong id="totalVisitorsCount" style="color: #0f2b48; font-size: 16px;">...</strong>
+      </span>
+    </div>
+    <div style="font-size: 12px; color: #64748b;">
+      © २०२६ महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ. सर्व हक्क राखीव.
+    </div>
+  </footer>
+
+  <!-- २. स्वयं-कार्यरत रिअलटाइम ट्रॅकिंग इंजिन -->
+  <script type="module">
+    import { ref, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    function startLiveVisitorTracker() {
+      if (!window.rtdb) {
+        setTimeout(startLiveVisitorTracker, 300);
+        return;
+      }
+
+      // भारतीय प्रमाणवेळेनुसार आजची अचूक तारीख (YYYY-MM-DD)
+      const now = new Date();
+      const istDate = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+      const todayKey = istDate.toISOString().slice(0, 10);
+
+      const todayVisitsRef = ref(window.rtdb, 'site_analytics/daily/' + todayKey);
+      const totalVisitsRef = ref(window.rtdb, 'site_analytics/total_visits');
+
+      // स्क्रीनवर लाईव्ह आकडे अपडेट करणे
+      onValue(todayVisitsRef, (snap) => {
+        const val = snap.val() || 0;
+        const el = document.getElementById('todayVisitorsCount');
+        if (el) el.textContent = val.toLocaleString('en-IN');
+      });
+
+      onValue(totalVisitsRef, (snap) => {
+        const val = snap.val() || 0;
+        const el = document.getElementById('totalVisitorsCount');
+        if (el) el.textContent = val.toLocaleString('en-IN');
+      });
+
+      // युनिक व्हिजिट मोजणे (वारंवार पेज रिफ्रेश केल्यास खोटा आकडा वाढणार नाही)
+      const sessionKey = 'mahasangh_visited_' + todayKey;
+      if (!sessionStorage.getItem(sessionKey)) {
+        sessionStorage.setItem(sessionKey, 'true');
+
+        runTransaction(todayVisitsRef, (curr) => (curr || 0) + 1);
+        runTransaction(totalVisitsRef, (curr) => (curr || 0) + 1);
+      }
+    }
+
+    // पेज लोड होताच सुरू करणे
+    if (document.readyState === 'complete') {
+      startLiveVisitorTracker();
+    } else {
+      window.addEventListener('load', startLiveVisitorTracker);
+    }
+  </script>
+  <!-- ================= [LIVE VISITOR COUNTER SINGLE PATCH END] ================= -->
+  <!-- ================= [STATEWIDE REGISTRY SINGLE STANDALONE PATCH START] ================= -->
+  <script type="module">
+    import { ref, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // १. राज्याध्यक्ष पॅनलमध्ये बटण स्वयंचलित जोडणे
+    function injectStateRegistryButton() {
+      const container = document.querySelector('#tab-letters > div:first-child');
+      if (!container || document.getElementById('autoStateRegistryBtn')) return;
+
+      const btn = document.createElement('button');
+      btn.id = 'autoStateRegistryBtn';
+      btn.className = 'btn btn-outline';
+      btn.style.cssText = 'border-color: #0f2b48; color: #0f2b48; font-weight: 800; display: inline-flex; align-items: center; gap: 6px;';
+      btn.innerHTML = '<i class="fa-solid fa-list-ol"></i> नियुक्ती क्रमांकानुसार राज्य यादी (PDF)';
+      btn.onclick = generateStatewideRegistryPDF;
+
+      // मूळ डाऊनलोड बटनाच्या शेजारी बटण लावणे
+      container.appendChild(btn);
+    }
+
+    // २. मागणीनुसार (On-Demand) १ ते शेवटपर्यंत सलग ब्लॅक अँड व्हाईट PDF तयार करणे
+    async function generateStatewideRegistryPDF() {
+      const btn = document.getElementById('autoStateRegistryBtn');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> डेटा तपासत आहे...';
+
+      try {
+        if (!window.rtdb) {
+          alert("डेटाबेस सेवा उपलब्ध नाही. कृपया पेज रिफ्रेश करा.");
+          return;
+        }
+
+        // केवळ बटण दाबल्यावरच फायरबेसवरून एकदाच ऑन-डिमांड मागणी (Zero Background Cost)
+        const snapshot = await get(ref(window.rtdb, 'officials'));
+        const rawData = snapshot.val();
+        if (!rawData) {
+          alert("पोर्टलवर एकही नोंदणीकृत पदाधिकारी आढळला नाही.");
+          return;
+        }
+
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> PDF तयार होत आहे...';
+
+        const allMembers = Object.keys(rawData).map(key => ({ id: key, ...rawData[key] }));
+
+        // नोंदणीच्या अचूक वेळेनुसार १ ते शेवटपर्यंत सलग क्रमवारी
+        allMembers.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
+
+          if (timeA !== timeB && timeA > 0 && timeB > 0) return timeA - timeB;
+
+          const numIdA = parseInt(a.id) || 0;
+          const numIdB = parseInt(b.id) || 0;
+          if (numIdA > 0 && numIdB > 0 && numIdA !== numIdB) return numIdA - numIdB;
+
+          return String(a.id || '').localeCompare(String(b.id || ''));
+        });
+
+        const totalRecords = allMembers.length;
+        const ROWS_PER_PAGE = 26; // पानावर खाली नको ती रिकामी जागा न सोडता योग्य बसवणे
+        const totalPages = Math.ceil(totalRecords / ROWS_PER_PAGE);
+
+        const todayDate = new Date();
+        const formattedDate = `${String(todayDate.getDate()).padStart(2, '0')}/${String(todayDate.getMonth() + 1).padStart(2, '0')}/${todayDate.getFullYear()}`;
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        const renderWrapper = document.createElement('div');
+        renderWrapper.style.cssText = 'position: fixed; left: -9999px; top: 0; width: 794px; background: #ffffff; z-index: 999999;';
+        document.body.appendChild(renderWrapper);
+
+        for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+          const startIndex = pIdx * ROWS_PER_PAGE;
+          const chunk = allMembers.slice(startIndex, startIndex + ROWS_PER_PAGE);
+
+          let pageHTML = `
+            <div style="width: 794px; min-height: 1123px; max-height: 1123px; padding: 22px 30px; background: #ffffff; color: #000000; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; font-family: 'Noto Sans Devanagari', 'Yantramanav', sans-serif;">
+              <div>
+                <!-- ब्लॅक अँड व्हाईट शासकीय हेडर -->
+                <div style="text-align: center; border-bottom: 2px solid #000000; padding-bottom: 8px; margin-bottom: 10px;">
+                  <div style="font-size: 9.5pt; font-weight: 800;">श्रमिक संघ / धर्मादाय आयुक्त नोंदणीकृत संघटना | Reg. No. MH/0000555/2026</div>
+                  <div style="font-size: 18pt; font-weight: 900; line-height: 1.2; margin-top: 2px;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+                  <div style="font-size: 9.5pt; font-weight: 700; margin-top: 2px;">कार्यालय : १३१, पाटणे, ता. मालेगाव, जि. नाशिक | संपर्क: ९८६०७०४०९८</div>
+                </div>
+
+                <div style="border: 1.5px solid #000000; padding: 6px 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11pt; font-weight: 900; background: #f8fafc;">
+                  <div>॥ राज्यस्तरीय अधिकृत नियुक्ती पत्र जावक नोंदवही ॥</div>
+                  <div>एकूण जारी नियुक्ती: ${totalRecords}</div>
+                  <div>दिनांक: ${formattedDate}</div>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000000;">
+                  <thead>
+                    <tr style="background: #f1f5f9;">
+                      <th style="border: 1.2px solid #000000; padding: 6px 4px; width: 42px; text-align: center; font-size: 10pt; font-weight: 900;">अनु.</th>
+                      <th style="border: 1.2px solid #000000; padding: 6px 4px; width: 85px; text-align: center; font-size: 10pt; font-weight: 900;">नियुक्ती क्र.</th>
+                      <th style="border: 1.2px solid #000000; padding: 6px 8px; width: 105px; text-align: left; font-size: 10.5pt; font-weight: 900;">जिल्हा</th>
+                      <th style="border: 1.2px solid #000000; padding: 6px 8px; font-size: 10.5pt; font-weight: 900;">पदाधिकाऱ्याचे संपूर्ण नाव</th>
+                      <th style="border: 1.2px solid #000000; padding: 6px 8px; width: 230px; text-align: left; font-size: 10.5pt; font-weight: 900;">बहाल केलेले पद</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+          `;
+
+          chunk.forEach((m, cIdx) => {
+            const serialNo = startIndex + cIdx + 1;
+            const outwardFormatted = String(serialNo).padStart(2, '0');
+            const distName = (m.district === 'अहमदनगर' || (m.district && m.district.toLowerCase() === 'ahmednagar')) ? 'अहिल्यानगर' : (m.district || '-');
+            const postName = m.taluka ? `${m.appointedPost} (${m.taluka})` : m.appointedPost;
+
+            pageHTML += `
+              <tr>
+                <td style="border: 1px solid #000000; text-align: center; font-weight: 800; padding: 5px 3px; font-size: 9.5pt;">${serialNo}</td>
+                <td style="border: 1px solid #000000; text-align: center; font-weight: 900; padding: 5px 3px; font-size: 10pt;">${outwardFormatted}</td>
+                <td style="border: 1px solid #000000; font-weight: 800; padding: 5px 6px; font-size: 10pt;">${distName}</td>
+                <td style="border: 1px solid #000000; font-weight: 800; padding: 5px 8px; font-size: 10pt;">${m.salutation || ''} ${m.firstName || ''} ${m.middleName || ''} ${m.lastName || ''}</td>
+                <td style="border: 1px solid #000000; font-weight: 900; padding: 5px 6px; font-size: 10pt;">${postName}</td>
+              </tr>
+            `;
+          });
+
+          pageHTML += `
+                  </tbody>
+                </table>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9pt; font-weight: 800; border-top: 1.5px solid #000000; padding-top: 4px; margin-top: 6px;">
+                <div>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - राज्यस्तरीय मास्टर यादी</div>
+                <div>पान क्र. ${pIdx + 1} / ${totalPages}</div>
+              </div>
+            </div>
+          `;
+
+          renderWrapper.innerHTML = pageHTML;
+          await new Promise(res => setTimeout(res, 150));
+
+          const canvas = await html2canvas(renderWrapper.firstElementChild, {
+            scale: 2.2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            width: 794,
+            height: 1123
+          });
+
+          const imgData = canvas.toDataURL('image/jpeg', 0.98);
+          if (pIdx > 0) pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+        }
+
+        document.body.removeChild(renderWrapper);
+        pdf.save(`राज्यस्तरीय_नियुक्ती_नोंदवही_यादी_${formattedDate.replace(/\//g, '-')}.pdf`);
+
+      } catch (err) {
+        alert("मास्टर यादी PDF डाऊनलोड करताना त्रुटी आली: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+
+    // टॅब उघडताना बटण लोड करणे
+    window.addEventListener('load', injectStateRegistryButton);
+    setInterval(injectStateRegistryButton, 1000);
+  </script>
+  <!-- ================= [STATEWIDE REGISTRY SINGLE STANDALONE PATCH END] ================= -->
+</body>
+</html>

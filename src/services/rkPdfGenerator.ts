@@ -993,7 +993,7 @@ async function buildMembershipIdCardPdfDocument(
     const { jsPDF, html2canvas } = await loadPdfEngines();
     const cardEl = wrapper.firstElementChild as HTMLElement;
     const canvas = await html2canvas(cardEl, {
-      scale: 4, // 856x540 * 4 = 3424x2160px (1016 DPI Ultra-HD print resolution)
+      scale: 2.2, // ~300 KB lightweight PDF for instant download
       useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -1008,81 +1008,14 @@ async function buildMembershipIdCardPdfDocument(
       logging: false,
     });
 
-    const createPdfInstance = () =>
-      new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: [85.6, 54], // Standard CR80 landscape ID card format
-        compress: true,
-      });
-
-    const minTargetBytes = forEmail ? 1_900_000 : 2_050_000; // >= 2.0 MB for download
-    const maxTargetBytes = forEmail ? 2_650_000 : 2_980_000; // Strictly <= 3.0 MB
-
-    const buildWithImage = (dataUrl: string, fmt: 'PNG' | 'JPEG', compression: 'SLOW' | 'FAST') => {
-      const docPdf = createPdfInstance();
-      docPdf.addImage(dataUrl, fmt, 0, 0, 85.6, 54, undefined, compression);
-      return { docPdf, bytes: docPdf.output('arraybuffer').byteLength };
-    };
-
-    const downsampleCanvas = (src: HTMLCanvasElement, targetScale: number) => {
-      const targetW = Math.round(856 * targetScale);
-      const targetH = Math.round(540 * targetScale);
-      const out = document.createElement('canvas');
-      out.width = targetW;
-      out.height = targetH;
-      const ctx = out.getContext('2d');
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(src, 0, 0, targetW, targetH);
-      }
-      return out;
-    };
-
-    // 1. Try 1016 DPI (4x) lossless PNG with SLOW zlib compression
-    const pngData4x = canvas.toDataURL('image/png');
-    let best = buildWithImage(pngData4x, 'PNG', 'SLOW');
-
-    if (best.bytes < minTargetBytes) {
-      // Lossless PNG compressed very tightly; check FAST zlib or full-res JPEG 1.0 to land in [2 MB, 3 MB]
-      const fast4x = buildWithImage(pngData4x, 'PNG', 'FAST');
-      if (fast4x.bytes >= minTargetBytes && fast4x.bytes <= maxTargetBytes) {
-        best = fast4x;
-      } else {
-        const jpeg100 = buildWithImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 'SLOW');
-        if (jpeg100.bytes >= minTargetBytes && jpeg100.bytes <= maxTargetBytes) {
-          best = jpeg100;
-        } else if (fast4x.bytes <= maxTargetBytes && fast4x.bytes > best.bytes) {
-          best = fast4x;
-        }
-      }
-    } else if (best.bytes > maxTargetBytes) {
-      // Over 3 MB at 4x SLOW PNG: try 3.5x (889 DPI) lossless PNG inside [2 MB, 3 MB] first
-      const canvas35x = downsampleCanvas(canvas, 3.5);
-      const png35x = buildWithImage(canvas35x.toDataURL('image/png'), 'PNG', 'SLOW');
-      if (png35x.bytes >= minTargetBytes && png35x.bytes <= maxTargetBytes) {
-        best = png35x;
-      } else {
-        // Pick the highest quality JPEG on full 4x (1016 DPI) canvas that fits inside <= 3 MB
-        let picked = false;
-        for (const q of [1.0, 0.99, 0.98, 0.96, 0.94, 0.92, 0.88, 0.84]) {
-          const candidate = buildWithImage(canvas.toDataURL('image/jpeg', q), 'JPEG', 'SLOW');
-          if (candidate.bytes <= maxTargetBytes) {
-            best = candidate;
-            picked = true;
-            break;
-          }
-        }
-        if (!picked) {
-          best = png35x.bytes <= maxTargetBytes
-            ? png35x
-            : buildWithImage(canvas35x.toDataURL('image/jpeg', 0.92), 'JPEG', 'SLOW');
-        }
-      }
-    }
-
-    const pdf = best.docPdf;
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [85.6, 54],
+      compress: true,
+    });
+    const jpegData = canvas.toDataURL('image/jpeg', 0.88);
+    pdf.addImage(jpegData, 'JPEG', 0, 0, 85.6, 54, undefined, 'SLOW');
     const cleanName = (app.fullName || 'सदस्य').replace(/\s+/g, '_');
     const cleanMemberId = memberNo.replace(/[^a-zA-Z0-9_-]/g, '_');
     return {
@@ -1112,6 +1045,116 @@ export async function generateMembershipIdCardPdfBase64(
 
 export async function generateMembershipCertificatePdf(app: MembershipApplication): Promise<void> {
   return generateMembershipIdCardPdf(app);
+}
+
+/**
+ * 4B. Bulk District ID Cards Landscape PDF for Super Admin printing (नवीन आयकार्ड प्रिंट करा)
+ */
+export async function generateDistrictBatchIdCardsPdf(
+  districtName: string,
+  members: MembershipApplication[],
+  onProgress?: (s: string) => void
+): Promise<void> {
+  const approved = members.filter(
+    (m) =>
+      m.status === 'approved' &&
+      (!districtName || (m.district || '').trim().toLowerCase() === districtName.trim().toLowerCase())
+  );
+  if (approved.length === 0) {
+    throw new Error(`'${districtName}' जिल्ह्यात एकही मंजूर सदस्य उपलब्ध नाही.`);
+  }
+
+  const { jsPDF, html2canvas } = await loadPdfEngines();
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: [85.6, 54],
+    compress: true,
+  });
+
+  for (let i = 0; i < approved.length; i++) {
+    const app = approved[i];
+    if (onProgress) {
+      onProgress(`आय-कार्ड तयार करत आहे (${i + 1}/${approved.length}): ${app.fullName}`);
+    }
+
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'fixed';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    wrapper.style.width = '856px';
+    wrapper.style.height = '540px';
+    wrapper.style.zIndex = '999999';
+
+    const memberNo = app.memberNumber || `MRK-${2026}-${1000 + i}`;
+    const cadre = app.professional || 'केंद्रप्रमुख / विस्तार अधिकारी';
+    const talukaStr = app.taluka ? `ता. ${app.taluka}` : '';
+    const distStr = app.district ? `जि. ${app.district}` : '';
+    const areaText = [talukaStr, distStr].filter(Boolean).join(', ');
+    const phoneText = app.phone || '';
+    const photoUrl = app.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400';
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://mahasangh.in/member/${memberNo}`)}`;
+    const transparentSignUrl = cachedSignBase64 || 'sign.jpg';
+
+    wrapper.innerHTML = `
+      <div style="width: 856px; height: 540px; background: #ffffff; position: relative; overflow: hidden; box-sizing: border-box; font-family: 'Yantramanav', 'Noto Sans Devanagari', sans-serif;">
+        <div style="background: linear-gradient(135deg, #09243f, #1e3a8a); color: white; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #d4af37;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #d4af37; overflow: hidden;">
+              <img src="logo.jpg" style="width: 100%; height: 100%; object-fit: contain;" />
+            </div>
+            <div>
+              <div style="font-size: 13.5px; font-weight: 800; letter-spacing: 0.3px;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
+              <div style="font-size: 10px; font-weight: 700; color: #fde047;">अधिकृत ओळखपत्र (Digital ID Card) - 2026</div>
+            </div>
+          </div>
+          <div style="text-align: right; font-size: 11px; font-weight: 800; background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; border: 1px solid #d4af37;">
+            सदस्य क्र.: ${memberNo}
+          </div>
+        </div>
+        <div style="padding: 22px 28px; display: flex; gap: 24px; align-items: center; position: relative; height: calc(540px - 72px);">
+          <div style="width: 142px; height: 175px; border-radius: 10px; border: 3px solid #d4af37; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: #f8fafc; flex-shrink: 0;">
+            <img src="${photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous" />
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <div style="font-size: 22px; font-weight: 900; color: #0f2b48; line-height: 1.2;">
+              ${app.salutation || ''} ${app.fullName}
+            </div>
+            <div style="font-size: 14.5px; font-weight: 700; color: #334155; line-height: 1.4;">
+              <div>पद: ${cadre}</div>
+              <div>कार्यक्षेत्र: ${areaText}</div>
+              <div>मोबाईल: ${phoneText}</div>
+            </div>
+          </div>
+          <div style="width: 120px; height: 120px; background: white; border: 1px solid #cbd5e1; padding: 4px; display: flex; align-items: center; justify-content: center;">
+            <img src="${qrUrl}" style="width: 100%; height: 100%; object-fit: contain;" />
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(wrapper);
+    try {
+      await waitForFontsAndImages(wrapper);
+      const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
+        scale: 3,
+        useCORS: false,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      if (i > 0) {
+        pdf.addPage([85.6, 54], 'landscape');
+      }
+      pdf.addImage(imgData, 'JPEG', 0, 0, 85.6, 54, undefined, 'SLOW');
+    } finally {
+      document.body.removeChild(wrapper);
+    }
+  }
+
+  const cleanDist = districtName.replace(/\s+/g, '_');
+  pdf.save(`जिल्हा_${cleanDist}_सर्व_सदस्य_आयकार्ड.pdf`);
 }
 
 
