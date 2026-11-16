@@ -42,7 +42,7 @@ import {
 } from '../firebase';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
-import { saveDynamicLeadersToFirebase, fetchDynamicLeaders } from '../services/rkFirebaseService';
+import { saveDynamicLeadersToFirebase, fetchDynamicLeaders, updateDistrictPasswordInRtdb } from '../services/rkFirebaseService';
 import {
   getCloudinaryConfig,
   saveCloudinaryConfig,
@@ -89,6 +89,7 @@ type AdminSubTabKey =
   | 'applications'
   | 'edit_members'
   | 'leadership'
+  | 'master_studio'
   | 'add_news'
   | 'latest_banners'
   | 'id_card_preview'
@@ -311,6 +312,26 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const showAdminFeedback = (text: string, type: 'success' | 'error' = 'success') => {
     setAdminFeedbackBanner({ text, type });
   };
+
+  // Master Studio Post & Password Management state
+  const [postsList, setPostsList] = useState<Array<{ name: string; isTaluka: boolean }>>(() => {
+    try {
+      const stored = localStorage.getItem('mahasangh_posts_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      { name: 'जिल्हाध्यक्ष', isTaluka: false },
+      { name: 'जिल्हा कार्याध्यक्ष', isTaluka: false },
+      { name: 'जिल्हा सरचिटणीस', isTaluka: false },
+      { name: 'जिल्हा कोषाध्यक्ष', isTaluka: false },
+      { name: 'तालुकाध्यक्ष', isTaluka: true },
+      { name: 'तालुका सरचिटणीस', isTaluka: true }
+    ];
+  });
+  const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>({});
 
   // Latest Banners form state
   const [editingBannerId, setEditingBannerId] = useState<string | null>(null);
@@ -1698,6 +1719,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
+      key: 'master_studio',
+      label: 'Master Studio',
+      shortLabel: 'Studio',
+      icon: <Award className="w-4 h-4 shrink-0 text-amber-500" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
+    },
+    {
       key: 'add_news',
       label: 'बातम्या व परिपत्रके',
       shortLabel: 'बातम्या',
@@ -3056,6 +3084,196 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       )}
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+
+            {/* Sub-tab: Master Studio (पदे व्यवस्थापन, जिल्हा पासवर्ड रिसेट) */}
+            {activeAdminSubTab === 'master_studio' && currentUser?.isSuperAdmin && (
+              <div className="space-y-6">
+                <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
+                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2 mb-1">
+                    <Award className="w-5 h-5 text-amber-500" />
+                    महासंघ मास्टर स्टुडिओ (Master Studio)
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-6">
+                    येथून आपण बहाल करावयाची पदे, जिल्हा पासवर्ड रिसेट आणि नियुक्ती पत्र डिझाईन व्यवस्थापित करू शकता.
+                  </p>
+
+                  <div className="space-y-8">
+                    {/* Part 1: Post Management */}
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                      <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] mb-2">
+                        1. बहाल करावयाची पदे व्यवस्थापन (Post Management)
+                      </h4>
+                      <p className="text-xs text-slate-600 mb-4">
+                        नियुक्ती पत्रासाठी व अर्जांसाठी उपलब्ध असणारी पदे जोडा, क्रम बदला किंवा वगळा.
+                      </p>
+                      
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        const nameInput = (e.currentTarget.elements.namedItem('newPostName') as HTMLInputElement)?.value?.trim();
+                        const levelInput = (e.currentTarget.elements.namedItem('newPostLevel') as HTMLSelectElement)?.value;
+                        if (!nameInput) return;
+                        const isTaluka = levelInput === 'taluka';
+                        const updatedPosts = [...postsList, { name: nameInput, isTaluka }];
+                        setPostsList(updatedPosts);
+                        localStorage.setItem('mahasangh_posts_v1', JSON.stringify(updatedPosts));
+                        window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                        showAdminFeedback(`पद '${nameInput}' यशस्वीरीत्या जोडले गेले!`, 'success');
+                        e.currentTarget.reset();
+                      }} className="flex flex-col sm:flex-row gap-3 items-end">
+                        <div className="flex-1 w-full">
+                          <label className="font-bold text-slate-700 text-xs block mb-1">नवीन पदाचे नाव:</label>
+                          <input
+                            type="text"
+                            name="newPostName"
+                            required
+                            placeholder="उदा. जिल्हा सहसंघटक"
+                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div className="w-full sm:w-48">
+                          <label className="font-bold text-slate-700 text-xs block mb-1">पदाचा स्तर:</label>
+                          <select name="newPostLevel" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs">
+                            <option value="district">जिल्हास्तर (District)</option>
+                            <option value="taluka">तालुकास्तर (Taluka)</option>
+                            <option value="state">राज्यस्तर (State)</option>
+                            <option value="division">विभागस्तर (Division)</option>
+                          </select>
+                        </div>
+                        <button type="submit" className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] text-white font-bold px-5 py-2.5 rounded-lg text-xs cursor-pointer">
+                          पद जोडा
+                        </button>
+                      </form>
+
+                      <div className="mt-4 space-y-2">
+                        <h5 className="font-bold text-xs text-slate-700">विद्यमान पदे (कुल: {postsList.length}):</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
+                          {postsList.map((p, idx) => (
+                            <div key={p.name} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono text-slate-400 font-bold">{idx + 1}.</span>
+                                <span className="font-bold text-[#17366d] truncate">{p.name}</span>
+                                <span className="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                                  {p.isTaluka ? 'तालुकास्तर' : 'मुख्य स्तर'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => {
+                                    const arr = [...postsList];
+                                    const temp = arr[idx];
+                                    arr[idx] = arr[idx - 1];
+                                    arr[idx - 1] = temp;
+                                    setPostsList(arr);
+                                    localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                    window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                                  }}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold"
+                                  title="वर सरकवा"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === postsList.length - 1}
+                                  onClick={() => {
+                                    const arr = [...postsList];
+                                    const temp = arr[idx];
+                                    arr[idx] = arr[idx + 1];
+                                    arr[idx + 1] = temp;
+                                    setPostsList(arr);
+                                    localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                    window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                                  }}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold"
+                                  title="खाली सरकवा"
+                                >
+                                  ▼
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const arr = postsList.filter((_, i) => i !== idx);
+                                    setPostsList(arr);
+                                    localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                    window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                                    showAdminFeedback(`पद '${p.name}' वगळण्यात आले आहे.`, 'success');
+                                  }}
+                                  className="p-1.5 hover:bg-rose-50 text-rose-600 rounded cursor-pointer"
+                                  title="वगळा"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Part 2: District Password Reset */}
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+                      <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] mb-2">
+                        2. जिल्हा पासवर्ड रिसेट (Master District Password Reset)
+                      </h4>
+                      <p className="text-xs text-slate-600 mb-4">
+                        कोणत्याही जिल्ह्यासाठी नवीन गुप्त पासवर्ड सेट करा.
+                      </p>
+                      
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const dist = (e.currentTarget.elements.namedItem('masterResetDist') as HTMLSelectElement)?.value;
+                        const pwd = (e.currentTarget.elements.namedItem('masterResetPwd') as HTMLInputElement)?.value?.trim();
+                        if (!dist || !pwd || pwd.length < 4) {
+                          showAdminFeedback('कृपया वैध जिल्हा आणि किमान ४ अक्षरी पासवर्ड प्रविष्ट करा.', 'error');
+                          return;
+                        }
+                        try {
+                          await updateDistrictPasswordInRtdb(dist, pwd);
+                          showAdminFeedback(`'${dist}' जिल्ह्याचा पासवर्ड यशस्वीरीत्या अपडेट करण्यात आला!`, 'success');
+                          e.currentTarget.reset();
+                        } catch (err: any) {
+                          showAdminFeedback('पासवर्ड अपडेट करताना त्रुटी आली: ' + err.message, 'error');
+                        }
+                      }} className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                          <label className="font-bold text-slate-700 text-xs block mb-1">जिल्हा निवडा:</label>
+                          <select name="masterResetDist" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs">
+                            {MAHARASHTRA_DISTRICTS.map((d) => (
+                              <option key={d} value={d}>{d}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="font-bold text-slate-700 text-xs block mb-1">नवीन पासवर्ड:</label>
+                          <input
+                            type="text"
+                            name="masterResetPwd"
+                            required
+                            placeholder="किमान ४ अक्षरी पासवर्ड"
+                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+                        <button type="submit" className="bg-[#17366d] hover:bg-[#12284c] text-white font-bold px-5 py-2.5 rounded-lg text-xs cursor-pointer">
+                          पासवर्ड सेव्ह करा
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Part 3: Letter Studio Info */}
+                    <div className="bg-amber-50/70 p-5 rounded-xl border border-amber-300 text-xs space-y-2">
+                      <h4 className="font-serifDevanagari font-bold text-base text-[#17366d]">
+                        3. नियुक्ती पत्र डिझाईन व कस्टमायझेशन (Appointment Letter Studio)
+                      </h4>
+                      <p className="text-slate-700">
+                        नियुक्ती पत्रातील घटक (हेडर बॅनर, पत्र क्रमांक, विषय पट्टी, स्वाक्षरी, परिच्छेद) दाखवणे/लपवणे आणि मजकूर संपादन करण्याची सुविधा थेट 'पदाधिकारी व नियुक्तीपत्रे' (Appointments) टॅबमधील ॲडमिन नियंत्रण कक्षामध्ये उपलब्ध आहे.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
