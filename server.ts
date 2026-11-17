@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import nodemailer from 'nodemailer';
@@ -33,6 +35,7 @@ import {
   mysqlListApplications,
   mysqlListApprovedDirectory,
   mysqlCountApprovedMembers,
+  mysqlGetApplicationById,
   mysqlUpsertApplication,
   mysqlTrackApplication,
   mysqlFindExistingApplication,
@@ -61,6 +64,8 @@ import {
   mysqlDeleteContact,
   mysqlListSubAdmins,
   mysqlSaveSubAdmin,
+  mysqlUpdateSubAdminPassword,
+  mysqlTouchSubAdminLastLogin,
   mysqlDeleteSubAdmin,
   mysqlGetAdminAuth,
   mysqlUpdateAdminAuth,
@@ -72,12 +77,31 @@ import {
   mysqlSaveOfficial,
   mysqlDeleteOfficial,
   mysqlListDistrictPasswords,
+  mysqlListDistrictPasswordStatuses,
   mysqlSetDistrictPassword,
   mysqlListAppointedPosts,
   mysqlSetAppointedPosts,
   mysqlGetPresidentPassword,
+  mysqlIsPresidentPasswordDefault,
   mysqlSetPresidentPassword,
 } from './src/db/mysqlRepository';
+import {
+  SUPER_ADMIN_PASSWORD,
+  MASTER_DEV_ADMIN_PASSWORD,
+  DEFAULT_DISTRICT_PASSWORD,
+} from './src/data/rkMaharashtraData';
+import {
+  hashPassword,
+  verifyPassword,
+  signSessionToken,
+  extractRequestSession,
+  setSessionCookie,
+  clearSessionCookie,
+  signPaymentProof,
+  verifyPaymentProof,
+  SessionPayload,
+  SessionRole,
+} from './src/utils/serverAuth';
 import {
   collectFullFirebaseDataset,
   exportFullFirebaseSqlDump,
@@ -85,6 +109,25 @@ import {
   triggerInitialFirebaseMigrationOnBoot,
   waitForInitialMysqlMigrationIfRunning,
 } from './src/db/firebaseMigrationExporter';
+import {
+  collectActiveWebsiteAndDatabaseBackup,
+  createAndSaveBackupSnapshot,
+  listBackupSnapshots,
+  readBackupSnapshotBuffer,
+  deleteBackupSnapshot,
+  parseAndValidateBackupPayload,
+  restoreWebsiteAndDatabaseBackup,
+} from './src/db/backupRestoreService';
+import {
+  loadWhatsAppConfig,
+  saveWhatsAppConfig,
+  sanitizeWhatsAppConfig,
+  loadWhatsAppBroadcastLogs,
+  normalizeIndianWhatsAppNumber,
+  formatPresidentWhatsAppMessage,
+  sendSingleWhatsAppMessage,
+  runWhatsAppBroadcastCampaign,
+} from './src/utils/whatsappService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -738,16 +781,234 @@ async function approveApplicationOnServer(params: {
 }
 
 // =========================================================================
-// Middleware
+// Security Middleware (Helmet, Strict CORS, Balanced Rate Limiting, Session Guards)
 // =========================================================================
-app.use(cors());
+const DEFAULT_ADMIN_EMAIL = 'padmakarshinde043@gmail.com';
+const MASTER_RECOVERY_KEY = 'RK@Mahasangh2026';
+const RK_RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
+
+const ALL_SUPER_ADMIN_PERMISSIONS: Record<string, boolean> = {
+  approveMembers: true,
+  editMembers: true,
+  manageLeadership: true,
+  manageNews: true,
+  manageGovOrders: true,
+  manageLatestBanners: true,
+  viewIdCardPreview: true,
+  manageContactMessages: true,
+  manageAdmins: true,
+  manageRazorpay: true,
+  manageCloudinary: true,
+};
+
+const ALLOWED_EXACT_ORIGINS = new Set([
+  'https://mahasangh.in',
+  'https://www.mahasangh.in',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'https://aistudio.google.com',
+]);
+
+function isAllowedCorsOrigin(origin?: string): boolean {
+  if (!origin) return true; // same-origin navigation, server-to-server webhooks, curl
+  if (ALLOWED_EXACT_ORIGINS.has(origin)) return true;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== 'https:' && protocol !== 'http:') return false;
+    if (
+      hostname === 'mahasangh.in' ||
+      hostname.endsWith('.mahasangh.in') ||
+      hostname.endsWith('.run.app') ||
+      hostname.endsWith('.googleusercontent.com') ||
+      hostname.endsWith('.web.app') ||
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1'
+    ) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+app.use(
+  helmet({
+    xFrameOptions: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    hsts: process.env.NODE_ENV === 'production'
+      ? { maxAge: 31536000, includeSubDomains: true }
+      : false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          'https://checkout.razorpay.com',
+          'https://apis.google.com',
+          'https://www.gstatic.com',
+        ],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        connectSrc: [
+          "'self'",
+          'https://api.razorpay.com',
+          'https://lumberjack.razorpay.com',
+          'https://checkout.razorpay.com',
+          'https://api.cloudinary.com',
+          'https://res.cloudinary.com',
+          'https://*.firebaseio.com',
+          'https://*.firebaseapp.com',
+          'https://*.googleapis.com',
+          'https://firestore.googleapis.com',
+          'https://identitytoolkit.googleapis.com',
+          'https://securetoken.googleapis.com',
+          'wss:',
+          'ws:',
+        ],
+        frameSrc: [
+          "'self'",
+          'https://api.razorpay.com',
+          'https://checkout.razorpay.com',
+          'https://drive.google.com',
+          'https://*.firebaseapp.com',
+        ],
+        frameAncestors: [
+          "'self'",
+          'https://aistudio.google.com',
+          'https://*.googleusercontent.com',
+          'https://*.google.com',
+        ],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        upgradeInsecureRequests: null,
+      },
+    },
+  })
+);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (isAllowedCorsOrigin(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma'],
+  })
+);
+
+const rateLimitMessage = {
+  status: 'error',
+  message: 'अनेक विनंत्या आल्यामुळे तात्पुरते थांबवले आहे. कृपया काही मिनिटांनी पुन्हा प्रयत्न करा.',
+};
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false, xForwardedForHeader: false },
+  message: rateLimitMessage,
+});
+
+const contactMailLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 25,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false, xForwardedForHeader: false },
+  message: rateLimitMessage,
+});
+
+const appSubmitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 35,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false, xForwardedForHeader: false },
+  message: rateLimitMessage,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false, xForwardedForHeader: false },
+  skip: (req) => req.path === '/razorpay/webhook' || req.path === '/health',
+  message: rateLimitMessage,
+});
+
+app.use('/api/', apiLimiter);
+app.use('/api/auth', authLimiter);
+app.use('/api/email', contactMailLimiter);
+app.use('/api/mailbox/send', contactMailLimiter);
+
+function requireRoles(
+  allowedRoles: SessionRole[],
+  requiredPerm?: string | string[]
+): express.RequestHandler {
+  return (req, res, next) => {
+    const session = extractRequestSession(req);
+    if (!session) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'प्रवेश नाकारला: कृपया आधी अधिकृत लॉगिन करा.',
+      });
+    }
+    if (!allowedRoles.includes(session.role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'आपल्याला या कृतीसाठी आवश्यक अधिकार नाहीत.',
+      });
+    }
+    if (session.role === 'sub_admin' && requiredPerm) {
+      const permsToCheck = Array.isArray(requiredPerm) ? requiredPerm : [requiredPerm];
+      const hasAny = permsToCheck.some((p) => Boolean(session.permissions?.[p]));
+      if (!hasAny) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'आपल्या खात्याला या विभागाचे अधिकार दिलेले नाहीत.',
+        });
+      }
+    }
+    (req as express.Request & { authSession?: SessionPayload }).authSession = session;
+    next();
+  };
+}
+
+const requireSuperAdmin = requireRoles(['super_admin']);
+const requireAdminOrSubAdmin = (perm?: string | string[]) =>
+  requireRoles(['super_admin', 'sub_admin'], perm);
+const requirePresidentOrSuperAdmin = requireRoles(['super_admin', 'state_president']);
+const requireOfficialEditor = requireRoles(['super_admin', 'state_president', 'district_admin']);
+
+function sanitizeSubAdminForResponse(admin: Record<string, any>) {
+  const hasPassword = Boolean(admin.hasPassword || (admin.password && String(admin.password).trim()));
+  return {
+    ...admin,
+    password: '',
+    hasPassword,
+  };
+}
 
 // Raw body parser for Razorpay Webhook signature verification
 app.use('/api/razorpay/webhook', express.raw({ type: 'application/json' }));
+app.use('/api/backup/restore', express.json({ limit: '60mb' }));
 app.use(express.json({ limit: '10mb' }));
 
 // Ensure first-boot automatic Firebase -> MySQL migration finishes before any MySQL reads/writes/webhooks
-app.use(['/api/db', '/api/razorpay', '/api/email'], async (req, _res, next) => {
+app.use(['/api/db', '/api/auth', '/api/razorpay', '/api/email'], async (req, _res, next) => {
   if (req.path === '/mode' && req.baseUrl === '/api/db') {
     return next();
   }
@@ -783,6 +1044,503 @@ app.get('/api/db/mode', (_req, res) => {
     backend: isMysqlActive() ? 'mysql' : 'firebase',
     mysqlConfigured: isMysqlConfigured(),
   });
+});
+
+// =========================================================================
+// Server-Side Authentication Routes (/api/auth/*)
+// =========================================================================
+
+async function getServerAdminCredsUnified(): Promise<{ email: string; password: string }> {
+  if (isMysqlActive()) {
+    return mysqlGetAdminAuth();
+  }
+  const db = getServerFirestore(true);
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, 'settings', 'admin_auth'));
+      if (snap.exists()) {
+        const d = snap.data();
+        return {
+          email: String(d.email || DEFAULT_ADMIN_EMAIL),
+          password: String(d.password || 'Padmakar@2027'),
+        };
+      }
+    } catch {}
+  }
+  return { email: DEFAULT_ADMIN_EMAIL, password: 'Padmakar@2027' };
+}
+
+async function getServerSubAdminsUnified(): Promise<Record<string, any>[]> {
+  if (isMysqlActive()) {
+    return mysqlListSubAdmins();
+  }
+  const db = getServerFirestore(true);
+  if (db) {
+    const snap = await getDocs(collection(db, 'sub_admins'));
+    const list: Record<string, any>[] = [];
+    snap.forEach((d) => list.push(d.data() as Record<string, any>));
+    return list;
+  }
+  return [];
+}
+
+async function getServerDistrictPasswordsUnified(): Promise<Record<string, string>> {
+  if (isMysqlActive()) {
+    return mysqlListDistrictPasswords();
+  }
+  try {
+    const r = await fetch(`${RK_RTDB_BASE_URL}/district_passwords.json`);
+    if (r.ok) {
+      const data = await r.json();
+      if (data && typeof data === 'object') return data;
+    }
+  } catch {}
+  return {};
+}
+
+async function getServerPresidentPasswordUnified(): Promise<string> {
+  if (isMysqlActive()) {
+    return mysqlGetPresidentPassword();
+  }
+  try {
+    const r = await fetch(`${RK_RTDB_BASE_URL}/president_password.json`);
+    if (r.ok) {
+      const data = await r.json();
+      if (typeof data === 'string' && data.trim()) return data.trim();
+    }
+  } catch {}
+  return SUPER_ADMIN_PASSWORD;
+}
+
+app.get('/api/auth/session', (req, res) => {
+  const session = extractRequestSession(req);
+  res.json({ authenticated: Boolean(session), session });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  clearSessionCookie(res, req);
+  res.json({ status: 'success' });
+});
+
+app.post('/api/auth/admin-login', async (req, res) => {
+  try {
+    const inputEmail = String(req.body?.email || '').trim().toLowerCase();
+    const inputPass = String(req.body?.password || '').trim();
+
+    if (!inputEmail) {
+      return res.status(400).json({ status: 'error', message: 'कृपया ई-मेल प्रविष्ट करा.' });
+    }
+
+    const [creds, subAdmins] = await Promise.all([
+      getServerAdminCredsUnified(),
+      getServerSubAdminsUnified(),
+    ]);
+
+    const validSuperEmail = String(creds.email || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
+
+    if (inputEmail === validSuperEmail || inputEmail === DEFAULT_ADMIN_EMAIL.toLowerCase()) {
+      if (!inputPass) {
+        return res.status(400).json({ status: 'error', message: 'कृपया पासवर्ड प्रविष्ट करा.' });
+      }
+      const isPassValid =
+        verifyPassword(inputPass, creds.password) ||
+        verifyPassword(inputPass, MASTER_RECOVERY_KEY);
+
+      if (!isPassValid) {
+        return res.status(401).json({ status: 'error', message: 'चुकीचा पासवर्ड. कृपया पुन्हा प्रयत्न करा.' });
+      }
+
+      const token = signSessionToken({
+        role: 'super_admin',
+        email: validSuperEmail,
+        name: 'मुख्य प्रशासक (Super Admin)',
+        permissions: ALL_SUPER_ADMIN_PERMISSIONS,
+      });
+      setSessionCookie(res, token, req);
+
+      return res.json({
+        status: 'success',
+        token,
+        user: {
+          id: 'super-admin',
+          email: validSuperEmail,
+          name: 'मुख्य प्रशासक (Super Admin)',
+          isSuperAdmin: true,
+          permissions: ALL_SUPER_ADMIN_PERMISSIONS,
+          createdAt: '',
+        },
+        subAdmins: subAdmins.map(sanitizeSubAdminForResponse),
+      });
+    }
+
+    const matchingSubAdmin = subAdmins.find(
+      (a) => String(a.email || '').trim().toLowerCase() === inputEmail
+    );
+    if (!matchingSubAdmin) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'अवैध ई-मेल. कृपया अधिकृत ॲडमिन ई-मेल वापरा किंवा मुख्य प्रशासकाशी संपर्क साधा.',
+      });
+    }
+
+    if (matchingSubAdmin.isFirstLogin || !matchingSubAdmin.password) {
+      return res.json({
+        status: 'first_login',
+        email: matchingSubAdmin.email,
+        name: matchingSubAdmin.name || '',
+      });
+    }
+
+    if (!inputPass) {
+      return res.status(400).json({ status: 'error', message: 'कृपया पासवर्ड प्रविष्ट करा.' });
+    }
+
+    if (!verifyPassword(inputPass, String(matchingSubAdmin.password || ''))) {
+      return res.status(401).json({ status: 'error', message: 'चुकीचा पासवर्ड. कृपया पुन्हा प्रयत्न करा.' });
+    }
+
+    if (isMysqlActive()) {
+      await mysqlTouchSubAdminLastLogin(String(matchingSubAdmin.id)).catch(() => {});
+    }
+
+    const token = signSessionToken({
+      role: 'sub_admin',
+      email: String(matchingSubAdmin.email).toLowerCase(),
+      name: String(matchingSubAdmin.name || ''),
+      permissions: (matchingSubAdmin.permissions || {}) as Record<string, boolean>,
+    });
+    setSessionCookie(res, token, req);
+
+    return res.json({
+      status: 'success',
+      token,
+      user: sanitizeSubAdminForResponse(matchingSubAdmin),
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: 'लॉगिन करताना त्रुटी आली: ' + (err?.message || 'Error') });
+  }
+});
+
+app.post('/api/auth/sub-admin-first-login', async (req, res) => {
+  try {
+    const targetEmail = String(req.body?.email || '').trim().toLowerCase();
+    const newPassword = String(req.body?.newPassword || '').trim();
+
+    if (!targetEmail || !newPassword || newPassword.length < 4) {
+      return res.status(400).json({ status: 'error', message: 'पासवर्ड किमान 4 अक्षरांचा असावा.' });
+    }
+
+    const subAdmins = await getServerSubAdminsUnified();
+    const matching = subAdmins.find(
+      (a) => String(a.email || '').trim().toLowerCase() === targetEmail
+    );
+
+    if (!matching || (!matching.isFirstLogin && Boolean(matching.password))) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'पहिल्या लॉगिनची परवानगी उपलब्ध नाही किंवा पासवर्ड आधीच सेट आहे.',
+      });
+    }
+
+    let updatedUser: Record<string, any> | null = null;
+    if (isMysqlActive()) {
+      updatedUser = await mysqlUpdateSubAdminPassword(targetEmail, newPassword);
+    } else {
+      const db = getServerFirestore(true);
+      if (db) {
+        const updated = {
+          ...matching,
+          password: hashPassword(newPassword),
+          isFirstLogin: false,
+          lastLoginAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, 'sub_admins', String(matching.id)), updated);
+        updatedUser = sanitizeSubAdminForResponse(updated);
+      }
+    }
+
+    if (!updatedUser) {
+      return res.status(404).json({ status: 'error', message: 'सब-ॲडमिन खाते सापडले नाही.' });
+    }
+
+    const token = signSessionToken({
+      role: 'sub_admin',
+      email: targetEmail,
+      name: String(updatedUser.name || ''),
+      permissions: (updatedUser.permissions || {}) as Record<string, boolean>,
+    });
+    setSessionCookie(res, token, req);
+
+    res.json({
+      status: 'success',
+      token,
+      user: updatedUser,
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/auth/admin-change-password', requireAdminOrSubAdmin(), async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession!;
+    const currentPassword = String(req.body?.currentPassword || '').trim();
+    const newPassword = String(req.body?.newPassword || '').trim();
+
+    if (!currentPassword || !newPassword || newPassword.length < 4) {
+      return res.status(400).json({ status: 'error', message: 'नवीन पासवर्ड किमान 4 अक्षरांचा असावा.' });
+    }
+
+    if (session.role === 'super_admin') {
+      const creds = await getServerAdminCredsUnified();
+      if (
+        !verifyPassword(currentPassword, creds.password) &&
+        !verifyPassword(currentPassword, MASTER_RECOVERY_KEY)
+      ) {
+        return res.status(401).json({ status: 'error', message: 'सध्याचा चालू पासवर्ड चुकीचा आहे.' });
+      }
+
+      if (isMysqlActive()) {
+        await mysqlUpdateAdminAuth(newPassword);
+      } else {
+        const db = getServerFirestore(true);
+        if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
+        await setDoc(
+          doc(db, 'settings', 'admin_auth'),
+          { email: creds.email, password: hashPassword(newPassword), updatedAt: new Date().toISOString() },
+          { merge: true }
+        );
+      }
+      return res.json({ status: 'success' });
+    }
+
+    // Sub-admin changing own password
+    const subAdmins = await getServerSubAdminsUnified();
+    const target = subAdmins.find(
+      (a) => String(a.email || '').trim().toLowerCase() === String(session.email || '').toLowerCase()
+    );
+    if (!target || !verifyPassword(currentPassword, String(target.password || ''))) {
+      return res.status(401).json({ status: 'error', message: 'सध्याचा चालू पासवर्ड चुकीचा आहे.' });
+    }
+
+    if (isMysqlActive()) {
+      await mysqlUpdateSubAdminPassword(String(target.email), newPassword);
+    } else {
+      const db = getServerFirestore(true);
+      if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
+      await setDoc(
+        doc(db, 'sub_admins', String(target.id)),
+        { ...target, password: hashPassword(newPassword), isFirstLogin: false, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+    }
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/auth/district-login', async (req, res) => {
+  try {
+    const district = String(req.body?.district || '').trim();
+    const input = String(req.body?.password || '').trim();
+    if (!district || !input) {
+      return res.status(400).json({ status: 'error', message: 'कृपया पासवर्ड प्रविष्ट करा.' });
+    }
+
+    const storedPresPass = await getServerPresidentPasswordUnified();
+    if (
+      verifyPassword(input, storedPresPass) ||
+      verifyPassword(input, SUPER_ADMIN_PASSWORD) ||
+      verifyPassword(input, MASTER_DEV_ADMIN_PASSWORD)
+    ) {
+      const token = signSessionToken({ role: 'state_president', district });
+      setSessionCookie(res, token, req);
+      return res.json({ status: 'success', role: 'state_president', isSuperAdmin: true, token });
+    }
+
+    const passMap = await getServerDistrictPasswordsUnified();
+    const storedDistrictPass =
+      passMap[district] ||
+      (district === 'अहिल्यानगर' ? passMap['अहमदनगर'] : '') ||
+      DEFAULT_DISTRICT_PASSWORD;
+
+    const isStillDefault =
+      !storedDistrictPass || verifyPassword(DEFAULT_DISTRICT_PASSWORD, storedDistrictPass);
+
+    if (isStillDefault && input === DEFAULT_DISTRICT_PASSWORD) {
+      return res.json({ status: 'require_initial_password', district });
+    }
+
+    if (verifyPassword(input, storedDistrictPass)) {
+      const token = signSessionToken({ role: 'district_admin', district });
+      setSessionCookie(res, token, req);
+      return res.json({ status: 'success', role: 'district_admin', district, token });
+    }
+
+    return res.status(401).json({
+      status: 'error',
+      message: `चुकीचा पासवर्ड! आपण फक्त '${district}' जिल्ह्याचा पासवर्ड टाकूनच संपादन करू शकता.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/auth/district-set-initial-password', async (req, res) => {
+  try {
+    const district = String(req.body?.district || '').trim();
+    const newPassword = String(req.body?.newPassword || '').trim();
+
+    if (!district || !newPassword || newPassword.length < 4 || newPassword === DEFAULT_DISTRICT_PASSWORD) {
+      return res.status(400).json({
+        status: 'error',
+        message: `कृपया किमान ४ अक्षरी सुरक्षित पासवर्ड तयार करा (डिफॉल्ट '${DEFAULT_DISTRICT_PASSWORD}' वगळता)!`,
+      });
+    }
+
+    const passMap = await getServerDistrictPasswordsUnified();
+    const storedDistrictPass =
+      passMap[district] ||
+      (district === 'अहिल्यानगर' ? passMap['अहमदनगर'] : '') ||
+      DEFAULT_DISTRICT_PASSWORD;
+
+    const isStillDefault =
+      !storedDistrictPass || verifyPassword(DEFAULT_DISTRICT_PASSWORD, storedDistrictPass);
+
+    if (!isStillDefault) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'या जिल्ह्याचा पासवर्ड आधीच सेट आहे. कृपया नवीन पासवर्डने लॉगिन करा.',
+      });
+    }
+
+    if (isMysqlActive()) {
+      await mysqlSetDistrictPassword(district, newPassword);
+    } else {
+      await fetch(`${RK_RTDB_BASE_URL}/district_passwords/${encodeURIComponent(district)}.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hashPassword(newPassword)),
+      });
+    }
+
+    const token = signSessionToken({ role: 'district_admin', district });
+    setSessionCookie(res, token, req);
+    res.json({ status: 'success', role: 'district_admin', district, token });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/auth/president-login', async (req, res) => {
+  try {
+    const input = String(req.body?.password || '').trim();
+    if (!input) {
+      return res.status(400).json({ status: 'error', message: 'कृपया पासवर्ड प्रविष्ट करा.' });
+    }
+
+    if (verifyPassword(input, MASTER_DEV_ADMIN_PASSWORD)) {
+      const token = signSessionToken({ role: 'state_president' });
+      setSessionCookie(res, token, req);
+      return res.json({ status: 'success', isMasterKey: true, token });
+    }
+
+    const storedPresPass = await getServerPresidentPasswordUnified();
+    const isStillDefault = !storedPresPass || verifyPassword(SUPER_ADMIN_PASSWORD, storedPresPass);
+
+    if (isStillDefault && input === SUPER_ADMIN_PASSWORD) {
+      return res.json({ status: 'require_initial_password' });
+    }
+
+    if (verifyPassword(input, storedPresPass)) {
+      const token = signSessionToken({ role: 'state_president' });
+      setSessionCookie(res, token, req);
+      return res.json({ status: 'success', token });
+    }
+
+    return res.status(401).json({
+      status: 'error',
+      message: 'चुकीचा पासवर्ड! केवळ संस्थापक राज्याध्यक्षच हे लॉगिन करू शकतात.',
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/auth/president-set-initial-password', async (req, res) => {
+  try {
+    const newPassword = String(req.body?.newPassword || '').trim();
+    if (!newPassword || newPassword.length < 4 || newPassword === SUPER_ADMIN_PASSWORD) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'कृपया सुरक्षित व नवीन पासवर्ड प्रविष्ट करा (RK2026 व्यतिरिक्त)!',
+      });
+    }
+
+    const storedPresPass = await getServerPresidentPasswordUnified();
+    const isStillDefault = !storedPresPass || verifyPassword(SUPER_ADMIN_PASSWORD, storedPresPass);
+    if (!isStillDefault) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'राज्याध्यक्ष पासवर्ड आधीच सेट आहे.',
+      });
+    }
+
+    if (isMysqlActive()) {
+      await mysqlSetPresidentPassword(newPassword);
+    } else {
+      await fetch(`${RK_RTDB_BASE_URL}/president_password.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hashPassword(newPassword)),
+      });
+    }
+
+    const token = signSessionToken({ role: 'state_president' });
+    setSessionCookie(res, token, req);
+    res.json({ status: 'success', token });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/auth/president-change-password', requirePresidentOrSuperAdmin, async (req, res) => {
+  try {
+    const currentPassword = String(req.body?.currentPassword || '').trim();
+    const newPassword = String(req.body?.newPassword || '').trim();
+
+    if (!currentPassword || !newPassword || newPassword.length < 4) {
+      return res.status(400).json({ status: 'error', message: 'कृपया किमान ४ अक्षरी नवीन पासवर्ड प्रविष्ट करा.' });
+    }
+
+    const storedPresPass = await getServerPresidentPasswordUnified();
+    const isCurrentValid =
+      verifyPassword(currentPassword, storedPresPass) ||
+      verifyPassword(currentPassword, MASTER_DEV_ADMIN_PASSWORD);
+
+    if (!isCurrentValid) {
+      return res.status(401).json({ status: 'error', message: 'सध्याचा पासवर्ड चुकीचा आहे!' });
+    }
+
+    if (verifyPassword(newPassword, storedPresPass)) {
+      return res.status(400).json({ status: 'error', message: 'कृपया नवीन व वेगळा पासवर्ड प्रविष्ट करा!' });
+    }
+
+    if (isMysqlActive()) {
+      await mysqlSetPresidentPassword(newPassword);
+    } else {
+      await fetch(`${RK_RTDB_BASE_URL}/president_password.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(hashPassword(newPassword)),
+      });
+    }
+
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
 });
 
 // One-time AI Studio Dev download route for the 50-page Technical Manual PDF (disabled in production)
@@ -955,7 +1713,7 @@ app.post('/api/email/send-id-card', async (req, res) => {
 // HostKarle MySQL API Routes (/api/db/*) & Migration Exporter (/api/migration/*)
 // =========================================================================
 
-app.get('/api/migration/counts', async (_req, res) => {
+app.get('/api/migration/counts', requireSuperAdmin, async (_req, res) => {
   try {
     const db = getServerFirestore(true);
     if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
@@ -966,7 +1724,7 @@ app.get('/api/migration/counts', async (_req, res) => {
   }
 });
 
-app.get('/api/migration/export-sql', async (_req, res) => {
+app.get('/api/migration/export-sql', requireSuperAdmin, async (_req, res) => {
   try {
     const db = getServerFirestore(true);
     if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
@@ -980,7 +1738,7 @@ app.get('/api/migration/export-sql', async (_req, res) => {
   }
 });
 
-app.post('/api/migration/sync-to-mysql', async (_req, res) => {
+app.post('/api/migration/sync-to-mysql', requireSuperAdmin, async (_req, res) => {
   try {
     if (!isMysqlConfigured()) {
       return res.status(400).json({ status: 'error', message: 'MySQL is not configured yet.' });
@@ -992,6 +1750,249 @@ app.post('/api/migration/sync-to-mysql', async (_req, res) => {
     res.json({ status: 'success', counts: syncedCounts, warnings });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'MySQL Sync failed' });
+  }
+});
+
+// =========================================================================
+// Super Admin 1-Click Full Website + Database Backup & Restore (/api/backup/*)
+// =========================================================================
+
+app.get('/api/backup/list', requireSuperAdmin, (_req, res) => {
+  try {
+    res.json({
+      status: 'ok',
+      activeBackend: isMysqlActive() ? 'mysql' : 'firebase',
+      snapshots: listBackupSnapshots(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Could not list backups' });
+  }
+});
+
+app.post('/api/backup/create', requireSuperAdmin, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const { snapshot, warnings } = await createAndSaveBackupSnapshot({
+      createdBy: session?.email || 'super_admin',
+      firestoreDb: getServerFirestore(true),
+      prefix: 'mahasangh_backup',
+    });
+    res.json({ status: 'success', snapshot, warnings });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'बॅकअप तयार करताना त्रुटी आली.' });
+  }
+});
+
+app.get('/api/backup/download/:fileName', requireSuperAdmin, (req, res) => {
+  try {
+    const { fileName, buffer } = readBackupSnapshotBuffer(req.params.fileName);
+    res.setHeader('Content-Type', 'application/gzip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  } catch (err: any) {
+    res.status(404).json({ status: 'error', message: err?.message || 'Backup file not found' });
+  }
+});
+
+app.get('/api/backup/download-active-sql', requireSuperAdmin, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const { bundle, counts } = await collectActiveWebsiteAndDatabaseBackup({
+      createdBy: session?.email || 'super_admin',
+      firestoreDb: getServerFirestore(true),
+    });
+    res.setHeader('Content-Type', 'application/sql; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="mahasangh_active_db_${new Date().toISOString().slice(0, 10)}.sql"`
+    );
+    res.setHeader('X-Migration-Counts', JSON.stringify(counts));
+    res.send(bundle.sqlDump || '');
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'SQL Export failed' });
+  }
+});
+
+app.post('/api/backup/restore', requireSuperAdmin, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const snapshotFileName = String(req.body?.snapshotFileName || '').trim();
+    const fileBase64 = String(req.body?.fileBase64 || '').trim();
+
+    if (!snapshotFileName && !fileBase64) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'कृपया रिस्टोअर करण्यासाठी सर्व्हर बॅकअप निवडा किंवा .mhsbak.gz फाइल अपलोड करा.',
+      });
+    }
+
+    const rawInput = snapshotFileName
+      ? readBackupSnapshotBuffer(snapshotFileName).buffer
+      : fileBase64;
+    const bundle = parseAndValidateBackupPayload(rawInput);
+
+    const result = await restoreWebsiteAndDatabaseBackup({
+      bundle,
+      firestoreDb: getServerFirestore(true),
+      createdBy: session?.email || 'super_admin',
+    });
+
+    res.json({
+      status: 'success',
+      restoredFrom: bundle.createdAt,
+      sourceBackend: bundle.sourceBackend,
+      ...result,
+    });
+  } catch (err: any) {
+    res.status(400).json({
+      status: 'error',
+      message: err?.message || 'रिस्टोअर प्रक्रिया अयशस्वी झाली.',
+    });
+  }
+});
+
+app.delete('/api/backup/:fileName', requireSuperAdmin, (req, res) => {
+  try {
+    deleteBackupSnapshot(req.params.fileName);
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(400).json({ status: 'error', message: err?.message || 'Delete failed' });
+  }
+});
+
+// =========================================================================
+// Super Admin WhatsApp API Configuration & Broadcast Routes (/api/whatsapp/*)
+// =========================================================================
+
+app.get('/api/whatsapp/config', requireSuperAdmin, async (_req, res) => {
+  try {
+    const cfg = await loadWhatsAppConfig(getServerFirestore(true));
+    res.json({ status: 'ok', config: sanitizeWhatsAppConfig(cfg) });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error loading WhatsApp config' });
+  }
+});
+
+app.post('/api/whatsapp/config', requireSuperAdmin, async (req, res) => {
+  try {
+    const saved = await saveWhatsAppConfig(req.body || {}, getServerFirestore(true));
+    res.json({ status: 'success', config: sanitizeWhatsAppConfig(saved) });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'WhatsApp सेटिंग्ज सेव्ह करताना त्रुटी आली.' });
+  }
+});
+
+app.get('/api/whatsapp/logs', requireSuperAdmin, async (_req, res) => {
+  try {
+    const logs = await loadWhatsAppBroadcastLogs(getServerFirestore(true));
+    res.json({ status: 'ok', logs });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error loading logs' });
+  }
+});
+
+app.post('/api/whatsapp/test', requireSuperAdmin, async (req, res) => {
+  try {
+    const cfg = await loadWhatsAppConfig(getServerFirestore(true));
+    const phone91 = normalizeIndianWhatsAppNumber(req.body?.phone);
+    if (!phone91) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'कृपया चाचणीसाठी वैध १० अंकी भारतीय मोबाईल नंबर प्रविष्ट करा.',
+      });
+    }
+    const senderName = String(req.body?.senderName || cfg.defaultSenderName || '').trim();
+    const senderTitle = String(req.body?.senderTitle || cfg.defaultSenderTitle || '').trim();
+    const photoUrl = String(req.body?.photoUrl || cfg.defaultSenderPhoto || '').trim();
+    const messageTemplate = String(req.body?.message || '').trim();
+    if (!messageTemplate) {
+      return res.status(400).json({ status: 'error', message: 'कृपया संदेशाचा मजकूर भरा.' });
+    }
+
+    const formattedText = formatPresidentWhatsAppMessage({
+      messageTemplate,
+      senderName,
+      senderTitle,
+      recipient: { name: 'चाचणी प्राप्तकर्ता (Test)', role: 'सदस्य', district: 'महाराष्ट्र' },
+      includeSignatureHeader: req.body?.includeSignatureHeader !== false,
+    });
+
+    const originHint = `${req.protocol}://${req.get('host')}`;
+    const result = await sendSingleWhatsAppMessage({
+      config: cfg,
+      phone91,
+      formattedText,
+      photoUrl,
+      recipient: { name: 'Test Admin', role: 'Admin', district: 'Maharashtra' },
+      senderName,
+      senderTitle,
+      originHint,
+    });
+
+    if (!result.ok) {
+      return res.status(400).json({
+        status: 'error',
+        message: result.error || 'चाचणी संदेश पाठवता आला नाही.',
+      });
+    }
+
+    res.json({
+      status: 'success',
+      phone: phone91,
+      messageId: result.messageId || '',
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'WhatsApp चाचणी अयशस्वी' });
+  }
+});
+
+app.post('/api/whatsapp/broadcast', requireSuperAdmin, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const cfg = await loadWhatsAppConfig(getServerFirestore(true));
+    if (!cfg.enabled) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'प्रसारण सुरू करण्यापूर्वी कृपया WhatsApp API सेटिंग्जमध्ये "API सक्रिय ठेवा" पर्याय चालू करून जतन करा.',
+      });
+    }
+
+    const recipients = Array.isArray(req.body?.recipients) ? req.body.recipients : [];
+    if (recipients.length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'प्रसारणासाठी किमान एक वैध WhatsApp नंबर असलेला प्राप्तकर्ता निवडा.',
+      });
+    }
+
+    const messageTemplate = String(req.body?.message || '').trim();
+    if (!messageTemplate) {
+      return res.status(400).json({ status: 'error', message: 'कृपया पाठवायचा संदेश लिहा.' });
+    }
+
+    const senderName = String(req.body?.senderName || cfg.defaultSenderName || '').trim();
+    const senderTitle = String(req.body?.senderTitle || cfg.defaultSenderTitle || '').trim();
+    const photoUrl = String(req.body?.photoUrl || cfg.defaultSenderPhoto || '').trim();
+    const groups = Array.isArray(req.body?.groups) ? req.body.groups : [];
+    const originHint = `${req.protocol}://${req.get('host')}`;
+
+    const summary = await runWhatsAppBroadcastCampaign({
+      config: cfg,
+      recipients,
+      messageTemplate,
+      senderName,
+      senderTitle,
+      photoUrl,
+      groups,
+      sentBy: session?.email || 'super_admin',
+      includeSignatureHeader: req.body?.includeSignatureHeader !== false,
+      originHint,
+      firestoreDb: getServerFirestore(true),
+    });
+
+    res.json({ status: 'success', ...summary });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'WhatsApp प्रसारण करताना त्रुटी आली.' });
   }
 });
 
@@ -1040,6 +2041,27 @@ app.get('/api/db/applications', async (req, res) => {
   try {
     const onlyApproved = req.query.status === 'approved';
     const isSummary = req.query.summary === '1' || req.query.summary === 'true';
+
+    if (!(onlyApproved && isSummary)) {
+      const session = extractRequestSession(req);
+      if (!session || (session.role !== 'super_admin' && session.role !== 'sub_admin')) {
+        return res.status(401).json({
+          status: 'error',
+          message: 'प्रवेश नाकारला: अर्जांची संपूर्ण यादी पाहण्यासाठी कृपया आधी ॲडमिन लॉगिन करा.',
+        });
+      }
+      if (
+        session.role === 'sub_admin' &&
+        !session.permissions?.approveMembers &&
+        !session.permissions?.editMembers
+      ) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'आपल्या खात्याला सदस्य अर्ज पाहण्याचे अधिकार नाहीत.',
+        });
+      }
+    }
+
     const list =
       onlyApproved && isSummary
         ? await mysqlListApprovedDirectory()
@@ -1050,9 +2072,38 @@ app.get('/api/db/applications', async (req, res) => {
   }
 });
 
-app.post('/api/db/applications', async (req, res) => {
+app.post('/api/db/applications', appSubmitLimiter, async (req, res) => {
   try {
-    await mysqlUpsertApplication(req.body || {});
+    const session = extractRequestSession(req);
+    const isPrivilegedAdmin =
+      session &&
+      (session.role === 'super_admin' ||
+        (session.role === 'sub_admin' &&
+          (session.permissions?.approveMembers || session.permissions?.editMembers)));
+
+    const payload = { ...(req.body || {}) };
+    if (!isPrivilegedAdmin) {
+      // Unauthenticated member submissions can NEVER self-approve or overwrite an approved record
+      if (payload.id) {
+        const existing = await mysqlGetApplicationById(String(payload.id));
+        if (existing && (existing.status === 'approved' || existing.paymentConfirmed)) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'मंजूर अर्जात थेट बदल करता येत नाहीत.',
+          });
+        }
+      }
+      payload.status = 'pending';
+      payload.paymentConfirmed = false;
+      payload.memberNumber = '';
+      payload.approvedAt = '';
+      payload.approvedBy = '';
+      payload.rejectReason = '';
+      payload.idCardEmailSent = false;
+      payload.welcomeEmailSent = false;
+    }
+
+    await mysqlUpsertApplication(payload);
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -1080,14 +2131,36 @@ app.post('/api/db/applications/find-existing', async (req, res) => {
 
 app.post('/api/db/applications/approve-atomic', async (req, res) => {
   try {
-    const result = await mysqlApproveApplicationAtomic(req.body || {});
+    const session = extractRequestSession(req);
+    const isPrivilegedAdmin =
+      session &&
+      (session.role === 'super_admin' ||
+        (session.role === 'sub_admin' && session.permissions?.approveMembers));
+
+    const body = req.body || {};
+    const paymentProofToken = String(body.paymentProofToken || '').trim();
+    const expectedPaymentId = String(
+      body.extraUpdates?.razorpayPaymentId || body.extraUpdates?.paymentRef || ''
+    ).trim();
+
+    if (
+      !isPrivilegedAdmin &&
+      !verifyPaymentProof(paymentProofToken, body.appId, expectedPaymentId)
+    ) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'प्रवेश नाकारला: सदस्यत्व मंजुरीसाठी अधिकृत ॲडमिन लॉगिन किंवा वैध पेमेंट पडताळणी आवश्यक आहे.',
+      });
+    }
+
+    const result = await mysqlApproveApplicationAtomic(body);
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.post('/api/db/applications/:id/reject', async (req, res) => {
+app.post('/api/db/applications/:id/reject', requireAdminOrSubAdmin('approveMembers'), async (req, res) => {
   try {
     await mysqlRejectApplication(req.params.id, String(req.body?.reason || ''));
     res.json({ status: 'success' });
@@ -1096,7 +2169,7 @@ app.post('/api/db/applications/:id/reject', async (req, res) => {
   }
 });
 
-app.delete('/api/db/applications/:id', async (req, res) => {
+app.delete('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
   try {
     const result = await mysqlDeleteApplication(req.params.id, req.body || {});
     res.json(result);
@@ -1105,7 +2178,7 @@ app.delete('/api/db/applications/:id', async (req, res) => {
   }
 });
 
-app.post('/api/db/applications/resequence', async (_req, res) => {
+app.post('/api/db/applications/resequence', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (_req, res) => {
   try {
     res.json(await mysqlResequenceApproved());
   } catch (err: any) {
@@ -1113,7 +2186,7 @@ app.post('/api/db/applications/resequence', async (_req, res) => {
   }
 });
 
-app.post('/api/db/applications/reset-counter', async (_req, res) => {
+app.post('/api/db/applications/reset-counter', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (_req, res) => {
   try {
     res.json(await mysqlResetMemberCounter());
   } catch (err: any) {
@@ -1121,7 +2194,7 @@ app.post('/api/db/applications/reset-counter', async (_req, res) => {
   }
 });
 
-app.post('/api/db/applications/purge-ghosts', async (_req, res) => {
+app.post('/api/db/applications/purge-ghosts', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (_req, res) => {
   try {
     res.json(await mysqlPurgeGhostApplications());
   } catch (err: any) {
@@ -1137,7 +2210,7 @@ app.get('/api/db/member-counter', async (_req, res) => {
   }
 });
 
-app.post('/api/db/member-counter/allocate', async (req, res) => {
+app.post('/api/db/member-counter/allocate', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
   try {
     res.json(await mysqlAllocateNextMemberNumber(req.body?.district));
   } catch (err: any) {
@@ -1145,7 +2218,7 @@ app.post('/api/db/member-counter/allocate', async (req, res) => {
   }
 });
 
-app.post('/api/db/member-counter/sync', async (req, res) => {
+app.post('/api/db/member-counter/sync', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
   try {
     await mysqlSyncMemberCounter(Number(req.body?.highestKnownCount || 0));
     res.json({ status: 'success' });
@@ -1162,7 +2235,7 @@ app.get('/api/db/news', async (_req, res) => {
   }
 });
 
-app.post('/api/db/news', async (req, res) => {
+app.post('/api/db/news', requireAdminOrSubAdmin('manageNews'), async (req, res) => {
   try {
     await mysqlSaveNews(req.body);
     res.json({ status: 'success' });
@@ -1171,7 +2244,7 @@ app.post('/api/db/news', async (req, res) => {
   }
 });
 
-app.delete('/api/db/news/:id', async (req, res) => {
+app.delete('/api/db/news/:id', requireAdminOrSubAdmin('manageNews'), async (req, res) => {
   try {
     await mysqlDeleteNews(req.params.id);
     res.json({ status: 'success' });
@@ -1188,7 +2261,7 @@ app.get('/api/db/latest-banners', async (_req, res) => {
   }
 });
 
-app.post('/api/db/latest-banners', async (req, res) => {
+app.post('/api/db/latest-banners', requireAdminOrSubAdmin('manageLatestBanners'), async (req, res) => {
   try {
     await mysqlSaveLatestBanner(req.body);
     res.json({ status: 'success' });
@@ -1197,7 +2270,7 @@ app.post('/api/db/latest-banners', async (req, res) => {
   }
 });
 
-app.delete('/api/db/latest-banners/:id', async (req, res) => {
+app.delete('/api/db/latest-banners/:id', requireAdminOrSubAdmin('manageLatestBanners'), async (req, res) => {
   try {
     await mysqlDeleteLatestBanner(req.params.id);
     res.json({ status: 'success' });
@@ -1214,7 +2287,7 @@ app.get('/api/db/gov-orders', async (_req, res) => {
   }
 });
 
-app.post('/api/db/gov-orders', async (req, res) => {
+app.post('/api/db/gov-orders', requireAdminOrSubAdmin('manageGovOrders'), async (req, res) => {
   try {
     await mysqlSaveGovOrder(req.body);
     res.json({ status: 'success' });
@@ -1223,7 +2296,7 @@ app.post('/api/db/gov-orders', async (req, res) => {
   }
 });
 
-app.delete('/api/db/gov-orders/:id', async (req, res) => {
+app.delete('/api/db/gov-orders/:id', requireAdminOrSubAdmin('manageGovOrders'), async (req, res) => {
   try {
     await mysqlDeleteGovOrder(req.params.id);
     res.json({ status: 'success' });
@@ -1232,7 +2305,7 @@ app.delete('/api/db/gov-orders/:id', async (req, res) => {
   }
 });
 
-app.get('/api/db/contacts', async (_req, res) => {
+app.get('/api/db/contacts', requireAdminOrSubAdmin('manageContactMessages'), async (_req, res) => {
   try {
     res.json({ items: await mysqlListContacts() });
   } catch (err: any) {
@@ -1240,7 +2313,7 @@ app.get('/api/db/contacts', async (_req, res) => {
   }
 });
 
-app.post('/api/db/contacts', async (req, res) => {
+app.post('/api/db/contacts', contactMailLimiter, async (req, res) => {
   try {
     await mysqlSaveContact(req.body);
     res.json({ status: 'success' });
@@ -1249,7 +2322,7 @@ app.post('/api/db/contacts', async (req, res) => {
   }
 });
 
-app.delete('/api/db/contacts/:id', async (req, res) => {
+app.delete('/api/db/contacts/:id', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   try {
     await mysqlDeleteContact(req.params.id);
     res.json({ status: 'success' });
@@ -1258,24 +2331,30 @@ app.delete('/api/db/contacts/:id', async (req, res) => {
   }
 });
 
-app.get('/api/db/sub-admins', async (_req, res) => {
+app.get('/api/db/sub-admins', requireAdminOrSubAdmin(['manageAdmins', 'approveMembers', 'editMembers', 'manageLeadership', 'manageNews', 'manageGovOrders', 'manageLatestBanners', 'viewIdCardPreview', 'manageContactMessages', 'manageRazorpay', 'manageCloudinary']), async (_req, res) => {
   try {
-    res.json({ items: await mysqlListSubAdmins() });
+    const items = await mysqlListSubAdmins();
+    res.json({ items: items.map(sanitizeSubAdminForResponse) });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.post('/api/db/sub-admins', async (req, res) => {
+app.post('/api/db/sub-admins', requireAdminOrSubAdmin('manageAdmins'), async (req, res) => {
   try {
-    await mysqlSaveSubAdmin(req.body);
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const body = { ...(req.body || {}) };
+    if (session?.role !== 'super_admin') {
+      body.isSuperAdmin = false;
+    }
+    await mysqlSaveSubAdmin(body);
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.delete('/api/db/sub-admins/:id', async (req, res) => {
+app.delete('/api/db/sub-admins/:id', requireAdminOrSubAdmin('manageAdmins'), async (req, res) => {
   try {
     await mysqlDeleteSubAdmin(req.params.id);
     res.json({ status: 'success' });
@@ -1284,15 +2363,16 @@ app.delete('/api/db/sub-admins/:id', async (req, res) => {
   }
 });
 
-app.get('/api/db/admin-auth', async (_req, res) => {
+app.get('/api/db/admin-auth', requireSuperAdmin, async (_req, res) => {
   try {
-    res.json(await mysqlGetAdminAuth());
+    const auth = await mysqlGetAdminAuth();
+    res.json({ email: auth.email, password: '', configured: true });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.post('/api/db/admin-auth', async (req, res) => {
+app.post('/api/db/admin-auth', requireSuperAdmin, async (req, res) => {
   try {
     await mysqlUpdateAdminAuth(String(req.body?.password || ''), req.body?.email);
     res.json({ status: 'success' });
@@ -1319,7 +2399,7 @@ app.get('/api/db/rk/leaders', async (_req, res) => {
   }
 });
 
-app.post('/api/db/rk/leaders', async (req, res) => {
+app.post('/api/db/rk/leaders', requireAdminOrSubAdmin('manageLeadership'), async (req, res) => {
   try {
     const version = await mysqlSaveLeaders(Array.isArray(req.body?.leaders) ? req.body.leaders : []);
     res.json({ status: 'success', version });
@@ -1336,17 +2416,47 @@ app.get('/api/db/rk/officials', async (req, res) => {
   }
 });
 
-app.post('/api/db/rk/officials', async (req, res) => {
+app.post('/api/db/rk/officials', requireOfficialEditor, async (req, res) => {
   try {
-    await mysqlSaveOfficial(req.body);
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const member = req.body || {};
+    if (session?.role === 'district_admin' && session.district) {
+      const targetDist = String(member.district || '').trim();
+      const allowedAliases =
+        session.district === 'अहिल्यानगर'
+          ? ['अहिल्यानगर', 'अहमदनगर']
+          : [session.district];
+      if (!allowedAliases.includes(targetDist)) {
+        return res.status(403).json({
+          status: 'error',
+          message: `आपण फक्त '${session.district}' जिल्ह्याची माहिती संपादित करू शकता.`,
+        });
+      }
+    }
+    await mysqlSaveOfficial(member);
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.delete('/api/db/rk/officials/:id', async (req, res) => {
+app.delete('/api/db/rk/officials/:id', requireOfficialEditor, async (req, res) => {
   try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    if (session?.role === 'district_admin' && session.district) {
+      const officials = await mysqlListOfficials();
+      const target = officials.find((o) => String(o.id) === String(req.params.id));
+      const allowedAliases =
+        session.district === 'अहिल्यानगर'
+          ? ['अहिल्यानगर', 'अहमदनगर']
+          : [session.district];
+      if (target && !allowedAliases.includes(String(target.district || '').trim())) {
+        return res.status(403).json({
+          status: 'error',
+          message: `आपण फक्त '${session.district}' जिल्ह्यातील पदाधिकारी हटवू शकता.`,
+        });
+      }
+    }
     await mysqlDeleteOfficial(req.params.id);
     res.json({ status: 'success' });
   } catch (err: any) {
@@ -1354,17 +2464,29 @@ app.delete('/api/db/rk/officials/:id', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/district-passwords', async (req, res) => {
+app.get('/api/db/rk/district-passwords', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
-    sendFreshJson(req, res, { map: await mysqlListDistrictPasswords() });
+    sendFreshJson(req, res, { map: await mysqlListDistrictPasswordStatuses() });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.post('/api/db/rk/district-passwords', async (req, res) => {
+app.post('/api/db/rk/district-passwords', requireOfficialEditor, async (req, res) => {
   try {
-    await mysqlSetDistrictPassword(String(req.body?.district || ''), String(req.body?.password || ''));
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const district = String(req.body?.district || '').trim();
+    const password = String(req.body?.password || '').trim();
+    if (!district || !password) {
+      return res.status(400).json({ status: 'error', message: 'जिल्हा व पासवर्ड आवश्यक आहे.' });
+    }
+    if (session?.role === 'district_admin' && session.district !== district) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'आपण फक्त स्वतःच्या जिल्ह्याचाच पासवर्ड बदलू शकता.',
+      });
+    }
+    await mysqlSetDistrictPassword(district, password);
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -1379,7 +2501,7 @@ app.get('/api/db/rk/appointed-posts', async (req, res) => {
   }
 });
 
-app.post('/api/db/rk/appointed-posts', async (req, res) => {
+app.post('/api/db/rk/appointed-posts', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     await mysqlSetAppointedPosts(items);
@@ -1389,15 +2511,16 @@ app.post('/api/db/rk/appointed-posts', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/president-password', async (req, res) => {
+app.get('/api/db/rk/president-password', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
-    sendFreshJson(req, res, { password: await mysqlGetPresidentPassword() });
+    const isDefault = await mysqlIsPresidentPasswordDefault();
+    sendFreshJson(req, res, { isDefault, configured: true });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.post('/api/db/rk/president-password', async (req, res) => {
+app.post('/api/db/rk/president-password', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
     await mysqlSetPresidentPassword(String(req.body?.password || ''));
     res.json({ status: 'success' });
@@ -1420,7 +2543,7 @@ app.get('/api/razorpay/public-config', (_req, res) => {
 });
 
 // 2. Admin: Get Full Razorpay Config (masked)
-app.get('/api/razorpay/admin-config', (req, res) => {
+app.get('/api/razorpay/admin-config', requireAdminOrSubAdmin('manageRazorpay'), (req, res) => {
   const config = loadRazorpayConfig();
   res.json({
     keyId: config.keyId,
@@ -1434,7 +2557,7 @@ app.get('/api/razorpay/admin-config', (req, res) => {
 });
 
 // 3. Admin: Update Razorpay Config
-app.post('/api/razorpay/admin-config', (req, res) => {
+app.post('/api/razorpay/admin-config', requireAdminOrSubAdmin('manageRazorpay'), (req, res) => {
   const { keyId, keySecret, webhookSecret, enabled } = req.body;
   const current = loadRazorpayConfig();
 
@@ -1461,7 +2584,7 @@ app.post('/api/razorpay/admin-config', (req, res) => {
 });
 
 // 4. Create Razorpay Order
-app.post('/api/razorpay/create-order', async (req, res) => {
+app.post('/api/razorpay/create-order', appSubmitLimiter, async (req, res) => {
   try {
     const { amount = 220, applicationId, fullName, phone, email, district } = req.body;
     const { instance, config } = getRazorpayInstance();
@@ -1556,12 +2679,18 @@ app.post('/api/razorpay/verify-payment', async (req, res) => {
       console.error('Server approval after verify-payment warning:', approveErr);
     }
 
+    const paymentProofToken = signPaymentProof(
+      String(approvedApplication?.id || applicationId || ''),
+      String(razorpay_payment_id)
+    );
+
     res.json({
       status: 'success',
       verified: true,
       message: 'पेमेंट यशस्वीरीत्या पडताळले गेले (Signature Verified).',
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
+      paymentProofToken,
       application: approvedApplication
     });
   } catch (err: any) {
@@ -1709,7 +2838,7 @@ app.post('/api/razorpay/webhook', async (req, res) => {
 // =========================================================================
 // Unified Contact Mailbox API (IMAP + SMTP for contact@mahasangh.in)
 // =========================================================================
-app.get('/api/mailbox/messages', async (req, res) => {
+app.get('/api/mailbox/messages', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   const cfg = loadContactMailboxConfig();
   const folder = String(req.query.folder || 'INBOX').trim() || 'INBOX';
   const limitRaw = Number(req.query.limit || 40);
@@ -1871,7 +3000,7 @@ app.get('/api/mailbox/messages', async (req, res) => {
   }
 });
 
-app.post('/api/mailbox/send', async (req, res) => {
+app.post('/api/mailbox/send', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   try {
     const cfg = loadContactMailboxConfig();
     const to = String(req.body?.to || '').trim();
@@ -1999,7 +3128,7 @@ app.post('/api/mailbox/send', async (req, res) => {
   }
 });
 
-app.post('/api/mailbox/mark-read', async (req, res) => {
+app.post('/api/mailbox/mark-read', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   const cfg = loadContactMailboxConfig();
   const uid = Number(req.body?.uid);
   const isRead = Boolean(req.body?.isRead);
@@ -2033,7 +3162,7 @@ app.post('/api/mailbox/mark-read', async (req, res) => {
   }
 });
 
-app.delete('/api/mailbox/message/:uid', async (req, res) => {
+app.delete('/api/mailbox/message/:uid', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   const cfg = loadContactMailboxConfig();
   const uid = Number(req.params.uid);
   const folder = String(req.query.folder || 'INBOX').trim() || 'INBOX';

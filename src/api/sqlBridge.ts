@@ -10,7 +10,7 @@ import { isAiStudioPreviewHostname } from '../utils/previewFirebaseGuard';
 
 export type ActiveBackendMode = 'mysql' | 'firebase';
 
-let resolvedMode: ActiveBackendMode | null = 'mysql';
+let resolvedMode: ActiveBackendMode | null = null;
 let modeCheckPromise: Promise<ActiveBackendMode> | null = null;
 
 export function isAiStudioPreviewEnvironment(): boolean {
@@ -19,13 +19,15 @@ export function isAiStudioPreviewEnvironment(): boolean {
 }
 
 export async function getActiveBackendMode(): Promise<ActiveBackendMode> {
-  if (resolvedMode && resolvedMode === 'mysql') {
-    // Verify async in background or return mysql
+  const isPreview = isAiStudioPreviewEnvironment();
+  if (!isPreview) {
+    resolvedMode = 'mysql';
+    return 'mysql';
+  }
+  if (resolvedMode) {
     return resolvedMode;
   }
   if (modeCheckPromise) return modeCheckPromise;
-
-  const isPreview = isAiStudioPreviewEnvironment();
 
   modeCheckPromise = (async (): Promise<ActiveBackendMode> => {
     try {
@@ -77,15 +79,53 @@ export function isFirebaseAllowedSync(): boolean {
   return resolvedMode === 'firebase';
 }
 
+const AUTH_TOKEN_KEY = 'mahasangh_auth_token_v1';
+
+export function getAuthSessionToken(): string {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      return sessionStorage.getItem(AUTH_TOKEN_KEY) || '';
+    }
+  } catch {}
+  return '';
+}
+
+export function setAuthSessionToken(token?: string | null): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      if (token && token.trim()) {
+        sessionStorage.setItem(AUTH_TOKEN_KEY, token.trim());
+      } else {
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
+      }
+    }
+  } catch {}
+}
+
+export function clearAuthSessionToken(): void {
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  } catch {}
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = getAuthSessionToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function sqlApiRequest<T = any>(
   url: string,
   options?: RequestInit
 ): Promise<T> {
   const res = await fetch(url, {
     ...options,
+    credentials: 'include',
     cache: options?.cache ?? 'no-store',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...(options?.headers || {}),
     },
   });
@@ -101,3 +141,26 @@ export async function sqlApiRequest<T = any>(
 
   return (await res.json()) as T;
 }
+
+export async function authApiRequest<T = any>(
+  url: string,
+  body?: unknown,
+  method: 'GET' | 'POST' = 'POST'
+): Promise<{ ok: boolean; status: number; data: T }> {
+  const res = await fetch(url, {
+    method,
+    credentials: 'include',
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
+  });
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {}
+  return { ok: res.ok, status: res.status, data: data as T };
+}
+

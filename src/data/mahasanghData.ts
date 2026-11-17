@@ -373,6 +373,7 @@ export function isAdvisoryBoardLeader(leader?: Leader | null): boolean {
 
 export function isLegalAdvisorLeader(leader?: Leader | null): boolean {
   if (!leader || !isAdvisoryBoardLeader(leader)) return false;
+  if (leader.category === 'मार्गदर्शक') return false;
   return leader.category === 'कायदेविषयक सल्लागार' || (leader.role || '').includes('कायदे');
 }
 

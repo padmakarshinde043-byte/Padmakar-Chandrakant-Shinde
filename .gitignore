@@ -11,3 +11,7 @@ mysql-config.json
 database/mahasangh_full_backup.sql
 server.cjs
 tmp
+.session-secret
+whatsapp-config.json
+whatsapp-logs.json
+backups

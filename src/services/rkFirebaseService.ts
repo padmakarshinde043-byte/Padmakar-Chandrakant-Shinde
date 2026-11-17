@@ -14,7 +14,7 @@ import { Leader, DEFAULT_AUTHORITATIVE_LEADERS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { getPreviewDb } from '../firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import { isSqlBackendActive, isFirebaseAllowedInCurrentEnvironment, sqlApiRequest } from '../api/sqlBridge';
+import { isSqlBackendActive, isFirebaseAllowedInCurrentEnvironment, sqlApiRequest, getAuthHeaders } from '../api/sqlBridge';
 import { canUsePreviewRead, recordPreviewFirestoreReads } from '../utils/previewFirebaseGuard';
 
 import {
@@ -123,14 +123,17 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
   try {
     const res = await fetch('/api/db/rk/officials', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ ...member, ...memberPayload, id: member.id }),
     });
     if (!res.ok) {
-      console.warn('Failed to save official to SQL:', res.statusText);
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.message || res.statusText || 'Failed to save official');
     }
   } catch (err) {
     console.warn('Error saving official to SQL:', err);
+    throw err;
   }
 
   // Update local cache
@@ -148,12 +151,16 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
   try {
     const res = await fetch(`/api/db/rk/officials/${encodeURIComponent(id)}`, {
       method: 'DELETE',
+      credentials: 'include',
+      headers: { ...getAuthHeaders() },
     });
     if (!res.ok) {
-      console.warn('Failed to delete official from SQL:', res.statusText);
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.message || res.statusText || 'Failed to delete official');
     }
   } catch (err) {
     console.warn('Error deleting official from SQL:', err);
+    throw err;
   }
 
   // Update local cache
@@ -174,10 +181,12 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
 export async function fetchDistrictPasswords(forceRefresh = false): Promise<Record<string, string>> {
   try {
     const res = await fetch(`/api/db/rk/district-passwords?_t=${Date.now()}`, {
+      credentials: 'include',
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache'
+        Pragma: 'no-cache',
+        ...getAuthHeaders(),
       }
     });
     if (res.ok) {
@@ -205,19 +214,25 @@ export async function fetchDistrictPasswords(forceRefresh = false): Promise<Reco
  */
 export async function updateDistrictPasswordInRtdb(district: string, newPass: string): Promise<void> {
   try {
-    await fetch('/api/db/rk/district-passwords', {
+    const res = await fetch('/api/db/rk/district-passwords', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ district, password: newPass }),
     });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.message || res.statusText || 'Failed to save district password');
+    }
   } catch (err) {
     console.warn('Error saving district password to SQL:', err);
+    throw err;
   }
 
   try {
     const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
     const map = cached ? JSON.parse(cached) : {};
-    map[district] = newPass;
+    map[district] = newPass === 'AD2026' ? 'AD2026' : '__CUSTOM__';
     localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(map));
     localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
   } catch {}
@@ -272,45 +287,50 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
  */
 export async function saveAppointedPostsToRtdb(posts: AppointedPostItem[]): Promise<void> {
   try {
-    await fetch('/api/db/rk/appointed-posts', {
+    const res = await fetch('/api/db/rk/appointed-posts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ items: posts }),
     });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.message || res.statusText || 'Failed to save posts');
+    }
   } catch (err) {
     console.warn('Error saving appointed posts to SQL:', err);
+    throw err;
   }
   localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(posts));
   localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
 }
 
 /**
- * Fetch the current President password from HostKarle MySQL.
- * If not set yet, defaults to SUPER_ADMIN_PASSWORD ('RK2026').
+ * Fetch the current President password status from HostKarle MySQL.
  */
 export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
   try {
     const res = await fetch(`/api/db/rk/president-password?_t=${Date.now()}`, {
+      credentials: 'include',
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache'
+        Pragma: 'no-cache',
+        ...getAuthHeaders(),
       }
     });
     if (res.ok) {
       const sqlRes = await res.json();
+      if (sqlRes?.isDefault) {
+        return SUPER_ADMIN_PASSWORD;
+      }
       if (typeof sqlRes?.password === 'string' && sqlRes.password.trim()) {
-        localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, sqlRes.password.trim());
         return sqlRes.password.trim();
       }
+      return '__CUSTOM__';
     }
   } catch (error) {
     console.warn('Error fetching president password from SQL, checking cache:', error);
-  }
-
-  const cached = localStorage.getItem(CACHE_KEY_PRESIDENT_PASS);
-  if (cached && cached.trim()) {
-    return cached.trim();
   }
 
   return SUPER_ADMIN_PASSWORD;
@@ -322,16 +342,20 @@ export async function fetchPresidentPasswordFromFirebase(): Promise<string> {
 export async function updatePresidentPasswordInFirebase(newPass: string): Promise<void> {
   const cleanPass = newPass.trim();
   try {
-    await fetch('/api/db/rk/president-password', {
+    const res = await fetch('/api/db/rk/president-password', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ password: cleanPass }),
     });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData?.message || res.statusText || 'Failed to save president password');
+    }
   } catch (err) {
     console.warn('Error saving president password to SQL:', err);
+    throw err;
   }
-
-  localStorage.setItem(CACHE_KEY_PRESIDENT_PASS, cleanPass);
 }
 
 /**
@@ -485,16 +509,38 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
  * Save dynamic leaders list to SQL or Firebase and update version.
  */
 export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<void> {
+  const seenIds = new Set<string>();
+  const cleanLeaders: Leader[] = (Array.isArray(leaders) ? leaders : []).map((l, idx) => {
+    let cid = String(l.id || `leader_${idx}`).trim() || `leader_${idx}`;
+    if (seenIds.has(cid)) {
+      cid = `${cid}_${idx}`;
+    }
+    seenIds.add(cid);
+    const cleaned: Leader = {
+      id: cid,
+      name: String(l.name || ''),
+      role: String(l.role || ''),
+      region: String(l.region || ''),
+      education: String(l.education || ''),
+      phone: String(l.phone || ''),
+      photo: String(l.photo || ''),
+      isKey: Boolean(l.isKey),
+      ...(l.email ? { email: String(l.email) } : {}),
+      ...(l.category ? { category: l.category } : {}),
+    };
+    return cleaned;
+  });
+
   if (await isSqlBackendActive()) {
     const res = await sqlApiRequest<{ status: string; version?: number }>('/api/db/rk/leaders', {
       method: 'POST',
-      body: JSON.stringify({ leaders }),
+      body: JSON.stringify({ leaders: cleanLeaders }),
     });
     const newVer = res?.version || Date.now();
-    localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(leaders));
+    localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
     localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
     localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-    window.dispatchEvent(new Event('mahasangh_leadership_updated'));
+    window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
     return;
   }
 
@@ -508,7 +554,7 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
   const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(leaders)
+    body: JSON.stringify(cleanLeaders)
   });
 
   if (!res.ok) {
@@ -522,26 +568,38 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
     body: JSON.stringify(newVer)
   }).catch(() => {});
 
-  localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(leaders));
+  localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
   localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
-  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(newVer));
-  window.dispatchEvent(new Event('mahasangh_leadership_updated'));
+  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
 
-  // Dual-sync to Firestore `/leadership` collection in background (AI Studio Preview only)
+  // Dual-sync to Firestore `/leadership` collection (AI Studio Preview only)
   try {
     const previewDb = getPreviewDb();
     if (previewDb) {
-      for (let i = 0; i < leaders.length; i++) {
-        const l = leaders[i];
-        const id = l.id || `leader_${i}`;
-        setDoc(doc(previewDb, 'leadership', id), {
-          ...l,
-          orderIndex: i,
-          updatedAt: new Date().toISOString()
-        }).catch(() => {});
-      }
+      await Promise.all(
+        cleanLeaders.map((l, i) => {
+          const id = l.id || `leader_${i}`;
+          const fsPayload: Record<string, any> = {
+            id,
+            name: l.name,
+            role: l.role,
+            region: l.region,
+            education: l.education || '',
+            phone: l.phone || '-',
+            photo: l.photo || '',
+            isKey: Boolean(l.isKey),
+            orderIndex: i,
+            updatedAt: new Date().toISOString(),
+          };
+          if (l.email) fsPayload.email = l.email;
+          if (l.category) fsPayload.category = l.category;
+          return setDoc(doc(previewDb, 'leadership', id), fsPayload).catch(() => {});
+        })
+      );
     }
   } catch (err) {
     console.warn('Firestore leadership sync warning:', err);
   }
+
+  window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
 }

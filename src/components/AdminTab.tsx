@@ -6,7 +6,7 @@ import {
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
-  Send, Inbox, Reply, Smartphone, Globe, Paperclip
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -72,6 +72,14 @@ import {
 } from '../firebase';
 import { MemberEditManager } from './MemberEditManager';
 import { MembershipIdCardPreview } from './MembershipIdCardPreview';
+import { AdminBackupRestorePanel } from './AdminBackupRestorePanel';
+import { AdminWhatsappBroadcastPanel } from './AdminWhatsappBroadcastPanel';
+import {
+  authApiRequest,
+  setAuthSessionToken,
+  clearAuthSessionToken,
+  getAuthHeaders,
+} from '../api/sqlBridge';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
@@ -106,6 +114,8 @@ type AdminSubTabKey =
   | 'leadership'
   | 'district_leadership'
   | 'master_studio'
+  | 'whatsapp_broadcast'
+  | 'backup_restore'
   | 'add_news'
   | 'latest_banners'
   | 'print_id_cards'
@@ -371,18 +381,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   useEffect(() => {
-    if (activeAdminSubTab === 'master_studio') {
+    if (isLoggedIn && currentUser?.isSuperAdmin && activeAdminSubTab === 'master_studio') {
       loadAllDistrictPasswords(true);
     }
-  }, [activeAdminSubTab]);
+  }, [isLoggedIn, currentUser?.isSuperAdmin, activeAdminSubTab]);
 
   useEffect(() => {
     const handleUpdate = () => {
-      loadAllDistrictPasswords(false);
+      if (isLoggedIn && currentUser?.isSuperAdmin) {
+        loadAllDistrictPasswords(false);
+      }
     };
     window.addEventListener('mahasangh_district_passwords_updated', handleUpdate);
     return () => window.removeEventListener('mahasangh_district_passwords_updated', handleUpdate);
-  }, []);
+  }, [isLoggedIn, currentUser?.isSuperAdmin]);
 
   const handleResetDistrictToAD2026 = async (distName: string) => {
     if (!distName) return;
@@ -1088,6 +1100,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [leaderPhotoSizeKb, setLeaderPhotoSizeKb] = useState(0);
   const [leaderPhotoUrl, setLeaderPhotoUrl] = useState('');
   const [leaderFormMsg, setLeaderFormMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [isSavingLeader, setIsSavingLeader] = useState(false);
   const leaderPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   const normalizeDynamicLeadersList = (rawList: Leader[]): Leader[] => {
@@ -1135,19 +1148,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }).catch(() => {});
   }, []);
 
-  // Save Dynamic Leadership to LocalStorage and Firebase (Zero Quota Impact with compressed images)
-  const saveLeadersToStorage = (updatedList: Leader[]) => {
+  // Save Dynamic Leadership to LocalStorage and active backend (MySQL / Firebase) sequentially
+  const saveLeadersToStorage = async (updatedList: Leader[]): Promise<boolean> => {
     setDynamicLeaders(updatedList);
     try {
       localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(updatedList));
-      // Dispatch custom storage event so other tabs sync live
-      window.dispatchEvent(new Event('mahasangh_leadership_updated'));
-      // Sync to Firebase Realtime Database
-      saveDynamicLeadersToFirebase(updatedList).catch((err) => {
-        console.warn('Could not sync leaders to Firebase:', err);
-      });
     } catch (e) {
-      console.warn('Could not save dynamic leaders:', e);
+      console.warn('Could not write localStorage leaders cache:', e);
+    }
+    try {
+      await saveDynamicLeadersToFirebase(updatedList);
+      return true;
+    } catch (err: any) {
+      console.warn('Could not sync leaders to backend:', err);
+      setLeaderFormMsg({
+        text: err?.message || 'डेटा सर्व्हरवर सेव्ह करताना त्रुटी आली. कृपया पुन्हा लॉगिन करून प्रयत्न करा.',
+        type: 'error',
+      });
+      return false;
     }
   };
 
@@ -1213,7 +1231,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   }, [districtLeaderMode, allDistrictModeLeaders.length]);
 
   // Safe category-specific Move Up
-  const handleMoveLeaderUp = (leaderId?: string) => {
+  const handleMoveLeaderUp = async (leaderId?: string) => {
     const targetId = leaderId || selectedLeaderIdForReorder;
     if (!targetId) return;
 
@@ -1232,13 +1250,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const temp = newLeaders[posCurrent];
       newLeaders[posCurrent] = newLeaders[posAbove];
       newLeaders[posAbove] = temp;
-      saveLeadersToStorage(newLeaders);
       setSelectedLeaderIdForReorder(targetId);
+      await saveLeadersToStorage(newLeaders);
     }
   };
 
   // Safe category-specific Move Down
-  const handleMoveLeaderDown = (leaderId?: string) => {
+  const handleMoveLeaderDown = async (leaderId?: string) => {
     const targetId = leaderId || selectedLeaderIdForReorder;
     if (!targetId) return;
 
@@ -1257,8 +1275,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const temp = newLeaders[posCurrent];
       newLeaders[posCurrent] = newLeaders[posBelow];
       newLeaders[posBelow] = temp;
-      saveLeadersToStorage(newLeaders);
       setSelectedLeaderIdForReorder(targetId);
+      await saveLeadersToStorage(newLeaders);
     }
   };
 
@@ -1266,7 +1284,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const selectedLeader = selectedLeaderIndex >= 0 ? categoryLeaders[selectedLeaderIndex] : null;
 
   // District-specific Move Up (preserves District Presidents / Secretaries relative order)
-  const handleMoveDistrictLeaderUp = (leaderId?: string) => {
+  const handleMoveDistrictLeaderUp = async (leaderId?: string) => {
     const targetId = leaderId || selectedDistrictLeaderId;
     if (!targetId) return;
 
@@ -1284,13 +1302,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const temp = newLeaders[posCurrent];
       newLeaders[posCurrent] = newLeaders[posAbove];
       newLeaders[posAbove] = temp;
-      saveLeadersToStorage(newLeaders);
       setSelectedDistrictLeaderId(targetId);
+      await saveLeadersToStorage(newLeaders);
     }
   };
 
   // District-specific Move Down
-  const handleMoveDistrictLeaderDown = (leaderId?: string) => {
+  const handleMoveDistrictLeaderDown = async (leaderId?: string) => {
     const targetId = leaderId || selectedDistrictLeaderId;
     if (!targetId) return;
 
@@ -1308,8 +1326,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const temp = newLeaders[posCurrent];
       newLeaders[posCurrent] = newLeaders[posBelow];
       newLeaders[posBelow] = temp;
-      saveLeadersToStorage(newLeaders);
       setSelectedDistrictLeaderId(targetId);
+      await saveLeadersToStorage(newLeaders);
     }
   };
 
@@ -1371,86 +1389,56 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
     try {
       setIsLoggingIn(true);
-      // Refresh admin list and super admin creds directly from cloud server
-      const [creds, subAdmins] = await Promise.all([
-        getAdminCredentials(),
-        fetchAdminUsers()
-      ]);
-      setAdminUsersList(subAdmins);
+      const { ok, data } = await authApiRequest<{
+        status: string;
+        token?: string;
+        user?: AdminUser;
+        subAdmins?: AdminUser[];
+        email?: string;
+        message?: string;
+      }>('/api/auth/admin-login', { email: inputEmail, password: inputPass });
 
-      const validSuperEmail = creds.email.toLowerCase();
-      const validSuperPass = creds.password;
+      if (data?.status === 'first_login') {
+        setIsFirstLoginMode(true);
+        setFirstLoginEmail(data.email || inputEmail);
+        setFirstLoginError('');
+        setFirstLoginSuccess('');
+        setFirstLoginNewPassword('');
+        setFirstLoginConfirmPassword('');
+        return;
+      }
 
-      // 1. Check if Super Admin
-      if (inputEmail === validSuperEmail || inputEmail === DEFAULT_ADMIN_EMAIL.toLowerCase()) {
-        if (!inputPass) {
-          setLoginError('कृपया पासवर्ड प्रविष्ट करा.');
-          return;
-        }
-        const isPassValid = inputPass === validSuperPass || inputPass === MASTER_RECOVERY_KEY;
-        if (!isPassValid) {
-          setLoginError('चुकीचा पासवर्ड. कृपया पुन्हा प्रयत्न करा.');
-          return;
-        }
+      if (!ok || data?.status !== 'success' || !data.user) {
+        setLoginError(data?.message || 'चुकीचा ई-मेल किंवा पासवर्ड. कृपया पुन्हा प्रयत्न करा.');
+        return;
+      }
 
-        const superAdminUser: AdminUser = {
-          id: 'super-admin',
-          email: validSuperEmail,
-          name: 'मुख्य प्रशासक (Super Admin)',
-          isSuperAdmin: true,
-          permissions: { ...ALL_ADMIN_PERMISSIONS_TRUE },
-          createdAt: '',
-        };
+      if (data.token) {
+        setAuthSessionToken(data.token);
+      }
 
-        setCurrentUser(superAdminUser);
-        setIsLoggedIn(true);
+      const loggedUser = data.user;
+      if (Array.isArray(data.subAdmins)) {
+        setAdminUsersList(data.subAdmins);
+      } else if (loggedUser.isSuperAdmin || loggedUser.permissions?.manageAdmins) {
+        fetchAdminUsers().then(setAdminUsersList).catch(() => {});
+      }
+
+      setCurrentUser(loggedUser);
+      setIsLoggedIn(true);
+      setLoginError('');
+
+      if (loggedUser.isSuperAdmin) {
         setActiveAdminSubTab('applications');
-        setLoginError('');
         if (onFetchApplications) {
           onFetchApplications();
         }
-        return;
-      }
-
-      // 2. Check if Sub-Admin
-      const matchingSubAdmin = subAdmins.find((a) => a.email.toLowerCase() === inputEmail);
-      if (matchingSubAdmin) {
-        // If this is sub-admin's first login (or they don't have a password set yet)
-        if (matchingSubAdmin.isFirstLogin || !matchingSubAdmin.password) {
-          setIsFirstLoginMode(true);
-          setFirstLoginEmail(matchingSubAdmin.email);
-          setFirstLoginError('');
-          setFirstLoginSuccess('');
-          setFirstLoginNewPassword('');
-          setFirstLoginConfirmPassword('');
-          return;
-        }
-
-        // Sub-admin already has a password
-        if (!inputPass) {
-          setLoginError('कृपया पासवर्ड प्रविष्ट करा.');
-          return;
-        }
-
-        if (inputPass !== matchingSubAdmin.password) {
-          setLoginError('चुकीचा पासवर्ड. कृपया पुन्हा प्रयत्न करा.');
-          return;
-        }
-
-        setCurrentUser(matchingSubAdmin);
-        setIsLoggedIn(true);
-        setLoginError('');
-
-        // Select first available tab based on their permissions
-        setActiveAdminSubTab(getFirstAllowedAdminTab(matchingSubAdmin.permissions));
-
-        if ((matchingSubAdmin.permissions.approveMembers || matchingSubAdmin.permissions.editMembers) && onFetchApplications) {
+      } else {
+        setActiveAdminSubTab(getFirstAllowedAdminTab(loggedUser.permissions));
+        if ((loggedUser.permissions.approveMembers || loggedUser.permissions.editMembers) && onFetchApplications) {
           onFetchApplications();
         }
-        return;
       }
-
-      setLoginError('अवैध ई-मेल. कृपया अधिकृत ॲडमिन ई-मेल वापरा किंवा मुख्य प्रशासकाशी संपर्क साधा.');
     } catch (err: any) {
       setLoginError('लॉगिन करताना त्रुटी आली: ' + (err.message || 'Error'));
     } finally {
@@ -1483,21 +1471,33 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
 
     try {
-      await setAdminUserPassword(firstLoginEmail, newPwd);
-      const updatedList = await fetchAdminUsers();
-      setAdminUsersList(updatedList);
-      const user = updatedList.find((a) => a.email.toLowerCase() === firstLoginEmail.toLowerCase());
+      const { ok, data } = await authApiRequest<{
+        status: string;
+        token?: string;
+        user?: AdminUser;
+        message?: string;
+      }>('/api/auth/sub-admin-first-login', {
+        email: firstLoginEmail,
+        newPassword: newPwd,
+      });
 
+      if (!ok || data?.status !== 'success' || !data.user) {
+        setFirstLoginError(data?.message || 'पासवर्ड सेव्ह करताना त्रुटी आली.');
+        return;
+      }
+
+      if (data.token) {
+        setAuthSessionToken(data.token);
+      }
+      const user = data.user;
       setFirstLoginSuccess('आपला पासवर्ड यशस्वीपणे तयार झाला आहे! डॅशबोर्ड उघडत आहे...');
       setTimeout(() => {
         setIsFirstLoginMode(false);
-        if (user) {
-          setCurrentUser(user);
-          setIsLoggedIn(true);
-          setActiveAdminSubTab(getFirstAllowedAdminTab(user.permissions));
-          if ((user.permissions.approveMembers || user.permissions.editMembers) && onFetchApplications) {
-            onFetchApplications();
-          }
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+        setActiveAdminSubTab(getFirstAllowedAdminTab(user.permissions));
+        if ((user.permissions.approveMembers || user.permissions.editMembers) && onFetchApplications) {
+          onFetchApplications();
         }
       }, 1000);
     } catch (err: any) {
@@ -1532,20 +1532,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
 
     try {
-      if (currentUser?.isSuperAdmin) {
-        const creds = await getAdminCredentials();
-        if (curr !== creds.password && curr !== MASTER_RECOVERY_KEY) {
-          setChangePassStatus({ text: 'सध्याचा चालू पासवर्ड चुकीचा आहे.', type: 'error' });
-          return;
-        }
-        await updateAdminCredentials(newP);
-      } else if (currentUser) {
-        if (curr !== currentUser.password) {
-          setChangePassStatus({ text: 'सध्याचा चालू पासवर्ड चुकीचा आहे.', type: 'error' });
-          return;
-        }
-        await setAdminUserPassword(currentUser.email, newP);
-        setCurrentUser({ ...currentUser, password: newP });
+      const { ok, data } = await authApiRequest<{ status: string; message?: string }>(
+        '/api/auth/admin-change-password',
+        { currentPassword: curr, newPassword: newP }
+      );
+      if (!ok || data?.status !== 'success') {
+        setChangePassStatus({ text: data?.message || 'सध्याचा चालू पासवर्ड चुकीचा आहे.', type: 'error' });
+        return;
       }
 
       setChangePassStatus({
@@ -1689,7 +1682,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const [contactsRes, mailboxRes] = await Promise.allSettled([
         fetchContactsForAdmin(),
         fetch(`/api/mailbox/messages?limit=40&_t=${Date.now()}`, {
+          credentials: 'include',
           cache: 'no-store',
+          headers: { ...getAuthHeaders() },
         }).then((r) => r.json()),
       ]);
 
@@ -1734,7 +1729,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       const res = await fetch('/api/mailbox/mark-read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ uid: emailItem.uid, isRead: nextRead, folder: emailItem.folder || 'INBOX' }),
       });
       if (!res.ok) throw new Error('Mark read failed');
@@ -1751,7 +1747,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       const res = await fetch(
         `/api/mailbox/message/${emailItem.uid}?folder=${encodeURIComponent(emailItem.folder || 'INBOX')}`,
-        { method: 'DELETE' }
+        { method: 'DELETE', credentials: 'include', headers: { ...getAuthHeaders() } }
       );
       if (!res.ok) throw new Error('Delete failed');
       setMailboxEmails((prev) => prev.filter((m) => m.uid !== emailItem.uid));
@@ -1811,7 +1807,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       const res = await fetch('/api/mailbox/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           to,
           subject,
@@ -1954,7 +1951,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   // Add or Edit Leader in selected category (State Leadership OR District Leadership)
-  const handleSaveLeader = (e: React.FormEvent) => {
+  const handleSaveLeader = async (e: React.FormEvent) => {
     e.preventDefault();
     setLeaderFormMsg(null);
 
@@ -1976,84 +1973,98 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         ? advisorySubTab
         : leaderCategory;
 
-    if (editingLeaderId) {
-      // Update existing leader
-      const updated = dynamicLeaders.map((l) => {
-        if ((l.id || l.name) === editingLeaderId) {
-          return {
-            ...l,
+    setIsSavingLeader(true);
+    let savedOk = false;
+    try {
+      if (editingLeaderId) {
+        // Update existing leader
+        const updated = dynamicLeaders.map((l) => {
+          if ((l.id || l.name) === editingLeaderId) {
+            return {
+              ...l,
+              name: leaderName.trim(),
+              role: leaderRole.trim(),
+              region: leaderRegion.trim() || 'महाराष्ट्र',
+              phone: leaderPhone.trim() || '-',
+              education: leaderEducation.trim() || '',
+              photo: leaderPhoto,
+              category: isDistrictTab ? l.category : targetCategory
+            };
+          }
+          return l;
+        });
+        savedOk = await saveLeadersToStorage(updated);
+        if (savedOk) {
+          setLeaderFormMsg({ text: 'पदाधिकारी माहिती यशस्वीपणे अद्यतनित झाली!', type: 'success' });
+        }
+      } else if (isDistrictTab) {
+        // If a placeholder slot exists for the same district and mode, fill it in place to preserve district row order
+        const normTarget = normalizeDistrictAlias(leaderRegion);
+        const placeholderIdx = dynamicLeaders.findIndex((l) => {
+          const sameMode =
+            districtLeaderMode === 'जिल्हा अध्यक्ष'
+              ? l.category === 'जिल्हा अध्यक्ष' || l.category === 'district'
+              : l.category === 'जिल्हा सरचिटणीस';
+          return (
+            sameMode &&
+            normalizeDistrictAlias(l.region) === normTarget &&
+            isPlaceholderDistrictName(l.name)
+          );
+        });
+
+        if (placeholderIdx !== -1) {
+          const updated = [...dynamicLeaders];
+          updated[placeholderIdx] = {
+            ...updated[placeholderIdx],
             name: leaderName.trim(),
             role: leaderRole.trim(),
-            region: leaderRegion.trim() || 'महाराष्ट्र',
+            region: leaderRegion.trim(),
             phone: leaderPhone.trim() || '-',
             education: leaderEducation.trim() || '',
-            photo: leaderPhoto || l.photo,
-            category: isDistrictTab ? l.category : targetCategory
+            photo: leaderPhoto || updated[placeholderIdx].photo || '',
+            category: districtLeaderMode
           };
+          savedOk = await saveLeadersToStorage(updated);
+        } else {
+          const newLeader: Leader = {
+            id: `ldr-${Date.now()}`,
+            name: leaderName.trim(),
+            role: leaderRole.trim(),
+            region: leaderRegion.trim(),
+            phone: leaderPhone.trim() || '-',
+            education: leaderEducation.trim() || '',
+            photo: leaderPhoto,
+            category: districtLeaderMode
+          };
+          savedOk = await saveLeadersToStorage([...dynamicLeaders, newLeader]);
         }
-        return l;
-      });
-      saveLeadersToStorage(updated);
-      setLeaderFormMsg({ text: 'पदाधिकारी माहिती यशस्वीपणे अद्यतनित झाली!', type: 'success' });
-    } else if (isDistrictTab) {
-      // If a placeholder slot exists for the same district and mode, fill it in place to preserve district row order
-      const normTarget = normalizeDistrictAlias(leaderRegion);
-      const placeholderIdx = dynamicLeaders.findIndex((l) => {
-        const sameMode =
-          districtLeaderMode === 'जिल्हा अध्यक्ष'
-            ? l.category === 'जिल्हा अध्यक्ष' || l.category === 'district'
-            : l.category === 'जिल्हा सरचिटणीस';
-        return (
-          sameMode &&
-          normalizeDistrictAlias(l.region) === normTarget &&
-          isPlaceholderDistrictName(l.name)
-        );
-      });
-
-      if (placeholderIdx !== -1) {
-        const updated = [...dynamicLeaders];
-        updated[placeholderIdx] = {
-          ...updated[placeholderIdx],
-          name: leaderName.trim(),
-          role: leaderRole.trim(),
-          region: leaderRegion.trim(),
-          phone: leaderPhone.trim() || '-',
-          education: leaderEducation.trim() || '',
-          photo: leaderPhoto || updated[placeholderIdx].photo || '',
-          category: districtLeaderMode
-        };
-        saveLeadersToStorage(updated);
+        if (savedOk) {
+          setLeaderFormMsg({ text: `${districtLeaderMode} माहिती यशस्वीपणे जतन झाली!`, type: 'success' });
+        }
       } else {
+        // Add new state/advisory leader
         const newLeader: Leader = {
           id: `ldr-${Date.now()}`,
           name: leaderName.trim(),
           role: leaderRole.trim(),
-          region: leaderRegion.trim(),
+          region: leaderRegion.trim() || 'महाराष्ट्र',
           phone: leaderPhone.trim() || '-',
           education: leaderEducation.trim() || '',
           photo: leaderPhoto,
-          category: districtLeaderMode
+          category: targetCategory
         };
-        saveLeadersToStorage([...dynamicLeaders, newLeader]);
+        savedOk = await saveLeadersToStorage([newLeader, ...dynamicLeaders]);
+        if (savedOk) {
+          setLeaderFormMsg({ text: 'नवीन पदाधिकारी यशस्वीपणे जोडले गेले!', type: 'success' });
+        }
       }
-      setLeaderFormMsg({ text: `${districtLeaderMode} माहिती यशस्वीपणे जतन झाली!`, type: 'success' });
-    } else {
-      // Add new state/advisory leader
-      const newLeader: Leader = {
-        id: `ldr-${Date.now()}`,
-        name: leaderName.trim(),
-        role: leaderRole.trim(),
-        region: leaderRegion.trim() || 'महाराष्ट्र',
-        phone: leaderPhone.trim() || '-',
-        education: leaderEducation.trim() || '',
-        photo: leaderPhoto,
-        category: targetCategory
-      };
-      saveLeadersToStorage([newLeader, ...dynamicLeaders]);
-      setLeaderFormMsg({ text: 'नवीन पदाधिकारी यशस्वीपणे जोडले गेले!', type: 'success' });
+    } finally {
+      setIsSavingLeader(false);
     }
 
-    // Reset Form
+    if (!savedOk) return;
+
+    // Reset Form only on successful save
     setEditingLeaderId(null);
     setLeaderName('');
     setLeaderRole(isDistrictTab ? districtLeaderMode : '');
@@ -2064,7 +2075,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setLeaderPhotoSizeKb(0);
     setLeaderPhotoUrl('');
     if (leaderPhotoInputRef.current) leaderPhotoInputRef.current.value = '';
-    setTimeout(() => setLeaderFormMsg(null), 3000);
+    setTimeout(() => setLeaderFormMsg(null), 3500);
   };
 
   // Start Editing Leader
@@ -2086,11 +2097,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   // Delete Leader
-  const handleDeleteLeader = (leaderId?: string, leaderName?: string) => {
+  const handleDeleteLeader = async (leaderId?: string, leaderName?: string) => {
     const filtered = dynamicLeaders.filter((l) => (l.id ? l.id !== leaderId : l.name !== leaderName));
-    saveLeadersToStorage(filtered);
-    setLeaderFormMsg({ text: `'${leaderName || 'पदाधिकारी'}' यांना यादीतून वगळण्यात आले आहे.`, type: 'success' });
-    setTimeout(() => setLeaderFormMsg(null), 3000);
+    const ok = await saveLeadersToStorage(filtered);
+    if (ok) {
+      setLeaderFormMsg({ text: `'${leaderName || 'पदाधिकारी'}' यांना यादीतून वगळण्यात आले आहे.`, type: 'success' });
+      setTimeout(() => setLeaderFormMsg(null), 3500);
+    }
   };
 
   // Create or Update News / GR
@@ -2336,6 +2349,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
+      key: 'whatsapp_broadcast',
+      label: 'व्हॉट्सॲप संदेश (API)',
+      shortLabel: 'WhatsApp',
+      icon: <Smartphone className="w-4 h-4 shrink-0 text-emerald-600" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
+    },
+    {
+      key: 'backup_restore',
+      label: 'बॅकअप व रिस्टोअर',
+      shortLabel: 'बॅकअप',
+      icon: <Database className="w-4 h-4 shrink-0 text-[#193568]" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
+    },
+    {
       key: 'add_news',
       label: 'बातम्या व परिपत्रके',
       shortLabel: 'बातम्या',
@@ -2453,6 +2480,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  clearAuthSessionToken();
+                  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
                   setIsLoggedIn(false);
                   setCurrentUser(null);
                   setIsMobileMenuOpen(false);
@@ -3778,9 +3807,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="flex gap-2 pt-2">
                       <button
                         type="submit"
-                        className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-xs"
+                        disabled={isSavingLeader || isUploadingLeaderCloudinary}
+                        className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-xs disabled:opacity-60 cursor-pointer flex items-center gap-1.5"
                       >
-                        {editingLeaderId ? 'बदल सेव्ह करा' : 'पदाधिकारी जोडा'}
+                        {isSavingLeader ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>सेव्ह होत आहे...</span>
+                          </>
+                        ) : (
+                          <span>{editingLeaderId ? 'बदल सेव्ह करा' : 'पदाधिकारी जोडा'}</span>
+                        )}
                       </button>
                       {editingLeaderId && (
                         <button
@@ -4265,9 +4302,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="flex gap-2 pt-2">
                       <button
                         type="submit"
-                        className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-sm cursor-pointer"
+                        disabled={isSavingLeader || isUploadingLeaderCloudinary}
+                        className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-sm cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
                       >
-                        {editingLeaderId ? 'बदल सेव्ह करा' : `${districtLeaderMode} सेव्ह करा`}
+                        {isSavingLeader ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            <span>सेव्ह होत आहे...</span>
+                          </>
+                        ) : (
+                          <span>{editingLeaderId ? 'बदल सेव्ह करा' : `${districtLeaderMode} सेव्ह करा`}</span>
+                        )}
                       </button>
                       {editingLeaderId && (
                         <button
@@ -6180,7 +6225,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     </div>
                                   </td>
                                   <td className="p-3">
-                                    {subAdmin.isFirstLogin || !subAdmin.password ? (
+                                    {subAdmin.isFirstLogin || (!subAdmin.hasPassword && !subAdmin.password) ? (
                                       <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold">
                                         पहिले लॉगिन प्रलंबित
                                       </span>
@@ -7217,6 +7262,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
+            {/* Super Admin Only: WhatsApp API Setup & Broadcast Studio */}
+            {activeAdminSubTab === 'whatsapp_broadcast' && currentUser?.isSuperAdmin && (
+              <AdminWhatsappBroadcastPanel
+                applications={applications}
+                dynamicLeaders={dynamicLeaders}
+                cloudinaryConfig={cloudinaryConfig}
+              />
+            )}
+
+            {/* Super Admin Only: 1-Click Full Website & Database Backup / Restore */}
+            {activeAdminSubTab === 'backup_restore' && currentUser?.isSuperAdmin && (
+              <AdminBackupRestorePanel
+                onRestoreCompleted={async () => {
+                  try {
+                    if (onFetchApplications) await onFetchApplications(true);
+                    const freshLeaders = await fetchDynamicLeaders(true);
+                    if (freshLeaders && freshLeaders.length > 0) {
+                      const normalized = normalizeDynamicLeadersList(freshLeaders);
+                      setDynamicLeaders(normalized);
+                      localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(normalized));
+                    }
+                  } catch (e) {
+                    console.warn('Post-restore refresh warning:', e);
+                  }
+                }}
+              />
+            )}
+
             </main>
           </div>
         )}
@@ -7373,6 +7446,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    clearAuthSessionToken();
+                    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
                     setIsMobileMenuOpen(false);
                     setIsLoggedIn(false);
                     setCurrentUser(null);

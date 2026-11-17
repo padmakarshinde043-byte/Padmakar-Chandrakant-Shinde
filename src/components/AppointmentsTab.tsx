@@ -43,6 +43,11 @@ import {
   filterAndSortDistrictOfficials,
   matchesDistrictName,
 } from '../utils/officialsCache';
+import {
+  authApiRequest,
+  setAuthSessionToken,
+  clearAuthSessionToken,
+} from '../api/sqlBridge';
 
 const ModalPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
@@ -248,14 +253,6 @@ export const AppointmentsTab: React.FC = () => {
   // Load Initial Data on Mount (Cache-first, non-blocking: public list never waits on Firestore or passwords)
   useEffect(() => {
     loadData(false);
-
-    const handleDistrictPasswordsUpdated = () => {
-      fetchDistrictPasswords(true)
-        .then((passwordsData) => setDistrictPasswords(passwordsData))
-        .catch(() => {});
-    };
-    window.addEventListener('mahasangh_district_passwords_updated', handleDistrictPasswordsUpdated);
-    return () => window.removeEventListener('mahasangh_district_passwords_updated', handleDistrictPasswordsUpdated);
   }, []);
 
   // Lazy-load approved registered members ONLY when President Letters / Status Matrix is opened
@@ -285,16 +282,6 @@ export const AppointmentsTab: React.FC = () => {
       }
       setIsLoading(false);
       setLastRefreshedAt(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }));
-
-      // 2. Non-blocking background sync for admin passwords (and approved members only if letters tab active)
-      fetchDistrictPasswords(force)
-        .then((passwordsData) => setDistrictPasswords(passwordsData))
-        .catch(() => {});
-      fetchPresidentPasswordFromFirebase()
-        .then((presPass) => {
-          if (presPass) setPresidentSavedPassword(presPass);
-        })
-        .catch(() => {});
 
       if (activeSubTab === 'letters' || showStatusMatrixModal) {
         fetchApprovedMembersCached(force)
@@ -424,7 +411,7 @@ export const AppointmentsTab: React.FC = () => {
     setShowPresidentLoginModal(true);
   };
 
-  // Submit District Login from in-page modal
+  // Submit District Login from in-page modal (verified server-side)
   const handleDistrictLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setDistrictLoginError('');
@@ -435,50 +422,43 @@ export const AppointmentsTab: React.FC = () => {
       return;
     }
 
-    // 1. Super Admin master password bypass
-    if (input === SUPER_ADMIN_PASSWORD || input === MASTER_DEV_ADMIN_PASSWORD) {
-      setIsSuperAdmin(true);
-      setIsManageUnlocked(true);
-      setIsLettersUnlocked(true);
+    try {
+      const { ok, data } = await authApiRequest<{
+        status: string;
+        role?: string;
+        isSuperAdmin?: boolean;
+        token?: string;
+        message?: string;
+      }>('/api/auth/district-login', { district: currentDistrict, password: input });
+
+      if (data?.status === 'require_initial_password') {
+        setIsSettingInitialPassword(true);
+        return;
+      }
+
+      if (!ok || data?.status !== 'success') {
+        setDistrictLoginError(
+          data?.message || `चुकीचा पासवर्ड! आपण फक्त '${currentDistrict}' जिल्ह्याचा पासवर्ड टाकूनच संपादन करू शकता.`
+        );
+        return;
+      }
+
+      if (data.token) {
+        setAuthSessionToken(data.token);
+      }
+
+      if (data.isSuperAdmin || data.role === 'state_president') {
+        setIsSuperAdmin(true);
+        setIsManageUnlocked(true);
+        setIsLettersUnlocked(true);
+      } else {
+        setIsManageUnlocked(true);
+        setLockedDistrictName(currentDistrict);
+      }
       setShowDistrictLoginModal(false);
       setActiveSubTab('manage');
-      return;
-    }
-
-    // 2. District specific password
-    let distPass =
-      districtPasswords[currentDistrict] ||
-      (currentDistrict === 'अहिल्यानगर' ? districtPasswords['अहमदनगर'] : null) ||
-      DEFAULT_DISTRICT_PASSWORD;
-
-    // If input is AD2026, verify with fresh fetch if cached distPass is not AD2026 (in case admin just reset it!)
-    if (input === DEFAULT_DISTRICT_PASSWORD && distPass !== DEFAULT_DISTRICT_PASSWORD) {
-      try {
-        const fresh = await fetchDistrictPasswords(true);
-        if (fresh) {
-          setDistrictPasswords(fresh);
-          distPass =
-            fresh[currentDistrict] ||
-            (currentDistrict === 'अहिल्यानगर' ? fresh['अहमदनगर'] : null) ||
-            DEFAULT_DISTRICT_PASSWORD;
-        }
-      } catch {}
-    }
-
-    // Check if initial login or reset with AD2026
-    if (distPass === DEFAULT_DISTRICT_PASSWORD && input === DEFAULT_DISTRICT_PASSWORD) {
-      setIsSettingInitialPassword(true);
-      return;
-    }
-
-    // Check if matches custom saved password from MySQL / Firebase RTDB
-    if (input === distPass) {
-      setIsManageUnlocked(true);
-      setLockedDistrictName(currentDistrict);
-      setShowDistrictLoginModal(false);
-      setActiveSubTab('manage');
-    } else {
-      setDistrictLoginError(`चुकीचा पासवर्ड! आपण फक्त '${currentDistrict}' जिल्ह्याचा पासवर्ड टाकूनच संपादन करू शकता.`);
+    } catch (err: any) {
+      setDistrictLoginError('लॉगिन करताना त्रुटी आली: ' + (err?.message || 'Error'));
     }
   };
 
@@ -496,8 +476,24 @@ export const AppointmentsTab: React.FC = () => {
 
     try {
       const newPass = newInitialPass1.trim();
-      await updateDistrictPasswordInRtdb(currentDistrict, newPass);
-      setDistrictPasswords((prev) => ({ ...prev, [currentDistrict]: newPass }));
+      const { ok, data } = await authApiRequest<{
+        status: string;
+        token?: string;
+        message?: string;
+      }>('/api/auth/district-set-initial-password', {
+        district: currentDistrict,
+        newPassword: newPass,
+      });
+
+      if (!ok || data?.status !== 'success') {
+        setDistrictLoginError(data?.message || 'पासवर्ड सेव्ह करताना त्रुटी आली.');
+        return;
+      }
+
+      if (data.token) {
+        setAuthSessionToken(data.token);
+      }
+      setDistrictPasswords((prev) => ({ ...prev, [currentDistrict]: '__CUSTOM__' }));
       window.dispatchEvent(new Event('mahasangh_district_passwords_updated'));
       setIsManageUnlocked(true);
       setLockedDistrictName(currentDistrict);
@@ -512,8 +508,8 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // Submit President Master Login from in-page modal
-  const handlePresidentLoginSubmit = (e: React.FormEvent) => {
+  // Submit President Master Login from in-page modal (verified server-side)
+  const handlePresidentLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPresidentLoginError('');
     const input = presidentPasswordInput.trim();
@@ -523,44 +519,52 @@ export const AppointmentsTab: React.FC = () => {
       return;
     }
 
-    // Emergency developer recovery bypass
-    if (input === MASTER_DEV_ADMIN_PASSWORD) {
+    try {
+      const { ok, data } = await authApiRequest<{
+        status: string;
+        isMasterKey?: boolean;
+        token?: string;
+        message?: string;
+      }>('/api/auth/president-login', { password: input });
+
+      if (data?.status === 'require_initial_password') {
+        setIsSettingPresidentInitialPassword(true);
+        return;
+      }
+
+      if (!ok || data?.status !== 'success') {
+        setPresidentLoginError(
+          data?.message || 'चुकीचा पासवर्ड! केवळ संस्थापक राज्याध्यक्षच हे लॉगिन करू शकतात.'
+        );
+        return;
+      }
+
+      if (data.token) {
+        setAuthSessionToken(data.token);
+      }
+
       setIsSuperAdmin(true);
       setIsManageUnlocked(true);
       setIsLettersUnlocked(true);
       setShowPresidentLoginModal(false);
       setActiveSubTab('letters');
-      showToast('संस्थापक राज्याध्यक्ष म्हणून स्वागत आहे (मास्टर की)!', 'success');
-      return;
-    }
-
-    const currentSaved = presidentSavedPassword || SUPER_ADMIN_PASSWORD;
-
-    // Check if initial login with RK2026 default password
-    if (currentSaved === SUPER_ADMIN_PASSWORD && input === SUPER_ADMIN_PASSWORD) {
-      setIsSettingPresidentInitialPassword(true);
-      return;
-    }
-
-    // Check if custom password matches saved password in Firebase
-    if (input === currentSaved) {
-      setIsSuperAdmin(true);
-      setIsManageUnlocked(true);
-      setIsLettersUnlocked(true);
-      setShowPresidentLoginModal(false);
-      setActiveSubTab('letters');
-      showToast('संस्थापक राज्याध्यक्ष म्हणून स्वागत आहे!', 'success');
-    } else {
-      setPresidentLoginError('चुकीचा पासवर्ड! केवळ संस्थापक राज्याध्यक्षच हे लॉगिन करू शकतात.');
+      showToast(
+        data.isMasterKey
+          ? 'संस्थापक राज्याध्यक्ष म्हणून स्वागत आहे (मास्टर की)!'
+          : 'संस्थापक राज्याध्यक्ष म्हणून स्वागत आहे!',
+        'success'
+      );
+    } catch (err: any) {
+      setPresidentLoginError('लॉगिन करताना त्रुटी आली: ' + (err?.message || 'Error'));
     }
   };
 
-  // Save Initial New Password for State President to Firebase
+  // Save Initial New Password for State President
   const handleSavePresidentInitialPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPresidentLoginError('');
 
-    if (!newPresidentPass1.trim() || newPresidentPass1.trim() === SUPER_ADMIN_PASSWORD) {
+    if (!newPresidentPass1.trim() || newPresidentPass1.trim().length < 4 || newPresidentPass1.trim() === SUPER_ADMIN_PASSWORD) {
       setPresidentLoginError('कृपया सुरक्षित व नवीन पासवर्ड प्रविष्ट करा (RK2026 व्यतिरिक्त)!');
       return;
     }
@@ -571,15 +575,28 @@ export const AppointmentsTab: React.FC = () => {
 
     try {
       const newPass = newPresidentPass1.trim();
-      await updatePresidentPasswordInFirebase(newPass);
-      setPresidentSavedPassword(newPass);
+      const { ok, data } = await authApiRequest<{
+        status: string;
+        token?: string;
+        message?: string;
+      }>('/api/auth/president-set-initial-password', { newPassword: newPass });
+
+      if (!ok || data?.status !== 'success') {
+        setPresidentLoginError(data?.message || 'पासवर्ड सेव्ह होऊ शकला नाही.');
+        return;
+      }
+
+      if (data.token) {
+        setAuthSessionToken(data.token);
+      }
+      setPresidentSavedPassword('__CUSTOM__');
       setIsSuperAdmin(true);
       setIsManageUnlocked(true);
       setIsLettersUnlocked(true);
       setShowPresidentLoginModal(false);
       setIsSettingPresidentInitialPassword(false);
       setActiveSubTab('letters');
-      showToast('राज्याध्यक्ष नवीन पासवर्ड फायरबेसवर यशस्वीपणे सेव्ह झाला आहे! यापुढे हाच पासवर्ड वापरा.', 'success');
+      showToast('राज्याध्यक्ष नवीन पासवर्ड यशस्वीपणे सेव्ह झाला आहे! यापुढे हाच पासवर्ड वापरा.', 'success');
     } catch (err: any) {
       setPresidentLoginError('त्रुटी: ' + (err.message || 'पासवर्ड सेव्ह होऊ शकला नाही.'));
     }
@@ -590,13 +607,12 @@ export const AppointmentsTab: React.FC = () => {
     e.preventDefault();
     setChangePassError('');
 
-    const currentSaved = presidentSavedPassword || SUPER_ADMIN_PASSWORD;
-    if (changeOldPass.trim() !== currentSaved && changeOldPass.trim() !== MASTER_DEV_ADMIN_PASSWORD) {
-      setChangePassError('सध्याचा पासवर्ड चुकीचा आहे!');
+    if (!changeOldPass.trim()) {
+      setChangePassError('कृपया सध्याचा पासवर्ड प्रविष्ट करा!');
       return;
     }
-    if (!changeNewPass1.trim() || changeNewPass1.trim() === currentSaved) {
-      setChangePassError('कृपया नवीन व वेगळा पासवर्ड प्रविष्ट करा!');
+    if (!changeNewPass1.trim() || changeNewPass1.trim().length < 4) {
+      setChangePassError('कृपया किमान ४ अक्षरी नवीन व वेगळा पासवर्ड प्रविष्ट करा!');
       return;
     }
     if (changeNewPass1.trim() !== changeNewPass2.trim()) {
@@ -605,9 +621,19 @@ export const AppointmentsTab: React.FC = () => {
     }
 
     try {
-      const newPass = changeNewPass1.trim();
-      await updatePresidentPasswordInFirebase(newPass);
-      setPresidentSavedPassword(newPass);
+      const { ok, data } = await authApiRequest<{ status: string; message?: string }>(
+        '/api/auth/president-change-password',
+        {
+          currentPassword: changeOldPass.trim(),
+          newPassword: changeNewPass1.trim(),
+        }
+      );
+      if (!ok || data?.status !== 'success') {
+        setChangePassError(data?.message || 'पासवर्ड बदलता आला नाही.');
+        return;
+      }
+
+      setPresidentSavedPassword('__CUSTOM__');
       setShowChangePresidentPasswordModal(false);
       setChangeOldPass('');
       setChangeNewPass1('');
@@ -620,6 +646,8 @@ export const AppointmentsTab: React.FC = () => {
 
   // Logout from District / Super Admin Session
   const handleLogout = () => {
+    clearAuthSessionToken();
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
     setIsManageUnlocked(false);
     setIsLettersUnlocked(false);
     setIsSuperAdmin(false);

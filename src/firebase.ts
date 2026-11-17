@@ -1724,13 +1724,14 @@ export async function approveApplicationAtomicInFirestore(params: {
   district?: string;
   extraUpdates?: Partial<MembershipApplication>;
   knownRecords?: Array<{ memberNumber?: string | null }>;
+  paymentProofToken?: string;
 }): Promise<{
   memberNumber: string;
   seqNumber: number;
   alreadyApproved: boolean;
   application: MembershipApplication;
 }> {
-  const { appId, district, extraUpdates = {}, knownRecords } = params;
+  const { appId, district, extraUpdates = {}, knownRecords, paymentProofToken } = params;
   if (await isSqlBackendActive()) {
     const txResult = await sqlApiRequest<{
       memberNumber: string;
@@ -1739,7 +1740,7 @@ export async function approveApplicationAtomicInFirestore(params: {
       application: MembershipApplication;
     }>('/api/db/applications/approve-atomic', {
       method: 'POST',
-      body: JSON.stringify({ appId, district, extraUpdates }),
+      body: JSON.stringify({ appId, district, extraUpdates, paymentProofToken }),
     });
     if (!txResult.alreadyApproved && txResult.seqNumber > 0) {
       safeStorageSet(
@@ -2771,6 +2772,7 @@ export interface AdminUser {
   email: string;
   name?: string;
   password?: string;
+  hasPassword?: boolean;
   isFirstLogin?: boolean;
   isSuperAdmin?: boolean;
   permissions: AdminPermissions;

@@ -44,7 +44,7 @@ export interface InitiateRazorpayPaymentParams {
   phone: string;
   email?: string;
   district?: string;
-  onSuccess: (paymentId: string, orderId: string, signature: string, approvedApplication?: any) => void;
+  onSuccess: (paymentId: string, orderId: string, signature: string, approvedApplication?: any, paymentProofToken?: string) => void;
   onError: (errorMsg: string) => void;
   onDismiss?: () => void;
 }
@@ -118,7 +118,8 @@ export async function initiateRazorpayPayment(params: InitiateRazorpayPaymentPar
               response.razorpay_payment_id,
               response.razorpay_order_id,
               response.razorpay_signature,
-              verifyData.application
+              verifyData.application,
+              verifyData.paymentProofToken
             );
           } else {
             params.onError(verifyData.message || 'पेमेंट स्वाक्षरी अमान्य आहे (Invalid Payment Signature).');

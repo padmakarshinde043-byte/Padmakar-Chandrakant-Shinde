@@ -8,7 +8,8 @@ import {
   Leader,
   formatSequentialMemberNumber,
 } from '../data/mahasanghData';
-import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
+import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD } from '../data/rkMaharashtraData';
+import { hashPassword, verifyPassword } from '../utils/serverAuth';
 import {
   DEFAULT_COUNTER_BASELINE,
   parseMemberNumberSeq,
@@ -155,6 +156,17 @@ export async function mysqlCountApprovedMembers(): Promise<number> {
         OR \`approved_at\` != ''`
   );
   return Number(rows[0]?.cnt || 0);
+}
+
+export async function mysqlGetApplicationById(id: string): Promise<(MembershipApplication & Record<string, any>) | null> {
+  if (!id) return null;
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    'SELECT * FROM `applications` WHERE `id` = ? LIMIT 1',
+    [String(id).trim()]
+  );
+  return rows.length ? mapAppRow(rows[0]) : null;
 }
 
 export async function mysqlUpsertApplication(app: Record<string, any>): Promise<void> {
@@ -1085,6 +1097,24 @@ export async function mysqlListSubAdmins(): Promise<Record<string, any>[]> {
 export async function mysqlSaveSubAdmin(admin: Record<string, any>): Promise<void> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();
+
+  const rawIncomingPwd = typeof admin.password === 'string' ? admin.password.trim() : '';
+  const isFirstLogin = Boolean(admin.isFirstLogin);
+  let resolvedPasswordToStore = '';
+
+  if (rawIncomingPwd) {
+    resolvedPasswordToStore = hashPassword(rawIncomingPwd);
+  } else if (!isFirstLogin) {
+    // Preserve existing stored password when updating sub-admin metadata/permissions from sanitized UI state
+    const [existingRows] = await pool.query<RowDataPacket[]>(
+      'SELECT `password` FROM `sub_admins` WHERE `id` = ? LIMIT 1',
+      [String(admin.id)]
+    );
+    if (existingRows.length && existingRows[0].password) {
+      resolvedPasswordToStore = String(existingRows[0].password);
+    }
+  }
+
   await pool.execute(
     `INSERT INTO \`sub_admins\` (id, email, name, password, is_first_login, is_super_admin, permissions_json, created_at, last_login_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1096,14 +1126,46 @@ export async function mysqlSaveSubAdmin(admin: Record<string, any>): Promise<voi
       String(admin.id),
       String(admin.email || '').trim().toLowerCase(),
       String(admin.name || ''),
-      String(admin.password || ''),
-      admin.isFirstLogin ? 1 : 0,
+      resolvedPasswordToStore,
+      isFirstLogin ? 1 : 0,
       admin.isSuperAdmin ? 1 : 0,
       JSON.stringify(admin.permissions || {}),
       String(admin.createdAt || new Date().toISOString()),
       String(admin.lastLoginAt || ''),
     ]
   );
+}
+
+export async function mysqlUpdateSubAdminPassword(email: string, newPassword: string): Promise<Record<string, any> | null> {
+  await ensureMysqlSchema();
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const list = await mysqlListSubAdmins();
+  const target = list.find((a) => String(a.email || '').toLowerCase() === cleanEmail);
+  if (!target) return null;
+
+  const hashed = hashPassword(String(newPassword || '').trim());
+  const nowIso = new Date().toISOString();
+  const pool = getMysqlPool();
+  await pool.execute(
+    'UPDATE `sub_admins` SET `password` = ?, `is_first_login` = 0, `last_login_at` = ? WHERE `id` = ?',
+    [hashed, nowIso, target.id]
+  );
+  return {
+    ...target,
+    password: '',
+    hasPassword: true,
+    isFirstLogin: false,
+    lastLoginAt: nowIso,
+  };
+}
+
+export async function mysqlTouchSubAdminLastLogin(id: string): Promise<void> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  await pool.execute('UPDATE `sub_admins` SET `last_login_at` = ? WHERE `id` = ?', [
+    new Date().toISOString(),
+    id,
+  ]);
 }
 
 export async function mysqlDeleteSubAdmin(adminId: string): Promise<void> {
@@ -1132,9 +1194,10 @@ export async function mysqlGetAdminAuth(): Promise<{ email: string; password: st
 
 export async function mysqlUpdateAdminAuth(password: string, email?: string): Promise<void> {
   const current = await mysqlGetAdminAuth();
+  const cleanPwd = password.trim();
   const next = {
     email: email?.trim() || current.email,
-    password: password.trim(),
+    password: cleanPwd ? hashPassword(cleanPwd) : current.password,
     updatedAt: new Date().toISOString(),
   };
   const pool = getMysqlPool();
@@ -1220,15 +1283,32 @@ export async function mysqlListLeaders(): Promise<Leader[]> {
 export async function mysqlSaveLeaders(leaders: Leader[]): Promise<number> {
   const version = Date.now();
   const nowIso = new Date().toISOString();
+  const seenIds = new Set<string>();
 
   await withMysqlTransaction(async (conn) => {
     await conn.execute('DELETE FROM `leaders`');
     for (let i = 0; i < leaders.length; i++) {
       const l = leaders[i];
-      const id = String(l.id || `leader_${i}`);
+      let id = String(l.id || `leader_${i}`).trim() || `leader_${i}`;
+      if (seenIds.has(id)) {
+        id = `${id}_${i}`;
+      }
+      seenIds.add(id);
       await conn.execute(
         `INSERT INTO \`leaders\` (id, order_index, name, role, region, education, phone, email, photo, is_key, category, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           order_index = VALUES(order_index),
+           name = VALUES(name),
+           role = VALUES(role),
+           region = VALUES(region),
+           education = VALUES(education),
+           phone = VALUES(phone),
+           email = VALUES(email),
+           photo = VALUES(photo),
+           is_key = VALUES(is_key),
+           category = VALUES(category),
+           updated_at = VALUES(updated_at)`,
         [
           id,
           i,
@@ -1340,15 +1420,31 @@ export async function mysqlListDistrictPasswords(): Promise<Record<string, strin
   return map;
 }
 
+export async function mysqlListDistrictPasswordStatuses(): Promise<Record<string, string>> {
+  const raw = await mysqlListDistrictPasswords();
+  const statusMap: Record<string, string> = {};
+  for (const [dist, stored] of Object.entries(raw)) {
+    const cleanStored = String(stored || '').trim();
+    if (!cleanStored || verifyPassword(DEFAULT_DISTRICT_PASSWORD, cleanStored)) {
+      statusMap[dist] = DEFAULT_DISTRICT_PASSWORD;
+    } else {
+      statusMap[dist] = '__CUSTOM__';
+    }
+  }
+  return statusMap;
+}
+
 export async function mysqlSetDistrictPassword(district: string, password: string): Promise<void> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();
   const nowIso = new Date().toISOString();
+  const cleanPass = String(password || '').trim();
+  const stored = hashPassword(cleanPass);
   await pool.execute(
     `INSERT INTO \`district_passwords\` (district, password, updated_at)
      VALUES (?, ?, ?)
      ON DUPLICATE KEY UPDATE password = VALUES(password), updated_at = VALUES(updated_at)`,
-    [district, password, nowIso]
+    [district, stored, nowIso]
   );
 }
 
@@ -1406,14 +1502,82 @@ export async function mysqlGetPresidentPassword(): Promise<string> {
   return SUPER_ADMIN_PASSWORD;
 }
 
+export async function mysqlIsPresidentPasswordDefault(): Promise<boolean> {
+  const stored = await mysqlGetPresidentPassword();
+  return verifyPassword(SUPER_ADMIN_PASSWORD, stored);
+}
+
 export async function mysqlSetPresidentPassword(newPass: string): Promise<void> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();
   const nowIso = new Date().toISOString();
+  const stored = hashPassword(newPass.trim());
   await pool.execute(
     `INSERT INTO \`leadership_meta\` (meta_key, meta_value, updated_at)
      VALUES ('president_password', ?, ?)
      ON DUPLICATE KEY UPDATE meta_value = VALUES(meta_value), updated_at = VALUES(updated_at)`,
-    [newPass.trim(), nowIso]
+    [stored, nowIso]
   );
+}
+
+// =========================================================================
+// 6. Generic System Settings & Raw Helpers (Backup/Restore + WhatsApp Config)
+// =========================================================================
+
+export async function mysqlGetSystemSetting<T = any>(key: string): Promise<T | null> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    'SELECT `setting_json` FROM `system_settings` WHERE `setting_key` = ? LIMIT 1',
+    [key]
+  );
+  if (!rows.length || !rows[0].setting_json) return null;
+  try {
+    return JSON.parse(String(rows[0].setting_json)) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function mysqlSaveSystemSetting(key: string, value: any): Promise<void> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const nowIso = new Date().toISOString();
+  await pool.execute(
+    `INSERT INTO \`system_settings\` (setting_key, setting_json, updated_at)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE setting_json = VALUES(setting_json), updated_at = VALUES(updated_at)`,
+    [key, JSON.stringify(value ?? {}), nowIso]
+  );
+}
+
+export async function mysqlListSystemSettingsMap(): Promise<Record<string, any>> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT `setting_key`, `setting_json` FROM `system_settings`');
+  const map: Record<string, any> = {};
+  for (const r of rows) {
+    try {
+      map[String(r.setting_key)] = JSON.parse(String(r.setting_json || '{}'));
+    } catch {
+      map[String(r.setting_key)] = String(r.setting_json || '');
+    }
+  }
+  return map;
+}
+
+export async function mysqlGetSiteStatsRaw(): Promise<Record<string, any> | null> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    "SELECT * FROM `site_stats` WHERE `stat_key` = 'visits' LIMIT 1"
+  );
+  if (!rows.length) return null;
+  const r = rows[0];
+  return {
+    total: Number(r.total_count || 5155),
+    today: Number(r.today_count || 0),
+    lastDate: String(r.last_date || ''),
+    lastUpdated: String(r.last_updated || ''),
+  };
 }

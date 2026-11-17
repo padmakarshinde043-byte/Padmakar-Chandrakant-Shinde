@@ -122,12 +122,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       phone: app.phone,
       email: app.email,
       district: app.district,
-      onSuccess: (paymentId, orderId, _signature, approvedFromServer) => {
+      onSuccess: (paymentId, orderId, _signature, approvedFromServer, paymentProofToken) => {
         setIsRazorpayLoading(false);
         handleConfirmPaymentCompleted(app, {
           paymentId,
           orderId,
           approvedFromServer,
+          paymentProofToken,
         });
       },
       onError: (err) => {
@@ -431,6 +432,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       paymentId: string;
       orderId?: string;
       approvedFromServer?: Partial<MembershipApplication> | null;
+      paymentProofToken?: string;
     }
   ) => {
     const appToApprove = targetApp;
@@ -455,6 +457,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         appId: appToApprove.id,
         district: appToApprove.district,
         knownRecords: applications,
+        paymentProofToken: verifiedPayment.paymentProofToken,
         extraUpdates: {
           ...profileFields,
           paymentConfirmed: true,

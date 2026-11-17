@@ -41,7 +41,17 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
   useEffect(() => {
     loadLeaders(false);
 
-    const onUpdated = () => loadLeaders(false);
+    const onUpdated = (ev: Event) => {
+      const detail = (ev as CustomEvent)?.detail;
+      if (Array.isArray(detail) && detail.length > 0) {
+        setAllLeaders(detail);
+        try {
+          localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(detail));
+        } catch {}
+      } else {
+        loadLeaders(true);
+      }
+    };
     window.addEventListener('mahasangh_leadership_updated', onUpdated);
     return () => window.removeEventListener('mahasangh_leadership_updated', onUpdated);
   }, []);
