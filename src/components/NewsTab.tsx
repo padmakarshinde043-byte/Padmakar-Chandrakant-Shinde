@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Calendar, Tag, ArrowRight, X, Search, FileText, RefreshCw, ChevronRight, ShieldCheck, Megaphone, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { NewsItem, GovOrder, INITIAL_GOV_ORDERS, INITIAL_NEWS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
+import { sortNewsDescending, parseNewsDateMs } from '../firebase';
 
 interface NewsTabProps {
   mode?: 'news' | 'circulars';
@@ -52,9 +53,10 @@ export const NewsTab: React.FC<NewsTabProps> = ({
   const section1Categories = ['सर्व', 'अधिकृत घोषणा', 'अधिकृत वृत्त', 'संघटना घडामोडी', 'संघटना वृत्त', 'अभिनंदन', 'टॅगलाईन फोटो'];
   const [sec1Category, setSec1Category] = useState('सर्व');
 
-  // Ensure newsList is never empty by falling back to INITIAL_NEWS
+  // Ensure newsList is never empty and is always sorted newest selected publishDate first
   const safeNewsList = useMemo(() => {
-    return newsList && newsList.length > 0 ? newsList : INITIAL_NEWS;
+    const raw = newsList && newsList.length > 0 ? newsList : INITIAL_NEWS;
+    return sortNewsDescending(raw);
   }, [newsList]);
 
   // पहिला विभाग: बातम्या, अधिकृत घोषणा व संघटना घडामोडी
@@ -108,7 +110,12 @@ export const NewsTab: React.FC<NewsTabProps> = ({
       const summary = (item.summary || '').toLowerCase();
       return title.includes(term) || summary.includes(term);
     })
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    .sort((a, b) => {
+      const diff = (parseNewsDateMs(b.date) || new Date(b.createdAt || 0).getTime()) -
+        (parseNewsDateMs(a.date) || new Date(a.createdAt || 0).getTime());
+      if (diff !== 0) return diff;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
 
   return (
     <div className="bg-slate-50 py-6 sm:py-10 text-slate-800">

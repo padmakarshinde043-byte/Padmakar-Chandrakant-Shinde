@@ -39,7 +39,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
     }
   }, [fullScreenPhoto]);
 
-  const list = newsList && newsList.length > 0 ? newsList : INITIAL_NEWS;
+  const list = useMemo(
+    () => sortNewsDescending(newsList && newsList.length > 0 ? newsList : INITIAL_NEWS),
+    [newsList]
+  );
   const recentNews = list.slice(0, 6);
 
   return (
@@ -106,35 +109,49 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
             </div>
 
             {/* Key Organization Stats Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-700/60">
-              <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
-                  <AnimatedCounter target={34} />
-                </strong>
-                <span className="text-xs sm:text-sm text-slate-300 font-medium">जिल्हा शाखा</span>
+            <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pt-4 border-t border-slate-700/60">
+              <div className="flex items-center gap-5 sm:gap-7">
+                <div>
+                  <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                    <AnimatedCounter target={34} />
+                  </strong>
+                  <span className="text-xs sm:text-sm text-slate-300 font-medium">जिल्हा शाखा</span>
+                </div>
+                <div>
+                  <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                    <AnimatedCounter target={350} suffix="+" />
+                  </strong>
+                  <span className="text-xs sm:text-sm text-slate-300 font-medium">तालुका कार्यकारिणी</span>
+                </div>
+                <div>
+                  <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                    <AnimatedCounter target={5000} />
+                  </strong>
+                  <span className="text-xs sm:text-sm text-slate-300 font-medium">सदस्य उद्दिष्ट</span>
+                </div>
               </div>
-              <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
-                  <AnimatedCounter target={350} suffix="+" />
-                </strong>
-                <span className="text-xs sm:text-sm text-slate-300 font-medium">तालुका कार्यकारिणी</span>
-              </div>
-              <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
-                  <AnimatedCounter target={5000} />
-                </strong>
-                <span className="text-xs sm:text-sm text-slate-300 font-medium">सदस्य उद्दिष्ट</span>
-              </div>
-              <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono tabular-nums text-emerald-400">
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentTab('membership');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                title="नोंदणीकृत अधिकृत सदस्य यादी पहा"
+                className="group w-full sm:w-auto bg-[#153160] hover:bg-[#1a3c74] px-3.5 py-2 rounded-lg border border-[#efb24b]/75 border-b-2 border-b-[#efb24b] shadow-md transition-all cursor-pointer flex flex-col items-center justify-center shrink-0"
+              >
+                <span className="flex items-center justify-center gap-1.5 text-white text-xs sm:text-[13px] font-bold leading-tight whitespace-nowrap">
+                  <Users className="w-3.5 h-3.5 text-[#efb24b] shrink-0" />
+                  <span>नोंदणीकृत अधिकृत सदस्य यादी</span>
+                </span>
+                <strong className="block text-xl sm:text-2xl font-black font-mono tabular-nums text-[#efb24b] leading-none mt-1 group-hover:scale-105 transition-transform">
                   {typeof registeredMembersCount === 'number' ? (
                     <AnimatedCounter target={registeredMembersCount} />
                   ) : (
                     '...'
                   )}
                 </strong>
-                <span className="text-xs sm:text-sm text-slate-300 font-medium">नोंदणीकृत सदस्य संख्या</span>
-              </div>
+              </button>
             </div>
           </div>
 

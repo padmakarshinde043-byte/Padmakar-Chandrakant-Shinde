@@ -96,7 +96,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
 
         {/* Technical Assistance & Web Creation Credit */}
         <div className="text-center text-slate-300 text-xs sm:text-sm font-medium">
-          तांत्रिक सहाय्य व वेब निर्मिती: <span className="text-amber-300 font-semibold">श्री. पदमाकर चंद्रकांत शिंदे</span>, केंद्रप्रमुख माजलगाव बीड
+          तांत्रिक सहाय्य व वेब निर्मिती: <span className="text-amber-300 font-semibold">श्री. पदमाकर चंद्रकांत शिंदे</span>
         </div>
 
         {/* Minimal High-Efficiency Zero-Quota Visitor Counter */}

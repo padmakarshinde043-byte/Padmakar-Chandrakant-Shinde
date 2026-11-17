@@ -74,8 +74,8 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
       key={(leader.id || leader.name) + leader.region}
       className="bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col items-center p-3.5 text-center group overflow-hidden"
     >
-      {/* Leader Photo Container - Proportioned height for full headshot visibility on Desktop & Mobile */}
-      <div className="w-full h-48 sm:h-60 lg:h-68 bg-slate-100 flex items-center justify-center mb-3 rounded-lg overflow-hidden border border-slate-200/80 group-hover:border-amber-200 transition-all relative shrink-0">
+      {/* Leader Photo Container - Balanced aspect ratio so cards look crisp on all 4-col desktop & 2-col mobile screens */}
+      <div className="w-full aspect-[4/4.2] bg-slate-100 flex items-center justify-center mb-3 rounded-lg overflow-hidden border border-slate-200/80 group-hover:border-amber-200 transition-all relative shrink-0">
         {leader.photo ? (
           <img
             src={leader.photo}
@@ -222,7 +222,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
             </div>
           </div>
 
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
             {filteredDistricts.length > 0 ? (
               filteredDistricts.map((leader) => renderLeaderCard(leader, 'जिल्हा अध्यक्ष'))
             ) : (

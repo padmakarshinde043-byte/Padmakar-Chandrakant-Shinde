@@ -60,7 +60,7 @@ export const AppointmentsTab: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'directory' | 'manage' | 'letters'>('directory');
 
   // Filters & Search
-  const [currentDistrict, setCurrentDistrict] = useState<string>('गडचिरोली');
+  const [currentDistrict, setCurrentDistrict] = useState<string>('बीड');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Authentication states
@@ -113,7 +113,7 @@ export const AppointmentsTab: React.FC = () => {
   const [formMiddleName, setFormMiddleName] = useState<string>('');
   const [formLastName, setFormLastName] = useState<string>('');
   const [formPost, setFormPost] = useState<string>('जिल्हाध्यक्ष');
-  const [formDistrict, setFormDistrict] = useState<string>('गडचिरोली');
+  const [formDistrict, setFormDistrict] = useState<string>('बीड');
   const [formTaluka, setFormTaluka] = useState<string>('');
   const [formCadre, setFormCadre] = useState<string>('केंद्रप्रमुख');
   const [customCadreInput, setCustomCadreInput] = useState<string>('');

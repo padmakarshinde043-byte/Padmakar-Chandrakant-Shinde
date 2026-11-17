@@ -519,59 +519,62 @@ export async function deleteLatestBannerFromFirestore(bannerId: string): Promise
   }
 }
 
-// Universal sorting: newest news by custom publish date at top, older news moving down
+// Parse DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, or Marathi month date strings consistently into UTC day timestamp
+export function parseNewsDateMs(rawValue: unknown): number {
+  if (!rawValue) return 0;
+  const eng = toEnglishDigits(String(rawValue).trim());
+  if (!eng) return 0;
+
+  // 1. YYYY-MM-DD
+  const ymd = eng.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (ymd) {
+    const y = parseInt(ymd[1], 10);
+    const m = parseInt(ymd[2], 10) - 1;
+    const d = parseInt(ymd[3], 10);
+    return Date.UTC(y, m, d);
+  }
+
+  // 2. DD/MM/YYYY or DD-MM-YYYY (must run before new Date() which misparses DD/MM as MM/DD!)
+  const dmy = eng.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const d = parseInt(dmy[1], 10);
+    const m = parseInt(dmy[2], 10) - 1;
+    const y = parseInt(dmy[3], 10);
+    return Date.UTC(y, m, d);
+  }
+
+  // 3. Marathi month names (e.g. "01 नोव्हेंबर 2026")
+  const marathiMonths: Record<string, number> = {
+    'जानेवारी': 0, 'फेब्रुवारी': 1, 'मार्च': 2, 'एप्रिल': 3, 'मे': 4, 'जून': 5,
+    'जुलै': 6, 'ऑगस्ट': 7, 'सप्टेंबर': 8, 'ऑक्टोबर': 9, 'नोव्हेंबर': 10, 'डिसेंबर': 11
+  };
+  for (const [mName, mIdx] of Object.entries(marathiMonths)) {
+    if (String(rawValue).includes(mName)) {
+      const dayMatch = eng.match(/\d{1,2}/);
+      const yearMatch = eng.match(/\d{4}/);
+      const d = dayMatch ? parseInt(dayMatch[0], 10) : 1;
+      const y = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
+      return Date.UTC(y, mIdx, d);
+    }
+  }
+
+  // 4. ISO timestamp or fallback
+  const direct = new Date(eng);
+  if (!isNaN(direct.getTime()) && direct.getTime() > 0) {
+    return Date.UTC(direct.getUTCFullYear(), direct.getUTCMonth(), direct.getUTCDate());
+  }
+
+  return 0;
+}
+
+// Universal sorting: newest news by selected publish date at top, older news moving down
 export function sortNewsDescending(list: NewsItem[]): NewsItem[] {
   const parseDateDay = (item: any): number => {
     if (!item) return 0;
-
-    // 1. Check custom publishDate (YYYY-MM-DD)
-    if (item.publishDate) {
-      const eng = toEnglishDigits(String(item.publishDate).trim());
-      const ymd = eng.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-      if (ymd) {
-        return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10)).getTime();
-      }
-      const t = new Date(eng).getTime();
-      if (!isNaN(t) && t > 0) return t;
-    }
-
-    // 2. Check item.date string
-    if (item.date) {
-      const engDate = toEnglishDigits(String(item.date).trim());
-      // YYYY-MM-DD
-      const ymd = engDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-      if (ymd) {
-        return new Date(parseInt(ymd[1], 10), parseInt(ymd[2], 10) - 1, parseInt(ymd[3], 10)).getTime();
-      }
-      // DD/MM/YYYY or DD-MM-YYYY
-      const ddmmyyyy = engDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-      if (ddmmyyyy) {
-        const d = parseInt(ddmmyyyy[1], 10);
-        const m = parseInt(ddmmyyyy[2], 10) - 1;
-        const y = parseInt(ddmmyyyy[3], 10);
-        const t = new Date(y, m, d).getTime();
-        if (!isNaN(t) && t > 0) return t;
-      }
-      // Marathi month names
-      const marathiMonths: Record<string, number> = {
-        'जानेवारी': 0, 'फेब्रुवारी': 1, 'मार्च': 2, 'एप्रिल': 3, 'मे': 4, 'जून': 5,
-        'जुलै': 6, 'ऑगस्ट': 7, 'सप्टेंबर': 8, 'ऑक्टोबर': 9, 'नोव्हेंबर': 10, 'डिसेंबर': 11
-      };
-      for (const [mName, mIdx] of Object.entries(marathiMonths)) {
-        if (item.date.includes(mName)) {
-          const dayMatch = engDate.match(/\d{1,2}/);
-          const yearMatch = engDate.match(/\d{4}/);
-          const d = dayMatch ? parseInt(dayMatch[0], 10) : 1;
-          const y = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
-          const t = new Date(y, mIdx, d).getTime();
-          if (!isNaN(t) && t > 0) return t;
-        }
-      }
-
-      const directT = new Date(engDate).getTime();
-      if (!isNaN(directT) && directT > 0) return directT;
-    }
-
+    const fromPublish = parseNewsDateMs(item.publishDate);
+    if (fromPublish > 0) return fromPublish;
+    const fromDate = parseNewsDateMs(item.date);
+    if (fromDate > 0) return fromDate;
     return 0;
   };
 
