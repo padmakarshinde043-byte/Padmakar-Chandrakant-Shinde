@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search, ShieldCheck, Award, FileText, Share2,
   Lock, Unlock, Plus, Trash2, Edit3, RefreshCw, KeyRound, CheckCircle2,
@@ -42,6 +43,81 @@ import {
   filterAndSortDistrictOfficials,
   matchesDistrictName,
 } from '../utils/officialsCache';
+
+const ModalPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, []);
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+};
+
+const ToastPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+};
+
+const OFFICER_CAPSULE_TINTS = [
+  {
+    surface: 'bg-gradient-to-br from-sky-100/80 via-white/95 to-sky-50/90',
+    border: 'border-sky-200/90',
+    ring: 'ring-sky-100/80',
+    divider: 'border-sky-200/70',
+    serial: 'text-sky-800/80 bg-sky-100/80 border-sky-200/80',
+    photoRing: 'ring-sky-200/80',
+    orb: 'bg-sky-200/45',
+  },
+  {
+    surface: 'bg-gradient-to-br from-cyan-100/70 via-white/95 to-sky-50/85',
+    border: 'border-cyan-200/85',
+    ring: 'ring-cyan-100/75',
+    divider: 'border-cyan-200/70',
+    serial: 'text-cyan-800/80 bg-cyan-100/75 border-cyan-200/80',
+    photoRing: 'ring-cyan-200/80',
+    orb: 'bg-cyan-200/40',
+  },
+  {
+    surface: 'bg-gradient-to-br from-blue-100/70 via-white/95 to-sky-50/85',
+    border: 'border-blue-200/85',
+    ring: 'ring-blue-100/75',
+    divider: 'border-blue-200/70',
+    serial: 'text-blue-800/80 bg-blue-100/75 border-blue-200/80',
+    photoRing: 'ring-blue-200/80',
+    orb: 'bg-blue-200/40',
+  },
+  {
+    surface: 'bg-gradient-to-br from-indigo-100/60 via-white/95 to-sky-50/90',
+    border: 'border-indigo-200/80',
+    ring: 'ring-indigo-100/70',
+    divider: 'border-indigo-200/65',
+    serial: 'text-indigo-800/80 bg-indigo-100/70 border-indigo-200/75',
+    photoRing: 'ring-indigo-200/75',
+    orb: 'bg-indigo-200/35',
+  },
+  {
+    surface: 'bg-gradient-to-br from-teal-100/60 via-white/95 to-cyan-50/85',
+    border: 'border-teal-200/80',
+    ring: 'ring-teal-100/70',
+    divider: 'border-teal-200/65',
+    serial: 'text-teal-800/80 bg-teal-100/70 border-teal-200/75',
+    photoRing: 'ring-teal-200/75',
+    orb: 'bg-teal-200/35',
+  },
+  {
+    surface: 'bg-gradient-to-br from-sky-100/75 via-white/95 to-amber-50/65',
+    border: 'border-sky-200/85',
+    ring: 'ring-amber-100/60',
+    divider: 'border-sky-200/65',
+    serial: 'text-sky-800/80 bg-sky-100/75 border-sky-200/80',
+    photoRing: 'ring-sky-200/80',
+    orb: 'bg-amber-100/50',
+  },
+] as const;
 
 export const AppointmentsTab: React.FC = () => {
   // Hydrate synchronously from localStorage for instant 0ms tab render
@@ -1154,107 +1230,80 @@ export const AppointmentsTab: React.FC = () => {
                 </h4>
               </div>
             ) : (
-              <div>
-                {/* Mobile Clean List View */}
-                <div className="divide-y divide-slate-200 sm:hidden bg-white">
+              <div className="bg-gradient-to-b from-sky-50/75 via-slate-50/70 to-white p-3.5 sm:p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
                   {searchedOfficials.map((m, idx) => {
                     const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
                     const cadre = m.currentCadre || 'केंद्रप्रमुख';
                     const details = m.workingPlace || '';
+                    const tint = OFFICER_CAPSULE_TINTS[idx % OFFICER_CAPSULE_TINTS.length];
+                    const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim();
 
                     return (
-                      <div key={m.id} className="p-4 flex items-center gap-3.5">
-                        <span className="text-sm font-mono font-bold text-slate-500 w-6 shrink-0 tabular-nums">
-                          {idx + 1}.
-                        </span>
-                        {m.photo ? (
-                          <img
-                            src={m.photo}
-                            alt={m.firstName}
-                            loading="lazy"
-                            crossOrigin="anonymous"
-                            referrerPolicy="no-referrer"
-                            className="w-14 h-18 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0 bg-slate-100"
-                          />
-                        ) : (
-                          <div className="w-14 h-18 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
-                            <ImageIcon className="w-6 h-6" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-base font-bold text-[#193568] leading-snug truncate">
-                            {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
-                          </div>
-                          <div className="mt-1">
-                            <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2.5 py-0.5 rounded text-xs font-semibold">
+                      <article
+                        key={m.id}
+                        className={`relative overflow-hidden rounded-3xl ${tint.surface} border ${tint.border} ring-1 ring-inset ${tint.ring} backdrop-blur-md p-4 sm:p-5 shadow-[0_10px_28px_-10px_rgba(14,116,144,0.16),inset_0_1px_1px_rgba(255,255,255,0.95)] hover:shadow-[0_14px_34px_-10px_rgba(14,116,144,0.22),inset_0_1px_1px_rgba(255,255,255,1)] transition-all duration-200 hover:-translate-y-0.5`}
+                      >
+                        {/* Soft glassy specular highlight & gentle ambient sheen */}
+                        <div
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/85 via-white/35 to-transparent rounded-t-3xl"
+                        />
+                        <div
+                          aria-hidden="true"
+                          className={`pointer-events-none absolute -right-8 -top-8 w-28 h-28 rounded-full ${tint.orb} blur-xl`}
+                        />
+
+                        <div className="relative z-10 flex items-center gap-4 sm:gap-5">
+                          {/* Enlarged Officer Portrait Frame */}
+                          {m.photo ? (
+                            <img
+                              src={m.photo}
+                              alt={fullName}
+                              loading="lazy"
+                              crossOrigin="anonymous"
+                              referrerPolicy="no-referrer"
+                              className={`w-24 h-28 sm:w-28 sm:h-32 rounded-2xl object-cover object-top border-2 border-white ring-1 ${tint.photoRing} shadow-md shrink-0 bg-gradient-to-b from-sky-50 to-slate-100`}
+                            />
+                          ) : (
+                            <div
+                              className={`w-24 h-28 sm:w-28 sm:h-32 rounded-2xl bg-gradient-to-br from-sky-50 to-slate-100 border-2 border-white ring-1 ${tint.photoRing} flex flex-col items-center justify-center text-sky-400 shrink-0 shadow-sm`}
+                            >
+                              <ImageIcon className="w-8 h-8" />
+                            </div>
+                          )}
+
+                          {/* Spacious Officer Information Column */}
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <h3 className="text-lg sm:text-xl font-bold text-[#0b2545] leading-snug break-words">
+                                {fullName}
+                              </h3>
+                              <span
+                                className={`text-xs font-mono font-bold tabular-nums px-2 py-0.5 rounded-lg border shrink-0 ${tint.serial}`}
+                              >
+                                {toEnglishDigits(String(idx + 1).padStart(2, '0'))}
+                              </span>
+                            </div>
+
+                            <div className="text-sm sm:text-base font-bold text-[#9a460b] leading-snug">
                               {displayPost}
-                            </span>
-                          </div>
-                          <div className="text-xs text-slate-600 mt-1">
-                            {cadre} {details ? `· ${details}` : ''}
+                            </div>
+
+                            <div className={`border-t ${tint.divider} pt-1.5 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed`}>
+                              <span>{cadre}</span>
+                              {details && (
+                                <>
+                                  <span className="mx-1.5 text-slate-400" aria-hidden="true">·</span>
+                                  <span>{details}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </article>
                     );
                   })}
-                </div>
-
-                {/* Desktop Registry Table View */}
-                <div className="hidden sm:block overflow-x-auto bg-white">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead className="bg-slate-100 text-[#193568] font-bold border-b border-slate-300">
-                      <tr>
-                        <th className="py-3 px-4 w-20 text-center border-r border-slate-200">अनु. क्र.</th>
-                        <th className="py-3 px-4 text-sm border-r border-slate-200">पदाधिकाऱ्याचे नाव व बहाल केलेले पद</th>
-                        <th className="py-3 px-4 text-sm">सध्याचे पद व कार्यक्षेत्र</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {searchedOfficials.map((m, idx) => {
-                        const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
-                        const cadre = m.currentCadre || 'केंद्रप्रमुख';
-                        const details = m.workingPlace || '';
-
-                        return (
-                          <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-4 px-4 text-center font-semibold text-slate-600 font-mono tabular-nums border-r border-slate-200">
-                              {idx + 1}
-                            </td>
-                            <td className="py-4 px-4 border-r border-slate-200">
-                              <div className="flex items-center gap-3.5">
-                                {m.photo ? (
-                                  <img
-                                    src={m.photo}
-                                    alt={m.firstName}
-                                    loading="lazy"
-                                    crossOrigin="anonymous"
-                                    referrerPolicy="no-referrer"
-                                    className="w-16 h-20 rounded-lg object-cover border border-slate-300 shadow-2xs shrink-0 bg-slate-100"
-                                  />
-                                ) : (
-                                  <div className="w-16 h-20 rounded-lg bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
-                                    <ImageIcon className="w-6 h-6" />
-                                  </div>
-                                )}
-                                <div className="flex flex-col items-start gap-1 min-w-0">
-                                  <span className="font-bold text-[#193568] text-base leading-snug truncate">
-                                    {m.salutation} {m.firstName} {m.middleName ? m.middleName + ' ' : ''}{m.lastName}
-                                  </span>
-                                  <span className="inline-block bg-amber-50/70 text-[#9a460b] border border-amber-200 px-2.5 py-0.5 rounded text-sm font-semibold">
-                                    {displayPost}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-slate-600">
-                              <strong className="text-slate-800 block text-sm font-semibold">{cadre}</strong>
-                              <span className="text-xs sm:text-sm text-slate-500">{details}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             )}
@@ -1705,8 +1754,13 @@ export const AppointmentsTab: React.FC = () => {
       {/* IN-PAGE MODAL 1: DISTRICT PRESIDENT LOGIN (जिल्हाध्यक्ष लॉगिन) */}
       {/* ========================================================================= */}
       {showDistrictLoginModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden max-h-[90dvh] flex flex-col">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
                 {!isSettingInitialPassword ? (
@@ -1832,15 +1886,21 @@ export const AppointmentsTab: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* IN-PAGE MODAL 2: STATE PRESIDENT MASTER LOGIN (राज्याध्यक्ष लॉगिन) */}
       {/* ========================================================================= */}
       {showPresidentLoginModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden max-h-[90dvh] flex flex-col">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
                 {!isSettingPresidentInitialPassword ? (
@@ -1967,15 +2027,21 @@ export const AppointmentsTab: React.FC = () => {
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: CHANGE PRESIDENT PASSWORD (राज्याध्यक्ष पासवर्ड बदला) */}
       {/* ========================================================================= */}
       {showChangePresidentPasswordModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden max-h-[90dvh] flex flex-col">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
                 <KeyRound className="w-4 h-4 text-[#efb24b] shrink-0" />
@@ -2066,15 +2132,21 @@ export const AppointmentsTab: React.FC = () => {
               </form>
             </div>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: A4 APPOINTMENT LETTER PREVIEW & HIGH-QUALITY PDF */}
       {/* ========================================================================= */}
       {selectedOfficialForLetter && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-4xl w-full max-h-[94dvh] flex flex-col overflow-hidden">
             {/* Modal Controls Bar */}
             <div className="p-3 sm:p-4 bg-[#193568] text-white flex flex-wrap items-center justify-between gap-3 shrink-0 border-b-2 border-[#efb24b]">
               <div className="flex items-center gap-2">
@@ -2239,30 +2311,36 @@ export const AppointmentsTab: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: ADD / EDIT OFFICIAL */}
       {/* ========================================================================= */}
       {isMemberModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-lg w-full text-sm max-h-[92vh] flex flex-col overflow-hidden">
-            <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b] shrink-0">
-              <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold">
-                {editingMemberId ? 'पदाधिकारी माहिती दुरुस्ती' : `नवीन पदाधिकारी नोंदणी (${formDistrict} जिल्हा)`}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsMemberModalOpen(false)}
-                className="text-slate-300 hover:text-white p-1 cursor-pointer"
-                aria-label="बंद करा"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-lg w-full text-sm max-h-[90dvh] flex flex-col overflow-hidden">
+              <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b] shrink-0">
+                <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold">
+                  {editingMemberId ? 'पदाधिकारी माहिती दुरुस्ती' : `नवीन पदाधिकारी नोंदणी (${formDistrict} जिल्हा)`}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsMemberModalOpen(false)}
+                  className="text-slate-300 hover:text-white p-1 cursor-pointer"
+                  aria-label="बंद करा"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
 
-            <form onSubmit={handleSaveMember} className="p-5 space-y-3.5 overflow-y-auto">
+              <form onSubmit={handleSaveMember} className="p-5 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
               {formError && (
                 <div className="p-2.5 bg-rose-50 border border-rose-300 text-rose-700 rounded-md text-sm font-semibold flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -2484,15 +2562,21 @@ export const AppointmentsTab: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: CHANGE DISTRICT PASSWORD */}
       {/* ========================================================================= */}
       {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden max-h-[90dvh] flex flex-col">
             <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
               <h3 className="font-serifDevanagari text-lg font-bold">
                 पासवर्ड बदला ({isSuperAdmin ? formDistrict : (lockedDistrictName || currentDistrict)} जिल्हा)
@@ -2543,15 +2627,21 @@ export const AppointmentsTab: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* IN-PAGE CONFIRMATION MODAL: DELETE OFFICIAL */}
       {/* ========================================================================= */}
       {memberToDelete && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-sm w-full text-sm overflow-hidden max-h-[90dvh] flex flex-col">
             <div className="bg-[#193568] text-white px-5 py-3 flex items-center gap-2 border-b-2 border-[#efb24b]">
               <Trash2 className="w-4 h-4 text-rose-300 shrink-0" />
               <h3 className="font-serifDevanagari text-lg font-bold">
@@ -2581,15 +2671,21 @@ export const AppointmentsTab: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* MODAL: संघटना सद्यस्थिती (34 जिल्हे मॅट्रिक्स तक्ता & A4 B&W PDF) */}
       {/* ========================================================================= */}
       {showStatusMatrixModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 flex items-center justify-center p-3 sm:p-5">
-          <div className="bg-white rounded-md border border-slate-300 shadow-2xl max-w-4xl w-full text-sm relative max-h-[92vh] flex flex-col overflow-hidden">
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-[9999] w-screen h-[100dvh] overflow-y-auto overscroll-contain bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-4xl w-full text-sm relative max-h-[92dvh] flex flex-col overflow-hidden">
             {/* Modal Header */}
             <div className="bg-[#193568] text-white px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-[#efb24b] shrink-0">
               <div>
@@ -2731,28 +2827,31 @@ export const AppointmentsTab: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+          </div>
+        </ModalPortal>
       )}
 
       {/* ========================================================================= */}
       {/* IN-PAGE FLOATING TOAST NOTIFICATION */}
       {/* ========================================================================= */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-[100] max-w-sm bg-[#193568] text-white px-4 py-3 rounded-md shadow-xl flex items-center gap-3 border border-slate-700">
-          {toast.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
-          )}
-          <span className="text-sm font-semibold leading-relaxed">{toast.message}</span>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="ml-auto text-slate-300 hover:text-white p-1 cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        <ToastPortal>
+          <div className="fixed bottom-5 right-5 z-[10000] max-w-sm bg-[#193568] text-white px-4 py-3 rounded-md shadow-xl flex items-center gap-3 border border-slate-700">
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+            )}
+            <span className="text-sm font-semibold leading-relaxed">{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="ml-auto text-slate-300 hover:text-white p-1 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </ToastPortal>
       )}
     </div>
   );
