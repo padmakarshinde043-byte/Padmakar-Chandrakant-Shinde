@@ -885,6 +885,8 @@ app.use(
           'https://*.googleusercontent.com',
           'https://*.google.com',
         ],
+        workerSrc: ["'self'", 'blob:'],
+        manifestSrc: ["'self'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         upgradeInsecureRequests: null,
@@ -3202,7 +3204,7 @@ async function startServer() {
     try {
       const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
-        server: { middlewareMode: true },
+        server: { middlewareMode: true, hmr: false },
         appType: 'spa'
       });
       app.use(vite.middlewares);
@@ -3215,6 +3217,22 @@ async function startServer() {
       }
     }
   }
+
+  // Digital Asset Links for Android TWA / PWABuilder verification (express.static skips dotfiles by default)
+  app.get('/.well-known/assetlinks.json', (_req, res) => {
+    const candidates = [
+      path.resolve(process.cwd(), 'dist', '.well-known', 'assetlinks.json'),
+      path.resolve(process.cwd(), 'public', '.well-known', 'assetlinks.json'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.sendFile(p);
+      }
+    }
+    return res.status(200).json([]);
+  });
 
   if (!useViteDev) {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));

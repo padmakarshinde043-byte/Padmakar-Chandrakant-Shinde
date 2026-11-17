@@ -24,6 +24,11 @@ import {
   isLegalAdvisorLeader,
   isMargdarshakLeader
 } from '../data/mahasanghData';
+import {
+  filterValidDynamicLeaders,
+  findMissingVacantLeaders,
+  mergeMissingVacantLeaders,
+} from '../data/recoveredVacantLeaders';
 import { DEFAULT_DISTRICT_PASSWORD } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import {
@@ -1104,8 +1109,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const leaderPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
   const normalizeDynamicLeadersList = (rawList: Leader[]): Leader[] => {
-    const cleaned = rawList
-      .filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district' || l.category === 'जिल्हा सरचिटणीस' || isValidLeaderRecord(l)))
+    const cleaned = filterValidDynamicLeaders(rawList)
       .map((l) => {
         if (l.category === 'सल्लागार' || l.category === 'advisory' || l.category === 'राज्य सल्लागार मंडळ') {
           return {
@@ -1172,10 +1176,31 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const activeLeaderSectionLabel =
     leaderCategory === 'राज्य सल्लागार मंडळ' ? advisorySubTab : leaderCategory;
 
+  const missingVacantLeadersCount = findMissingVacantLeaders(dynamicLeaders).length;
+
+  const handleRestoreMissingVacantLeaders = async () => {
+    const { merged, addedCount } = mergeMissingVacantLeaders(dynamicLeaders);
+    if (addedCount === 0) return;
+    setIsSavingLeader(true);
+    try {
+      const ok = await saveLeadersToStorage(merged);
+      if (ok) {
+        setLeaderFormMsg({
+          text: `✓ ${addedCount} रिकामी पदे (राज्य / महिला आघाडी / विभागीय कार्यकारिणी) यशस्वीरीत्या पुन्हा जोडली गेली आहेत!`,
+          type: 'success',
+        });
+        setTimeout(() => setLeaderFormMsg(null), 5000);
+      }
+    } finally {
+      setIsSavingLeader(false);
+    }
+  };
+
   // Filter state/advisory leaders by active category (and sub-tab for राज्य सल्लागार मंडळ)
   const categoryLeaders = dynamicLeaders.filter((l) => {
-    if (!isValidLeaderRecord(l)) return false;
+    if (!l) return false;
     if (leaderCategory === 'राज्य सल्लागार मंडळ') {
+      if (!isValidLeaderRecord(l)) return false;
       if (!isAdvisoryBoardLeader(l)) return false;
       return advisorySubTab === 'कायदेविषयक सल्लागार'
         ? isLegalAdvisorLeader(l)
@@ -1962,10 +1987,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    if (!leaderName.trim() || !leaderRole.trim()) {
+    if (isDistrictTab && (!leaderName.trim() || !leaderRole.trim())) {
       setLeaderFormMsg({ text: 'कृपया नाव आणि पद आवश्यकपणे भरा.', type: 'error' });
       return;
     }
+
+    if (!isDistrictTab && !leaderRole.trim()) {
+      setLeaderFormMsg({ text: 'कृपया पद (Role) आवश्यकपणे भरा.', type: 'error' });
+      return;
+    }
+
+    const effectiveLeaderName = isDistrictTab ? leaderName.trim() : (leaderName.trim() || '-');
 
     const targetCategory: Leader['category'] = isDistrictTab
       ? districtLeaderMode
@@ -1982,7 +2014,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           if ((l.id || l.name) === editingLeaderId) {
             return {
               ...l,
-              name: leaderName.trim(),
+              name: effectiveLeaderName,
               role: leaderRole.trim(),
               region: leaderRegion.trim() || 'महाराष्ट्र',
               phone: leaderPhone.trim() || '-',
@@ -2016,7 +2048,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           const updated = [...dynamicLeaders];
           updated[placeholderIdx] = {
             ...updated[placeholderIdx],
-            name: leaderName.trim(),
+            name: effectiveLeaderName,
             role: leaderRole.trim(),
             region: leaderRegion.trim(),
             phone: leaderPhone.trim() || '-',
@@ -2028,7 +2060,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         } else {
           const newLeader: Leader = {
             id: `ldr-${Date.now()}`,
-            name: leaderName.trim(),
+            name: effectiveLeaderName,
             role: leaderRole.trim(),
             region: leaderRegion.trim(),
             phone: leaderPhone.trim() || '-',
@@ -2042,10 +2074,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           setLeaderFormMsg({ text: `${districtLeaderMode} माहिती यशस्वीपणे जतन झाली!`, type: 'success' });
         }
       } else {
-        // Add new state/advisory leader
+        // Add new state/advisory leader (vacant post allowed with '-' when name is empty)
         const newLeader: Leader = {
           id: `ldr-${Date.now()}`,
-          name: leaderName.trim(),
+          name: effectiveLeaderName,
           role: leaderRole.trim(),
           region: leaderRegion.trim() || 'महाराष्ट्र',
           phone: leaderPhone.trim() || '-',
@@ -3420,6 +3452,28 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </span>
                 </div>
 
+                {missingVacantLeadersCount > 0 && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs text-amber-950">
+                      <strong className="block text-sm font-bold text-[#17366d]">
+                        मूळ रिकामी पदे पुन्हा जोडण्यासाठी उपलब्ध ({missingVacantLeadersCount} पदे)
+                      </strong>
+                      <span className="text-amber-900">
+                        राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी व विभागीय कार्यकारिणीतील गहाळ झालेली रिकामी पदे एका क्लिकवर पुन्हा जोडा (कोणतेही विद्यमान नाव/फोटो बदलणार नाहीत).
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSavingLeader}
+                      onClick={handleRestoreMissingVacantLeaders}
+                      className="px-4 py-2.5 bg-[#17366d] hover:bg-[#10274e] text-white font-bold text-xs rounded-xl shadow-xs shrink-0 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-[#efb24b]" />
+                      <span>रिकामी पदे पुन्हा जोडा ({missingVacantLeadersCount})</span>
+                    </button>
+                  </div>
+                )}
+
                 {leaderCategory === 'राज्य सल्लागार मंडळ' && (
                   <div className="bg-[#f8f9fc] p-3.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="text-xs font-semibold text-[#17366d]">
@@ -3473,7 +3527,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           <span className="inline-flex items-center gap-1.5 flex-wrap">
                             <span>निवडलेले नाव:</span>
                             <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-400 font-bold text-[#193568] shadow-2xs">
-                              #{selectedLeaderIndex + 1} {selectedLeader.name} ({selectedLeader.role})
+                              #{selectedLeaderIndex + 1} {isPlaceholderDistrictName(selectedLeader.name) ? 'नाव भरायचे आहे (पद रिक्त)' : selectedLeader.name} ({selectedLeader.role})
                             </span>
                           </span>
                         ) : (
@@ -3529,6 +3583,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                       {categoryLeaders.map((ldr, index) => {
                         const isSelected = (ldr.id || ldr.name) === selectedLeaderIdForReorder;
+                        const isVacantSlot = isPlaceholderDistrictName(ldr.name);
                         return (
                           <div
                             key={ldr.id || ldr.name}
@@ -3536,7 +3591,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             className={`rounded-2xl p-3 border transition-all flex items-center justify-between gap-3 cursor-pointer ${
                               isSelected
                                 ? 'bg-amber-50/90 border-2 border-[#df6b16] shadow-md ring-2 ring-[#df6b16]/20'
-                                : 'bg-white border-slate-200 shadow-2xs hover:border-amber-300 hover:bg-slate-50/70'
+                                : isVacantSlot
+                                  ? 'bg-amber-50/35 border-amber-200/80 shadow-2xs hover:border-amber-400'
+                                  : 'bg-white border-slate-200 shadow-2xs hover:border-amber-300 hover:bg-slate-50/70'
                             }`}
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -3569,10 +3626,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
                                   <h5 className={`font-serifDevanagari font-bold text-xs sm:text-sm truncate ${
-                                    isSelected ? 'text-[#193568]' : 'text-slate-900'
+                                    isVacantSlot
+                                      ? 'text-amber-800 italic'
+                                      : isSelected
+                                        ? 'text-[#193568]'
+                                        : 'text-slate-900'
                                   }`}>
-                                    {ldr.name}
+                                    {isVacantSlot ? 'नाव भरायचे आहे (पद रिक्त)' : ldr.name}
                                   </h5>
+                                  {isVacantSlot && (
+                                    <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                                      रिक्त
+                                    </span>
+                                  )}
                                   {isSelected && (
                                     <span className="bg-[#df6b16] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
                                       निवडलेले
@@ -3667,14 +3733,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          पदाधिकाऱ्याचे नाव <span className="text-rose-600">*</span>
+                          पदाधिकाऱ्याचे नाव <span className="text-[10px] font-normal text-slate-500">(रिक्त पदासाठी मोकळे सोडा)</span>
                         </label>
                         <input
                           type="text"
-                          required
                           value={leaderName}
                           onChange={(e) => setLeaderName(e.target.value)}
-                          placeholder="उदा. श्री. रमेश देशमुख"
+                          placeholder="उदा. श्री. रमेश देशमुख (किंवा रिकामे ठेवा)"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>

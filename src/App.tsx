@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeTab } from './components/HomeTab';
+import { OfflineIndicator } from './components/PWAInstallButton';
 
 const loadAboutTab = () => import('./components/AboutTab');
 const loadLeadershipTab = () => import('./components/LeadershipTab');
@@ -772,6 +773,7 @@ export function App() {
       </main>
 
       <Footer setCurrentTab={setCurrentTab} />
+      <OfflineIndicator />
     </div>
   );
 }
