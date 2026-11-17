@@ -993,8 +993,25 @@ export async function mysqlDeleteGovOrder(id: string): Promise<void> {
   await pool.execute('DELETE FROM `gov_orders` WHERE `id` = ?', [id]);
 }
 
+let contactsPhotoColumnChecked = false;
+
+async function ensureContactsPhotoColumn(): Promise<void> {
+  if (contactsPhotoColumnChecked) return;
+  const pool = getMysqlPool();
+  try {
+    const [cols] = await pool.query<RowDataPacket[]>("SHOW COLUMNS FROM `contacts` LIKE 'photo'");
+    if (!cols || cols.length === 0) {
+      await pool.query('ALTER TABLE `contacts` ADD COLUMN `photo` LONGTEXT NULL AFTER `message`');
+    }
+    contactsPhotoColumnChecked = true;
+  } catch (err) {
+    console.warn('ensureContactsPhotoColumn notice:', err);
+  }
+}
+
 export async function mysqlListContacts(): Promise<Record<string, any>[]> {
   await ensureMysqlSchema();
+  await ensureContactsPhotoColumn();
   const pool = getMysqlPool();
   const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `contacts` ORDER BY `created_at` DESC');
   return rows.map((r) => ({
@@ -1005,17 +1022,19 @@ export async function mysqlListContacts(): Promise<Record<string, any>[]> {
     district: r.district ? String(r.district) : undefined,
     subject: r.subject ? String(r.subject) : undefined,
     message: String(r.message || ''),
+    photo: r.photo ? String(r.photo) : undefined,
     createdAt: String(r.created_at || ''),
   }));
 }
 
 export async function mysqlSaveContact(contact: Record<string, any>): Promise<void> {
   await ensureMysqlSchema();
+  await ensureContactsPhotoColumn();
   const pool = getMysqlPool();
   await pool.execute(
-    `INSERT INTO \`contacts\` (id, name, phone, email, district, subject, message, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE message = VALUES(message)`,
+    `INSERT INTO \`contacts\` (id, name, phone, email, district, subject, message, photo, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE message = VALUES(message), photo = VALUES(photo)`,
     [
       String(contact.id),
       String(contact.name || ''),
@@ -1024,6 +1043,7 @@ export async function mysqlSaveContact(contact: Record<string, any>): Promise<vo
       String(contact.district || ''),
       String(contact.subject || ''),
       String(contact.message || ''),
+      String(contact.photo || ''),
       String(contact.createdAt || new Date().toISOString()),
     ]
   );

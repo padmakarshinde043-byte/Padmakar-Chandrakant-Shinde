@@ -104,6 +104,7 @@ type AdminSubTabKey =
   | 'applications'
   | 'edit_members'
   | 'leadership'
+  | 'district_leadership'
   | 'master_studio'
   | 'add_news'
   | 'latest_banners'
@@ -1068,9 +1069,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   // ==========================================
-  // Leadership Management State (Point 7)
+  // Leadership Management State (राज्य पदाधिकारी व जिल्हा कार्यकारिणी)
   // ==========================================
-  const [leaderCategory, setLeaderCategory] = useState<'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'राज्य सल्लागार मंडळ'>('राज्य कार्यकारिणी');
+  const [leaderCategory, setLeaderCategory] = useState<'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'राज्य सल्लागार मंडळ'>('राज्य कार्यकारिणी');
+  const [districtLeaderMode, setDistrictLeaderMode] = useState<'जिल्हा अध्यक्ष' | 'जिल्हा सरचिटणीस'>('जिल्हा अध्यक्ष');
+  const [districtLeaderSearch, setDistrictLeaderSearch] = useState('');
+  const [selectedDistrictLeaderId, setSelectedDistrictLeaderId] = useState<string | null>(null);
+  const [contactPhotoModal, setContactPhotoModal] = useState<{ src: string; title: string } | null>(null);
   const [advisorySubTab, setAdvisorySubTab] = useState<'कायदेविषयक सल्लागार' | 'मार्गदर्शक'>('कायदेविषयक सल्लागार');
   const [dynamicLeaders, setDynamicLeaders] = useState<Leader[]>([]);
   const [editingLeaderId, setEditingLeaderId] = useState<string | null>(null);
@@ -1087,7 +1092,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const normalizeDynamicLeadersList = (rawList: Leader[]): Leader[] => {
     const cleaned = rawList
-      .filter((l) => isValidLeaderRecord(l))
+      .filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district' || l.category === 'जिल्हा सरचिटणीस' || isValidLeaderRecord(l)))
       .map((l) => {
         if (l.category === 'सल्लागार' || l.category === 'advisory' || l.category === 'राज्य सल्लागार मंडळ') {
           return {
@@ -1149,7 +1154,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const activeLeaderSectionLabel =
     leaderCategory === 'राज्य सल्लागार मंडळ' ? advisorySubTab : leaderCategory;
 
-  // Filter leaders by active category (and sub-tab for राज्य सल्लागार मंडळ)
+  // Filter state/advisory leaders by active category (and sub-tab for राज्य सल्लागार मंडळ)
   const categoryLeaders = dynamicLeaders.filter((l) => {
     if (!isValidLeaderRecord(l)) return false;
     if (leaderCategory === 'राज्य सल्लागार मंडळ') {
@@ -1158,7 +1163,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         ? isLegalAdvisorLeader(l)
         : !isLegalAdvisorLeader(l);
     }
+    if (leaderCategory === 'विभागीय समन्वयक') {
+      return l.category === 'विभागीय समन्वयक' || l.category === 'विभागीय कार्यकारिणी' || l.category === 'division';
+    }
     return (l.category || 'राज्य कार्यकारिणी') === leaderCategory;
+  });
+
+  // District leaders filtered by mode ('जिल्हा अध्यक्ष' | 'जिल्हा सरचिटणीस')
+  const allDistrictModeLeaders = dynamicLeaders.filter((l) => {
+    if (!l) return false;
+    if (districtLeaderMode === 'जिल्हा अध्यक्ष') {
+      return l.category === 'जिल्हा अध्यक्ष' || l.category === 'district';
+    }
+    return l.category === 'जिल्हा सरचिटणीस';
+  });
+
+  const filteredDistrictModeLeaders = allDistrictModeLeaders.filter((l) => {
+    const q = districtLeaderSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (l.region || '').toLowerCase().includes(q) ||
+      (l.name || '').toLowerCase().includes(q) ||
+      (l.role || '').toLowerCase().includes(q)
+    );
   });
 
   // Selected leader ID for prominent reordering
@@ -1174,6 +1201,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setSelectedLeaderIdForReorder(null);
     }
   }, [leaderCategory, advisorySubTab, categoryLeaders.length]);
+
+  useEffect(() => {
+    if (allDistrictModeLeaders.length > 0) {
+      if (!selectedDistrictLeaderId || !allDistrictModeLeaders.some((l) => (l.id || l.name) === selectedDistrictLeaderId)) {
+        setSelectedDistrictLeaderId(allDistrictModeLeaders[0].id || allDistrictModeLeaders[0].name);
+      }
+    } else {
+      setSelectedDistrictLeaderId(null);
+    }
+  }, [districtLeaderMode, allDistrictModeLeaders.length]);
 
   // Safe category-specific Move Up
   const handleMoveLeaderUp = (leaderId?: string) => {
@@ -1227,6 +1264,73 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const selectedLeaderIndex = categoryLeaders.findIndex((l) => (l.id || l.name) === selectedLeaderIdForReorder);
   const selectedLeader = selectedLeaderIndex >= 0 ? categoryLeaders[selectedLeaderIndex] : null;
+
+  // District-specific Move Up (preserves District Presidents / Secretaries relative order)
+  const handleMoveDistrictLeaderUp = (leaderId?: string) => {
+    const targetId = leaderId || selectedDistrictLeaderId;
+    if (!targetId) return;
+
+    const modeIndex = allDistrictModeLeaders.findIndex((l) => (l.id || l.name) === targetId);
+    if (modeIndex <= 0) return;
+
+    const currentLeader = allDistrictModeLeaders[modeIndex];
+    const leaderAbove = allDistrictModeLeaders[modeIndex - 1];
+
+    const newLeaders = [...dynamicLeaders];
+    const posCurrent = newLeaders.findIndex((l) => (l.id || l.name) === (currentLeader.id || currentLeader.name));
+    const posAbove = newLeaders.findIndex((l) => (l.id || l.name) === (leaderAbove.id || leaderAbove.name));
+
+    if (posCurrent !== -1 && posAbove !== -1) {
+      const temp = newLeaders[posCurrent];
+      newLeaders[posCurrent] = newLeaders[posAbove];
+      newLeaders[posAbove] = temp;
+      saveLeadersToStorage(newLeaders);
+      setSelectedDistrictLeaderId(targetId);
+    }
+  };
+
+  // District-specific Move Down
+  const handleMoveDistrictLeaderDown = (leaderId?: string) => {
+    const targetId = leaderId || selectedDistrictLeaderId;
+    if (!targetId) return;
+
+    const modeIndex = allDistrictModeLeaders.findIndex((l) => (l.id || l.name) === targetId);
+    if (modeIndex === -1 || modeIndex >= allDistrictModeLeaders.length - 1) return;
+
+    const currentLeader = allDistrictModeLeaders[modeIndex];
+    const leaderBelow = allDistrictModeLeaders[modeIndex + 1];
+
+    const newLeaders = [...dynamicLeaders];
+    const posCurrent = newLeaders.findIndex((l) => (l.id || l.name) === (currentLeader.id || currentLeader.name));
+    const posBelow = newLeaders.findIndex((l) => (l.id || l.name) === (leaderBelow.id || leaderBelow.name));
+
+    if (posCurrent !== -1 && posBelow !== -1) {
+      const temp = newLeaders[posCurrent];
+      newLeaders[posCurrent] = newLeaders[posBelow];
+      newLeaders[posBelow] = temp;
+      saveLeadersToStorage(newLeaders);
+      setSelectedDistrictLeaderId(targetId);
+    }
+  };
+
+  const selectedDistrictLeaderIndex = allDistrictModeLeaders.findIndex((l) => (l.id || l.name) === selectedDistrictLeaderId);
+  const selectedDistrictLeader = selectedDistrictLeaderIndex >= 0 ? allDistrictModeLeaders[selectedDistrictLeaderIndex] : null;
+  const districtLeaderFormRef = useRef<HTMLDivElement | null>(null);
+
+  const normalizeDistrictAlias = (dist?: string): string => {
+    const clean = (dist || '').trim();
+    if (!clean) return '';
+    if (clean.includes('संभाजीनगर') || clean.includes('औरंगाबाद')) return 'छत्रपती संभाजीनगर';
+    if (clean.includes('धाराशिव') || clean.includes('उस्मानाबाद')) return 'धाराशिव';
+    if (clean.includes('अहिल्यानगर') || clean.includes('अहमदनगर')) return 'अहिल्यानगर';
+    if (clean.includes('वाशीम') || clean.includes('वाशिम')) return 'वाशीम';
+    return clean;
+  };
+
+  const isPlaceholderDistrictName = (name?: string): boolean => {
+    const clean = (name || '').trim();
+    return !clean || clean === '-' || clean === '.' || clean === '0';
+  };
 
   // Hydrate sub-admin list from local cache on mount; live cloud credentials are verified on login
   useEffect(() => {
@@ -1838,18 +1942,28 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  // Add or Edit Leader in selected category
+  // Add or Edit Leader in selected category (State Leadership OR District Leadership)
   const handleSaveLeader = (e: React.FormEvent) => {
     e.preventDefault();
     setLeaderFormMsg(null);
+
+    const isDistrictTab = activeAdminSubTab === 'district_leadership';
+
+    if (isDistrictTab && !leaderRegion.trim()) {
+      setLeaderFormMsg({ text: 'कृपया जिल्हा निवडा.', type: 'error' });
+      return;
+    }
 
     if (!leaderName.trim() || !leaderRole.trim()) {
       setLeaderFormMsg({ text: 'कृपया नाव आणि पद आवश्यकपणे भरा.', type: 'error' });
       return;
     }
 
-    const targetCategory: Leader['category'] =
-      leaderCategory === 'राज्य सल्लागार मंडळ' ? advisorySubTab : leaderCategory;
+    const targetCategory: Leader['category'] = isDistrictTab
+      ? districtLeaderMode
+      : leaderCategory === 'राज्य सल्लागार मंडळ'
+        ? advisorySubTab
+        : leaderCategory;
 
     if (editingLeaderId) {
       // Update existing leader
@@ -1863,15 +1977,57 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             phone: leaderPhone.trim() || '-',
             education: leaderEducation.trim() || '',
             photo: leaderPhoto || l.photo,
-            category: targetCategory
+            category: isDistrictTab ? l.category : targetCategory
           };
         }
         return l;
       });
       saveLeadersToStorage(updated);
       setLeaderFormMsg({ text: 'पदाधिकारी माहिती यशस्वीपणे अद्यतनित झाली!', type: 'success' });
+    } else if (isDistrictTab) {
+      // If a placeholder slot exists for the same district and mode, fill it in place to preserve district row order
+      const normTarget = normalizeDistrictAlias(leaderRegion);
+      const placeholderIdx = dynamicLeaders.findIndex((l) => {
+        const sameMode =
+          districtLeaderMode === 'जिल्हा अध्यक्ष'
+            ? l.category === 'जिल्हा अध्यक्ष' || l.category === 'district'
+            : l.category === 'जिल्हा सरचिटणीस';
+        return (
+          sameMode &&
+          normalizeDistrictAlias(l.region) === normTarget &&
+          isPlaceholderDistrictName(l.name)
+        );
+      });
+
+      if (placeholderIdx !== -1) {
+        const updated = [...dynamicLeaders];
+        updated[placeholderIdx] = {
+          ...updated[placeholderIdx],
+          name: leaderName.trim(),
+          role: leaderRole.trim(),
+          region: leaderRegion.trim(),
+          phone: leaderPhone.trim() || '-',
+          education: leaderEducation.trim() || '',
+          photo: leaderPhoto || updated[placeholderIdx].photo || '',
+          category: districtLeaderMode
+        };
+        saveLeadersToStorage(updated);
+      } else {
+        const newLeader: Leader = {
+          id: `ldr-${Date.now()}`,
+          name: leaderName.trim(),
+          role: leaderRole.trim(),
+          region: leaderRegion.trim(),
+          phone: leaderPhone.trim() || '-',
+          education: leaderEducation.trim() || '',
+          photo: leaderPhoto,
+          category: districtLeaderMode
+        };
+        saveLeadersToStorage([...dynamicLeaders, newLeader]);
+      }
+      setLeaderFormMsg({ text: `${districtLeaderMode} माहिती यशस्वीपणे जतन झाली!`, type: 'success' });
     } else {
-      // Add new leader
+      // Add new state/advisory leader
       const newLeader: Leader = {
         id: `ldr-${Date.now()}`,
         name: leaderName.trim(),
@@ -1889,7 +2045,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     // Reset Form
     setEditingLeaderId(null);
     setLeaderName('');
-    setLeaderRole('');
+    setLeaderRole(isDistrictTab ? districtLeaderMode : '');
     setLeaderRegion('');
     setLeaderPhone('');
     setLeaderEducation('');
@@ -1903,15 +2059,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Start Editing Leader
   const handleEditLeader = (leader: Leader) => {
     setEditingLeaderId(leader.id || leader.name);
-    setLeaderName(leader.name);
-    setLeaderRole(leader.role);
-    setLeaderRegion(leader.region);
-    setLeaderPhone(leader.phone);
+    setLeaderName(isPlaceholderDistrictName(leader.name) ? '' : leader.name);
+    setLeaderRole(leader.role || (activeAdminSubTab === 'district_leadership' ? districtLeaderMode : ''));
+    setLeaderRegion(normalizeDistrictAlias(leader.region) || leader.region);
+    setLeaderPhone(leader.phone === '-' ? '' : leader.phone);
     setLeaderEducation(leader.education || '');
     setLeaderPhoto(leader.photo || '');
     setLeaderPhotoSizeKb(0);
     setLeaderPhotoUrl(leader.photo && leader.photo.startsWith('http') ? leader.photo : '');
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    if (activeAdminSubTab === 'district_leadership' && districtLeaderFormRef.current) {
+      districtLeaderFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
   };
 
   // Delete Leader
@@ -2145,10 +2305,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     },
     {
       key: 'leadership',
-      label: 'पदाधिकारी व्यवस्थापन',
-      shortLabel: 'व्यवस्थापन',
+      label: 'राज्य पदाधिकारी',
+      shortLabel: 'राज्य पदे',
       icon: <Award className="w-4 h-4 shrink-0" />,
-      allowed: Boolean(currentUser?.isSuperAdmin),
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership),
+    },
+    {
+      key: 'district_leadership',
+      label: 'जिल्हा कार्यकारिणी',
+      shortLabel: 'जिल्हा पदे',
+      icon: <Users className="w-4 h-4 shrink-0 text-amber-600" />,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership),
     },
     {
       key: 'master_studio',
@@ -3178,19 +3345,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               />
             )}
 
-            {/* Sub-tab 2: Leadership Management (Point 7) */}
-            {activeAdminSubTab === 'leadership' && currentUser?.isSuperAdmin && (
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-6">
+            {/* Sub-tab 2: State Leadership Management (राज्य पदाधिकारी) */}
+            {activeAdminSubTab === 'leadership' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
+              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
                 <div>
                   <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
-                    महासंघ नेतृत्व व पदाधिकारी संपादन (Leadership Management)
+                    राज्य पदाधिकारी संपादन (State Leadership Management)
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    येथून आपण राज्य कार्यकारिणी, विभागीय समन्वयक, जिल्हा अध्यक्ष आणि राज्य सल्लागार मंडळ (कायदेविषयक सल्लागार व मार्गदर्शक) यांचे फोटो, नाव आणि पद बदलू किंवा नव्याने जोडू शकता.
+                    येथून आपण राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी, विभागीय समन्वयक आणि राज्य सल्लागार मंडळ (कायदेविषयक सल्लागार व मार्गदर्शक) यांचे फोटो, नाव आणि पद बदलू किंवा नव्याने जोडू शकता. जिल्हा पदाधिकाऱ्यांसाठी शेजारील &quot;जिल्हा कार्यकारिणी&quot; टॅब वापरा.
                   </p>
                 </div>
 
-                {/* Dropdown with 5 Categories */}
+                {/* Dropdown with 4 State Categories */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <label className="font-bold text-xs text-[#09243f] shrink-0">
                     श्रेणी निवडा:
@@ -3206,8 +3373,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <option value="राज्य कार्यकारिणी">1. राज्य कार्यकारिणी</option>
                     <option value="महिला आघाडी राज्य कार्यकारिणी">2. महिला आघाडी राज्य कार्यकारिणी</option>
                     <option value="विभागीय समन्वयक">3. विभागीय समन्वयक</option>
-                    <option value="जिल्हा अध्यक्ष">4. जिल्हा अध्यक्ष</option>
-                    <option value="राज्य सल्लागार मंडळ">5. राज्य सल्लागार मंडळ (सल्लागार व मार्गदर्शक)</option>
+                    <option value="राज्य सल्लागार मंडळ">4. राज्य सल्लागार मंडळ (सल्लागार व मार्गदर्शक)</option>
                   </select>
                   <span className="text-xs text-slate-500 font-medium">
                     या विभागात एकूण: <strong>{categoryLeaders.length}</strong> पदाधिकारी
@@ -3618,6 +3784,494 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             setLeaderPhoto('');
                           }}
                           className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-lg text-xs"
+                        >
+                          रद्द करा
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Sub-tab 2B: District Leadership Management (जिल्हा कार्यकारिणी - जिल्हा अध्यक्ष व जिल्हा सरचिटणीस) */}
+            {activeAdminSubTab === 'district_leadership' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
+              <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
+                      जिल्हा कार्यकारिणी व्यवस्थापन (District Leadership)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      येथून सर्व ३४ जिल्ह्यांचे <strong>जिल्हा अध्यक्ष</strong> व <strong>जिल्हा सरचिटणीस</strong> यांचे नाव, पद, फोटो व क्रम थेट अद्यतनित करता येतात.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <span className="bg-sky-50 text-sky-900 border border-sky-200 px-3 py-1.5 rounded-lg">
+                      अध्यक्ष: {dynamicLeaders.filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district') && !isPlaceholderDistrictName(l.name)).length}
+                    </span>
+                    <span className="bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
+                      सरचिटणीस: {dynamicLeaders.filter((l) => l && l.category === 'जिल्हा सरचिटणीस' && !isPlaceholderDistrictName(l.name)).length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mode Switcher + Search */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDistrictLeaderMode('जिल्हा अध्यक्ष');
+                        setEditingLeaderId(null);
+                        setLeaderName('');
+                        setLeaderRole('जिल्हाध्यक्ष');
+                        setLeaderRegion('');
+                        setLeaderPhone('');
+                        setLeaderEducation('');
+                        setLeaderPhoto('');
+                        setLeaderFormMsg(null);
+                      }}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        districtLeaderMode === 'जिल्हा अध्यक्ष'
+                          ? 'bg-[#17366d] text-white border-[#17366d] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      १. जिल्हा अध्यक्ष ({dynamicLeaders.filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district')).length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDistrictLeaderMode('जिल्हा सरचिटणीस');
+                        setEditingLeaderId(null);
+                        setLeaderName('');
+                        setLeaderRole('जिल्हा सरचिटणीस');
+                        setLeaderRegion('');
+                        setLeaderPhone('');
+                        setLeaderEducation('');
+                        setLeaderPhoto('');
+                        setLeaderFormMsg(null);
+                      }}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        districtLeaderMode === 'जिल्हा सरचिटणीस'
+                          ? 'bg-[#df6b16] text-white border-[#df6b16] shadow-sm'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                      }`}
+                    >
+                      २. जिल्हा सरचिटणीस ({dynamicLeaders.filter((l) => l && l.category === 'जिल्हा सरचिटणीस').length})
+                    </button>
+                  </div>
+
+                  <div className="relative w-full md:w-72">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={districtLeaderSearch}
+                      onChange={(e) => setDistrictLeaderSearch(e.target.value)}
+                      placeholder="जिल्हा किंवा नाव शोधा..."
+                      className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-[#df6b16]"
+                    />
+                  </div>
+                </div>
+
+                {/* Quick-Add Chips for Districts Without Named Entry */}
+                {(() => {
+                  const filledDistrictKeys = new Set(
+                    allDistrictModeLeaders
+                      .filter((l) => !isPlaceholderDistrictName(l.name))
+                      .map((l) => normalizeDistrictAlias(l.region))
+                  );
+                  const missingDistricts = MAHARASHTRA_DISTRICTS.filter(
+                    (d) => !filledDistrictKeys.has(normalizeDistrictAlias(d))
+                  );
+                  if (missingDistricts.length === 0) return null;
+                  return (
+                    <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-bold text-[#17366d]">
+                          अद्याप {districtLeaderMode} नोंद नसलेले जिल्हे ({missingDistricts.length}) — थेट जोडण्यासाठी जिल्ह्यावर क्लिक करा:
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {missingDistricts.map((dist) => (
+                          <button
+                            key={dist}
+                            type="button"
+                            onClick={() => {
+                              setEditingLeaderId(null);
+                              setLeaderName('');
+                              setLeaderRole(districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'जिल्हाध्यक्ष' : 'जिल्हा सरचिटणीस');
+                              setLeaderRegion(dist);
+                              setLeaderPhone('');
+                              setLeaderEducation('');
+                              setLeaderPhoto('');
+                              setLeaderPhotoUrl('');
+                              setLeaderFormMsg(null);
+                              if (districtLeaderFormRef.current) {
+                                districtLeaderFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#17366d] hover:text-white text-[#17366d] border border-amber-300 text-[11px] font-bold transition-colors cursor-pointer"
+                          >
+                            + {dist}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Reordering Toolbar */}
+                <div className="bg-gradient-to-r from-sky-50/90 via-amber-50/70 to-sky-50/90 border border-sky-200 rounded-2xl p-4 shadow-sm">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h4 className="font-serifDevanagari font-bold text-sm text-[#193568]">
+                        जिल्ह्यांचा क्रम ठरवा ({districtLeaderMode})
+                      </h4>
+                      <p className="text-xs text-slate-700 mt-1">
+                        {selectedDistrictLeader ? (
+                          <span className="inline-flex items-center gap-1.5 flex-wrap">
+                            <span>निवडलेला जिल्हा:</span>
+                            <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-400 font-bold text-[#193568]">
+                              #{selectedDistrictLeaderIndex + 1} {selectedDistrictLeader.region} — {isPlaceholderDistrictName(selectedDistrictLeader.name) ? 'नाव भरायचे आहे' : selectedDistrictLeader.name}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">यादीतून जिल्हा निवडून वर-खाली क्रम बदला.</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+                      <button
+                        type="button"
+                        disabled={!selectedDistrictLeader || selectedDistrictLeaderIndex <= 0}
+                        onClick={() => handleMoveDistrictLeaderUp()}
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-[#17366d] hover:bg-[#12284c] text-white font-bold text-xs rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ArrowUp className="w-4 h-4 text-[#efb24b]" />
+                        <span>▲ वर हलवा</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!selectedDistrictLeader || selectedDistrictLeaderIndex === -1 || selectedDistrictLeaderIndex >= allDistrictModeLeaders.length - 1}
+                        onClick={() => handleMoveDistrictLeaderDown()}
+                        className="flex-1 md:flex-none px-4 py-2.5 bg-[#df6b16] hover:bg-[#b8540c] text-white font-bold text-xs rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <ArrowDown className="w-4 h-4 text-white" />
+                        <span>▼ खाली हलवा</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* District Leaders Cards Grid */}
+                {filteredDistrictModeLeaders.length === 0 ? (
+                  <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500 text-xs">
+                    {districtLeaderSearch.trim()
+                      ? `'${districtLeaderSearch}' साठी कोणताही पदाधिकारी सापडला नाही.`
+                      : `अद्याप ${districtLeaderMode} जोडलेले नाहीत. वरील जिल्ह्यावर क्लिक करून किंवा खालील फॉर्ममधून जोडा.`}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                    {filteredDistrictModeLeaders.map((ldr, index) => {
+                      const ldrKey = ldr.id || ldr.name;
+                      const isSelected = ldrKey === selectedDistrictLeaderId;
+                      const isBlank = isPlaceholderDistrictName(ldr.name);
+                      const fullIndex = allDistrictModeLeaders.findIndex((x) => (x.id || x.name) === ldrKey);
+
+                      return (
+                        <div
+                          key={`${ldrKey}-${index}`}
+                          onClick={() => setSelectedDistrictLeaderId(ldrKey)}
+                          className={`rounded-2xl p-3 border transition-all flex items-center justify-between gap-3 cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-50/90 border-2 border-[#df6b16] shadow-md ring-2 ring-[#df6b16]/20'
+                              : 'bg-white border-slate-200 shadow-sm hover:border-amber-300 hover:bg-slate-50/70'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <span
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold font-mono shrink-0 ${
+                                isSelected
+                                  ? 'bg-[#df6b16] text-white'
+                                  : 'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}
+                            >
+                              {fullIndex >= 0 ? fullIndex + 1 : index + 1}
+                            </span>
+
+                            {ldr.photo ? (
+                              <img
+                                src={ldr.photo}
+                                alt={ldr.name}
+                                className="w-11 h-11 rounded-full object-cover border-2 border-[#efb24b] shrink-0"
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-slate-400 shrink-0">
+                                <ImageIcon className="w-5 h-5" />
+                              </div>
+                            )}
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[11px] font-extrabold text-[#17366d] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded">
+                                  {ldr.region || 'जिल्हा'}
+                                </span>
+                                {isBlank && (
+                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
+                                    नाव भरायचे आहे
+                                  </span>
+                                )}
+                              </div>
+                              <h5 className="font-serifDevanagari font-bold text-xs sm:text-sm text-slate-900 truncate mt-1">
+                                {isBlank ? 'पदाधिकारी नाव अद्यतनित करा' : ldr.name}
+                              </h5>
+                              <span className="text-[11px] text-[#df6b16] font-semibold block truncate">
+                                {ldr.role || districtLeaderMode}
+                                {ldr.phone && ldr.phone !== '-' ? ` • ${toEnglishDigits(ldr.phone)}` : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200">
+                              <button
+                                type="button"
+                                disabled={fullIndex <= 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveDistrictLeaderUp(ldrKey);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#17366d] hover:text-white text-slate-700 disabled:opacity-30 border border-slate-200 cursor-pointer"
+                                title="वर हलवा"
+                              >
+                                <ChevronUp className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={fullIndex === -1 || fullIndex >= allDistrictModeLeaders.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveDistrictLeaderDown(ldrKey);
+                                }}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#df6b16] hover:text-white text-slate-700 disabled:opacity-30 border border-slate-200 cursor-pointer"
+                                title="खाली हलवा"
+                              >
+                                <ChevronDown className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditLeader(ldr);
+                              }}
+                              className="p-2 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors cursor-pointer"
+                              title="दुरुस्त करा (Edit)"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteLeader(ldr.id, ldr.name);
+                              }}
+                              className="p-2 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
+                              title="वगळा (Delete)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Form to Add / Edit District Officer */}
+                <div ref={districtLeaderFormRef} className="bg-[#fbfbfd] p-5 rounded-xl border border-slate-200">
+                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-1">
+                    {editingLeaderId
+                      ? `माहिती दुरुस्त करा (${districtLeaderMode})`
+                      : `नवीन ${districtLeaderMode} जोडा`}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mb-4">
+                    जिल्हा निवडा, नाव व पासपोर्ट फोटो अपलोड करून सेव्ह करा. बदल लगेच &quot;जिल्हा पदाधिकारी&quot; पानावर दिसतील.
+                  </p>
+
+                  {leaderFormMsg && (
+                    <div className={`p-3 mb-4 rounded-lg text-xs font-semibold ${
+                      leaderFormMsg.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-rose-50 text-rose-800 border border-rose-300'
+                    }`}>
+                      {leaderFormMsg.text}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleSaveLeader} className="space-y-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          जिल्हा निवडा <span className="text-rose-600">*</span>
+                        </label>
+                        <select
+                          required
+                          value={leaderRegion}
+                          onChange={(e) => setLeaderRegion(e.target.value)}
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        >
+                          <option value="">-- जिल्हा निवडा --</option>
+                          {MAHARASHTRA_DISTRICTS.map((dist) => (
+                            <option key={dist} value={dist}>{dist}</option>
+                          ))}
+                          {leaderRegion && !MAHARASHTRA_DISTRICTS.includes(leaderRegion) && (
+                            <option value={leaderRegion}>{leaderRegion}</option>
+                          )}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          पदाधिकाऱ्याचे नाव <span className="text-rose-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={leaderName}
+                          onChange={(e) => setLeaderName(e.target.value)}
+                          placeholder="उदा. श्री. अनंत नारायण सानप"
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          पद (Role) <span className="text-rose-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={leaderRole || (districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'जिल्हाध्यक्ष' : 'जिल्हा सरचिटणीस')}
+                          onChange={(e) => setLeaderRole(e.target.value)}
+                          placeholder={districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'जिल्हाध्यक्ष' : 'जिल्हा सरचिटणीस'}
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          मोबाईल नंबर
+                        </label>
+                        <input
+                          type="text"
+                          value={leaderPhone}
+                          onChange={(e) => setLeaderPhone(e.target.value)}
+                          placeholder="10 अंकी मोबाईल"
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          शैक्षणिक पात्रता / संवर्ग
+                        </label>
+                        <input
+                          type="text"
+                          value={leaderEducation}
+                          onChange={(e) => setLeaderEducation(e.target.value)}
+                          placeholder="उदा. M.A., B.Ed., केंद्रप्रमुख"
+                          className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="font-bold text-slate-700 text-xs">
+                            पासपोर्ट फोटो
+                          </label>
+                          {cloudinaryConfig.enabled && (
+                            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              क्लाउड सक्रिय
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <input
+                            ref={leaderPhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLeaderPhotoSelect}
+                            disabled={isUploadingLeaderCloudinary}
+                            className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px]"
+                          />
+                          {isUploadingLeaderCloudinary && (
+                            <div className="text-[11px] text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                              <span>फोटो अपलोड होत आहे...</span>
+                            </div>
+                          )}
+                          {leaderPhoto && !isUploadingLeaderCloudinary && (
+                            <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded">
+                              <img src={leaderPhoto} alt="प्रीव्ह्यू" className="w-8 h-8 rounded object-cover" />
+                              <span className="text-[10px] text-slate-600 truncate flex-1 font-mono">
+                                फोटो निवडला आहे
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLeaderPhoto('');
+                                  setLeaderPhotoUrl('');
+                                  setLeaderPhotoSizeKb(0);
+                                }}
+                                className="text-[10px] text-rose-600 font-bold cursor-pointer"
+                              >
+                                काढा
+                              </button>
+                            </div>
+                          )}
+                          <input
+                            type="url"
+                            value={leaderPhotoUrl}
+                            onChange={(e) => {
+                              const val = e.target.value.trim();
+                              setLeaderPhotoUrl(e.target.value);
+                              if (val) {
+                                setLeaderPhoto(val);
+                                setLeaderPhotoSizeKb(0);
+                              }
+                            }}
+                            placeholder="किंवा फोटो लिंक (URL) टाका..."
+                            className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] focus:outline-none focus:border-[#df6b16]"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="submit"
+                        className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold px-6 py-2.5 rounded-lg text-xs shadow-sm cursor-pointer"
+                      >
+                        {editingLeaderId ? 'बदल सेव्ह करा' : `${districtLeaderMode} सेव्ह करा`}
+                      </button>
+                      {editingLeaderId && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingLeaderId(null);
+                            setLeaderName('');
+                            setLeaderRole(districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'जिल्हाध्यक्ष' : 'जिल्हा सरचिटणीस');
+                            setLeaderRegion('');
+                            setLeaderPhone('');
+                            setLeaderEducation('');
+                            setLeaderPhoto('');
+                            setLeaderPhotoUrl('');
+                          }}
+                          className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-lg text-xs cursor-pointer"
                         >
                           रद्द करा
                         </button>
@@ -6189,6 +6843,51 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
                                 {msg.message}
                               </div>
+
+                              {msg.photo && (
+                                <div className="mt-2 p-2.5 bg-amber-50/60 border border-amber-200 rounded-lg flex flex-wrap items-center gap-3">
+                                  <img
+                                    src={msg.photo}
+                                    alt={`${msg.name} संलग्न फोटो`}
+                                    onClick={() =>
+                                      setContactPhotoModal({
+                                        src: msg.photo || '',
+                                        title: `${msg.name} — संलग्न फोटो`,
+                                      })
+                                    }
+                                    className="w-16 h-16 rounded-lg object-cover border border-amber-300 bg-white cursor-pointer hover:opacity-90 transition-opacity shrink-0"
+                                  />
+                                  <div className="min-w-0 flex-1 space-y-1">
+                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#17366d]">
+                                      <Paperclip className="w-3.5 h-3.5 text-[#df6b16]" />
+                                      <span>संलग्न फोटो (Attachment)</span>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setContactPhotoModal({
+                                            src: msg.photo || '',
+                                            title: `${msg.name} — संलग्न फोटो`,
+                                          })
+                                        }
+                                        className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-[#17366d] border border-slate-300 px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                        <span>पूर्ण फोटो पहा</span>
+                                      </button>
+                                      <a
+                                        href={msg.photo}
+                                        download={`contact-photo-${msg.id}.jpg`}
+                                        className="inline-flex items-center gap-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded text-[11px] font-bold"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                        <span>डाऊनलोड करा</span>
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
 
                             {/* Action Links: Reply via contact@mahasangh.in, Phone Call & WhatsApp */}
@@ -6346,6 +7045,60 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           </button>
                         </div>
                       </form>
+                    </div>
+                  </div>
+                )}
+
+                {/* Contact Photo Lightbox Modal */}
+                {contactPhotoModal && (
+                  <div
+                    className="fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4"
+                    onClick={() => setContactPhotoModal(null)}
+                  >
+                    <div
+                      className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full overflow-hidden"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="bg-[#193568] text-white px-5 py-3 flex items-center justify-between gap-2 border-b-2 border-[#efb24b]">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ImageIcon className="w-4 h-4 text-[#efb24b] shrink-0" />
+                          <h4 className="font-serifDevanagari text-sm sm:text-base font-bold truncate">
+                            {contactPhotoModal.title}
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setContactPhotoModal(null)}
+                          className="p-1 rounded-full hover:bg-white/15 text-slate-200 hover:text-white cursor-pointer"
+                          aria-label="बंद करा"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <div className="p-4 bg-slate-50 flex items-center justify-center">
+                        <img
+                          src={contactPhotoModal.src}
+                          alt={contactPhotoModal.title}
+                          className="max-h-[70vh] w-auto rounded-lg border border-slate-200 object-contain bg-white shadow-sm"
+                        />
+                      </div>
+                      <div className="px-5 py-3 bg-white border-t border-slate-200 flex items-center justify-end gap-2">
+                        <a
+                          href={contactPhotoModal.src}
+                          download="contact-attachment.jpg"
+                          className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>डाऊनलोड करा</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setContactPhotoModal(null)}
+                          className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-bold cursor-pointer"
+                        >
+                          बंद करा
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

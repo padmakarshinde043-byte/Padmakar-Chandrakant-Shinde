@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { MapPin, Phone, Mail, Clock, Send, CheckCircle2, Globe } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { MapPin, Phone, Send, CheckCircle2, Globe, Paperclip, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import { ORG_DETAILS, MAHARASHTRA_DISTRICTS } from '../data/mahasanghData';
+import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
+
+const MAX_CONTACT_PHOTO_BYTES = 3 * 1024 * 1024; // 3 MB strict raw limit
 
 interface ContactTabProps {
   onSaveContact?: (contact: {
@@ -11,6 +14,7 @@ interface ContactTabProps {
     district?: string;
     subject?: string;
     message: string;
+    photo?: string;
     createdAt: string;
   }) => void;
 }
@@ -22,15 +26,71 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
   const [district, setDistrict] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [photo, setPhoto] = useState('');
+  const [photoName, setPhotoName] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState('');
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhotoError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('कृपया फक्त फोटो फाईल (JPG, PNG, WEBP) निवडा.');
+      if (photoInputRef.current) photoInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > MAX_CONTACT_PHOTO_BYTES) {
+      setPhotoError('कृपया 3 MB पेक्षा कमी आकाराचा फोटो जोडा');
+      setPhoto('');
+      setPhotoName('');
+      if (photoInputRef.current) photoInputRef.current.value = '';
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    try {
+      const res = await uploadCompressedPhotoToCloudinaryOrFallback(file, 1000, 1000, 0.8);
+      setPhoto(res.urlOrBase64);
+      setPhotoName(`${file.name} (${res.sizeKb} KB)`);
+    } catch (err: any) {
+      setPhotoError(err?.message || 'फोटो जोडताना अडचण आली. कृपया दुसरा फोटो निवडा.');
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const handleClearPhoto = () => {
+    setPhoto('');
+    setPhotoName('');
+    setPhotoError('');
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
 
-    if (!name.trim() || !phone.trim() || !message.trim()) {
-      setFormError('कृपया नाव, मोबाईल नंबर आणि आपला संदेश आवश्यक भरा.');
+    if (
+      !name.trim() ||
+      !phone.trim() ||
+      !email.trim() ||
+      !district.trim() ||
+      !subject.trim() ||
+      !message.trim()
+    ) {
+      setFormError('कृपया नाव, मोबाईल नंबर, ई-मेल पत्ता, जिल्हा, विषय आणि आपला संदेश हे सर्व आवश्यक तपशील भरा.');
+      return;
+    }
+
+    if (isUploadingPhoto) {
+      setFormError('कृपया फोटो अपलोड पूर्ण होईपर्यंत थोडा वेळ थांबा.');
       return;
     }
 
@@ -39,10 +99,11 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
         id: `contact-${Date.now()}`,
         name: name.trim(),
         phone: phone.trim(),
-        email: email.trim() || undefined,
-        district: district || undefined,
-        subject: subject.trim() || undefined,
+        email: email.trim(),
+        district: district.trim(),
+        subject: subject.trim(),
         message: message.trim(),
+        photo: photo || undefined,
         createdAt: new Date().toISOString()
       });
     }
@@ -54,6 +115,10 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
     setDistrict('');
     setSubject('');
     setMessage('');
+    setPhoto('');
+    setPhotoName('');
+    setPhotoError('');
+    if (photoInputRef.current) photoInputRef.current.value = '';
   };
 
   return (
@@ -98,14 +163,14 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                   <div className="flex items-center gap-2.5">
                     <Phone className="w-5 h-5 text-amber-400 shrink-0" />
                     <strong className="text-amber-300 text-[15px] sm:text-lg font-black leading-snug">
-                      Grievance Redressal Committee:
+                      तक्रार निवारण समिती:
                     </strong>
                   </div>
                   <div className="flex flex-col gap-2.5">
                     {ORG_DETAILS.directContacts.map((contact, idx) => (
                       <div
                         key={idx}
-                        className="px-3.5 py-3 rounded-xl bg-[#10254a]/85 border border-white/15 hover:border-amber-400 transition-colors flex items-center justify-between gap-3 shadow-xs"
+                        className="px-3.5 py-3 rounded-xl bg-[#10254a]/85 border border-white/15 hover:border-amber-400 transition-colors flex items-center justify-between gap-3 shadow-sm"
                       >
                         <div className="min-w-0">
                           <span className="text-white text-sm sm:text-base font-bold block leading-snug font-serifDevanagari">
@@ -126,30 +191,12 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     ))}
                   </div>
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white block text-sm sm:text-base mb-0.5">अधिकृत ई-मेल:</strong>
-                    <a href={`mailto:${ORG_DETAILS.email}`} className="text-slate-200 hover:underline font-mono">
-                      {ORG_DETAILS.email}
-                    </a>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-white block text-sm sm:text-base mb-0.5">कार्यालयीन वेळ:</strong>
-                    <span>सोमवार ते शनिवार (सकाळी 10:00 ते सायंकाळी 06:00)</span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
 
           {/* Right Column: Direct Message / Suggestion Form */}
-          <div className="lg:col-span-7 bg-white p-5 sm:p-7 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="lg:col-span-7 bg-white p-5 sm:p-7 rounded-2xl border border-slate-200 shadow-sm">
             <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36] mb-1.5">
               आपला संदेश किंवा प्रश्न पाठवा
             </h2>
@@ -216,10 +263,11 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      ई-मेल पत्ता (पर्यायी)
+                      ई-मेल पत्ता <span className="text-rose-600">*</span>
                     </label>
                     <input
                       type="email"
+                      required
                       placeholder="example@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -229,14 +277,15 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
 
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      आपला जिल्हा
+                      आपला जिल्हा <span className="text-rose-600">*</span>
                     </label>
                     <select
+                      required
                       value={district}
                       onChange={(e) => setDistrict(e.target.value)}
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-medium text-slate-700 text-sm sm:text-base"
                     >
-                      <option value="">जिल्हा निवडा (ऐच्छिक)</option>
+                      <option value="">जिल्हा निवडा *</option>
                       {MAHARASHTRA_DISTRICTS.map((d) => (
                         <option key={d} value={d}>{d}</option>
                       ))}
@@ -246,10 +295,11 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
 
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
-                    विषय
+                    विषय <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     placeholder="उदा. सदस्यत्व, पदोन्नती, किंवा तक्रार"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
@@ -271,9 +321,73 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                   />
                 </div>
 
+                {/* Photo Attachment (Max 3 MB) */}
+                <div>
+                  <label className="font-bold text-slate-700 flex items-center gap-1.5 mb-1.5">
+                    <Paperclip className="w-4 h-4 text-amber-700" />
+                    <span>फोटो जोडा (ऐच्छिक, कमाल 3 MB)</span>
+                  </label>
+                  <div className="p-3 bg-slate-50 border border-dashed border-slate-300 rounded-xl space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoChange}
+                        disabled={isUploadingPhoto}
+                        className="w-full text-xs sm:text-sm text-slate-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs sm:file:text-sm file:font-bold file:bg-[#193568] file:text-amber-300 hover:file:bg-[#122b54] cursor-pointer"
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      निवेदन, कागदपत्र किंवा संबंधित फोटो (3 MB पेक्षा कमी आकाराचा) येथे जोडू शकता.
+                    </p>
+
+                    {isUploadingPhoto && (
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#193568] bg-sky-50 border border-sky-200 rounded-lg px-3 py-2">
+                        <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+                        <span>फोटो तयार होत आहे...</span>
+                      </div>
+                    )}
+
+                    {photoError && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-300 text-rose-800 rounded-lg font-bold text-xs sm:text-sm">
+                        {photoError}
+                      </div>
+                    )}
+
+                    {photo && !isUploadingPhoto && (
+                      <div className="flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-emerald-300">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={photo}
+                            alt="जोडलेला फोटो"
+                            className="w-14 h-14 rounded-lg object-cover border border-slate-200 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1 text-xs font-bold text-emerald-700">
+                              <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span>फोटो जोडला गेला</span>
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{photoName || 'फोटो संलग्न'}</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleClearPhoto}
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg border border-rose-200 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span>काढा</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   type="submit"
-                  className="bg-[#193568] hover:bg-[#122b54] text-amber-300 font-bold px-6 py-2.5 rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-md active:scale-98"
+                  disabled={isUploadingPhoto}
+                  className="bg-[#193568] hover:bg-[#122b54] disabled:opacity-60 text-amber-300 font-bold px-6 py-2.5 rounded-lg text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-md active:scale-98 cursor-pointer"
                 >
                   <Send className="w-4 h-4 text-amber-400" />
                   <span>संदेश पाठवा</span>

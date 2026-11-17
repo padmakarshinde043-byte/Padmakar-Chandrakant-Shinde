@@ -2525,6 +2525,7 @@ export interface ContactMessage {
   district?: string;
   subject?: string;
   message: string;
+  photo?: string;
   createdAt: string;
   isRead?: boolean;
 }
@@ -2532,27 +2533,28 @@ export interface ContactMessage {
 const CONTACTS_CACHE_KEY = 'mahasangh_contacts_cache_v1';
 
 export async function saveContactToFirestore(contact: ContactMessage): Promise<void> {
+  const cleanedContact = cleanForFirestore(contact) as ContactMessage;
   try {
     const raw = localStorage.getItem(CONTACTS_CACHE_KEY);
     const list: ContactMessage[] = raw ? JSON.parse(raw) : [];
-    const updated = [contact, ...list.filter(c => c.id !== contact.id)];
+    const updated = [cleanedContact, ...list.filter(c => c.id !== cleanedContact.id)];
     localStorage.setItem(CONTACTS_CACHE_KEY, JSON.stringify(updated));
   } catch (e) {
     console.error(e);
   }
 
-  const path = `contacts/${contact.id}`;
+  const path = `contacts/${cleanedContact.id}`;
   try {
     if (await isSqlBackendActive()) {
       await sqlApiRequest('/api/db/contacts', {
         method: 'POST',
-        body: JSON.stringify(contact),
+        body: JSON.stringify(cleanedContact),
       });
       return;
     }
     if (!(await isFirebaseAllowedInCurrentEnvironment())) return;
     const previewDb = requirePreviewDb();
-    await setDoc(doc(previewDb, 'contacts', contact.id), contact);
+    await setDoc(doc(previewDb, 'contacts', cleanedContact.id), cleanedContact);
   } catch (error) {
     console.warn('Saved contact locally, remote sync error:', error);
   }

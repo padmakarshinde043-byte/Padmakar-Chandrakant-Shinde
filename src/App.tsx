@@ -5,6 +5,7 @@ import { HomeTab } from './components/HomeTab';
 
 const loadAboutTab = () => import('./components/AboutTab');
 const loadLeadershipTab = () => import('./components/LeadershipTab');
+const loadDistrictLeadershipTab = () => import('./components/DistrictLeadershipTab');
 const loadAdvisoryBoardTab = () => import('./components/AdvisoryBoardTab');
 const loadNewsTab = () => import('./components/NewsTab');
 const loadMembershipTab = () => import('./components/MembershipTab');
@@ -14,6 +15,7 @@ const loadAppointmentsTab = () => import('./components/AppointmentsTab');
 
 const AboutTab = lazy(() => loadAboutTab().then((m) => ({ default: m.AboutTab })));
 const LeadershipTab = lazy(() => loadLeadershipTab().then((m) => ({ default: m.LeadershipTab })));
+const DistrictLeadershipTab = lazy(() => loadDistrictLeadershipTab().then((m) => ({ default: m.DistrictLeadershipTab })));
 const AdvisoryBoardTab = lazy(() => loadAdvisoryBoardTab().then((m) => ({ default: m.AdvisoryBoardTab })));
 const NewsTab = lazy(() => loadNewsTab().then((m) => ({ default: m.NewsTab })));
 const MembershipTab = lazy(() => loadMembershipTab().then((m) => ({ default: m.MembershipTab })));
@@ -29,6 +31,9 @@ const prefetchTabChunk = (tabId: string) => {
       break;
     case 'leadership':
       loadLeadershipTab();
+      break;
+    case 'district_leadership':
+      loadDistrictLeadershipTab();
       break;
     case 'advisory':
       loadAdvisoryBoardTab();
@@ -625,6 +630,7 @@ export function App() {
     district?: string;
     subject?: string;
     message: string;
+    photo?: string;
     createdAt: string;
   }) => {
     try {
@@ -704,6 +710,11 @@ export function App() {
           {(visitedTabs.leadership || currentTab === 'leadership') && (
             <div className={currentTab === 'leadership' ? 'block mhs-tab-enter' : 'hidden'}>
               <LeadershipTab setCurrentTab={setCurrentTab} />
+            </div>
+          )}
+          {(visitedTabs.district_leadership || currentTab === 'district_leadership') && (
+            <div className={currentTab === 'district_leadership' ? 'block mhs-tab-enter' : 'hidden'}>
+              <DistrictLeadershipTab setCurrentTab={setCurrentTab} />
             </div>
           )}
           {(visitedTabs.advisory || currentTab === 'advisory') && (

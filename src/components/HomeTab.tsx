@@ -300,28 +300,42 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
             </div>
           </div>
 
-          {/* Hub 4: State Leadership Directory */}
+          {/* Hub 4: State & District Executive Directory */}
           <div
             onClick={() => {
               setCurrentTab('leadership');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="mhs-card-interactive mhs-stagger-4 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-purple-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+            className="mhs-card-interactive mhs-stagger-4 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-purple-600 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
           >
             <div>
               <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-800 flex items-center justify-center mb-3 group-hover:bg-purple-700 group-hover:text-white transition-colors">
                 <School className="w-5 h-5" />
               </div>
               <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36] group-hover:text-purple-900 transition-colors">
-                राज्य व जिल्हा नेतृत्व
+                राज्य व जिल्हा पदाधिकारी
               </h3>
               <p className="text-base text-slate-600 mt-2 leading-relaxed">
-                राज्य कार्यकारिणी, 6 महसूल विभाग समन्वयक आणि सर्व 34 जिल्हाध्यक्षांचे संपर्क क्रमांक व माहिती.
+                राज्य कार्यकारिणी, महिला आघाडी, विभागीय कार्यकारिणी तसेच सर्व 34 जिल्ह्यांचे जिल्हाध्यक्ष व जिल्हा सरचिटणीस.
               </p>
             </div>
-            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-sm sm:text-base font-bold text-purple-700 group-hover:text-purple-900">
-              <span>कार्यकारिणी पहा</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs sm:text-sm font-bold">
+              <span className="text-purple-700 group-hover:text-purple-900 inline-flex items-center gap-1">
+                <span>राज्य पदाधिकारी</span>
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentTab('district_leadership');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200/80 inline-flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>जिल्हा पदाधिकारी</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>

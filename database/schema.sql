@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS `contacts` (
   `district` VARCHAR(128) NOT NULL DEFAULT '',
   `subject` VARCHAR(500) NOT NULL DEFAULT '',
   `message` LONGTEXT NOT NULL,
+  `photo` LONGTEXT NULL,
   `created_at` VARCHAR(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
