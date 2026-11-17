@@ -23,6 +23,7 @@
  */
 
 import type { jsPDF as JsPdfType } from 'jspdf';
+import QRCode from 'qrcode';
 import { OfficialMember, formatAppointedPostWithTaluka } from '../data/rkMaharashtraData';
 
 async function loadPdfEngines() {
@@ -57,89 +58,53 @@ let cachedLogoBase64: string | null = null;
 
 export async function getHedingDataUrl(): Promise<string> {
   if (cachedHedingBase64) return cachedHedingBase64;
-  try {
-    const res = await fetch('/heding.jpg');
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        cachedHedingBase64 = reader.result as string;
-        resolve(cachedHedingBase64);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return '/heding.jpg';
-  }
+  const resolved = await resolveImageUrlForPdf('/heding.jpg');
+  if (resolved) cachedHedingBase64 = resolved;
+  return resolved;
 }
 
 export async function getSignDataUrl(): Promise<string> {
   if (cachedSignBase64) return cachedSignBase64;
-  try {
-    const res = await fetch('/sign.jpg');
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        cachedSignBase64 = reader.result as string;
-        resolve(cachedSignBase64);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return '/sign.jpg';
-  }
+  const resolved = await resolveImageUrlForPdf('/sign.jpg');
+  if (resolved) cachedSignBase64 = resolved;
+  return resolved;
 }
 
 export async function getLogoDataUrl(): Promise<string> {
   if (cachedLogoBase64) return cachedLogoBase64;
-  try {
-    const res = await fetch('/logo.png');
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        cachedLogoBase64 = reader.result as string;
-        resolve(cachedLogoBase64);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return '/logo.png';
-  }
+  const resolved = await resolveImageUrlForPdf('/logo.png');
+  if (resolved) cachedLogoBase64 = resolved;
+  return resolved;
 }
 
-let cachedQrBase64: string | null = null;
-export async function getQrCodeDataUrl(): Promise<string> {
-  if (cachedQrBase64) return cachedQrBase64;
-  const urls = [
-    'https://api.qrserver.com/v1/create-qr-code/?size=600x600&margin=1&ecc=M&data=https%3A%2F%2Fmahasangh.in',
-    'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https%3A%2F%2Fmahasangh.in',
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const blob = await res.blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('QR read error'));
-        reader.readAsDataURL(blob);
-      });
-      cachedQrBase64 = dataUrl;
-      return dataUrl;
-    } catch {
-      // Try fallback URL
-    }
+const cachedQrByValue = new Map<string, string>();
+export async function getQrCodeDataUrl(targetUrl = 'https://mahasangh.in'): Promise<string> {
+  const existing = cachedQrByValue.get(targetUrl);
+  if (existing) return existing;
+  try {
+    const dataUrl = await QRCode.toDataURL(targetUrl, {
+      width: 600,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+    cachedQrByValue.set(targetUrl, dataUrl);
+    return dataUrl;
+  } catch (err) {
+    console.warn('Local QR generation error:', err);
+    return '';
   }
-  return urls[1];
 }
 
 function loadHtmlImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (!src.startsWith('data:') && !src.startsWith('blob:')) {
+      img.crossOrigin = 'anonymous';
+    }
     img.onload = () => resolve(img);
     img.onerror = (err) => reject(err);
     img.src = src;
@@ -299,83 +264,115 @@ async function getTransparentSignDataUrl(): Promise<string> {
 
 let cachedIdCardWaveBgDataUrl: string | null = null;
 /**
- * Rasterizes the Official Straight Gold-and-Navy Header/Footer layout directly via
- * the browser vector engine at 3424x2160 (1016 DPI CR80) into a lossless PNG background,
- * guaranteeing zero html2canvas SVG filter/gradient artifacts when printing.
+ * Draws the Official Straight Gold-and-Navy Header/Footer layout natively onto Canvas 2D
+ * at 3424x2160 (1016 DPI CR80) into a lossless PNG Data URL, guaranteeing zero
+ * SVG-to-canvas security taint or gradient artifacts on any browser/WebView.
  */
 async function getIdCardWaveBackgroundDataUrl(width = 3424, height = 2160): Promise<string> {
   if (cachedIdCardWaveBgDataUrl) return cachedIdCardWaveBgDataUrl;
-  const svgMarkup = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 404" width="${width}" height="${height}" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="idTopBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#041434" />
-          <stop offset="45%" stop-color="#0c347a" />
-          <stop offset="75%" stop-color="#1449a3" />
-          <stop offset="100%" stop-color="#05183d" />
-        </linearGradient>
-        <radialGradient id="idTopBlueGlow" cx="62%" cy="42%" r="48%">
-          <stop offset="0%" stop-color="#2262cc" stop-opacity="0.45" />
-          <stop offset="100%" stop-color="#041434" stop-opacity="0" />
-        </radialGradient>
-        <linearGradient id="idTopGoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#a16207" />
-          <stop offset="18%" stop-color="#f5c842" />
-          <stop offset="48%" stop-color="#fef08a" />
-          <stop offset="75%" stop-color="#eab308" />
-          <stop offset="100%" stop-color="#92400e" />
-        </linearGradient>
-        <filter id="idGoldDropShadow" x="-2%" y="-10%" width="104%" height="160%">
-          <feDropShadow dx="0" dy="1.8" stdDeviation="2" flood-color="#091e42" flood-opacity="0.22" />
-        </filter>
-        <linearGradient id="idBottomGoldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#92400e" />
-          <stop offset="28%" stop-color="#f5c842" />
-          <stop offset="55%" stop-color="#fef08a" />
-          <stop offset="82%" stop-color="#eab308" />
-          <stop offset="100%" stop-color="#a16207" />
-        </linearGradient>
-        <linearGradient id="idBottomBlueGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#041434" />
-          <stop offset="50%" stop-color="#124294" />
-          <stop offset="100%" stop-color="#041434" />
-        </linearGradient>
-      </defs>
-
-      <rect x="0" y="0" width="640" height="404" fill="#ffffff" />
-
-      <!-- Top Navy Header strictly above straight gold line -->
-      <rect x="0" y="0" width="640" height="95" fill="url(#idTopBlueGrad)" />
-      <rect x="0" y="0" width="640" height="95" fill="url(#idTopBlueGlow)" />
-      <!-- Straight Top Metallic Gold Divider Line -->
-      <rect x="0" y="95" width="640" height="7" fill="url(#idTopGoldGrad)" filter="url(#idGoldDropShadow)" />
-      <rect x="0" y="95.4" width="640" height="1" fill="#fef9c3" opacity="0.7" />
-      <rect x="0" y="101.2" width="640" height="0.8" fill="#854d0e" opacity="0.85" />
-
-      <!-- Bottom Straight Metallic Gold Line & Navy Blue Footer Band strictly below it -->
-      <rect x="0" y="368" width="640" height="6" fill="url(#idBottomGoldGrad)" />
-      <rect x="0" y="368.3" width="640" height="0.9" fill="#fef9c3" opacity="0.65" />
-      <rect x="0" y="374" width="640" height="30" fill="url(#idBottomBlueGrad)" />
-    </svg>
-  `.trim();
-
   try {
-    const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgMarkup)}`;
-    const img = await loadHtmlImage(svgDataUrl);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return svgDataUrl;
+    if (!ctx) return '';
+
+    const sx = width / 640;
+    const sy = height / 404;
 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(img, 0, 0, width, height);
+
+    // Top Navy Header strictly above straight gold line
+    const topBlueGrad = ctx.createLinearGradient(0, 0, width, 95 * sy);
+    topBlueGrad.addColorStop(0, '#041434');
+    topBlueGrad.addColorStop(0.45, '#0c347a');
+    topBlueGrad.addColorStop(0.75, '#1449a3');
+    topBlueGrad.addColorStop(1, '#05183d');
+    ctx.fillStyle = topBlueGrad;
+    ctx.fillRect(0, 0, width, 95 * sy);
+
+    const glowCx = 0.62 * width;
+    const glowCy = 0.42 * 95 * sy;
+    const glowR = 0.48 * width;
+    const topBlueGlow = ctx.createRadialGradient(glowCx, glowCy, 0, glowCx, glowCy, glowR);
+    topBlueGlow.addColorStop(0, 'rgba(34, 98, 204, 0.45)');
+    topBlueGlow.addColorStop(1, 'rgba(4, 20, 52, 0)');
+    ctx.fillStyle = topBlueGlow;
+    ctx.fillRect(0, 0, width, 95 * sy);
+
+    // Straight Top Metallic Gold Divider Line with subtle shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(9, 30, 66, 0.22)';
+    ctx.shadowBlur = 4 * sx;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1.8 * sy;
+    const topGoldGrad = ctx.createLinearGradient(0, 0, width, 0);
+    topGoldGrad.addColorStop(0, '#a16207');
+    topGoldGrad.addColorStop(0.18, '#f5c842');
+    topGoldGrad.addColorStop(0.48, '#fef08a');
+    topGoldGrad.addColorStop(0.75, '#eab308');
+    topGoldGrad.addColorStop(1, '#92400e');
+    ctx.fillStyle = topGoldGrad;
+    ctx.fillRect(0, 95 * sy, width, 7 * sy);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(254, 249, 195, 0.7)';
+    ctx.fillRect(0, 95.4 * sy, width, 1 * sy);
+    ctx.fillStyle = 'rgba(133, 77, 14, 0.85)';
+    ctx.fillRect(0, 101.2 * sy, width, 0.8 * sy);
+
+    // Bottom Straight Metallic Gold Line & Navy Blue Footer Band
+    const bottomGoldGrad = ctx.createLinearGradient(0, 0, width, 0);
+    bottomGoldGrad.addColorStop(0, '#92400e');
+    bottomGoldGrad.addColorStop(0.28, '#f5c842');
+    bottomGoldGrad.addColorStop(0.55, '#fef08a');
+    bottomGoldGrad.addColorStop(0.82, '#eab308');
+    bottomGoldGrad.addColorStop(1, '#a16207');
+    ctx.fillStyle = bottomGoldGrad;
+    ctx.fillRect(0, 368 * sy, width, 6 * sy);
+
+    ctx.fillStyle = 'rgba(254, 249, 195, 0.65)';
+    ctx.fillRect(0, 368.3 * sy, width, 0.9 * sy);
+
+    const bottomBlueGrad = ctx.createLinearGradient(0, 0, width, 0);
+    bottomBlueGrad.addColorStop(0, '#041434');
+    bottomBlueGrad.addColorStop(0.5, '#124294');
+    bottomBlueGrad.addColorStop(1, '#041434');
+    ctx.fillStyle = bottomBlueGrad;
+    ctx.fillRect(0, 374 * sy, width, 30 * sy);
+
     cachedIdCardWaveBgDataUrl = canvas.toDataURL('image/png');
     return cachedIdCardWaveBgDataUrl;
   } catch {
     return '';
   }
+}
+
+/**
+ * Ensures every <img> inside an off-screen print container has an inline data:image/*
+ * src before invoking html2canvas so canvas.toDataURL() can never fail with SecurityError.
+ */
+async function ensureAllImagesInlineDataUrls(root: HTMLElement): Promise<void> {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(async (img) => {
+      const src = (img.getAttribute('src') || '').trim();
+      if (!src) {
+        img.remove();
+        return;
+      }
+      if (src.startsWith('data:image/')) {
+        return;
+      }
+      const inlined = await resolveImageUrlForPdf(src);
+      if (inlined && inlined.startsWith('data:image/')) {
+        img.setAttribute('src', inlined);
+      } else {
+        img.remove();
+      }
+    })
+  );
 }
 
 /**
@@ -389,16 +386,21 @@ async function cropPhotoToCoverDataUrl(
 ): Promise<string> {
   if (!photoUrl) return '';
   try {
-    const img = await loadHtmlImage(photoUrl);
+    const safeSrc = photoUrl.startsWith('data:image/')
+      ? photoUrl
+      : await resolveImageUrlForPdf(photoUrl);
+    if (!safeSrc) return '';
+
+    const img = await loadHtmlImage(safeSrc);
     const sw = img.naturalWidth || img.width;
     const sh = img.naturalHeight || img.height;
-    if (!sw || !sh) return photoUrl;
+    if (!sw || !sh) return safeSrc.startsWith('data:image/') ? safeSrc : '';
 
     const canvas = document.createElement('canvas');
     canvas.width = targetW;
     canvas.height = targetH;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return photoUrl;
+    if (!ctx) return safeSrc.startsWith('data:image/') ? safeSrc : '';
 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, targetW, targetH);
@@ -418,7 +420,7 @@ async function cropPhotoToCoverDataUrl(
     }
     return canvas.toDataURL('image/png');
   } catch {
-    return photoUrl;
+    return photoUrl.startsWith('data:image/') ? photoUrl : '';
   }
 }
 
@@ -625,13 +627,14 @@ async function renderStandardPaginatedTablePdf(params: {
         dense,
       });
 
+      await ensureAllImagesInlineDataUrls(wrapper);
       await waitForFontsAndImages(wrapper);
 
       const pageEl = wrapper.firstElementChild as HTMLElement;
       const canvas = await html2canvas(pageEl, {
         scale: 1.5,
-        useCORS: false,
-        allowTaint: true,
+        useCORS: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         scrollX: 0,
         scrollY: 0,
@@ -689,13 +692,14 @@ export async function generateSingleLetterPdf(
   document.body.appendChild(wrapper);
 
   try {
+    await ensureAllImagesInlineDataUrls(wrapper);
     await waitForFontsAndImages(wrapper);
     const { jsPDF, html2canvas } = await loadPdfEngines();
 
     const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
       scale: 1.75,
-      useCORS: false,
-      allowTaint: true,
+      useCORS: true,
+      allowTaint: false,
       backgroundColor: '#ffffff',
       scrollX: 0,
       scrollY: 0,
@@ -899,9 +903,13 @@ async function buildMembershipIdCardPdfDocument(
       }
 
       <!-- 1. TOP-LEFT SHARP CIRCULAR LOGO (Inside straight top navy header) -->
-      <div style="position: absolute; left: 2.8%; top: 1.4%; width: 114px; height: 114px; border-radius: 50%; border: 3.6px solid #eab308; background: #ffffff; overflow: hidden; box-sizing: border-box; box-shadow: 0 3px 8px rgba(0,0,0,0.45), 0 0 0 1.8px rgba(255,255,255,0.72);">
-        <img src="${sharpLogoUrl}" alt="महासंघ लोगो" style="width: 100%; height: 100%; display: block;" />
-      </div>
+      ${
+        sharpLogoUrl
+          ? `<div style="position: absolute; left: 2.8%; top: 1.4%; width: 114px; height: 114px; border-radius: 50%; border: 3.6px solid #eab308; background: #ffffff; overflow: hidden; box-sizing: border-box; box-shadow: 0 3px 8px rgba(0,0,0,0.45), 0 0 0 1.8px rgba(255,255,255,0.72);">
+               <img src="${sharpLogoUrl}" alt="महासंघ लोगो" style="width: 100%; height: 100%; display: block;" />
+             </div>`
+          : ''
+      }
 
       <!-- 2. HEADER 3 TITLE LINES (Centered inside straight navy header above straight gold line) -->
       <div style="position: absolute; left: 16.5%; right: 6%; top: 2.6%; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
@@ -958,7 +966,11 @@ async function buildMembershipIdCardPdfDocument(
 
       <!-- 7. RIGHT SCANNABLE QR CODE (Moved Lower for Clear Gap Below Member No & Above Signature) -->
       <div style="position: absolute; right: 4.2%; top: 43.2%; width: 140px; height: 140px; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 2px; box-sizing: border-box;">
-        <img src="${qrUrl}" alt="mahasangh.in QR Code" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block;" />
+        ${
+          qrUrl
+            ? `<img src="${qrUrl}" alt="mahasangh.in QR Code" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block;" />`
+            : ''
+        }
       </div>
 
       <!-- 8. BOTTOM-LEFT FOOTER TEXT (Cleanly above straight bottom gold line) -->
@@ -973,7 +985,11 @@ async function buildMembershipIdCardPdfDocument(
 
       <!-- 9. BOTTOM-RIGHT TRANSPARENT BLUE INK SIGNATURE & DESIGNATION (Above straight gold line, clear of QR) -->
       <div style="position: absolute; right: 3.2%; bottom: 10.1%; min-width: 23%; text-align: center; display: flex; flex-direction: column; align-items: center;">
-        <img src="${transparentSignUrl}" alt="स्वाक्षरी" style="height: 42.5px; width: auto; max-width: 158px; object-fit: contain; display: block; margin: 0 auto -3px auto;" />
+        ${
+          transparentSignUrl
+            ? `<img src="${transparentSignUrl}" alt="स्वाक्षरी" style="height: 42.5px; width: auto; max-width: 158px; object-fit: contain; display: block; margin: 0 auto -3px auto;" />`
+            : ''
+        }
         <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; color: #000000; font-size: 20.2px; line-height: 1.18; white-space: nowrap;">
           श्री. राजेंद्र खैरनार
         </div>
@@ -988,14 +1004,15 @@ async function buildMembershipIdCardPdfDocument(
   document.body.appendChild(wrapper);
 
   try {
+    await ensureAllImagesInlineDataUrls(wrapper);
     await waitForFontsAndImages(wrapper);
 
     const { jsPDF, html2canvas } = await loadPdfEngines();
     const cardEl = wrapper.firstElementChild as HTMLElement;
     const canvas = await html2canvas(cardEl, {
       scale: 2.2, // ~300 KB lightweight PDF for instant download
-      useCORS: false,
-      allowTaint: true,
+      useCORS: true,
+      allowTaint: false,
       backgroundColor: '#ffffff',
       scrollX: 0,
       scrollY: 0,
@@ -1092,42 +1109,58 @@ export async function generateDistrictBatchIdCardsPdf(
     const distStr = app.district ? `जि. ${app.district}` : '';
     const areaText = [talukaStr, distStr].filter(Boolean).join(', ');
     const phoneText = app.phone || '';
-    const photoUrl = app.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400';
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://mahasangh.in/member/${memberNo}`)}`;
-    const transparentSignUrl = cachedSignBase64 || 'sign.jpg';
+
+    const [sharpLogoUrl, qrUrl, rawPhotoUrl] = await Promise.all([
+      getSharpLogoDataUrl(240),
+      getQrCodeDataUrl(`https://mahasangh.in/member/${memberNo}`),
+      resolveImageUrlForPdf(app.photo),
+    ]);
+    const croppedPhotoUrl = rawPhotoUrl ? await cropPhotoToCoverDataUrl(rawPhotoUrl, 284, 350) : '';
 
     wrapper.innerHTML = `
       <div style="width: 856px; height: 540px; background: #ffffff; position: relative; overflow: hidden; box-sizing: border-box; font-family: 'Yantramanav', 'Noto Sans Devanagari', sans-serif;">
         <div style="background: linear-gradient(135deg, #09243f, #1e3a8a); color: white; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #d4af37;">
           <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #d4af37; overflow: hidden;">
-              <img src="logo.jpg" style="width: 100%; height: 100%; object-fit: contain;" />
-            </div>
+            ${
+              sharpLogoUrl
+                ? `<div style="width: 44px; height: 44px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid #d4af37; overflow: hidden;">
+                     <img src="${sharpLogoUrl}" style="width: 100%; height: 100%; object-fit: contain;" />
+                   </div>`
+                : ''
+            }
             <div>
               <div style="font-size: 13.5px; font-weight: 800; letter-spacing: 0.3px;">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</div>
               <div style="font-size: 10px; font-weight: 700; color: #fde047;">अधिकृत ओळखपत्र (Digital ID Card) - 2026</div>
             </div>
           </div>
           <div style="text-align: right; font-size: 11px; font-weight: 800; background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 20px; border: 1px solid #d4af37;">
-            सदस्य क्र.: ${memberNo}
+            सदस्य क्र.: ${escapeCardHtml(memberNo)}
           </div>
         </div>
         <div style="padding: 22px 28px; display: flex; gap: 24px; align-items: center; position: relative; height: calc(540px - 72px);">
-          <div style="width: 142px; height: 175px; border-radius: 10px; border: 3px solid #d4af37; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: #f8fafc; flex-shrink: 0;">
-            <img src="${photoUrl}" style="width: 100%; height: 100%; object-fit: cover;" crossorigin="anonymous" />
+          <div style="width: 142px; height: 175px; border-radius: 10px; border: 3px solid #d4af37; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); background: #f8fafc; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+            ${
+              croppedPhotoUrl
+                ? `<img src="${croppedPhotoUrl}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                : `<span style="font-size: 13px; color: #94a3b8; font-weight: 700;">फोटो</span>`
+            }
           </div>
           <div style="flex: 1; display: flex; flex-direction: column; gap: 6px;">
             <div style="font-size: 22px; font-weight: 900; color: #0f2b48; line-height: 1.2;">
-              ${app.salutation || ''} ${app.fullName}
+              ${escapeCardHtml(app.salutation || '')} ${escapeCardHtml(app.fullName)}
             </div>
             <div style="font-size: 14.5px; font-weight: 700; color: #334155; line-height: 1.4;">
-              <div>पद: ${cadre}</div>
-              <div>कार्यक्षेत्र: ${areaText}</div>
-              <div>मोबाईल: ${phoneText}</div>
+              <div>पद: ${escapeCardHtml(cadre)}</div>
+              <div>कार्यक्षेत्र: ${escapeCardHtml(areaText)}</div>
+              <div>मोबाईल: ${escapeCardHtml(phoneText)}</div>
             </div>
           </div>
           <div style="width: 120px; height: 120px; background: white; border: 1px solid #cbd5e1; padding: 4px; display: flex; align-items: center; justify-content: center;">
-            <img src="${qrUrl}" style="width: 100%; height: 100%; object-fit: contain;" />
+            ${
+              qrUrl
+                ? `<img src="${qrUrl}" style="width: 100%; height: 100%; object-fit: contain;" />`
+                : ''
+            }
           </div>
         </div>
       </div>
@@ -1135,11 +1168,12 @@ export async function generateDistrictBatchIdCardsPdf(
 
     document.body.appendChild(wrapper);
     try {
+      await ensureAllImagesInlineDataUrls(wrapper);
       await waitForFontsAndImages(wrapper);
       const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, {
         scale: 3,
-        useCORS: false,
-        allowTaint: true,
+        useCORS: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
       });

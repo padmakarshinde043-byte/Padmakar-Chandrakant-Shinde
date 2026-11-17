@@ -1,4 +1,5 @@
 import { compressImageFile } from './imageCompressor';
+import { normalizeImageSrcForPdf } from './pdfImageSafety';
 
 /**
  * Cloudinary Image Upload & Free CDN Storage Utility
@@ -252,42 +253,76 @@ export async function uploadCompressedPhotoToCloudinaryOrFallback(
 
 const pdfImageDataCache = new Map<string, string>();
 
+async function responseToImageDataUrl(res: Response): Promise<string> {
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  if (!blob.type || !blob.type.toLowerCase().startsWith('image/')) {
+    throw new Error(`Invalid image MIME: ${blob.type || 'unknown'}`);
+  }
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (result.startsWith('data:image/')) {
+        resolve(result);
+      } else {
+        reject(new Error('Invalid Data URL'));
+      }
+    };
+    reader.onerror = () => reject(new Error('FileReader error'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /**
- * Converts remote Cloudinary/HTTP photo URLs into in-memory Base64 Data URLs
- * before rendering html2canvas PDFs, completely preventing CORS/tainted-canvas errors.
+ * Converts local paths and remote Cloudinary/Firebase/HTTP photo URLs into
+ * in-memory Base64 Data URLs before rendering html2canvas PDFs, completely
+ * preventing CORS/tainted-canvas errors across all browsers.
  */
 export async function resolveImageUrlForPdf(src?: string): Promise<string> {
-  if (!src || typeof src !== 'string') return '';
-  const trimmed = src.trim();
-  if (!trimmed) return '';
+  const normalized = normalizeImageSrcForPdf(src);
+  if (!normalized) return '';
 
-  if (trimmed.startsWith('data:') || trimmed.startsWith('/')) {
-    return trimmed;
+  if (normalized.startsWith('data:image/')) {
+    return normalized;
   }
 
-  if (pdfImageDataCache.has(trimmed)) {
-    return pdfImageDataCache.get(trimmed)!;
+  if (pdfImageDataCache.has(normalized)) {
+    return pdfImageDataCache.get(normalized)!;
   }
 
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+  // Same-origin local asset path (e.g. /logo.png, /assets/...)
+  if (normalized.startsWith('/')) {
     try {
-      const res = await fetch(trimmed, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('FileReader error'));
-        reader.readAsDataURL(blob);
-      });
-      pdfImageDataCache.set(trimmed, dataUrl);
+      const res = await fetch(normalized);
+      const dataUrl = await responseToImageDataUrl(res);
+      pdfImageDataCache.set(normalized, dataUrl);
       return dataUrl;
     } catch (err) {
-      console.warn('Could not inline remote photo for PDF, skipping image to avoid tainted canvas:', err);
+      console.warn('Could not inline local image for PDF:', normalized, err);
       return '';
     }
   }
 
-  return trimmed;
-}
+  // Remote HTTP/HTTPS URL: try direct CORS fetch first, then fallback to same-origin proxy
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    try {
+      const res = await fetch(normalized, { mode: 'cors' });
+      const dataUrl = await responseToImageDataUrl(res);
+      pdfImageDataCache.set(normalized, dataUrl);
+      return dataUrl;
+    } catch {
+      try {
+        const proxyRes = await fetch(`/api/proxy-image?url=${encodeURIComponent(normalized)}`);
+        const dataUrl = await responseToImageDataUrl(proxyRes);
+        pdfImageDataCache.set(normalized, dataUrl);
+        return dataUrl;
+      } catch (proxyErr) {
+        console.warn('Could not inline remote photo for PDF, skipping image to avoid tainted canvas:', proxyErr);
+        return '';
+      }
+    }
+  }
 
+  return '';
+}

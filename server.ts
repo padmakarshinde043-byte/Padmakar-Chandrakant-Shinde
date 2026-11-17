@@ -10,6 +10,8 @@ import { simpleParser } from 'mailparser';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
+import dns from 'dns/promises';
+import { isPrivateOrReservedIpAddress, isSafeExternalImageProxyUrl } from './src/utils/pdfImageSafety';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
@@ -1056,6 +1058,70 @@ app.get('/api/health', (_req, res) => {
     activeBackend: mysqlActive ? 'mysql' : 'firebase',
     emailConfigured: emailConfig.enabled
   });
+});
+
+// Safe same-origin image proxy for PDF / I-Card canvas rendering (prevents tainted canvas & CORS errors)
+app.get('/api/proxy-image', async (req, res) => {
+  const rawUrl = typeof req.query.url === 'string' ? req.query.url : '';
+  const check = isSafeExternalImageProxyUrl(rawUrl);
+  if (!check.valid || !check.url) {
+    return res.status(400).json({ status: 'error', message: check.reason || 'Invalid image URL' });
+  }
+
+  try {
+    const resolved = await dns.lookup(check.url.hostname, { all: true });
+    if (!resolved.length || resolved.some((entry) => isPrivateOrReservedIpAddress(entry.address))) {
+      return res.status(403).json({ status: 'error', message: 'Blocked destination host' });
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    let upstream: Response;
+    try {
+      upstream = await fetch(check.url.toString(), {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          Accept: 'image/*,*/*;q=0.8',
+          'User-Agent': 'MahasanghPortal/1.0',
+        },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+
+    if (!upstream.ok) {
+      return res.status(502).json({ status: 'error', message: `Upstream HTTP ${upstream.status}` });
+    }
+
+    // Re-check final redirected URL to guard against open-redirect SSRF
+    if (upstream.url) {
+      const finalCheck = isSafeExternalImageProxyUrl(upstream.url);
+      if (!finalCheck.valid) {
+        return res.status(403).json({ status: 'error', message: 'Blocked redirected image host' });
+      }
+    }
+
+    const contentType = (upstream.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!contentType.startsWith('image/')) {
+      return res.status(415).json({ status: 'error', message: 'Target is not a valid image' });
+    }
+
+    const arrayBuf = await upstream.arrayBuffer();
+    if (arrayBuf.byteLength === 0 || arrayBuf.byteLength > 5 * 1024 * 1024) {
+      return res.status(413).json({ status: 'error', message: 'Image size out of bounds' });
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    return res.send(Buffer.from(arrayBuf));
+  } catch (err: any) {
+    return res.status(502).json({
+      status: 'error',
+      message: err?.name === 'AbortError' ? 'Image fetch timed out' : 'Failed to load remote image',
+    });
+  }
 });
 
 // Active DB mode endpoint (used once on client boot)
