@@ -1089,11 +1089,11 @@ export const AppointmentsTab: React.FC = () => {
   };
 
   return (
-    <div className="bg-[#f5f7fa] min-h-screen py-5 sm:py-7 text-slate-900">
+    <div className="bg-[#f5f7fa] min-h-screen pt-3 pb-6 sm:pt-4 sm:pb-7 text-slate-900">
       <div className="max-w-[1100px] mx-auto px-3 sm:px-4">
         {/* Institutional Page Masthead, District Control & Standard Portal Tabs */}
-        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-5 overflow-hidden">
-          <div className="px-4 py-4 sm:px-6 sm:py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-4 overflow-hidden">
+          <div className="px-4 py-3.5 sm:px-6 sm:py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
               <div className="text-xs sm:text-sm font-semibold text-slate-600 mb-1">
                 महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ · कार्यकारिणी कक्ष

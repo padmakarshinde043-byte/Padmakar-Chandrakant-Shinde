@@ -122,10 +122,10 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
   };
 
   return (
-    <div className="bg-slate-50 py-6 sm:py-10 text-slate-800">
+    <div className="bg-slate-50 pt-3 pb-8 sm:pt-4 sm:pb-10 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-6">
-        <div className="border-b border-slate-200 pb-4">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-4">
+        <div className="border-b border-slate-200 pb-3">
           <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
             थेट संवाद व मार्गदर्शन
           </span>

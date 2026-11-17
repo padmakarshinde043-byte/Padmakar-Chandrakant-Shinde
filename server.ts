@@ -914,12 +914,27 @@ const rateLimitMessage = {
   message: 'अनेक विनंत्या आल्यामुळे तात्पुरते थांबवले आहे. कृपया काही मिनिटांनी पुन्हा प्रयत्न करा.',
 };
 
+function extractClientIpForLimiter(req: express.Request): string {
+  const cfIp = String(req.headers['cf-connecting-ip'] || '').trim();
+  if (cfIp) return cfIp;
+  const xff = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim();
+  if (xff) return xff;
+  const realIp = String(req.headers['x-real-ip'] || '').trim();
+  if (realIp) return realIp;
+  return String(req.ip || req.socket?.remoteAddress || 'unknown');
+}
+
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 25,
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false, xForwardedForHeader: false },
+  keyGenerator: (req) => `${extractClientIpForLimiter(req)}:${req.path}`,
+  skip: (req) => req.method === 'GET' || req.path === '/session' || req.path === '/logout',
+  validate: { trustProxy: false, xForwardedForHeader: false, keyGeneratorIpFallback: false },
   message: rateLimitMessage,
 });
 
@@ -928,7 +943,8 @@ const contactMailLimiter = rateLimit({
   max: 25,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false, xForwardedForHeader: false },
+  keyGenerator: (req) => extractClientIpForLimiter(req),
+  validate: { trustProxy: false, xForwardedForHeader: false, keyGeneratorIpFallback: false },
   message: rateLimitMessage,
 });
 
@@ -937,17 +953,19 @@ const appSubmitLimiter = rateLimit({
   max: 35,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false, xForwardedForHeader: false },
+  keyGenerator: (req) => extractClientIpForLimiter(req),
+  validate: { trustProxy: false, xForwardedForHeader: false, keyGeneratorIpFallback: false },
   message: rateLimitMessage,
 });
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 1500,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: { trustProxy: false, xForwardedForHeader: false },
-  skip: (req) => req.path === '/razorpay/webhook' || req.path === '/health',
+  keyGenerator: (req) => extractClientIpForLimiter(req),
+  validate: { trustProxy: false, xForwardedForHeader: false, keyGeneratorIpFallback: false },
+  skip: (req) => req.path === '/razorpay/webhook' || req.path === '/health' || req.path === '/auth/session',
   message: rateLimitMessage,
 });
 
@@ -3206,6 +3224,30 @@ async function startServer() {
       const vite = await createViteServer({
         server: { middlewareMode: true, hmr: false },
         appType: 'spa'
+      });
+      app.get('/@vite/client', async (_req, res, next) => {
+        try {
+          const result = await vite.transformRequest('/@vite/client');
+          if (!result?.code) return next();
+          const patchedCode = result.code
+            .replace(
+              'transport.connect(createHMRHandler(handleMessage));',
+              '/* HMR WebSocket disabled */'
+            )
+            .replace(
+              'throw new Error("send was called before connect");',
+              'return;'
+            )
+            .replace(
+              'throw new Error("invoke was called before connect");',
+              'return;'
+            );
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache');
+          return res.send(patchedCode);
+        } catch {
+          return next();
+        }
       });
       app.use(vite.middlewares);
     } catch (viteErr) {

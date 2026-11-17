@@ -48,7 +48,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
   return (
     <div className="bg-slate-50 text-slate-800">
       {/* Hero Section: Compact, Executive Asymmetric Portal */}
-      <section className="relative bg-gradient-to-b from-[#152f59] via-[#193568] to-[#132b52] text-white py-8 sm:py-12 px-4 sm:px-6 overflow-hidden border-b border-slate-700/80">
+      <section className="relative bg-gradient-to-b from-[#152f59] via-[#193568] to-[#132b52] text-white pt-5 pb-8 sm:pt-7 sm:pb-10 px-4 sm:px-6 overflow-hidden border-b border-slate-700/80">
         {/* Subtle architectural background texture */}
         <div
           className="absolute inset-0 opacity-10 bg-cover bg-center pointer-events-none mix-blend-overlay"

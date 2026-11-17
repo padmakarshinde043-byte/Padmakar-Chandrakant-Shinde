@@ -100,10 +100,10 @@ export const AdvisoryBoardTab: React.FC = () => {
   );
 
   return (
-    <div className="bg-slate-50 py-10 md:py-14 text-slate-800">
+    <div className="bg-slate-50 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-10">
-        <div className="border-b-2 border-[#102a43] pb-6">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-6">
+        <div className="border-b-2 border-[#102a43] pb-4">
           <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
             अधिकृत सल्लागार व मार्गदर्शन कक्ष
           </span>

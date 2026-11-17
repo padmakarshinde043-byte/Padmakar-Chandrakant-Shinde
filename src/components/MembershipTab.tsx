@@ -630,11 +630,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   };
 
   return (
-    <div className="bg-[#f5f7fa] py-6 sm:py-8">
+    <div className="bg-[#f5f7fa] pt-3 pb-6 sm:pt-4 sm:pb-8">
       <div className="max-w-[1000px] mx-auto px-4">
         {/* Institutional Page Masthead & Standard Portal Navigation Tabs */}
-        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-6 overflow-hidden">
-          <div className="px-5 py-5 sm:px-6 sm:py-6">
+        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-4 overflow-hidden">
+          <div className="px-4 py-3.5 sm:px-6 sm:py-4">
             <div className="text-xs sm:text-sm font-semibold text-slate-600 mb-1">
               {ORG_DETAILS.name} · आजीवन सभासद कक्ष
             </div>

@@ -292,10 +292,10 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
   }, [districtRows, districtSearch]);
 
   return (
-    <div className="bg-gradient-to-b from-slate-50 via-[#f8fafc] to-slate-100 py-10 md:py-14 text-slate-800">
+    <div className="bg-gradient-to-b from-slate-50 via-[#f8fafc] to-slate-100 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-8">
-        <div className="border-b-2 border-[#102a43] pb-5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-5">
+        <div className="border-b-2 border-[#102a43] pb-3.5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
             <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
               जिल्हास्तरीय नेतृत्व व कार्यकारिणी
