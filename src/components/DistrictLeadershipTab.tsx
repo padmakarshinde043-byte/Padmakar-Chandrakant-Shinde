@@ -84,20 +84,64 @@ const ROW_GLOSSY_THEMES = [
 ] as const;
 
 function normalizeDistrictPairKey(region?: string): string {
-  const clean = (region || '').trim();
+  const clean = (region || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/जिल्हा/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!clean) return '';
-  if (clean.includes('संभाजीनगर') || clean.includes('औरंगाबाद')) return 'छत्रपती संभाजीनगर';
-  if (clean.includes('धाराशिव') || clean.includes('उस्मानाबाद')) return 'धाराशिव';
-  if (clean.includes('अहिल्यानगर') || clean.includes('अहमदनगर')) return 'अहिल्यानगर';
-  if (clean.includes('वाशीम') || clean.includes('वाशिम')) return 'वाशीम';
-  return clean;
+
+  const phonetic = clean.replace(/ू/g, 'ु').replace(/ी/g, 'ि').toLowerCase();
+
+  if (
+    phonetic.includes('संभाजिनगर') ||
+    phonetic.includes('औरंगाबाद') ||
+    phonetic.includes('sambhajinagar') ||
+    phonetic.includes('aurangabad')
+  ) {
+    return 'छत्रपती संभाजीनगर';
+  }
+  if (
+    phonetic.includes('धाराशिव') ||
+    phonetic.includes('उस्मानाबाद') ||
+    phonetic.includes('dharashiv') ||
+    phonetic.includes('osmanabad')
+  ) {
+    return 'धाराशिव';
+  }
+  if (
+    phonetic.includes('अहिल्यानगर') ||
+    phonetic.includes('अहमदनगर') ||
+    phonetic.includes('ahilyanagar') ||
+    phonetic.includes('ahmednagar')
+  ) {
+    return 'अहिल्यानगर';
+  }
+  if (phonetic.includes('सिंधुदुर्ग') || phonetic.includes('sindhudurg')) {
+    return 'सिंधुदुर्ग';
+  }
+  if (phonetic.includes('वाशिम') || phonetic.includes('washim')) {
+    return 'वाशीम';
+  }
+  if (phonetic.includes('बुलढाणा') || phonetic.includes('बुलडाणा') || phonetic.includes('buldhana') || phonetic.includes('buldana')) {
+    return 'बुलढाणा';
+  }
+
+  const canonical = MAHARASHTRA_DISTRICTS.find((d) => {
+    const dp = d.replace(/ू/g, 'ु').replace(/ी/g, 'ि').toLowerCase();
+    return phonetic === dp || phonetic.includes(dp);
+  });
+
+  return canonical || clean;
 }
 
 function formatDistrictDisplayTitle(region?: string): string {
-  const clean = (region || '').trim();
+  const clean = (region || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
   if (!clean) return 'जिल्हा';
   if (clean === 'अहमदनगर') return 'अहिल्यानगर (अहमदनगर)';
-  return clean;
+  return normalizeDistrictPairKey(clean) || clean;
 }
 
 function isPlaceholderLeaderName(name?: string): boolean {
@@ -180,7 +224,7 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
     for (const pres of presidents) {
       const rawRegion = (pres.region || '').trim();
       const key = normalizeDistrictPairKey(rawRegion) || pres.id || pres.name;
-      if (seenDistrictKeys.has(key)) continue;
+      if (!key || seenDistrictKeys.has(key)) continue;
       seenDistrictKeys.add(key);
 
       const secretary = findMatchingSecretary(rawRegion, usedSecretaryIds);
@@ -192,7 +236,7 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
       });
     }
 
-    // 2. Append any remaining districts from official 34 districts (or secretaries with unmatched district)
+    // 2. Append any remaining districts from official 34 districts
     for (const dist of MAHARASHTRA_DISTRICTS) {
       const key = normalizeDistrictPairKey(dist);
       if (seenDistrictKeys.has(key)) continue;
@@ -206,11 +250,13 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
       });
     }
 
-    // 3. Any extra custom district secretaries not in standard 34 list
+    // 3. Any extra custom district secretaries not already included in the 34 districts
     secretaries.forEach((sec, idx) => {
       const sid = sec.id || `${sec.name}-${idx}`;
       if (usedSecretaryIds.has(sid)) return;
       const key = normalizeDistrictPairKey(sec.region) || sid;
+      if (seenDistrictKeys.has(key)) return;
+      seenDistrictKeys.add(key);
       rows.push({
         districtKey: key,
         districtTitle: formatDistrictDisplayTitle(sec.region),

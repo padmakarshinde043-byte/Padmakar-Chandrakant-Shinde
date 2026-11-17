@@ -1318,13 +1318,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const districtLeaderFormRef = useRef<HTMLDivElement | null>(null);
 
   const normalizeDistrictAlias = (dist?: string): string => {
-    const clean = (dist || '').trim();
+    const clean = (dist || '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/जिल्हा/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     if (!clean) return '';
-    if (clean.includes('संभाजीनगर') || clean.includes('औरंगाबाद')) return 'छत्रपती संभाजीनगर';
-    if (clean.includes('धाराशिव') || clean.includes('उस्मानाबाद')) return 'धाराशिव';
-    if (clean.includes('अहिल्यानगर') || clean.includes('अहमदनगर')) return 'अहिल्यानगर';
-    if (clean.includes('वाशीम') || clean.includes('वाशिम')) return 'वाशीम';
-    return clean;
+    const phonetic = clean.replace(/ू/g, 'ु').replace(/ी/g, 'ि').toLowerCase();
+    if (phonetic.includes('संभाजिनगर') || phonetic.includes('औरंगाबाद')) return 'छत्रपती संभाजीनगर';
+    if (phonetic.includes('धाराशिव') || phonetic.includes('उस्मानाबाद')) return 'धाराशिव';
+    if (phonetic.includes('अहिल्यानगर') || phonetic.includes('अहमदनगर')) return 'अहिल्यानगर';
+    if (phonetic.includes('सिंधुदुर्ग')) return 'सिंधुदुर्ग';
+    if (phonetic.includes('वाशिम')) return 'वाशीम';
+    if (phonetic.includes('बुलढाणा') || phonetic.includes('बुलडाणा')) return 'बुलढाणा';
+    const canonical = MAHARASHTRA_DISTRICTS.find((d) => {
+      const dp = d.replace(/ू/g, 'ु').replace(/ी/g, 'ि').toLowerCase();
+      return phonetic === dp || phonetic.includes(dp);
+    });
+    return canonical || clean;
   };
 
   const isPlaceholderDistrictName = (name?: string): boolean => {

@@ -350,6 +350,45 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
         </div>
       </div>
 
+      {/* Bold Count Summary Strip Right Below Filter Bar */}
+      <div className="px-4 py-3 bg-gradient-to-r from-amber-50/90 via-white to-sky-50/90 border-b-2 border-[#193568]/15 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-5">
+          <div className="flex items-center gap-2 bg-[#193568] text-white px-3.5 py-1.5 rounded-lg shadow-sm">
+            <span className="text-xs sm:text-sm font-bold text-amber-200">
+              {selectedDistrict || selectedTaluka || searchTerm.trim()
+                ? `${[selectedDistrict, selectedTaluka].filter(Boolean).join(' • ') || 'शोध निकाल'} (दाखवले):`
+                : 'दाखवले:'}
+            </span>
+            <span className="font-mono tabular-nums text-base sm:text-lg font-extrabold text-[#efb24b]">
+              {filteredMembers.length}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 bg-white border-2 border-[#193568]/25 text-[#0b1e36] px-3.5 py-1.5 rounded-lg shadow-sm">
+            <span className="text-xs sm:text-sm font-bold text-slate-700">
+              एकूण मंजूर सदस्य:
+            </span>
+            <span className="font-mono tabular-nums text-base sm:text-lg font-extrabold text-[#193568]">
+              {allRegisteredMembers.length}
+            </span>
+          </div>
+        </div>
+
+        {(selectedDistrict || selectedTaluka || searchTerm.trim()) && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDistrict('');
+              setSelectedTaluka('');
+              setSearchTerm('');
+            }}
+            className="text-xs sm:text-sm font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+          >
+            ✕ फिल्टर काढा
+          </button>
+        )}
+      </div>
+
       {/* Visible Vertical & Horizontal Scrollbars, Progressive DOM Render for 60 FPS Mobile Speed */}
       {filteredMembers.length > 0 ? (
         <div
@@ -467,12 +506,9 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
       )}
 
       {/* Frame Footer with Clean Guidance */}
-      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
+      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 text-xs sm:text-sm text-slate-600">
         <div className="font-medium text-slate-600">
           टीप: उभी व आडवी स्क्रोल बार वापरून (किंवा मोबाईलवर स्क्रीन डावी-उजवी सरकवून) संपूर्ण तपशील पाहता येईल.
-        </div>
-        <div className="font-semibold text-slate-700 tabular-nums shrink-0">
-          दाखवले: <strong>{filteredMembers.length}</strong> / एकूण मंजूर: <strong>{allRegisteredMembers.length}</strong>
         </div>
       </div>
     </div>

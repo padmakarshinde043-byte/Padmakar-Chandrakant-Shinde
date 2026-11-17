@@ -73,14 +73,18 @@ export function getPresidentPasswordFromStorageSync(
 
 export function matchesDistrictName(memberDistrict?: string, selectedDistrict?: string): boolean {
   if (!memberDistrict || !selectedDistrict) return false;
-  const md = memberDistrict.trim().toLowerCase();
-  const sd = selectedDistrict.trim().toLowerCase();
-  if (md === sd) return true;
+  const cleanStr = (s: string) => s.replace(/[\u200B-\u200D\uFEFF]/g, '').trim().toLowerCase();
+  const toPhonetic = (s: string) => cleanStr(s).replace(/ू/g, 'ु').replace(/ी/g, 'ि');
+  const md = cleanStr(memberDistrict);
+  const sd = cleanStr(selectedDistrict);
+  const mp = toPhonetic(memberDistrict);
+  const sp = toPhonetic(selectedDistrict);
+  if (md === sd || mp === sp) return true;
 
   // Ahilyanagar / Ahmednagar
   if (
-    (sd === 'अहिल्यानगर' && (md === 'अहमदनगर' || md.includes('ahmed'))) ||
-    (sd === 'अहमदनगर' && (md === 'अहिल्यानगर' || md.includes('ahmed')))
+    (sd === 'अहिल्यानगर' && (md.includes('अहमदनगर') || md.includes('अहिल्यानगर') || md.includes('ahmed'))) ||
+    (sd === 'अहमदनगर' && (md.includes('अहिल्यानगर') || md.includes('अहमदनगर') || md.includes('ahmed')))
   ) {
     return true;
   }
@@ -95,26 +99,29 @@ export function matchesDistrictName(memberDistrict?: string, selectedDistrict?: 
 
   // Chhatrapati Sambhajinagar / Aurangabad
   if (
-    (sd.includes('संभाजीनगर') && (md.includes('संभाजीनगर') || md.includes('औरंगाबाद') || md.includes('aurangabad'))) ||
-    (sd.includes('औरंगाबाद') && (md.includes('संभाजीनगर') || md.includes('औरंगाबाद') || md.includes('aurangabad')))
+    (sp.includes('संभाजिनगर') && (mp.includes('संभाजिनगर') || mp.includes('औरंगाबाद') || mp.includes('aurangabad'))) ||
+    (sp.includes('औरंगाबाद') && (mp.includes('संभाजिनगर') || mp.includes('औरंगाबाद') || mp.includes('aurangabad')))
   ) {
     return true;
   }
 
-  // Dharashiv / Osmanabad
+  // Dharashiv / Osmanabad (handles धाराशिव, धाराशीव, उस्मानाबाद)
   if (
-    (sd.includes('धाराशिव') && (md.includes('धाराशिव') || md.includes('उस्मानाबाद') || md.includes('osmanabad'))) ||
-    (sd.includes('उस्मानाबाद') && (md.includes('धाराशिव') || md.includes('उस्मानाबाद') || md.includes('osmanabad')))
+    (sp.includes('धाराशिव') && (mp.includes('धाराशिव') || mp.includes('उस्मानाबाद') || mp.includes('osmanabad'))) ||
+    (sp.includes('उस्मानाबाद') && (mp.includes('धाराशिव') || mp.includes('उस्मानाबाद') || mp.includes('osmanabad')))
   ) {
+    return true;
+  }
+
+  // Sindhudurg (handles सिंधुदुर्ग & सिंधुदूर्ग)
+  if (sp.includes('सिंधुदुर्ग') && (mp.includes('सिंधुदुर्ग') || mp.includes('sindhudurg'))) {
     return true;
   }
 
   // Washim / वाशीम / वाशिम
   if (
-    (sd === 'वाशीम' && (md === 'वाशिम' || md === 'washim' || md === 'वाशीम')) ||
-    (sd === 'वाशिम' && (md === 'वाशीम' || md === 'washim' || md === 'वाशिम')) ||
-    (sd === 'washim' && (md === 'वाशीम' || md === 'वाशिम')) ||
-    sd.replace('शी', 'शि') === md.replace('शी', 'शि')
+    (sp === 'वाशिम' && (mp === 'वाशिम' || mp === 'washim')) ||
+    (sp === 'washim' && mp === 'वाशिम')
   ) {
     return true;
   }
