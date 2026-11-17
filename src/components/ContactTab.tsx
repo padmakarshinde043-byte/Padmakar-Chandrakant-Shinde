@@ -332,13 +332,13 @@ export const ContactTab: React.FC<ContactTabProps> = ({ onSaveContact }) => {
                     </div>
                   </div>
 
-                  <div className="pt-2.5 border-t border-white/10 flex items-center gap-2">
-                    <span className="text-slate-400 text-sm sm:text-base font-semibold">संपर्क क्रमांक :</span>
+                  <div className="pt-2.5 border-t border-white/10 flex items-center gap-2 flex-wrap">
+                    <span className="text-slate-400 text-sm sm:text-base font-semibold">संपर्क ईमेल :</span>
                     <a
-                      href="tel:7219123699"
-                      className="text-amber-300 hover:text-white font-mono font-bold text-base sm:text-lg tracking-wide"
+                      href="mailto:contact@mahasangh.in"
+                      className="text-amber-300 hover:text-white font-mono font-bold text-base sm:text-lg tracking-wide break-all"
                     >
-                      7219123699
+                      contact@mahasangh.in
                     </a>
                   </div>
                 </div>

@@ -3,6 +3,8 @@ import cors from 'cors';
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import nodemailer from 'nodemailer';
+import { ImapFlow } from 'imapflow';
+import { simpleParser } from 'mailparser';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
@@ -202,6 +204,126 @@ function loadEmailConfig(): EmailConfig {
   const enabled = Boolean(host && user && pass);
 
   return { host, port, user, pass, from, enabled };
+}
+
+interface ContactMailboxConfig {
+  host: string;
+  imapPort: number;
+  smtpPort: number;
+  user: string;
+  pass: string;
+}
+
+function loadContactMailboxConfig(): ContactMailboxConfig {
+  let fileCfg: Record<string, any> = {};
+  try {
+    if (fs.existsSync(EMAIL_CONFIG_FILE)) {
+      fileCfg = JSON.parse(fs.readFileSync(EMAIL_CONFIG_FILE, 'utf-8'));
+    }
+  } catch (e) {
+    console.warn('Could not load email-config.json for contact mailbox:', e);
+  }
+
+  const nested = (fileCfg.contactMailbox && typeof fileCfg.contactMailbox === 'object')
+    ? fileCfg.contactMailbox
+    : {};
+
+  const rawHost = String(
+    nested.host ||
+      fileCfg.contactHost ||
+      process.env.CONTACT_MAIL_HOST ||
+      'mail.mahasangh.in'
+  ).trim();
+  const host =
+    !rawHost || rawHost.toLowerCase() === 'mail.savezpschools.in'
+      ? 'mail.mahasangh.in'
+      : rawHost;
+  const imapPortRaw = Number(
+    nested.imapPort ||
+      fileCfg.contactImapPort ||
+      process.env.CONTACT_MAIL_IMAP_PORT ||
+      993
+  );
+  const smtpPortRaw = Number(
+    nested.smtpPort ||
+      fileCfg.contactSmtpPort ||
+      process.env.CONTACT_MAIL_SMTP_PORT ||
+      465
+  );
+  const user = String(
+    nested.user ||
+      fileCfg.contactUser ||
+      process.env.CONTACT_MAIL_USER ||
+      'contact@mahasangh.in'
+  ).trim();
+  const pass = String(
+    nested.pass ||
+      fileCfg.contactPass ||
+      process.env.CONTACT_MAIL_PASS ||
+      'Nashik@2026'
+  );
+
+  return {
+    host,
+    imapPort: Number.isFinite(imapPortRaw) && imapPortRaw > 0 ? imapPortRaw : 993,
+    smtpPort: Number.isFinite(smtpPortRaw) && smtpPortRaw > 0 ? smtpPortRaw : 465,
+    user,
+    pass,
+  };
+}
+
+function getContactMailHostCandidates(primaryHost: string): string[] {
+  const candidates = [primaryHost, 'mail.mahasangh.in', 'panel.hostkarle.in']
+    .map((h) => String(h || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(candidates));
+}
+
+function createContactImapClient(cfg: ContactMailboxConfig, hostOverride?: string): ImapFlow {
+  return new ImapFlow({
+    host: hostOverride || cfg.host,
+    port: cfg.imapPort,
+    secure: cfg.imapPort === 993,
+    auth: {
+      user: cfg.user,
+      pass: cfg.pass,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    logger: false,
+    connectionTimeout: 12000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
+}
+
+async function connectContactImapWithFallback(
+  cfg: ContactMailboxConfig
+): Promise<{ client: ImapFlow; activeHost: string }> {
+  const hosts = getContactMailHostCandidates(cfg.host);
+  let lastErr: any = null;
+  for (const hostCandidate of hosts) {
+    const client = createContactImapClient(cfg, hostCandidate);
+    try {
+      await client.connect();
+      return { client, activeHost: hostCandidate };
+    } catch (err: any) {
+      lastErr = err;
+      await client.logout().catch(() => {});
+      const errCode = String(err?.code || '').toUpperCase();
+      const errMsg = String(err?.message || '');
+      const isDnsOrNetworkHostErr =
+        errCode === 'ENOTFOUND' ||
+        errCode === 'EAI_AGAIN' ||
+        errCode === 'ECONNREFUSED' ||
+        /ENOTFOUND|getaddrinfo/i.test(errMsg);
+      if (!isDnsOrNetworkHostErr) {
+        throw err;
+      }
+    }
+  }
+  throw lastErr || new Error('IMAP connection failed');
 }
 
 function isRealMemberEmail(email?: string): boolean {
@@ -1581,6 +1703,362 @@ app.post('/api/razorpay/webhook', async (req, res) => {
   } catch (err: any) {
     console.error('Razorpay Webhook Processing Error:', err);
     res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// =========================================================================
+// Unified Contact Mailbox API (IMAP + SMTP for contact@mahasangh.in)
+// =========================================================================
+app.get('/api/mailbox/messages', async (req, res) => {
+  const cfg = loadContactMailboxConfig();
+  const folder = String(req.query.folder || 'INBOX').trim() || 'INBOX';
+  const limitRaw = Number(req.query.limit || 40);
+  const limitCount = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 80) : 40;
+
+  if (!cfg.host || !cfg.user || !cfg.pass) {
+    return res.json({
+      status: 'error',
+      account: cfg.user,
+      host: cfg.host,
+      imapPort: cfg.imapPort,
+      smtpPort: cfg.smtpPort,
+      items: [],
+      message: 'ईमेल खाते तपशील उपलब्ध नाहीत.',
+    });
+  }
+
+  let client: ImapFlow | null = null;
+  let activeHost = cfg.host;
+  try {
+    const connected = await connectContactImapWithFallback(cfg);
+    client = connected.client;
+    activeHost = connected.activeHost;
+    const lock = await client.getMailboxLock(folder);
+    try {
+      const mbox = client.mailbox;
+      const totalExists = mbox && typeof mbox !== 'boolean' ? Number(mbox.exists || 0) : 0;
+      if (totalExists === 0) {
+        return res.json({
+          status: 'success',
+          account: cfg.user,
+          host: activeHost,
+          imapPort: cfg.imapPort,
+          smtpPort: cfg.smtpPort,
+          totalCount: 0,
+          items: [],
+        });
+      }
+
+      const startSeq = Math.max(1, totalExists - limitCount + 1);
+      const range = `${startSeq}:*`;
+      const parsedEmails: Array<{
+        uid: number;
+        messageId: string;
+        folder: string;
+        fromName: string;
+        fromEmail: string;
+        toEmail: string;
+        subject: string;
+        textBody: string;
+        snippet: string;
+        date: string;
+        isRead: boolean;
+        hasAttachments: boolean;
+        attachmentNames: string[];
+      }> = [];
+
+      for await (const msg of client.fetch(range, {
+        uid: true,
+        flags: true,
+        envelope: true,
+        internalDate: true,
+        source: true,
+      })) {
+        let fromName = '';
+        let fromEmail = '';
+        let toEmail = cfg.user;
+        let subject = '(विषय नाही)';
+        let messageId = '';
+        let textBody = '';
+        let attachmentNames: string[] = [];
+        let dateIso = msg.internalDate ? new Date(msg.internalDate).toISOString() : new Date().toISOString();
+
+        if (msg.source) {
+          const parsed = await simpleParser(msg.source);
+          const fromFirst = parsed.from?.value?.[0];
+          fromName = String(fromFirst?.name || '').trim();
+          fromEmail = String(fromFirst?.address || '').trim();
+          const toObj = parsed.to;
+          if (toObj && !Array.isArray(toObj) && toObj.value?.[0]?.address) {
+            toEmail = String(toObj.value[0].address).trim();
+          } else if (Array.isArray(toObj) && toObj[0]?.value?.[0]?.address) {
+            toEmail = String(toObj[0].value[0].address).trim();
+          }
+          subject = String(parsed.subject || '(विषय नाही)').trim();
+          messageId = String(parsed.messageId || '').trim();
+          if (parsed.date) dateIso = parsed.date.toISOString();
+          textBody = String(parsed.text || '').trim();
+          const htmlBody = typeof parsed.html === 'string' ? parsed.html : '';
+          if (!textBody && htmlBody) {
+            textBody = htmlBody
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+          }
+          if (Array.isArray(parsed.attachments)) {
+            attachmentNames = parsed.attachments
+              .map((a) => String(a.filename || '').trim())
+              .filter(Boolean);
+          }
+        } else if (msg.envelope) {
+          const fromFirst = msg.envelope.from?.[0];
+          fromName = String(fromFirst?.name || '').trim();
+          fromEmail = String(fromFirst?.address || '').trim();
+          subject = String(msg.envelope.subject || '(विषय नाही)').trim();
+          messageId = String(msg.envelope.messageId || '').trim();
+          if (msg.envelope.date) dateIso = new Date(msg.envelope.date).toISOString();
+        }
+
+        parsedEmails.push({
+          uid: msg.uid,
+          messageId,
+          folder,
+          fromName: fromName || fromEmail || 'अज्ञात प्रेषक',
+          fromEmail,
+          toEmail,
+          subject,
+          textBody,
+          snippet: textBody.slice(0, 220),
+          date: dateIso,
+          isRead: Boolean(msg.flags && msg.flags.has('\\Seen')),
+          hasAttachments: attachmentNames.length > 0,
+          attachmentNames,
+        });
+      }
+
+      parsedEmails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.uid - a.uid);
+
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({
+        status: 'success',
+        account: cfg.user,
+        host: activeHost,
+        imapPort: cfg.imapPort,
+        smtpPort: cfg.smtpPort,
+        totalCount: totalExists,
+        items: parsedEmails,
+      });
+    } finally {
+      lock.release();
+    }
+  } catch (err: any) {
+    console.warn('IMAP mailbox fetch error:', err?.message || err);
+    res.json({
+      status: 'error',
+      account: cfg.user,
+      host: activeHost,
+      imapPort: cfg.imapPort,
+      smtpPort: cfg.smtpPort,
+      totalCount: 0,
+      items: [],
+      message: 'ईमेल सर्व्हरशी संपर्क साधताना अडचण आली: ' + (err?.message || 'IMAP Error'),
+    });
+  } finally {
+    if (client) {
+      await client.logout().catch(() => {});
+    }
+  }
+});
+
+app.post('/api/mailbox/send', async (req, res) => {
+  try {
+    const cfg = loadContactMailboxConfig();
+    const to = String(req.body?.to || '').trim();
+    const subject = String(req.body?.subject || '').trim();
+    const text = String(req.body?.text || '').trim();
+    const replyToMessageId = String(req.body?.replyToMessageId || '').trim();
+
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return res.status(400).json({ status: 'error', message: 'कृपया वैध प्राप्तकर्ता ई-मेल पत्ता (To Email) प्रविष्ट करा.' });
+    }
+    if (!subject) {
+      return res.status(400).json({ status: 'error', message: 'कृपया ई-मेलचा विषय (Subject) प्रविष्ट करा.' });
+    }
+    if (!text) {
+      return res.status(400).json({ status: 'error', message: 'कृपया ई-मेलचा संदेश (Message) प्रविष्ट करा.' });
+    }
+
+    const htmlBody = `
+      <div style="font-family: 'Noto Sans Devanagari', Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #f8fafc; padding: 18px; color: #0f172a;">
+        <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 10px; overflow: hidden;">
+          <div style="background: #193568; color: #ffffff; padding: 14px 18px; border-bottom: 3px solid #efb24b;">
+            <div style="font-size: 11px; color: #fde047; font-weight: 700;">महाराष्ट्र राज्य</div>
+            <div style="font-size: 16px; font-weight: 800;">केंद्रप्रमुख व अधिकारी महासंघ</div>
+          </div>
+          <div style="padding: 18px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; color: #1e293b;">${escapeEmailHtml(text)}</div>
+          <div style="background: #f1f5f9; border-top: 1px solid #e2e8f0; padding: 12px 18px; font-size: 12px; color: #475569;">
+            सादर,<br>
+            <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</strong><br>
+            अधिकृत संपर्क ई-मेल: ${escapeEmailHtml(cfg.user)} | वेबसाईट: <a href="https://mahasangh.in" style="color: #193568;">mahasangh.in</a>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const mailOptions = {
+      from: `"महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" <${cfg.user}>`,
+      replyTo: cfg.user,
+      to,
+      subject,
+      text,
+      html: htmlBody,
+      ...(replyToMessageId
+        ? {
+            inReplyTo: replyToMessageId,
+            references: replyToMessageId,
+          }
+        : {}),
+    };
+
+    let info: any = null;
+    let lastSmtpErr: any = null;
+    for (const hostCandidate of getContactMailHostCandidates(cfg.host)) {
+      const transporter = nodemailer.createTransport({
+        host: hostCandidate,
+        port: cfg.smtpPort,
+        secure: cfg.smtpPort === 465,
+        auth: {
+          user: cfg.user,
+          pass: cfg.pass,
+        },
+        tls: {
+          rejectUnauthorized: false,
+        },
+      });
+      try {
+        info = await transporter.sendMail(mailOptions);
+        break;
+      } catch (smtpErr: any) {
+        lastSmtpErr = smtpErr;
+        const code = String(smtpErr?.code || '').toUpperCase();
+        const msg = String(smtpErr?.message || '');
+        if (!(code === 'ENOTFOUND' || code === 'EAI_AGAIN' || /ENOTFOUND|getaddrinfo/i.test(msg))) {
+          throw smtpErr;
+        }
+      }
+    }
+    if (!info) {
+      throw lastSmtpErr || new Error('SMTP send failed');
+    }
+
+    // Best-effort sync to IMAP Sent folder so Roundcube & mobile Gmail/Outlook stay in sync
+    try {
+      const streamTransporter = nodemailer.createTransport({
+        streamTransport: true,
+        buffer: true,
+        newline: 'windows',
+      });
+      const built = await streamTransporter.sendMail(mailOptions);
+      const rawBuffer = built.message as Buffer;
+      if (Buffer.isBuffer(rawBuffer)) {
+        const { client: imapClient } = await connectContactImapWithFallback(cfg);
+        try {
+          const mailboxes = await imapClient.list();
+          const sentBox = mailboxes.find(
+            (b) =>
+              b.specialUse === '\\Sent' ||
+              /^sent$/i.test(b.name) ||
+              /^inbox\.sent$/i.test(b.path)
+          );
+          if (sentBox) {
+            await imapClient.append(sentBox.path, rawBuffer, ['\\Seen']);
+          }
+        } finally {
+          await imapClient.logout().catch(() => {});
+        }
+      }
+    } catch (appendErr) {
+      console.warn('Sent-folder IMAP sync skipped:', appendErr);
+    }
+
+    res.json({
+      status: 'success',
+      sent: true,
+      from: cfg.user,
+      to,
+      messageId: info.messageId || '',
+    });
+  } catch (err: any) {
+    console.error('SMTP mailbox send error:', err);
+    res.status(500).json({
+      status: 'error',
+      sent: false,
+      message: 'ई-मेल पाठवताना त्रुटी आली: ' + (err?.message || 'SMTP Error'),
+    });
+  }
+});
+
+app.post('/api/mailbox/mark-read', async (req, res) => {
+  const cfg = loadContactMailboxConfig();
+  const uid = Number(req.body?.uid);
+  const isRead = Boolean(req.body?.isRead);
+  const folder = String(req.body?.folder || 'INBOX').trim() || 'INBOX';
+
+  if (!Number.isFinite(uid) || uid <= 0) {
+    return res.status(400).json({ status: 'error', message: 'Invalid email UID' });
+  }
+
+  let client: ImapFlow | null = null;
+  try {
+    const connected = await connectContactImapWithFallback(cfg);
+    client = connected.client;
+    const lock = await client.getMailboxLock(folder);
+    try {
+      if (isRead) {
+        await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
+      } else {
+        await client.messageFlagsRemove({ uid }, ['\\Seen'], { uid: true });
+      }
+      res.json({ status: 'success', uid, isRead });
+    } finally {
+      lock.release();
+    }
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'IMAP Error' });
+  } finally {
+    if (client) {
+      await client.logout().catch(() => {});
+    }
+  }
+});
+
+app.delete('/api/mailbox/message/:uid', async (req, res) => {
+  const cfg = loadContactMailboxConfig();
+  const uid = Number(req.params.uid);
+  const folder = String(req.query.folder || 'INBOX').trim() || 'INBOX';
+
+  if (!Number.isFinite(uid) || uid <= 0) {
+    return res.status(400).json({ status: 'error', message: 'Invalid email UID' });
+  }
+
+  let client: ImapFlow | null = null;
+  try {
+    const connected = await connectContactImapWithFallback(cfg);
+    client = connected.client;
+    const lock = await client.getMailboxLock(folder);
+    try {
+      await client.messageDelete({ uid }, { uid: true });
+      res.json({ status: 'success', uid });
+    } finally {
+      lock.release();
+    }
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'IMAP Error' });
+  } finally {
+    if (client) {
+      await client.logout().catch(() => {});
+    }
   }
 });
 

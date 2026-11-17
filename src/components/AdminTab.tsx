@@ -5,7 +5,8 @@ import {
   Users, Edit3, Trash2, Check, Upload, Image as ImageIcon, X, FileText, Download, List,
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
-  ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video
+  ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -718,11 +719,42 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  // Contact Inquiries (प्राप्त संदेश / विचारणा)
+  // Contact Inquiries & Official Email Mailbox (contact@mahasangh.in)
+  interface MailboxEmailItem {
+    uid: number;
+    messageId: string;
+    folder: string;
+    fromName: string;
+    fromEmail: string;
+    toEmail: string;
+    subject: string;
+    textBody: string;
+    snippet: string;
+    date: string;
+    isRead: boolean;
+    hasAttachments: boolean;
+    attachmentNames: string[];
+  }
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [mailboxEmails, setMailboxEmails] = useState<MailboxEmailItem[]>([]);
+  const [mailboxAccount, setMailboxAccount] = useState('contact@mahasangh.in');
+  const [mailboxError, setMailboxError] = useState('');
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [contactSearchQuery, setContactSearchQuery] = useState('');
   const [contactDistrictFilter, setContactDistrictFilter] = useState('');
+  const [mailboxSourceFilter, setMailboxSourceFilter] = useState<'all' | 'email' | 'contact_form'>('all');
+  const [showMobileMailGuide, setShowMobileMailGuide] = useState(false);
+  const [replyModal, setReplyModal] = useState<{
+    open: boolean;
+    to: string;
+    recipientName: string;
+    subject: string;
+    body: string;
+    replyToMessageId?: string;
+    contextLabel?: string;
+    isSending: boolean;
+    error: string;
+  } | null>(null);
 
   // Manage Admins tab state
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -1534,14 +1566,37 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  // Fetch contact messages
+  // Fetch unified website contact messages + contact@mahasangh.in IMAP inbox
   const loadContactMessages = async () => {
     setIsLoadingContacts(true);
+    setMailboxError('');
     try {
-      const msgs = await fetchContactsForAdmin();
-      setContactMessages(msgs);
-    } catch (e) {
-      console.warn('Failed to fetch contact messages:', e);
+      const [contactsRes, mailboxRes] = await Promise.allSettled([
+        fetchContactsForAdmin(),
+        fetch(`/api/mailbox/messages?limit=40&_t=${Date.now()}`, {
+          cache: 'no-store',
+        }).then((r) => r.json()),
+      ]);
+
+      if (contactsRes.status === 'fulfilled' && Array.isArray(contactsRes.value)) {
+        setContactMessages(contactsRes.value);
+      }
+
+      if (mailboxRes.status === 'fulfilled' && mailboxRes.value) {
+        const mb = mailboxRes.value;
+        if (mb.account) setMailboxAccount(mb.account);
+        if (Array.isArray(mb.items)) {
+          setMailboxEmails(mb.items);
+        }
+        if (mb.status === 'error' && mb.message) {
+          setMailboxError(mb.message);
+        }
+      } else {
+        setMailboxError('ईमेल सर्व्हरशी संपर्क साधता आला नाही.');
+      }
+    } catch (e: any) {
+      console.warn('Failed to fetch unified inbox:', e);
+      setMailboxError(e?.message || 'संदेश लोड करताना त्रुटी आली.');
     } finally {
       setIsLoadingContacts(false);
     }
@@ -1556,11 +1611,117 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  const handleToggleMailboxEmailRead = async (emailItem: MailboxEmailItem) => {
+    const nextRead = !emailItem.isRead;
+    setMailboxEmails((prev) =>
+      prev.map((m) => (m.uid === emailItem.uid ? { ...m, isRead: nextRead } : m))
+    );
+    try {
+      const res = await fetch('/api/mailbox/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: emailItem.uid, isRead: nextRead, folder: emailItem.folder || 'INBOX' }),
+      });
+      if (!res.ok) throw new Error('Mark read failed');
+      showAdminFeedback(nextRead ? 'ईमेल वाचलेला म्हणून चिन्हांकित केला.' : 'ईमेल अनरीड केला.', 'success');
+    } catch {
+      setMailboxEmails((prev) =>
+        prev.map((m) => (m.uid === emailItem.uid ? { ...m, isRead: !nextRead } : m))
+      );
+      showAdminFeedback('ईमेल स्थिती अपडेट करताना अडचण आली.', 'error');
+    }
+  };
+
+  const handleDeleteMailboxEmail = async (emailItem: MailboxEmailItem) => {
+    try {
+      const res = await fetch(
+        `/api/mailbox/message/${emailItem.uid}?folder=${encodeURIComponent(emailItem.folder || 'INBOX')}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) throw new Error('Delete failed');
+      setMailboxEmails((prev) => prev.filter((m) => m.uid !== emailItem.uid));
+      showAdminFeedback('ईमेल इनबॉक्समधून हटवण्यात आला.', 'success');
+    } catch {
+      showAdminFeedback('ईमेल हटवताना त्रुटी आली.', 'error');
+    }
+  };
+
+  const handleOpenReplyModal = (opts: {
+    to: string;
+    recipientName?: string;
+    subject?: string;
+    replyToMessageId?: string;
+    contextLabel?: string;
+  }) => {
+    const rawSubject = (opts.subject || '').trim();
+    const formattedSubject = rawSubject
+      ? /^re:/i.test(rawSubject)
+        ? rawSubject
+        : `Re: ${rawSubject}`
+      : 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ — संपर्क उत्तर';
+    const greeting = opts.recipientName
+      ? `सप्रेम नमस्कार ${opts.recipientName} जी,\n\n`
+      : 'सप्रेम नमस्कार,\n\n';
+
+    setReplyModal({
+      open: true,
+      to: opts.to || '',
+      recipientName: opts.recipientName || '',
+      subject: opts.to ? formattedSubject : '',
+      body: greeting,
+      replyToMessageId: opts.replyToMessageId || '',
+      contextLabel: opts.contextLabel || '',
+      isSending: false,
+      error: '',
+    });
+  };
+
+  const handleSendMailboxReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyModal || replyModal.isSending) return;
+    const to = replyModal.to.trim();
+    const subject = replyModal.subject.trim();
+    const text = replyModal.body.trim();
+
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      setReplyModal((prev) => prev ? { ...prev, error: 'कृपया वैध ईमेल पत्ता (To Email) टाका.' } : prev);
+      return;
+    }
+    if (!subject || !text) {
+      setReplyModal((prev) => prev ? { ...prev, error: 'कृपया विषय आणि उत्तर मजकूर भरा.' } : prev);
+      return;
+    }
+
+    setReplyModal((prev) => prev ? { ...prev, isSending: true, error: '' } : prev);
+    try {
+      const res = await fetch('/api/mailbox/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to,
+          subject,
+          text,
+          replyToMessageId: replyModal.replyToMessageId || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.status === 'error') {
+        throw new Error(data.message || 'ईमेल पाठवता आला नाही.');
+      }
+      setReplyModal(null);
+      showAdminFeedback(`✓ '${to}' यांना ${mailboxAccount} वरून ईमेल यशस्वीपणे पाठवला!`, 'success');
+    } catch (err: any) {
+      setReplyModal((prev) =>
+        prev ? { ...prev, isSending: false, error: err?.message || 'ईमेल पाठवताना त्रुटी आली.' } : prev
+      );
+    }
+  };
+
   useEffect(() => {
     if (
       isLoggedIn &&
       (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) &&
-      (activeAdminSubTab === 'contact_messages' || contactMessages.length === 0)
+      (activeAdminSubTab === 'contact_messages' || (contactMessages.length === 0 && mailboxEmails.length === 0))
     ) {
       loadContactMessages();
     }
@@ -2033,10 +2194,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     },
     {
       key: 'contact_messages',
-      label: `प्राप्त संदेश (${toEnglishDigits(contactMessages.length)})`,
+      label: `प्राप्त संदेश (${toEnglishDigits(contactMessages.length + mailboxEmails.length)})`,
       shortLabel: 'संदेश',
       icon: <MessageSquare className="w-4 h-4 shrink-0" />,
-      badge: contactMessages.length > 0 ? contactMessages.length : undefined,
+      badge: contactMessages.length + mailboxEmails.length > 0 ? contactMessages.length + mailboxEmails.length : undefined,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages),
     },
     {
@@ -5587,85 +5748,252 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab 5: Contact Inquiries & Messages */}
+            {/* Sub-tab 5: Unified Mailbox (contact@mahasangh.in Emails + Website Contact Form Inquiries) */}
             {activeAdminSubTab === 'contact_messages' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) && (
               <div className="space-y-4">
-                {/* Header & Filter Bar */}
-                <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                {/* Header & Actions Bar */}
+                <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div>
                     <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
-                      <MessageSquare className="w-5 h-5 text-[#df6b16]" />
-                      प्राप्त संदेश व विचारणा (Contact Inquiries)
+                      <Inbox className="w-5 h-5 text-[#df6b16] shrink-0" />
+                      <span>एकत्रित प्राप्त संदेश व ईमेल बॉक्स ({mailboxAccount})</span>
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      वेबसाईटवरील संपर्क फॉर्मद्वारे प्राथमिक शिक्षण विभागातील केंद्रप्रमुख व अधिकाऱ्यांनी पाठवलेले प्रश्न व संदेश.
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      <strong>{mailboxAccount}</strong> वर येणारे सर्व थेट ईमेल तसेच वेबसाईटवरील संपर्क फॉर्मवरून आलेले संदेश येथे एकत्र दिसतात व येथूनच उत्तर पाठवता येते.
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleOpenReplyModal({
+                          to: '',
+                          recipientName: '',
+                          subject: '',
+                          contextLabel: 'नवीन ईमेल संदेश',
+                        })
+                      }
+                      className="bg-[#193568] hover:bg-[#11254a] text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5 text-[#efb24b]" />
+                      <span>नवीन ईमेल पाठवा</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileMailGuide((v) => !v)}
+                      className={`text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                        showMobileMailGuide
+                          ? 'bg-amber-50 border-amber-400 text-amber-900'
+                          : 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      <Smartphone className="w-3.5 h-3.5 text-[#df6b16]" />
+                      <span>मोबाईल सेटअप माहिती</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={loadContactMessages}
                       disabled={isLoadingContacts}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors"
-                      title="नवीन संदेश रिफ्रेश करा"
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="ईमेल व संपर्क संदेश रिफ्रेश करा"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isLoadingContacts ? 'animate-spin text-[#df6b16]' : ''}`} />
-                      रिफ्रेश करा
+                      <span>रिफ्रेश करा</span>
                     </button>
-                    <span className="bg-amber-100 text-[#df6b16] font-bold text-xs px-3 py-1.5 rounded-lg border border-amber-300 font-mono">
-                      एकूण: {toEnglishDigits(contactMessages.length)}
+
+                    <span className="bg-amber-100 text-[#9a460b] font-bold text-xs px-3 py-1.5 rounded-lg border border-amber-300 font-mono">
+                      एकूण: {toEnglishDigits(contactMessages.length + mailboxEmails.length)}
                     </span>
                   </div>
                 </div>
 
-                {/* Search & Filter Toolbar */}
-                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row gap-3">
-                  <div className="relative flex-1">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={contactSearchQuery}
-                      onChange={(e) => setContactSearchQuery(e.target.value)}
-                      placeholder="नाव, मोबाईल, विषय किंवा संदेशात शोधा..."
-                      className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
-                    />
+                {/* Collapsible Mobile Mail Setup Guide (No credentials exposed) */}
+                {showMobileMailGuide && (
+                  <div className="bg-[#f8fafc] border border-slate-300 rounded-xl p-4 sm:p-5 text-xs space-y-3">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                      <h4 className="font-serifDevanagari text-sm sm:text-base font-bold text-[#193568] flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-[#df6b16]" />
+                        मोबाईलवर (Gmail / Outlook अ‍ॅप) {mailboxAccount} जोडण्याची माहिती
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setShowMobileMailGuide(false)}
+                        className="text-slate-500 hover:text-slate-800 p-1 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-slate-700">
+                      <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                        <div className="font-bold text-[#193568]">Incoming Server (IMAP)</div>
+                        <div>Server / Host: <code className="font-mono font-bold text-slate-900">mail.mahasangh.in</code></div>
+                        <div>Port & Security: <code className="font-mono font-bold text-slate-900">993 (SSL/TLS)</code></div>
+                        <div>Username: <code className="font-mono font-bold text-slate-900">{mailboxAccount}</code></div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
+                        <div className="font-bold text-[#193568]">Outgoing Server (SMTP)</div>
+                        <div>Server / Host: <code className="font-mono font-bold text-slate-900">mail.mahasangh.in</code></div>
+                        <div>Port & Security: <code className="font-mono font-bold text-slate-900">465 (SSL/TLS)</code></div>
+                        <div>Webmail: <code className="font-mono text-slate-800">panel.hostkarle.in/roundcube</code></div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Gmail अ‍ॅपमध्ये: प्रोफाइल फोटो → Add another account → Other → {mailboxAccount} → Personal (IMAP) निवडून वरील IMAP व SMTP सर्व्हर तपशील आणि आपला मेल पासवर्ड प्रविष्ट करा.
+                    </p>
+                  </div>
+                )}
+
+                {mailboxError && (
+                  <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-3 text-xs font-medium flex items-center justify-between gap-2">
+                    <span>ईमेल सर्व्हर सूचना: {mailboxError} (संपर्क फॉर्मवरील संदेश खाली उपलब्ध आहेत)</span>
+                    <button
+                      type="button"
+                      onClick={loadContactMessages}
+                      className="text-xs font-bold underline shrink-0 cursor-pointer"
+                    >
+                      पुन्हा प्रयत्न करा
+                    </button>
+                  </div>
+                )}
+
+                {/* Source Filter Tabs + Search & District Filter */}
+                <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
+                    <button
+                      type="button"
+                      onClick={() => setMailboxSourceFilter('all')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                        mailboxSourceFilter === 'all'
+                          ? 'bg-[#193568] text-white border-[#193568]'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      सर्व एकत्र ({toEnglishDigits(contactMessages.length + mailboxEmails.length)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMailboxSourceFilter('email')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        mailboxSourceFilter === 'email'
+                          ? 'bg-[#df6b16] text-white border-[#df6b16]'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>ईमेल इनबॉक्स ({toEnglishDigits(mailboxEmails.length)})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMailboxSourceFilter('contact_form')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                        mailboxSourceFilter === 'contact_form'
+                          ? 'bg-emerald-700 text-white border-emerald-700'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>वेबसाईट संपर्क फॉर्म ({toEnglishDigits(contactMessages.length)})</span>
+                    </button>
                   </div>
 
-                  <select
-                    value={contactDistrictFilter}
-                    onChange={(e) => setContactDistrictFilter(e.target.value)}
-                    className="p-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] bg-white min-w-[160px]"
-                  >
-                    <option value="">सर्व 34 जिल्हे</option>
-                    {MAHARASHTRA_DISTRICTS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={contactSearchQuery}
+                        onChange={(e) => setContactSearchQuery(e.target.value)}
+                        placeholder="नाव, ईमेल, मोबाईल, विषय किंवा संदेशात शोधा..."
+                        className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
+                      />
+                    </div>
+
+                    <select
+                      value={contactDistrictFilter}
+                      onChange={(e) => setContactDistrictFilter(e.target.value)}
+                      className="p-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] bg-white min-w-[160px]"
+                    >
+                      <option value="">सर्व 34 जिल्हे (संपर्क फॉर्म)</option>
+                      {MAHARASHTRA_DISTRICTS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Messages List */}
+                {/* Unified Chronological List (Emails + Contact Form Inquiries) */}
                 {(() => {
-                  const filtered = contactMessages.filter((m) => {
-                    const matchesSearch =
-                      !contactSearchQuery.trim() ||
-                      (m.name || '').toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
-                      (m.phone || '').includes(contactSearchQuery) ||
-                      (m.subject || '').toLowerCase().includes(contactSearchQuery.toLowerCase()) ||
-                      (m.message || '').toLowerCase().includes(contactSearchQuery.toLowerCase());
-                    const matchesDist = !contactDistrictFilter || m.district === contactDistrictFilter;
-                    return matchesSearch && matchesDist;
-                  });
+                  type UnifiedInboxEntry =
+                    | { kind: 'email'; sortTime: number; emailItem: MailboxEmailItem }
+                    | { kind: 'contact_form'; sortTime: number; contactItem: ContactMessage };
 
-                  if (filtered.length === 0) {
+                  const q = contactSearchQuery.trim().toLowerCase();
+
+                  const emailEntries: UnifiedInboxEntry[] =
+                    mailboxSourceFilter === 'contact_form' || contactDistrictFilter
+                      ? []
+                      : mailboxEmails
+                          .filter((em) => {
+                            if (!q) return true;
+                            return (
+                              (em.fromName || '').toLowerCase().includes(q) ||
+                              (em.fromEmail || '').toLowerCase().includes(q) ||
+                              (em.subject || '').toLowerCase().includes(q) ||
+                              (em.textBody || '').toLowerCase().includes(q)
+                            );
+                          })
+                          .map((em) => ({
+                            kind: 'email' as const,
+                            sortTime: new Date(em.date || 0).getTime() || 0,
+                            emailItem: em,
+                          }));
+
+                  const contactEntries: UnifiedInboxEntry[] =
+                    mailboxSourceFilter === 'email'
+                      ? []
+                      : contactMessages
+                          .filter((m) => {
+                            const matchesSearch =
+                              !q ||
+                              (m.name || '').toLowerCase().includes(q) ||
+                              (m.email || '').toLowerCase().includes(q) ||
+                              (m.phone || '').includes(contactSearchQuery) ||
+                              (m.subject || '').toLowerCase().includes(q) ||
+                              (m.message || '').toLowerCase().includes(q);
+                            const matchesDist = !contactDistrictFilter || m.district === contactDistrictFilter;
+                            return matchesSearch && matchesDist;
+                          })
+                          .map((m) => ({
+                            kind: 'contact_form' as const,
+                            sortTime: new Date(m.createdAt || 0).getTime() || 0,
+                            contactItem: m,
+                          }));
+
+                  const unified = [...emailEntries, ...contactEntries].sort(
+                    (a, b) => b.sortTime - a.sortTime
+                  );
+
+                  if (isLoadingContacts && unified.length === 0) {
+                    return (
+                      <div className="bg-white p-10 text-center rounded-xl border border-slate-200 text-slate-500 text-sm flex flex-col items-center gap-2">
+                        <RefreshCw className="w-6 h-6 animate-spin text-[#df6b16]" />
+                        <span>ईमेल व संपर्क संदेश लोड होत आहेत...</span>
+                      </div>
+                    );
+                  }
+
+                  if (unified.length === 0) {
                     return (
                       <div className="bg-white p-12 text-center rounded-xl border border-dashed border-slate-300 text-slate-400 space-y-2">
-                        <MessageSquare className="w-12 h-12 mx-auto text-slate-300" />
-                        <p className="text-sm font-semibold text-slate-600">कोणतेही संदेश आढळले नाहीत.</p>
+                        <Inbox className="w-12 h-12 mx-auto text-slate-300" />
+                        <p className="text-sm font-semibold text-slate-600">कोणतेही संदेश किंवा ईमेल आढळले नाहीत.</p>
                         <p className="text-xs text-slate-400">
-                          वेबसाईटच्या संपर्क पानावरील फॉर्मवरून कोणी संदेश पाठवल्यास तो येथे तात्काळ दिसेल.
+                          {mailboxAccount} वर आलेले ईमेल व वेबसाईट संपर्क फॉर्मवरील संदेश येथे एकत्र दिसतील.
                         </p>
                       </div>
                     );
@@ -5673,11 +6001,114 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                   return (
                     <div className="grid grid-cols-1 gap-4">
-                      {filtered.map((msg) => {
+                      {unified.map((entry) => {
+                        if (entry.kind === 'email') {
+                          const em = entry.emailItem;
+                          return (
+                            <div
+                              key={`email-${em.folder}-${em.uid}`}
+                              className={`bg-white rounded-xl border p-5 shadow-xs transition-all space-y-3 ${
+                                em.isRead ? 'border-slate-200 hover:border-slate-300' : 'border-amber-300 bg-amber-50/15 hover:border-amber-400'
+                              }`}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                  <div className="w-9 h-9 rounded-full bg-[#193568] text-[#efb24b] font-bold flex items-center justify-center shrink-0">
+                                    <Mail className="w-4 h-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h4 className="font-bold text-sm text-[#09243f] leading-snug">
+                                        {em.fromName}
+                                      </h4>
+                                      <span className="bg-blue-50 text-[#193568] font-bold px-2 py-0.5 rounded text-[10px] border border-blue-200">
+                                        ईमेल ({mailboxAccount})
+                                      </span>
+                                      {em.isRead ? (
+                                        <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">
+                                          वाचलेला
+                                        </span>
+                                      ) : (
+                                        <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300">
+                                          नवीन ईमेल
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                                      {em.fromEmail && <span className="font-mono text-slate-700">{em.fromEmail}</span>}
+                                      <span>· दिनांक: {formatDateWithEnglishDigits(em.date)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleMailboxEmailRead(em)}
+                                    className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border cursor-pointer ${
+                                      em.isRead
+                                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                                    }`}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>{em.isRead ? 'अनरीड करा' : 'वाचले करा'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteMailboxEmail(em)}
+                                    className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-rose-200 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>हटवा</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5 text-xs">
+                                <p className="font-bold text-[#17366d]">
+                                  विषय: <span className="font-semibold text-slate-800">{em.subject}</span>
+                                </p>
+                                <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-slate-800 leading-relaxed whitespace-pre-wrap font-normal max-h-60 overflow-y-auto">
+                                  {em.textBody || em.snippet || '(मजकूर उपलब्ध नाही)'}
+                                </div>
+                                {em.hasAttachments && em.attachmentNames.length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600 pt-1">
+                                    <Paperclip className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>सोबत फायली: {em.attachmentNames.join(', ')}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                                {em.fromEmail && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleOpenReplyModal({
+                                        to: em.fromEmail,
+                                        recipientName: em.fromName,
+                                        subject: em.subject,
+                                        replyToMessageId: em.messageId,
+                                        contextLabel: `ईमेलला उत्तर (${em.fromEmail})`,
+                                      })
+                                    }
+                                    className="inline-flex items-center gap-1.5 bg-[#193568] hover:bg-[#11254a] text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <Reply className="w-3.5 h-3.5 text-[#efb24b]" />
+                                    <span>उत्तर पाठवा ({mailboxAccount} वरून)</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        const msg = entry.contactItem;
                         const cleanPhone = (msg.phone || '').replace(/\D/g, '');
                         return (
                           <div
-                            key={msg.id}
+                            key={`contact-${msg.id}`}
                             className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:border-amber-400 transition-all space-y-3"
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
@@ -5686,24 +6117,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   {msg.name?.charAt(0) || '👤'}
                                 </div>
                                 <div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
                                     <h4 className="font-bold text-sm text-[#09243f] leading-snug">
                                       {msg.name}
                                     </h4>
+                                    <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">
+                                      वेबसाईट संपर्क फॉर्म
+                                    </span>
                                     {msg.isRead ? (
-                                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200 flex items-center gap-1">
-                                        ✅ वाचलेला (Read)
+                                      <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[10px] border border-slate-200">
+                                        वाचलेला
                                       </span>
                                     ) : (
-                                      <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300 flex items-center gap-1 animate-pulse">
-                                        🔴 नवीन (Unread)
+                                      <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300">
+                                        नवीन संदेश
                                       </span>
                                     )}
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                                     {msg.district && (
                                       <span className="bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded text-[10px] border border-slate-200">
-                                        📍 {msg.district}
+                                        {msg.district}
                                       </span>
                                     )}
                                     <span>
@@ -5723,7 +6157,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     );
                                     showAdminFeedback(nextRead ? 'संदेश वाचलेला म्हणून चिन्हांकित केला.' : 'संदेश अनरीड केला.', 'success');
                                   }}
-                                  className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border ${
+                                  className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border cursor-pointer ${
                                     msg.isRead
                                       ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                                       : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
@@ -5736,7 +6170,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteContactMessage(msg.id)}
-                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-rose-200"
+                                  className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-rose-200 cursor-pointer"
                                   title="हा संदेश काढून टाका"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -5757,8 +6191,26 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </div>
                             </div>
 
-                            {/* Action Links: Phone Call, WhatsApp & Email */}
+                            {/* Action Links: Reply via contact@mahasangh.in, Phone Call & WhatsApp */}
                             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                              {msg.email && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleOpenReplyModal({
+                                      to: msg.email || '',
+                                      recipientName: msg.name,
+                                      subject: msg.subject || 'आपल्या संपर्क संदेशाचे उत्तर',
+                                      contextLabel: `संपर्क फॉर्म संदेशास उत्तर (${msg.email})`,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1.5 bg-[#193568] hover:bg-[#11254a] text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Reply className="w-3.5 h-3.5 text-[#efb24b]" />
+                                  <span>ईमेलने उत्तर पाठवा ({msg.email})</span>
+                                </button>
+                              )}
+
                               <a
                                 href={`tel:${cleanPhone}`}
                                 className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors"
@@ -5778,16 +6230,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <span>WhatsApp संदेश पाठवा</span>
                                 </a>
                               )}
-
-                              {msg.email && (
-                                <a
-                                  href={`mailto:${msg.email}`}
-                                  className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 hover:bg-slate-100 font-medium px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
-                                >
-                                  <Mail className="w-3.5 h-3.5" />
-                                  <span>{msg.email}</span>
-                                </a>
-                              )}
                             </div>
                           </div>
                         );
@@ -5795,6 +6237,118 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
                   );
                 })()}
+
+                {/* Direct Reply / Compose Email Modal (Sends directly via contact@mahasangh.in) */}
+                {replyModal?.open && (
+                  <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-lg w-full overflow-hidden text-xs">
+                      <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Send className="w-4 h-4 text-[#efb24b] shrink-0" />
+                          <h4 className="font-serifDevanagari text-base font-bold truncate">
+                            {replyModal.contextLabel || 'ईमेल उत्तर पाठवा'}
+                          </h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setReplyModal(null)}
+                          className="text-slate-300 hover:text-white p-1 cursor-pointer"
+                          aria-label="बंद करा"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSendMailboxReply} className="p-5 space-y-3.5">
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 flex items-center justify-between">
+                          <span>प्रेषक (From):</span>
+                          <strong className="font-mono text-[#193568]">{mailboxAccount}</strong>
+                        </div>
+
+                        {replyModal.error && (
+                          <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg font-semibold">
+                            {replyModal.error}
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            प्राप्तकर्ता ईमेल (To) *
+                          </label>
+                          <input
+                            type="email"
+                            required
+                            value={replyModal.to}
+                            onChange={(e) =>
+                              setReplyModal((prev) => prev ? { ...prev, to: e.target.value } : prev)
+                            }
+                            placeholder="recipient@example.com"
+                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-[#193568]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            विषय (Subject) *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={replyModal.subject}
+                            onChange={(e) =>
+                              setReplyModal((prev) => prev ? { ...prev, subject: e.target.value } : prev)
+                            }
+                            placeholder="ईमेलचा विषय"
+                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#193568]"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="font-bold text-slate-700 block mb-1">
+                            उत्तर / संदेश (Message) *
+                          </label>
+                          <textarea
+                            required
+                            rows={6}
+                            value={replyModal.body}
+                            onChange={(e) =>
+                              setReplyModal((prev) => prev ? { ...prev, body: e.target.value } : prev)
+                            }
+                            placeholder="येथे आपले सविस्तर उत्तर टाईप करा..."
+                            className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#193568] leading-relaxed"
+                          />
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setReplyModal(null)}
+                            className="px-4 py-2 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                          >
+                            रद्द करा
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={replyModal.isSending}
+                            className="px-5 py-2 bg-[#193568] hover:bg-[#11254a] text-white rounded-lg font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                          >
+                            {replyModal.isSending ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#efb24b]" />
+                                <span>पाठवत आहे...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Send className="w-3.5 h-3.5 text-[#efb24b]" />
+                                <span>{mailboxAccount} वरून पाठवा</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
