@@ -5,6 +5,7 @@ import { HomeTab } from './components/HomeTab';
 
 const loadAboutTab = () => import('./components/AboutTab');
 const loadLeadershipTab = () => import('./components/LeadershipTab');
+const loadAdvisoryBoardTab = () => import('./components/AdvisoryBoardTab');
 const loadNewsTab = () => import('./components/NewsTab');
 const loadMembershipTab = () => import('./components/MembershipTab');
 const loadContactTab = () => import('./components/ContactTab');
@@ -13,6 +14,7 @@ const loadAppointmentsTab = () => import('./components/AppointmentsTab');
 
 const AboutTab = lazy(() => loadAboutTab().then((m) => ({ default: m.AboutTab })));
 const LeadershipTab = lazy(() => loadLeadershipTab().then((m) => ({ default: m.LeadershipTab })));
+const AdvisoryBoardTab = lazy(() => loadAdvisoryBoardTab().then((m) => ({ default: m.AdvisoryBoardTab })));
 const NewsTab = lazy(() => loadNewsTab().then((m) => ({ default: m.NewsTab })));
 const MembershipTab = lazy(() => loadMembershipTab().then((m) => ({ default: m.MembershipTab })));
 const ContactTab = lazy(() => loadContactTab().then((m) => ({ default: m.ContactTab })));
@@ -28,10 +30,14 @@ const prefetchTabChunk = (tabId: string) => {
     case 'leadership':
       loadLeadershipTab();
       break;
+    case 'advisory':
+      loadAdvisoryBoardTab();
+      break;
     case 'appointments':
       loadAppointmentsTab();
       break;
     case 'news':
+    case 'circulars':
       loadNewsTab();
       break;
     case 'membership':
@@ -74,6 +80,8 @@ import {
   purgeStaleApplicationFromCachesByContact,
   fetchApplicationsForAdmin,
   fetchApprovedMembersCached,
+  getRegisteredMembersCountOncePerSession,
+  getCachedRegisteredMembersCountSync,
   safeCacheApplications,
   safeStorageGet,
   approveApplicationInFirestore,
@@ -110,6 +118,9 @@ export function App() {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
   const [isLoadingAdminApps, setIsLoadingAdminApps] = useState(false);
+  const [registeredMembersCount, setRegisteredMembersCount] = useState<number | null>(() =>
+    getCachedRegisteredMembersCountSync()
+  );
 
   // Track visited tabs so only active/visited tabs mount on mobile (eliminates heavy startup DOM & network burst)
   useEffect(() => {
@@ -266,11 +277,18 @@ export function App() {
     // 1. Session-level connection check runs asynchronously without blocking data or paint
     testConnectionOncePerSession().catch(() => {});
 
-    // 2. Load news & gov orders in parallel (0 Firestore reads if valid cache exists)
-    Promise.allSettled([fetchNewsCached(false), fetchGovOrders()])
-      .then(([newsRes, govRes]) => {
+    // 2. Load news, gov orders, and once-per-visit registered members count in parallel
+    Promise.allSettled([
+      fetchNewsCached(false),
+      fetchGovOrders(),
+      getRegisteredMembersCountOncePerSession(),
+    ])
+      .then(([newsRes, govRes, countRes]) => {
         if (newsRes.status === 'fulfilled') setNewsList(newsRes.value);
         if (govRes.status === 'fulfilled') setGovOrders(govRes.value);
+        if (countRes.status === 'fulfilled' && typeof countRes.value === 'number') {
+          setRegisteredMembersCount(countRes.value);
+        }
       })
       .catch((err) => {
         console.warn('Data init error:', err);
@@ -672,6 +690,7 @@ export function App() {
               onSelectNews={handleSelectNews}
               newsList={newsList}
               latestBanners={latestBanners}
+              registeredMembersCount={registeredMembersCount}
             />
           </div>
         )}
@@ -687,6 +706,11 @@ export function App() {
               <LeadershipTab setCurrentTab={setCurrentTab} />
             </div>
           )}
+          {(visitedTabs.advisory || currentTab === 'advisory') && (
+            <div className={currentTab === 'advisory' ? 'block mhs-tab-enter' : 'hidden'}>
+              <AdvisoryBoardTab />
+            </div>
+          )}
           {(visitedTabs.appointments || currentTab === 'appointments') && (
             <div className={currentTab === 'appointments' ? 'block mhs-tab-enter' : 'hidden'}>
               <AppointmentsTab />
@@ -695,6 +719,20 @@ export function App() {
           {(visitedTabs.news || currentTab === 'news') && (
             <div className={currentTab === 'news' ? 'block mhs-tab-enter' : 'hidden'}>
               <NewsTab
+                mode="news"
+                newsList={newsList}
+                govOrders={govOrders}
+                selectedNews={selectedNews}
+                setSelectedNews={setSelectedNews}
+                onRefreshNews={handleRefreshNews}
+                isRefreshing={isRefreshingNews}
+              />
+            </div>
+          )}
+          {(visitedTabs.circulars || currentTab === 'circulars') && (
+            <div className={currentTab === 'circulars' ? 'block mhs-tab-enter' : 'hidden'}>
+              <NewsTab
+                mode="circulars"
                 newsList={newsList}
                 govOrders={govOrders}
                 selectedNews={selectedNews}

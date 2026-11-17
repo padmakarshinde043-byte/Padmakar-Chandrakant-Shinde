@@ -1163,19 +1163,21 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">पद / संवर्ग</label>
                   <select
-                    value={editingMember.professional || ''}
+                    value={
+                      editingMember.professional &&
+                      (OFFICIAL_CADRES as readonly string[]).includes(editingMember.professional)
+                        ? editingMember.professional
+                        : ''
+                    }
                     onChange={(e) => setEditingMember({ ...editingMember, professional: e.target.value })}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-semibold"
                   >
+                    <option value="">-- संवर्ग निवडा --</option>
                     {OFFICIAL_CADRES.map((c) => (
                       <option key={c} value={c}>
                         {c}
                       </option>
                     ))}
-                    {editingMember.professional &&
-                      !(OFFICIAL_CADRES as readonly string[]).includes(editingMember.professional) && (
-                        <option value={editingMember.professional}>{editingMember.professional}</option>
-                      )}
                   </select>
                 </div>
 

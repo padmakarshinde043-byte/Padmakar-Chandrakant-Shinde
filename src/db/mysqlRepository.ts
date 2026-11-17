@@ -144,6 +144,19 @@ export async function mysqlListApprovedDirectory(): Promise<MembershipApplicatio
   return list;
 }
 
+export async function mysqlCountApprovedMembers(): Promise<number> {
+  await ensureMysqlSchema();
+  const pool = getMysqlPool();
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt
+     FROM \`applications\`
+     WHERE \`status\` = 'approved'
+        OR \`member_number\` != ''
+        OR \`approved_at\` != ''`
+  );
+  return Number(rows[0]?.cnt || 0);
+}
+
 export async function mysqlUpsertApplication(app: Record<string, any>): Promise<void> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();

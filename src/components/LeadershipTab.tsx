@@ -58,7 +58,6 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
   const womenExecutive = allLeaders.filter((l) => l.category === 'महिला आघाडी राज्य कार्यकारिणी');
   const divisional = allLeaders.filter((l) => l.category === 'विभागीय समन्वयक' || l.category === 'विभागीय कार्यकारिणी' || l.category === 'division');
   const districtPresidents = allLeaders.filter((l) => l.category === 'जिल्हा अध्यक्ष' || l.category === 'district');
-  const advisory = allLeaders.filter((l) => l.category === 'सल्लागार' || l.category === 'advisory');
 
   const filteredDistricts = districtPresidents.filter((item) => {
     if (!item) return false;
@@ -231,18 +230,6 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
                 कोणताही जिल्हा आढळला नाही.
               </div>
             )}
-          </div>
-        </section>
-
-        {/* Section 5: Advisory Board */}
-        <section className="bg-white p-6 rounded-2xl border-l-8 border-purple-600 shadow-sm">
-          <div className="mb-8">
-            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-              सल्लागार मंडळ
-            </h3>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {advisory.map((leader) => renderLeaderCard(leader))}
           </div>
         </section>
       </div>

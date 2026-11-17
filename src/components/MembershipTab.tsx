@@ -257,7 +257,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       const combinedName = [matched.firstName, matched.middleName, matched.lastName].filter(Boolean).join(' ');
       setFullName(combinedName);
       if (matched.mobile) setPhone(matched.mobile);
-      if (matched.currentCadre) setProfessional(matched.currentCadre);
+      if (
+        matched.currentCadre &&
+        (OFFICIAL_CADRES as readonly string[]).includes(matched.currentCadre)
+      ) {
+        setProfessional(matched.currentCadre);
+      } else {
+        setProfessional('');
+      }
       if (matched.appointedPost) setOfficialPost(matched.appointedPost);
       if (matched.taluka) {
         setOfficialTaluka(matched.taluka);

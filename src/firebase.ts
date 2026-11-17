@@ -2090,6 +2090,60 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
   return promise;
 }
 
+const REGISTERED_COUNT_CACHE_KEY = 'mhs_registered_members_count_v1';
+let sessionRegisteredCountPromise: Promise<number> | null = null;
+
+export function getCachedRegisteredMembersCountSync(): number | null {
+  try {
+    const raw = safeStorageGet(REGISTERED_COUNT_CACHE_KEY);
+    if (raw !== null) {
+      const n = Number(raw);
+      if (!Number.isNaN(n) && n >= 0) return n;
+    }
+    const cachedList = getCachedApprovedMembersSync();
+    if (Array.isArray(cachedList) && cachedList.length > 0) {
+      return cachedList.length;
+    }
+  } catch {}
+  return null;
+}
+
+/**
+ * Fetches the total approved/registered members count ONCE per website visit (no continuous polling).
+ */
+export async function getRegisteredMembersCountOncePerSession(): Promise<number> {
+  if (sessionRegisteredCountPromise) {
+    return sessionRegisteredCountPromise;
+  }
+
+  sessionRegisteredCountPromise = (async () => {
+    try {
+      if (await isSqlBackendActive()) {
+        const res = await sqlApiRequest<{ count: number }>('/api/db/applications/approved-count', {
+          cache: 'no-store',
+        });
+        if (typeof res?.count === 'number' && res.count >= 0) {
+          safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(res.count));
+          return res.count;
+        }
+      }
+
+      const list = await fetchApprovedMembersCached(false);
+      if (Array.isArray(list)) {
+        const count = list.length;
+        safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(count));
+        return count;
+      }
+    } catch (err) {
+      console.warn('Registered members count once-per-visit fallback:', err);
+    }
+
+    return getCachedRegisteredMembersCountSync() ?? 0;
+  })();
+
+  return sessionRegisteredCountPromise;
+}
+
 /**
  * Optimistically appends a newly approved application to the local approved members cache
  * so the user immediately sees it without an extra network fetch.

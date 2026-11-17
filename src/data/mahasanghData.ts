@@ -8,7 +8,7 @@ export interface Leader {
   email?: string;
   photo?: string;
   isKey?: boolean;
-  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'विभागीय कार्यकारिणी' | 'जिल्हा अध्यक्ष' | 'सल्लागार';
+  category?: 'state' | 'division' | 'district' | 'advisory' | 'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'विभागीय कार्यकारिणी' | 'जिल्हा अध्यक्ष' | 'सल्लागार' | 'राज्य सल्लागार मंडळ' | 'कायदेविषयक सल्लागार' | 'मार्गदर्शक';
 }
 
 export interface NewsItem {
@@ -59,11 +59,12 @@ export interface MembershipApplication {
   welcomeEmailSent?: boolean;
 }
 
-// अधिकृत पद / संवर्ग (केवळ ३ अधिकृत पर्याय)
+// अधिकृत पद / संवर्ग (केवळ ४ अधिकृत पर्याय)
 export const OFFICIAL_CADRES = [
   "केंद्रप्रमुख",
-  "शिक्षण विस्तार अधिकारी",
-  "गटशिक्षणाधिकारी"
+  "शिक्षण विस्तार अधिकारी जेष्ठ",
+  "शिक्षण विस्तार अधिकारी कनिष्ठ",
+  "शिक्षण विस्तार अधिकारी पंचायत"
 ] as const;
 
 // शिक्षक पदाला लागू असणाऱ्या सर्व व्यावसायिक पात्रता (Professional Qualifications)
@@ -319,6 +320,14 @@ export const DISTRICT_PRESIDENTS: Leader[] = [
   { name: "श्री. चंद्रकांत आत्राम", role: "जिल्हा अध्यक्ष", region: "गडचिरोली", education: "एम.ए., बी.एड.", phone: "9800000054" }
 ];
 
+export const DEFAULT_MARGDARSHAK_SEED: Leader[] = [
+  { id: "mg-1", name: "डॉ. सुरेश पाटील", role: "मुख्य मार्गदर्शक", region: "पुणे विभाग", education: "", phone: "-", category: "मार्गदर्शक" },
+  { id: "mg-2", name: "प्रा. मीना देशमुख", role: "वरिष्ठ मार्गदर्शक", region: "नागपूर विभाग", education: "", phone: "-", category: "मार्गदर्शक" },
+  { id: "mg-3", name: "श्री. रामचंद्र जोशी", role: "शैक्षणिक मार्गदर्शक", region: "नाशिक विभाग", education: "", phone: "-", category: "मार्गदर्शक" },
+  { id: "mg-4", name: "श्रीमती. कल्पना कुलकर्णी", role: "प्रशासकीय मार्गदर्शक", region: "छत्रपती संभाजीनगर विभाग", education: "", phone: "-", category: "मार्गदर्शक" },
+  { id: "mg-5", name: "श्री. विश्वासराव कदम", role: "संघटनात्मक मार्गदर्शक", region: "कोल्हापूर विभाग", education: "", phone: "-", category: "मार्गदर्शक" }
+];
+
 export const ADVISORY_BOARD: Leader[] = [
   {
     id: "ldr-1794299282004",
@@ -328,7 +337,7 @@ export const ADVISORY_BOARD: Leader[] = [
     education: "",
     phone: "-",
     photo: "https://res.cloudinary.com/fdrjsgjy/image/upload/v1794299176/ndijznapakkgr9nlcae0.jpg",
-    category: "सल्लागार"
+    category: "कायदेविषयक सल्लागार"
   },
   {
     id: "ldr-1794299133349",
@@ -338,13 +347,39 @@ export const ADVISORY_BOARD: Leader[] = [
     education: "",
     phone: "-",
     photo: "https://res.cloudinary.com/fdrjsgjy/image/upload/v1794299131/jlq3xxwoynv8z7h3umvj.jpg",
-    category: "सल्लागार"
+    category: "कायदेविषयक सल्लागार"
   },
-  { id: "ab-0", name: "डॉ. सुरेश पाटील", role: "वरिष्ठ सल्लागार", region: "पुणे विभाग", education: "पीएच.डी., एम.एड.", phone: "9800000061", category: "सल्लागार" },
-  { id: "ab-1", name: "प्रा. मीना देशमुख", role: "सल्लागार", region: "नागपूर विभाग", education: "एम.ए., एम.एड.", phone: "9800000062", category: "सल्लागार" },
-  { id: "ab-2", name: "श्री. रामचंद्र जोशी", role: "सल्लागार", region: "नाशिक विभाग", education: "एम.ए., बी.एड.", phone: "9800000063", category: "सल्लागार" },
-  { id: "ab-3", name: "श्रीमती. कल्पना शर्मा", role: "सल्लागार", region: "औरंगाबाद विभाग", education: "एम.एस.सी., बी.एड.", phone: "9800000064", category: "सल्लागार" }
+  ...DEFAULT_MARGDARSHAK_SEED
 ];
+
+const ADVISORY_CATEGORY_SET = new Set([
+  'सल्लागार',
+  'advisory',
+  'राज्य सल्लागार मंडळ',
+  'कायदेविषयक सल्लागार',
+  'मार्गदर्शक',
+]);
+
+export function isValidLeaderRecord(leader?: Leader | null): boolean {
+  if (!leader) return false;
+  const clean = (leader.name || '').trim();
+  return Boolean(clean && clean !== '.' && clean !== '-');
+}
+
+export function isAdvisoryBoardLeader(leader?: Leader | null): boolean {
+  if (!leader) return false;
+  return ADVISORY_CATEGORY_SET.has(leader.category || '');
+}
+
+export function isLegalAdvisorLeader(leader?: Leader | null): boolean {
+  if (!leader || !isAdvisoryBoardLeader(leader)) return false;
+  return leader.category === 'कायदेविषयक सल्लागार' || (leader.role || '').includes('कायदे');
+}
+
+export function isMargdarshakLeader(leader?: Leader | null): boolean {
+  if (!leader || !isAdvisoryBoardLeader(leader)) return false;
+  return !isLegalAdvisorLeader(leader) && isValidLeaderRecord(leader);
+}
 
 import liveLeadersSnapshot from './live_leaders_snapshot.json';
 

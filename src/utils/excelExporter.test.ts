@@ -18,11 +18,10 @@ test('exportOrganizationStatusExcel builds cleanly with two-part sums and full v
     distOfficial: 2,
     talukaOfficial: 1,
     officialsTotal: (idx === 0 ? 1 : 0) + (idx === 1 ? 1 : 0) + 2 + 1,
-    beoCount: 1,
     extOfficerCount: 2,
     headmasterCount: 10,
-    membersTotal: 13,
-    rowTotal: 13
+    membersTotal: 12,
+    rowTotal: 12
   }));
 
   // Verify rowTotal equals membersTotal

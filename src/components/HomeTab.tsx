@@ -15,9 +15,10 @@ interface HomeTabProps {
   onSelectNews: (news: NewsItem) => void;
   newsList?: NewsItem[];
   latestBanners?: LatestBannerItem[];
+  registeredMembersCount?: number | null;
 }
 
-export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList, latestBanners }) => {
+export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, newsList, latestBanners, registeredMembersCount }) => {
   const [fullScreenPhoto, setFullScreenPhoto] = useState<string | null>(null);
 
   // Close full-screen photo modal on Escape key and manage body overflow
@@ -98,9 +99,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                   setCurrentTab('news');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="text-slate-300 hover:text-white font-semibold px-3 py-2.5 text-sm sm:text-base transition-colors"
+                className="text-slate-300 hover:text-white font-semibold px-3 py-2.5 text-sm sm:text-base transition-colors cursor-pointer"
               >
-                बातम्या आणि परिपत्रके →
+                बातम्या पहा →
               </button>
             </div>
 
@@ -125,10 +126,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <span className="text-xs sm:text-sm text-slate-300 font-medium">सदस्य उद्दिष्ट</span>
               </div>
               <div>
-                <strong className="block text-xl sm:text-2xl font-black font-mono text-emerald-400">
-                  <AnimatedCounter target={100} suffix="%" />
+                <strong className="block text-xl sm:text-2xl font-black font-mono tabular-nums text-emerald-400">
+                  {typeof registeredMembersCount === 'number' ? (
+                    <AnimatedCounter target={registeredMembersCount} />
+                  ) : (
+                    '...'
+                  )}
                 </strong>
-                <span className="text-xs sm:text-sm text-slate-300 font-medium">कायदेशीर संरक्षण</span>
+                <span className="text-xs sm:text-sm text-slate-300 font-medium">नोंदणीकृत सदस्य संख्या</span>
               </div>
             </div>
           </div>
@@ -256,7 +261,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
           {/* Hub 3: Government Decisions & Circulars */}
           <div
             onClick={() => {
-              setCurrentTab('news');
+              setCurrentTab('circulars');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
             className="mhs-card-interactive mhs-stagger-3 group bg-white p-4 sm:p-5 rounded-xl border border-slate-200 hover:border-emerald-600 shadow-2xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"

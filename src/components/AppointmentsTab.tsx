@@ -32,7 +32,7 @@ import {
   exportOrganizationStatusExcel
 } from '../utils/excelExporter';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
-import { ORG_DETAILS, MembershipApplication } from '../data/mahasanghData';
+import { ORG_DETAILS, MembershipApplication, OFFICIAL_CADRES } from '../data/mahasanghData';
 import { fetchApprovedMembersCached } from '../firebase';
 import {
   getOfficialsFromStorageSync,
@@ -589,7 +589,7 @@ export const AppointmentsTab: React.FC = () => {
     setFormPost(m.appointedPost || '');
     setFormDistrict(m.district);
     setFormTaluka(m.taluka || '');
-    if (['केंद्रप्रमुख', 'शिक्षण विस्तार अधिकारी', 'गटशिक्षणाधिकारी'].includes(m.currentCadre)) {
+    if ((OFFICIAL_CADRES as readonly string[]).includes(m.currentCadre)) {
       setFormCadre(m.currentCadre);
       setCustomCadreInput('');
     } else {
@@ -804,22 +804,19 @@ export const AppointmentsTab: React.FC = () => {
         return matchesDistrictName(a.district, dist);
       });
 
-      let beoCount = 0;
       let extOfficerCount = 0;
       let headmasterCount = 0;
 
       distApprovedApps.forEach((a) => {
         const prof = (a.professional || '').trim();
-        if (prof.includes('गटशिक्षणाधिकारी') || prof.toLowerCase().includes('beo')) {
-          beoCount++;
-        } else if (prof.includes('शिक्षण विस्तार अधिकारी') || prof.includes('विस्तार अधिकारी')) {
+        if (prof.includes('शिक्षण विस्तार अधिकारी') || prof.includes('विस्तार अधिकारी')) {
           extOfficerCount++;
         } else {
           headmasterCount++;
         }
       });
 
-      const membersTotal = beoCount + extOfficerCount + headmasterCount;
+      const membersTotal = extOfficerCount + headmasterCount;
       const officialsTotal = stateRep + divRep + distOfficial + talukaOfficial;
       // अंतिम बेरीज ही सदस्य संख्ये एवढीच असावी (पदाधिकारी आधीच सदस्य असल्याने दुबार बेरीज नको)
       const rowTotal = membersTotal;
@@ -831,7 +828,6 @@ export const AppointmentsTab: React.FC = () => {
         distOfficial,
         talukaOfficial,
         officialsTotal,
-        beoCount,
         extOfficerCount,
         headmasterCount,
         membersTotal,
@@ -852,7 +848,6 @@ export const AppointmentsTab: React.FC = () => {
         distOfficial: acc.distOfficial + curr.distOfficial,
         talukaOfficial: acc.talukaOfficial + curr.talukaOfficial,
         officialsTotal: acc.officialsTotal + curr.officialsTotal,
-        beoCount: acc.beoCount + curr.beoCount,
         extOfficerCount: acc.extOfficerCount + curr.extOfficerCount,
         headmasterCount: acc.headmasterCount + curr.headmasterCount,
         membersTotal: acc.membersTotal + curr.membersTotal,
@@ -864,7 +859,6 @@ export const AppointmentsTab: React.FC = () => {
         distOfficial: 0,
         talukaOfficial: 0,
         officialsTotal: 0,
-        beoCount: 0,
         extOfficerCount: 0,
         headmasterCount: 0,
         membersTotal: 0,
@@ -2339,13 +2333,15 @@ export const AppointmentsTab: React.FC = () => {
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">सध्याचे संवर्ग पद *</label>
                 <select
-                  value={formCadre}
+                  value={(OFFICIAL_CADRES as readonly string[]).includes(formCadre) ? formCadre : 'केंद्रप्रमुख'}
                   onChange={(e) => setFormCadre(e.target.value)}
                   className="w-full p-2 border border-slate-300 rounded-md bg-white font-medium focus:outline-none focus:border-[#193568]"
                 >
-                  <option value="केंद्रप्रमुख">केंद्रप्रमुख</option>
-                  <option value="शिक्षण विस्तार अधिकारी">शिक्षण विस्तार अधिकारी</option>
-                  <option value="गटशिक्षणाधिकारी">गटशिक्षणाधिकारी</option>
+                  {OFFICIAL_CADRES.map((cadre) => (
+                    <option key={cadre} value={cadre}>
+                      {cadre}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -2641,7 +2637,6 @@ export const AppointmentsTab: React.FC = () => {
                     <th className="py-2.5 px-2 text-center border-r border-slate-200">जिल्हा पदाधिकारी</th>
                     <th className="py-2.5 px-2 text-center border-r border-slate-200">तालुका पदाधिकारी</th>
                     <th className="py-2.5 px-2 text-center border-r border-slate-200 font-bold text-[#193568]">एकूण पदाधिकारी</th>
-                    <th className="py-2.5 px-2 text-center border-r border-slate-200">गटशिक्षणाधिकारी</th>
                     <th className="py-2.5 px-2 text-center border-r border-slate-200">शिक्षण विस्तार अधिकारी</th>
                     <th className="py-2.5 px-2 text-center border-r border-slate-200">केंद्रप्रमुख</th>
                     <th className="py-2.5 px-2 text-center border-r border-slate-200 font-bold text-[#df6b16]">एकूण सदस्य</th>
@@ -2671,9 +2666,6 @@ export const AppointmentsTab: React.FC = () => {
                       </td>
                       <td className="py-2 px-2 text-center font-bold text-[#193568] bg-slate-50 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.officialsTotal)}
-                      </td>
-                      <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
-                        {toEnglishDigits(st.beoCount)}
                       </td>
                       <td className="py-2 px-2 text-center font-medium text-slate-700 font-mono tabular-nums border-r border-slate-200">
                         {toEnglishDigits(st.extOfficerCount)}
@@ -2709,9 +2701,6 @@ export const AppointmentsTab: React.FC = () => {
                     </td>
                     <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-bold font-mono tabular-nums text-[#efb24b] bg-[#11254a]">
                       {toEnglishDigits(matrixTotals.officialsTotal)}
-                    </td>
-                    <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
-                      {toEnglishDigits(matrixTotals.beoCount)}
                     </td>
                     <td className="py-3 px-2 text-center border-r border-slate-700 text-xs font-mono tabular-nums text-slate-100">
                       {toEnglishDigits(matrixTotals.extOfficerCount)}

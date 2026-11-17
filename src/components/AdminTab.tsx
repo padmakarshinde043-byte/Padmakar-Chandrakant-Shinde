@@ -16,7 +16,12 @@ import {
   ORG_DETAILS,
   Leader,
   DEFAULT_AUTHORITATIVE_LEADERS,
-  MAHARASHTRA_DISTRICTS
+  DEFAULT_MARGDARSHAK_SEED,
+  MAHARASHTRA_DISTRICTS,
+  isValidLeaderRecord,
+  isAdvisoryBoardLeader,
+  isLegalAdvisorLeader,
+  isMargdarshakLeader
 } from '../data/mahasanghData';
 import { DEFAULT_DISTRICT_PASSWORD } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
@@ -1033,7 +1038,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // ==========================================
   // Leadership Management State (Point 7)
   // ==========================================
-  const [leaderCategory, setLeaderCategory] = useState<'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'सल्लागार'>('राज्य कार्यकारिणी');
+  const [leaderCategory, setLeaderCategory] = useState<'राज्य कार्यकारिणी' | 'महिला आघाडी राज्य कार्यकारिणी' | 'विभागीय समन्वयक' | 'जिल्हा अध्यक्ष' | 'राज्य सल्लागार मंडळ'>('राज्य कार्यकारिणी');
+  const [advisorySubTab, setAdvisorySubTab] = useState<'कायदेविषयक सल्लागार' | 'मार्गदर्शक'>('कायदेविषयक सल्लागार');
   const [dynamicLeaders, setDynamicLeaders] = useState<Leader[]>([]);
   const [editingLeaderId, setEditingLeaderId] = useState<string | null>(null);
   const [leaderName, setLeaderName] = useState('');
@@ -1047,6 +1053,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [leaderFormMsg, setLeaderFormMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const leaderPhotoInputRef = useRef<HTMLInputElement | null>(null);
 
+  const normalizeDynamicLeadersList = (rawList: Leader[]): Leader[] => {
+    const cleaned = rawList
+      .filter((l) => isValidLeaderRecord(l))
+      .map((l) => {
+        if (l.category === 'सल्लागार' || l.category === 'advisory' || l.category === 'राज्य सल्लागार मंडळ') {
+          return {
+            ...l,
+            category: isLegalAdvisorLeader(l) ? ('कायदेविषयक सल्लागार' as const) : ('मार्गदर्शक' as const)
+          };
+        }
+        return l;
+      });
+    const hasMargdarshak = cleaned.some((l) => isMargdarshakLeader(l));
+    return hasMargdarshak ? cleaned : [...cleaned, ...DEFAULT_MARGDARSHAK_SEED];
+  };
+
   // Initialize Dynamic Leadership from Firebase / LocalStorage
   useEffect(() => {
     try {
@@ -1054,23 +1076,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length >= 50) {
-          setDynamicLeaders(parsed);
+          setDynamicLeaders(normalizeDynamicLeadersList(parsed));
         } else {
-          setDynamicLeaders(DEFAULT_AUTHORITATIVE_LEADERS);
+          setDynamicLeaders(normalizeDynamicLeadersList(DEFAULT_AUTHORITATIVE_LEADERS));
         }
       } else {
-        setDynamicLeaders(DEFAULT_AUTHORITATIVE_LEADERS);
+        setDynamicLeaders(normalizeDynamicLeadersList(DEFAULT_AUTHORITATIVE_LEADERS));
       }
     } catch (e) {
       console.warn('Could not read dynamic leaders:', e);
-      setDynamicLeaders(DEFAULT_AUTHORITATIVE_LEADERS);
+      setDynamicLeaders(normalizeDynamicLeadersList(DEFAULT_AUTHORITATIVE_LEADERS));
     }
 
     // Always sync authoritative remote leaders from Firebase (RTDB & Firestore)
     fetchDynamicLeaders(true).then((remote) => {
       if (remote && remote.length > 0) {
-        setDynamicLeaders(remote);
-        localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(remote));
+        const normalized = normalizeDynamicLeadersList(remote);
+        setDynamicLeaders(normalized);
+        localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(normalized));
       }
     }).catch(() => {});
   }, []);
@@ -1091,8 +1114,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
-  // Filter leaders by active category
-  const categoryLeaders = dynamicLeaders.filter((l) => (l.category || 'राज्य कार्यकारिणी') === leaderCategory);
+  const activeLeaderSectionLabel =
+    leaderCategory === 'राज्य सल्लागार मंडळ' ? advisorySubTab : leaderCategory;
+
+  // Filter leaders by active category (and sub-tab for राज्य सल्लागार मंडळ)
+  const categoryLeaders = dynamicLeaders.filter((l) => {
+    if (!isValidLeaderRecord(l)) return false;
+    if (leaderCategory === 'राज्य सल्लागार मंडळ') {
+      if (!isAdvisoryBoardLeader(l)) return false;
+      return advisorySubTab === 'कायदेविषयक सल्लागार'
+        ? isLegalAdvisorLeader(l)
+        : !isLegalAdvisorLeader(l);
+    }
+    return (l.category || 'राज्य कार्यकारिणी') === leaderCategory;
+  });
 
   // Selected leader ID for prominent reordering
   const [selectedLeaderIdForReorder, setSelectedLeaderIdForReorder] = useState<string | null>(null);
@@ -1106,7 +1141,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     } else {
       setSelectedLeaderIdForReorder(null);
     }
-  }, [leaderCategory, categoryLeaders.length]);
+  }, [leaderCategory, advisorySubTab, categoryLeaders.length]);
 
   // Safe category-specific Move Up
   const handleMoveLeaderUp = (leaderId?: string) => {
@@ -1652,10 +1687,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
+    const targetCategory: Leader['category'] =
+      leaderCategory === 'राज्य सल्लागार मंडळ' ? advisorySubTab : leaderCategory;
+
     if (editingLeaderId) {
       // Update existing leader
       const updated = dynamicLeaders.map((l) => {
-        if (l.id === editingLeaderId) {
+        if ((l.id || l.name) === editingLeaderId) {
           return {
             ...l,
             name: leaderName.trim(),
@@ -1664,7 +1702,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             phone: leaderPhone.trim() || '-',
             education: leaderEducation.trim() || '',
             photo: leaderPhoto || l.photo,
-            category: leaderCategory
+            category: targetCategory
           };
         }
         return l;
@@ -1681,7 +1719,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         phone: leaderPhone.trim() || '-',
         education: leaderEducation.trim() || '',
         photo: leaderPhoto,
-        category: leaderCategory
+        category: targetCategory
       };
       saveLeadersToStorage([newLeader, ...dynamicLeaders]);
       setLeaderFormMsg({ text: 'नवीन पदाधिकारी यशस्वीपणे जोडले गेले!', type: 'success' });
@@ -2987,30 +3025,71 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     महासंघ नेतृत्व व पदाधिकारी संपादन (Leadership Management)
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    येथून आपण राज्य कार्यकारिणी, विभागीय समन्वयक, जिल्हा अध्यक्ष व सल्लागार यांचे फोटो, नाव आणि पद बदलू किंवा नव्याने जोडू शकता.
+                    येथून आपण राज्य कार्यकारिणी, विभागीय समन्वयक, जिल्हा अध्यक्ष आणि राज्य सल्लागार मंडळ (कायदेविषयक सल्लागार व मार्गदर्शक) यांचे फोटो, नाव आणि पद बदलू किंवा नव्याने जोडू शकता.
                   </p>
                 </div>
 
-                {/* Dropdown with 4 Categories (As Requested) */}
+                {/* Dropdown with 5 Categories */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <label className="font-bold text-xs text-[#09243f] shrink-0">
                     श्रेणी निवडा:
                   </label>
                   <select
                     value={leaderCategory}
-                    onChange={(e) => setLeaderCategory(e.target.value as any)}
-                    className="p-2.5 bg-white border border-[#c8d2e2] text-xs font-bold text-[#193568] rounded-lg focus:outline-none focus:border-[#df6b16] w-full sm:w-64"
+                    onChange={(e) => {
+                      setLeaderCategory(e.target.value as any);
+                      setEditingLeaderId(null);
+                    }}
+                    className="p-2.5 bg-white border border-[#c8d2e2] text-xs font-bold text-[#193568] rounded-lg focus:outline-none focus:border-[#df6b16] w-full sm:w-72"
                   >
                     <option value="राज्य कार्यकारिणी">1. राज्य कार्यकारिणी</option>
                     <option value="महिला आघाडी राज्य कार्यकारिणी">2. महिला आघाडी राज्य कार्यकारिणी</option>
                     <option value="विभागीय समन्वयक">3. विभागीय समन्वयक</option>
                     <option value="जिल्हा अध्यक्ष">4. जिल्हा अध्यक्ष</option>
-                    <option value="सल्लागार">5. सल्लागार</option>
+                    <option value="राज्य सल्लागार मंडळ">5. राज्य सल्लागार मंडळ (सल्लागार व मार्गदर्शक)</option>
                   </select>
                   <span className="text-xs text-slate-500 font-medium">
-                    या श्रेणीत एकूण: <strong>{categoryLeaders.length}</strong> पदाधिकारी
+                    या विभागात एकूण: <strong>{categoryLeaders.length}</strong> पदाधिकारी
                   </span>
                 </div>
+
+                {leaderCategory === 'राज्य सल्लागार मंडळ' && (
+                  <div className="bg-[#f8f9fc] p-3.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-[#17366d]">
+                      राज्य सल्लागार मंडळ उप-विभाग निवडा:
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdvisorySubTab('कायदेविषयक सल्लागार');
+                          setEditingLeaderId(null);
+                        }}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                          advisorySubTab === 'कायदेविषयक सल्लागार'
+                            ? 'bg-[#193568] text-white border-[#193568]'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        १. कायदेविषयक सल्लागार
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdvisorySubTab('मार्गदर्शक');
+                          setEditingLeaderId(null);
+                        }}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                          advisorySubTab === 'मार्गदर्शक'
+                            ? 'bg-[#df6b16] text-white border-[#df6b16]'
+                            : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        २. मार्गदर्शक
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Reordering Control Toolbar & Selection Panel */}
                 <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 shadow-xs">
@@ -3068,7 +3147,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
-                      विद्यमान पदाधिकारी ({leaderCategory}) — एकूण: {categoryLeaders.length}
+                      विद्यमान पदाधिकारी ({activeLeaderSectionLabel}) — एकूण: {categoryLeaders.length}
                     </h4>
                     <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
                       💡 नावावर क्लिक करून निवडा किंवा बाजूच्या बाणांवर क्लिक करा
@@ -3203,7 +3282,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {/* Form to Add / Edit Leader (Photo < 200KB) */}
                 <div className="bg-[#fbfbfd] p-5 rounded-xl border border-slate-200">
                   <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-1">
-                    {editingLeaderId ? 'पदाधिकारी माहिती दुरुस्त करा (Edit Leader)' : `नवीन पदाधिकारी जोडा (${leaderCategory})`}
+                    {editingLeaderId ? 'पदाधिकारी माहिती दुरुस्त करा (Edit Leader)' : `नवीन पदाधिकारी जोडा (${activeLeaderSectionLabel})`}
                   </h4>
                   <p className="text-[11px] text-slate-500 mb-4">
                     नाव, पद, जिल्हा व 200KB आकारातील पासपोर्ट फोटो निवडून सेव्ह करा.

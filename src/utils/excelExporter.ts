@@ -443,8 +443,8 @@ export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
  * 6. 34 Districts Organizational Status Matrix Excel Export (A4 Landscape, Centered Numbers, Left Names)
  * - Row horizontal sum in 2 distinct parts:
  *     Part A: राज्य प्रतिनिधी + विभागीय प्रतिनिधी + जिल्हा पदाधिकारी + तालुका पदाधिकारी = एकूण पदाधिकारी
- *     Part B: गटशिक्षणाधिकारी + शिक्षण विस्तार अधिकारी + केंद्रप्रमुख = एकूण सदस्य
- *     Grand Total: एकूण पदाधिकारी + एकूण सदस्य = एकूण बेरीज
+ *     Part B: शिक्षण विस्तार अधिकारी (जेष्ठ + कनिष्ठ + पंचायत एकत्रित) + केंद्रप्रमुख = एकूण सदस्य
+ *     Grand Total: सदस्य संख्येएवढीच एकूण बेरीज
  * - Column vertical sums for ALL columns at the bottom (उभी बेरीज)
  * - Numbers centered horizontally & vertically; District names left-aligned
  * - Compact A4 landscape layout with wrapped headers
@@ -461,7 +461,6 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     'जिल्हा पदाधिकारी',
     'तालुका पदाधिकारी',
     'एकूण पदाधिकारी',
-    'गटशिक्षणाधिकारी',
     'शिक्षण विस्तार अधिकारी',
     'केंद्रप्रमुख',
     'एकूण सदस्य',
@@ -480,7 +479,6 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
   let tDistOff = 0;
   let tTalukaOff = 0;
   let tOffTot = 0;
-  let tBeo = 0;
   let tExt = 0;
   let tHm = 0;
   let tMemTot = 0;
@@ -494,11 +492,10 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     const talukaOff = Number(st.talukaOfficial || 0);
     const offTot = st.officialsTotal ?? (stateRep + divRep + distOff + talukaOff);
 
-    // 2. Part B (सदस्य बेरीज): गटशिक्षणाधिकारी + शिक्षण विस्तार अधिकारी + केंद्रप्रमुख एकत्र
-    const beo = Number(st.beoCount || 0);
+    // 2. Part B (सदस्य बेरीज): सर्व प्रकारचे शिक्षण विस्तार अधिकारी एकत्र + केंद्रप्रमुख
     const ext = Number(st.extOfficerCount || 0);
     const hm = Number(st.headmasterCount ?? st.members ?? 0);
-    const memTot = st.membersTotal ?? (beo + ext + hm);
+    const memTot = st.membersTotal ?? (ext + hm);
 
     // 3. अंतिम बेरीज: सदस्य संख्ये एवढीच (पदाधिकारी आधीच सदस्य असल्याने वेगळी/दुबार बेरीज नको)
     const rowTot = st.rowTotal !== undefined ? Number(st.rowTotal) : memTot;
@@ -509,7 +506,6 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     tDistOff += distOff;
     tTalukaOff += talukaOff;
     tOffTot += offTot;
-    tBeo += beo;
     tExt += ext;
     tHm += hm;
     tMemTot += memTot;
@@ -523,7 +519,6 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
       distOff,
       talukaOff,
       offTot,
-      beo,
       ext,
       hm,
       memTot,
@@ -540,7 +535,6 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     tDistOff,
     tTalukaOff,
     tOffTot,
-    tBeo,
     tExt,
     tHm,
     tMemTot,
@@ -550,20 +544,19 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
-  // Compact professional column widths tailored for A4 Landscape printing
+  // Compact professional column widths tailored for A4 Landscape printing (11 columns)
   ws['!cols'] = [
     { wch: 7 },   // 0: अ.क्र.
-    { wch: 18 },  // 1: जिल्ह्याचे नाव
-    { wch: 12 },  // 2: राज्य प्रतिनिधी
-    { wch: 12 },  // 3: विभागीय प्रतिनिधी
-    { wch: 13 },  // 4: जिल्हा पदाधिकारी
-    { wch: 13 },  // 5: तालुका पदाधिकारी
+    { wch: 19 },  // 1: जिल्ह्याचे नाव
+    { wch: 13 },  // 2: राज्य प्रतिनिधी
+    { wch: 13 },  // 3: विभागीय प्रतिनिधी
+    { wch: 14 },  // 4: जिल्हा पदाधिकारी
+    { wch: 14 },  // 5: तालुका पदाधिकारी
     { wch: 14 },  // 6: एकूण पदाधिकारी (Part A)
-    { wch: 13 },  // 7: गटशिक्षणाधिकारी
-    { wch: 15 },  // 8: शिक्षण विस्तार अधिकारी
-    { wch: 12 },  // 9: केंद्रप्रमुख
-    { wch: 13 },  // 10: एकूण सदस्य (Part B)
-    { wch: 14 }   // 11: एकूण बेरीज (Grand Total)
+    { wch: 17 },  // 7: शिक्षण विस्तार अधिकारी (जेष्ठ + कनिष्ठ + पंचायत एकत्रित)
+    { wch: 13 },  // 8: केंद्रप्रमुख
+    { wch: 14 },  // 9: एकूण सदस्य (Part B)
+    { wch: 14 }   // 10: एकूण बेरीज (Grand Total)
   ];
 
   // Row heights
@@ -578,10 +571,10 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
   }
   ws['!rows'].push({ hpt: 26 }); // Grand Total row
 
-  // Merges: Title banner across 12 cols, Subtitle across 12 cols, Total label across Col 0 & 1
+  // Merges: Title banner across 11 cols, Subtitle across 11 cols, Total label across Col 0 & 1
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } },
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } },
     { s: { r: data.length - 1, c: 0 }, e: { r: data.length - 1, c: 1 } }
   ];
 
@@ -590,7 +583,7 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
   ws['!margins'] = { left: 0.3, right: 0.3, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 };
 
   // Styling Title Row (0)
-  for (let c = 0; c <= 11; c++) {
+  for (let c = 0; c <= 10; c++) {
     const ref = XLSX.utils.encode_cell({ r: 0, c });
     if (!ws[ref]) ws[ref] = { t: 's', v: '' };
     ws[ref].s = {
@@ -601,7 +594,7 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
   }
 
   // Styling Subtitle Row (1)
-  for (let c = 0; c <= 11; c++) {
+  for (let c = 0; c <= 10; c++) {
     const ref = XLSX.utils.encode_cell({ r: 1, c });
     if (!ws[ref]) ws[ref] = { t: 's', v: '' };
     ws[ref].s = {
@@ -612,13 +605,13 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
   }
 
   // Styling Column Headers (Row 3, index 3)
-  for (let c = 0; c <= 11; c++) {
+  for (let c = 0; c <= 10; c++) {
     const ref = XLSX.utils.encode_cell({ r: 3, c });
     if (ws[ref]) {
       let bg = '193568'; // Institutional Navy
       if (c === 6) bg = '1E40AF'; // एकूण पदाधिकारी (distinct blue)
-      else if (c === 10) bg = 'C2410C'; // एकूण सदस्य (distinct amber/orange)
-      else if (c === 11) bg = '7C2D12'; // एकूण बेरीज (deep rust)
+      else if (c === 9) bg = 'C2410C'; // एकूण सदस्य (distinct amber/orange)
+      else if (c === 10) bg = '7C2D12'; // एकूण बेरीज (deep rust)
 
       ws[ref].s = {
         font: { name: 'Calibri', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
@@ -636,7 +629,7 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     const isZebra = i % 2 === 1;
     const defaultBg = isZebra ? 'F8FAFC' : 'FFFFFF';
 
-    for (let c = 0; c <= 11; c++) {
+    for (let c = 0; c <= 10; c++) {
       const ref = XLSX.utils.encode_cell({ r, c });
       if (!ws[ref]) continue;
 
@@ -651,11 +644,11 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
         // एकूण पदाधिकारी (Part A summary highlight)
         cellBg = isZebra ? 'E0E7FF' : 'EFF6FF';
         cellFont = { name: 'Calibri', sz: 10, color: { rgb: '1E40AF' }, bold: true };
-      } else if (c === 10) {
+      } else if (c === 9) {
         // एकूण सदस्य (Part B summary highlight)
         cellBg = isZebra ? 'FFEDD5' : 'FFF7ED';
         cellFont = { name: 'Calibri', sz: 10, color: { rgb: 'C2410C' }, bold: true };
-      } else if (c === 11) {
+      } else if (c === 10) {
         // एकूण बेरीज (Grand Total highlight)
         cellBg = isZebra ? 'FEF08A' : 'FEF9C3';
         cellFont = { name: 'Calibri', sz: 10.5, color: { rgb: '0F172A' }, bold: true };
@@ -675,7 +668,7 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
 
   // Styling Bottom Grand Total Row (सर्व रकान्यांची उभी बेरीज)
   const lastR = startRow + stats.length;
-  for (let c = 0; c <= 11; c++) {
+  for (let c = 0; c <= 10; c++) {
     const ref = XLSX.utils.encode_cell({ r: lastR, c });
     if (!ws[ref]) continue;
 
@@ -687,11 +680,11 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
       cellBg = '1E3A8A';
       fontColor = '93C5FD';
       fontSize = 11;
-    } else if (c === 10) {
+    } else if (c === 9) {
       cellBg = '7C2D12';
       fontColor = 'FDBA74';
       fontSize = 11;
-    } else if (c === 11) {
+    } else if (c === 10) {
       cellBg = '0F172A';
       fontColor = 'FEF08A';
       fontSize = 11.5;

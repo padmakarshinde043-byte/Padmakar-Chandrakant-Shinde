@@ -30,6 +30,7 @@ import { isMysqlActive, isMysqlConfigured } from './src/db/mysqlPool';
 import {
   mysqlListApplications,
   mysqlListApprovedDirectory,
+  mysqlCountApprovedMembers,
   mysqlUpsertApplication,
   mysqlTrackApplication,
   mysqlFindExistingApplication,
@@ -898,6 +899,16 @@ app.get('/api/db/applications/approved-directory', async (req, res) => {
   try {
     const list = await mysqlListApprovedDirectory();
     sendFreshJson(req, res, { items: list });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.get('/api/db/applications/approved-count', async (_req, res) => {
+  try {
+    const count = await mysqlCountApprovedMembers();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ count });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }

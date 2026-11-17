@@ -5,6 +5,7 @@ import { NewsItem, GovOrder, INITIAL_GOV_ORDERS, INITIAL_NEWS } from '../data/ma
 import { toEnglishDigits } from '../utils/formatters';
 
 interface NewsTabProps {
+  mode?: 'news' | 'circulars';
   newsList: NewsItem[];
   govOrders: GovOrder[];
   selectedNews: NewsItem | null;
@@ -14,6 +15,7 @@ interface NewsTabProps {
 }
 
 export const NewsTab: React.FC<NewsTabProps> = ({
+  mode = 'news',
   newsList,
   govOrders,
   selectedNews,
@@ -21,6 +23,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
   onRefreshNews,
   isRefreshing,
 }) => {
+  const isCircularsMode = mode === 'circulars';
   const [searchTerm, setSearchTerm] = useState('');
   const modalBodyRef = React.useRef<HTMLDivElement>(null);
 
@@ -114,13 +117,15 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         <div className="border-b border-slate-200 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-              अधिकृत प्रसिद्धी दालन
+              {isCircularsMode ? 'अधिकृत शासन निर्णय दालन' : 'अधिकृत प्रसिद्धी दालन'}
             </span>
             <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
-              बातम्या आणि परिपत्रके
+              {isCircularsMode ? 'शासन निर्णय व परिपत्रके' : 'बातम्या'}
             </h1>
             <p className="text-base text-slate-700 mt-2 max-w-2xl leading-relaxed">
-              राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित अधिकृत बातम्या, संघटना घडामोडी आणि महत्त्वाचे शासन निर्णय.
+              {isCircularsMode
+                ? 'महाराष्ट्र शासन, शिक्षण आयुक्तालय व शालेय शिक्षण विभागाचे अधिकृत शासन निर्णय (GR) व परिपत्रके.'
+                : 'राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित अधिकृत बातम्या, घोषणा आणि संघटना घडामोडी.'}
             </p>
           </div>
 
@@ -130,7 +135,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="बातमी किंवा शब्द शोधा..."
+                placeholder={isCircularsMode ? 'शासन निर्णय किंवा परिपत्रक शोधा...' : 'बातमी किंवा शब्द शोधा...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full text-sm pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 shadow-2xs"
@@ -141,7 +146,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                 onClick={onRefreshNews}
                 disabled={isRefreshing}
                 className="p-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 shadow-2xs"
-                title="ताज्या बातम्या लोड करा"
+                title="ताजी माहिती लोड करा"
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-600' : ''}`} />
               </button>
@@ -150,11 +155,12 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         </div>
       </div>
 
-      {/* Main Content: Two Distinct Stacked Sections */}
+      {/* Main Content */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 space-y-8">
         {/* =========================================================================
-            १. पहिला विभाग: महासंघ बातम्या, अधिकृत घोषणा व संघटना घडामोडी
+            १. महासंघ बातम्या, अधिकृत घोषणा व संघटना घडामोडी (केवळ बातम्या सब-मेनूमध्ये)
         ========================================================================= */}
+        {!isCircularsMode && (
         <section className="bg-white p-5 sm:p-7 rounded-2xl border border-slate-200/90 shadow-xs">
           {/* Section 1 Header: Clear, Bold & Distinct */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
@@ -253,10 +259,13 @@ export const NewsTab: React.FC<NewsTabProps> = ({
             )}
           </div>
         </section>
+        )}
 
         {/* =========================================================================
-            २. दुसरा विभाग: अधिकृत शासन निर्णय व परिपत्रके
+            २. अधिकृत शासन निर्णय व परिपत्रके व कॉपीराईट धोरण (केवळ शासन निर्णय सब-मेनूमध्ये)
         ========================================================================= */}
+        {isCircularsMode && (
+        <>
         <section className="bg-white p-5 sm:p-7 rounded-2xl border border-slate-200/90 shadow-xs">
           {/* Section 2 Header: Clear, Bold & Distinct */}
           <div className="pb-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -357,6 +366,8 @@ export const NewsTab: React.FC<NewsTabProps> = ({
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {/* Read News / View Photo Modal (सविस्तर बातमी व वर फोटो) — Rendered via Portal directly in document.body so it stays centered on mobile & above Header */}
