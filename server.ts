@@ -113,6 +113,10 @@ import {
   sendSingleWhatsAppMessage,
   runWhatsAppBroadcastCampaign,
 } from './src/utils/whatsappService';
+import {
+  matchRazorpayPaymentsWithPendingApps,
+  RazorpayApiPaymentLike,
+} from './src/utils/razorpaySyncMatcher';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -2741,6 +2745,71 @@ app.post('/api/razorpay/webhook', async (req, res) => {
   } catch (err: any) {
     console.error('Razorpay Webhook Processing Error:', err);
     res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+// 7. Admin: Direct Live Sync of Captured Razorpay Payments vs Pending Applications
+app.post('/api/razorpay/sync-pending-payments', requireAdminOrSubAdmin(['approveMembers', 'manageRazorpay']), async (req, res) => {
+  try {
+    const { instance } = getRazorpayInstance();
+    if (!instance) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Razorpay API Key ID व Key Secret अद्याप कॉन्फिगर केलेले नाहीत. कृपया आधी "बँक / Razorpay सेटिंग्ज" मधून सेट करा.',
+      });
+    }
+
+    const daysRaw = Number(req.body?.daysBack || 30);
+    const daysBack = Number.isFinite(daysRaw) ? Math.min(Math.max(Math.round(daysRaw), 1), 180) : 30;
+    const toEpoch = Math.floor(Date.now() / 1000);
+    const fromEpoch = toEpoch - daysBack * 86400;
+
+    const allPayments: RazorpayApiPaymentLike[] = [];
+    const pageSize = 100;
+    const maxPages = 15; // Up to 1,500 most recent payments inside selected window
+
+    for (let page = 0; page < maxPages; page++) {
+      const batch = (await instance.payments.all({
+        from: fromEpoch,
+        to: toEpoch,
+        count: pageSize,
+        skip: page * pageSize,
+      })) as unknown as { items?: RazorpayApiPaymentLike[]; count?: number };
+
+      const items = Array.isArray(batch?.items) ? batch.items : [];
+      allPayments.push(...items);
+      if (items.length < pageSize) break;
+    }
+
+    const applications = isMysqlActive()
+      ? await mysqlListApplications(false)
+      : Array.isArray(req.body?.applications)
+        ? req.body.applications
+        : [];
+
+    const matchResult = matchRazorpayPaymentsWithPendingApps({
+      payments: allPayments,
+      applications,
+      minAmountPaise: 22000,
+    });
+
+    sendFreshJson(req, res, {
+      status: 'success',
+      daysBack,
+      ...matchResult,
+    });
+  } catch (err: any) {
+    console.error('Error syncing Razorpay payments:', err);
+    const rawDesc =
+      err?.error?.description ||
+      err?.message ||
+      'Razorpay सर्व्हरशी संपर्क साधताना तांत्रिक अडचण आली.';
+    const statusCode = Number(err?.statusCode) === 401 ? 401 : 500;
+    const message =
+      statusCode === 401
+        ? 'Razorpay Key ID किंवा Key Secret अवैध आहे. कृपया "बँक / Razorpay सेटिंग्ज" मधून तपासा.'
+        : `Razorpay पेमेंट तपासताना त्रुटी आली: ${rawDesc}`;
+    res.status(statusCode).json({ status: 'error', message });
   }
 });
 

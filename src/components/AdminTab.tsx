@@ -91,10 +91,12 @@ import { AdminBackupRestorePanel } from './AdminBackupRestorePanel';
 import { AdminWhatsappBroadcastPanel } from './AdminWhatsappBroadcastPanel';
 import {
   authApiRequest,
+  sqlApiRequest,
   setAuthSessionToken,
   clearAuthSessionToken,
   getAuthHeaders,
 } from '../api/sqlBridge';
+import type { RazorpayMatchBy } from '../utils/razorpaySyncMatcher';
 
 interface AdminTabProps {
   applications: MembershipApplication[];
@@ -997,10 +999,139 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Certificate Modal (Point 5)
   const [certModalApp, setCertModalApp] = useState<MembershipApplication | null>(null);
 
-  // Razorpay Excel Auto-Approve state
+  // Razorpay Direct Live Sync & Excel Auto-Approve state
+  type RazorpayMatchedRow = {
+    app: MembershipApplication;
+    paymentId: string;
+    orderId: string;
+    amountRupees?: number;
+    paidAtIso?: string;
+    method?: string;
+    matchBy?: RazorpayMatchBy | 'excel';
+    selected?: boolean;
+  };
   const [showRazorpayMatchModal, setShowRazorpayMatchModal] = useState<boolean>(false);
-  const [razorpayMatchedList, setRazorpayMatchedList] = useState<Array<{ app: MembershipApplication; paymentId: string; orderId: string }>>([]);
+  const [razorpayMatchedList, setRazorpayMatchedList] = useState<RazorpayMatchedRow[]>([]);
   const [isBulkApprovingRazorpay, setIsBulkApprovingRazorpay] = useState<boolean>(false);
+  const [isSyncingRazorpay, setIsSyncingRazorpay] = useState<boolean>(false);
+  const [razorpaySyncDays, setRazorpaySyncDays] = useState<number>(30);
+  const [approvingSingleRazorpayId, setApprovingSingleRazorpayId] = useState<string | null>(null);
+  const [razorpaySyncMeta, setRazorpaySyncMeta] = useState<{
+    source: 'live' | 'excel';
+    scannedPaymentsCount?: number;
+    capturedPaymentsCount?: number;
+    pendingCheckedCount?: number;
+    daysBack?: number;
+  } | null>(null);
+
+  const handleSyncRazorpayLivePayments = async (daysOverride?: number) => {
+    const targetDays = daysOverride ?? razorpaySyncDays;
+    setIsSyncingRazorpay(true);
+    try {
+      const res = await sqlApiRequest<{
+        status: string;
+        daysBack: number;
+        scannedPaymentsCount: number;
+        capturedPaymentsCount: number;
+        pendingCheckedCount: number;
+        matches: Array<{
+          app: MembershipApplication;
+          paymentId: string;
+          orderId: string;
+          amountRupees: number;
+          paidAtIso: string;
+          method: string;
+          matchBy: RazorpayMatchBy;
+        }>;
+      }>('/api/razorpay/sync-pending-payments', {
+        method: 'POST',
+        body: JSON.stringify({
+          daysBack: targetDays,
+          applications: applications.map((a) => ({
+            id: a.id,
+            applicationNumber: a.applicationNumber,
+            salutation: a.salutation,
+            fullName: a.fullName,
+            phone: a.phone,
+            email: a.email,
+            district: a.district,
+            taluka: a.taluka,
+            professional: a.professional,
+            status: a.status,
+            razorpayOrderId: a.razorpayOrderId,
+            razorpayPaymentId: a.razorpayPaymentId,
+            paymentRef: a.paymentRef,
+            createdAt: a.createdAt,
+          })),
+        }),
+      });
+
+      const list: RazorpayMatchedRow[] = (res.matches || []).map((m) => ({
+        app: m.app,
+        paymentId: m.paymentId,
+        orderId: m.orderId,
+        amountRupees: m.amountRupees,
+        paidAtIso: m.paidAtIso,
+        method: m.method,
+        matchBy: m.matchBy,
+        selected: true,
+      }));
+
+      setRazorpaySyncDays(targetDays);
+      setRazorpayMatchedList(list);
+      setRazorpaySyncMeta({
+        source: 'live',
+        scannedPaymentsCount: res.scannedPaymentsCount,
+        capturedPaymentsCount: res.capturedPaymentsCount,
+        pendingCheckedCount: res.pendingCheckedCount,
+        daysBack: res.daysBack,
+      });
+      setShowRazorpayMatchModal(true);
+
+      if (list.length === 0) {
+        showAdminFeedback(
+          `Razorpay मधील मागील ${targetDays} दिवसांतील ${res.capturedPaymentsCount} सफल पेमेंट तपासले; परंतु प्रलंबित अर्जांपैकी नवीन न जुळलेले पेमेंट आढळले नाही.`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showAdminFeedback(err?.message || 'Razorpay सर्व्हरवरून पेमेंट तपासताना त्रुटी आली.', 'error');
+    } finally {
+      setIsSyncingRazorpay(false);
+    }
+  };
+
+  const approveSingleRazorpayMatchedItem = async (item: RazorpayMatchedRow) => {
+    const cleanPayId = item.paymentId && item.paymentId !== '-' ? item.paymentId : '';
+    const cleanOrderId = item.orderId && item.orderId !== '-' ? item.orderId : '';
+    const atomicResult = await approveApplicationAtomicInFirestore({
+      appId: item.app.id,
+      district: item.app.district,
+      paymentId: cleanPayId || undefined,
+      orderId: cleanOrderId || undefined,
+      approvedBy: currentUser?.email || 'Admin',
+      source: 'razorpay_direct_sync',
+      knownRecords: applications,
+      extraUpdates: {
+        paymentConfirmed: true,
+        ...(cleanPayId ? { paymentRef: cleanPayId, razorpayPaymentId: cleanPayId } : {}),
+        ...(cleanOrderId ? { razorpayOrderId: cleanOrderId } : {}),
+      },
+    });
+    const resolvedNum = atomicResult.memberNumber;
+    onApproveApplication(item.app.id, resolvedNum, { skipFirestore: true });
+    addApprovedMemberToCache({
+      ...item.app,
+      ...atomicResult.application,
+      status: 'approved',
+      memberNumber: resolvedNum,
+      approvedAt: atomicResult.application.approvedAt || new Date().toISOString(),
+      paymentConfirmed: true,
+      ...(cleanPayId ? { paymentRef: cleanPayId, razorpayPaymentId: cleanPayId } : {}),
+      ...(cleanOrderId ? { razorpayOrderId: cleanOrderId } : {}),
+    });
+    return resolvedNum;
+  };
 
   // Resequencing & ghost cleanup state
   const [isResequencing, setIsResequencing] = useState(false);
@@ -3227,6 +3358,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </button>
                     <button
                       type="button"
+                      disabled={isSyncingRazorpay}
+                      onClick={() => handleSyncRazorpayLivePayments()}
+                      className="min-h-[44px] bg-[#df6b16] hover:bg-[#c55b0d] disabled:opacity-60 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
+                      title="एक्सेल डाउनलोड न करता थेट Razorpay खात्यावरून पेमेंट आलेले प्रलंबित अर्ज तपासा व मंजूर करा"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isSyncingRazorpay ? 'animate-spin' : ''}`} />
+                      <span>{isSyncingRazorpay ? 'Razorpay तपासत आहे...' : 'Razorpay थेट सिंक'}</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => {
                         const fileInput = document.createElement('input');
                         fileInput.type = 'file';
@@ -3242,7 +3383,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             const rows: any[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
                             
                             const pendingApps = applications.filter((a) => a.status === 'pending');
-                            const matched: Array<{ app: MembershipApplication; paymentId: string; orderId: string }> = [];
+                            const matched: RazorpayMatchedRow[] = [];
 
                             rows.forEach((row) => {
                               const status = String(row['payment status'] || row['payment_status'] || row['status'] || '').trim().toLowerCase();
@@ -3263,12 +3404,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 const phoneMatch = rowPhone10 && appPhone10 && rowPhone10 === appPhone10;
 
                                 if ((emailMatch || phoneMatch) && !matched.some((m) => m.app.id === app.id)) {
-                                  matched.push({ app, paymentId, orderId });
+                                  matched.push({ app, paymentId, orderId, matchBy: 'excel', selected: true });
                                 }
                               });
                             });
 
                             setRazorpayMatchedList(matched);
+                            setRazorpaySyncMeta({ source: 'excel' });
                             setShowRazorpayMatchModal(true);
                             if (matched.length === 0) {
                               showAdminFeedback('एक्सेल फाईलमध्ये कोणत्याही प्रलंबित अर्जाशी जुळणारे सफल पेमेंट आढळले नाही.', 'error');
@@ -3283,7 +3425,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       title="Razorpay पेमेंट रिपोर्ट (Excel) अपलोड करून प्रलंबित अर्ज स्वयंचलित मंजूर करा"
                     >
                       <Upload className="w-4 h-4 text-[#efb24b]" />
-                      <span>Razorpay Excel ऑटो-मंजूर</span>
+                      <span>Excel ऑटो-मंजूर</span>
                     </button>
                   </div>
                 </div>
@@ -8335,21 +8477,36 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       })()}
 
       {/* ============================================================== */}
-      {/* Razorpay Excel Auto-Approve Match Modal                          */}
+      {/* Razorpay Direct Sync & Excel Auto-Approve Match Modal          */}
       {/* ============================================================== */}
-      {showRazorpayMatchModal && (
+      {showRazorpayMatchModal && (() => {
+        const selectedItems = razorpayMatchedList.filter((m) => m.selected !== false);
+        const allSelected = razorpayMatchedList.length > 0 && selectedItems.length === razorpayMatchedList.length;
+        const matchByLabel = (matchBy?: string) => {
+          if (matchBy === 'order_id') return 'Order ID';
+          if (matchBy === 'application_id') return 'अर्ज ID';
+          if (matchBy === 'phone') return 'मोबाईल';
+          if (matchBy === 'email') return 'ई-मेल';
+          return 'Excel';
+        };
+
+        return (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
           onClick={() => setShowRazorpayMatchModal(false)}
         >
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl relative border border-[#e7ded1] max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl relative border border-[#e7ded1] max-h-[92vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#0b1e36] text-white px-5 py-3.5 flex items-center justify-between gap-2 shrink-0">
               <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                <span>Razorpay पेमेंट जुळणी व स्वयंचलित मंजुरी ({razorpayMatchedList.length} अर्ज सापडले)</span>
+                <span>
+                  {razorpaySyncMeta?.source === 'live'
+                    ? `Razorpay थेट पेमेंट जुळणी (${razorpayMatchedList.length} अर्ज सापडले)`
+                    : `Razorpay Excel जुळणी व स्वयंचलित मंजुरी (${razorpayMatchedList.length} अर्ज सापडले)`}
+                </span>
               </h3>
               <button
                 type="button"
@@ -8361,34 +8518,134 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             </div>
 
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
-              <p className="text-xs text-[#607184] leading-relaxed">
-                खालील प्रलंबित अर्जांचे मोबाईल नंबर किंवा ई-मेल Razorpay पेमेंट रिपोर्टशी यशस्वीरीत्या जुळले आहेत. आपण एका क्लिकवर हे सर्व अर्ज मंजूर करू शकता:
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#fbf8f2] border border-[#e7ded1] rounded-xl p-3">
+                <div className="text-xs text-[#607184] leading-relaxed">
+                  {razorpaySyncMeta?.source === 'live' ? (
+                    <>
+                      Razorpay मधून मागील <strong className="text-[#0b1e36]">{razorpaySyncMeta.daysBack || razorpaySyncDays} दिवसांतील</strong>{' '}
+                      <strong className="text-emerald-700">{razorpaySyncMeta.capturedPaymentsCount ?? 0}</strong> सफल पेमेंट{' '}
+                      आणि <strong className="text-[#0b1e36]">{razorpaySyncMeta.pendingCheckedCount ?? 0}</strong> प्रलंबित अर्ज थेट तपासले.
+                    </>
+                  ) : (
+                    <>
+                      खालील प्रलंबित अर्जांचे मोबाईल नंबर किंवा ई-मेल Razorpay पेमेंट रिपोर्टशी यशस्वीरीत्या जुळले आहेत.
+                    </>
+                  )}
+                </div>
+
+                {razorpaySyncMeta?.source === 'live' && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      value={razorpaySyncDays}
+                      onChange={(e) => {
+                        const days = Number(e.target.value) || 30;
+                        setRazorpaySyncDays(days);
+                        handleSyncRazorpayLivePayments(days);
+                      }}
+                      disabled={isSyncingRazorpay || isBulkApprovingRazorpay}
+                      className="text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-[#0b1e36]"
+                    >
+                      <option value={7}>मागील ७ दिवस</option>
+                      <option value={30}>मागील ३० दिवस</option>
+                      <option value={90}>मागील ९० दिवस</option>
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isSyncingRazorpay || isBulkApprovingRazorpay}
+                      onClick={() => handleSyncRazorpayLivePayments(razorpaySyncDays)}
+                      className="bg-white hover:bg-slate-100 border border-slate-300 text-[#0b1e36] font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 text-[#df6b16] ${isSyncingRazorpay ? 'animate-spin' : ''}`} />
+                      <span>पुन्हा तपासा</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {razorpayMatchedList.length === 0 ? (
-                <div className="p-6 text-center text-slate-500 text-xs">
-                  कोणतेही जुळणारे प्रलंबित अर्ज नाहीत.
+                <div className="p-6 text-center text-slate-600 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-1.5">
+                  <div className="font-bold text-[#0b1e36]">प्रलंबित अर्जाशी जुळणारे कोणतेही नवीन सफल पेमेंट आढळले नाही.</div>
+                  {razorpaySyncMeta?.source === 'live' && razorpaySyncDays < 90 && (
+                    <div>अधिक जुनी पेमेंट्स तपासण्यासाठी वरील कालावधी "मागील ९० दिवस" वर बदलून पहा.</div>
+                  )}
                 </div>
               ) : (
-                <div className="border border-[#e7ded1] rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                <div className="border border-[#e7ded1] rounded-xl overflow-x-auto max-h-80 overflow-y-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-[#fbf8f2] text-[#0b1e36] font-bold border-b border-[#e7ded1] sticky top-0">
+                    <thead className="bg-[#fbf8f2] text-[#0b1e36] font-bold border-b border-[#e7ded1] sticky top-0 z-10">
                       <tr>
-                        <th className="py-2.5 px-3">अ.क्र.</th>
-                        <th className="py-2.5 px-3">नाव</th>
+                        <th className="py-2.5 px-3 w-8">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setRazorpayMatchedList((prev) => prev.map((m) => ({ ...m, selected: checked })));
+                            }}
+                            className="w-4 h-4 accent-[#df6b16] cursor-pointer"
+                            aria-label="सर्व निवडा"
+                          />
+                        </th>
+                        <th className="py-2.5 px-2">अ.क्र.</th>
+                        <th className="py-2.5 px-3">नाव व जिल्हा</th>
                         <th className="py-2.5 px-3">मोबाईल</th>
-                        <th className="py-2.5 px-3">जिल्हा</th>
+                        <th className="py-2.5 px-3">रक्कम व जुळणी</th>
                         <th className="py-2.5 px-3">Razorpay पेमेंट आयडी</th>
+                        <th className="py-2.5 px-3 text-right">कृती</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e7ded1]">
                       {razorpayMatchedList.map((item, idx) => (
                         <tr key={item.app.id} className="hover:bg-amber-50/40">
-                          <td className="py-2 px-3 font-mono">{idx + 1}</td>
-                          <td className="py-2 px-3 font-bold text-[#0b1e36]">{item.app.fullName}</td>
+                          <td className="py-2 px-3">
+                            <input
+                              type="checkbox"
+                              checked={item.selected !== false}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setRazorpayMatchedList((prev) =>
+                                  prev.map((m) => (m.app.id === item.app.id ? { ...m, selected: checked } : m))
+                                );
+                              }}
+                              className="w-4 h-4 accent-[#df6b16] cursor-pointer"
+                            />
+                          </td>
+                          <td className="py-2 px-2 font-mono">{idx + 1}</td>
+                          <td className="py-2 px-3">
+                            <div className="font-bold text-[#0b1e36]">{item.app.fullName}</div>
+                            <div className="text-[11px] text-slate-500">{item.app.district}</div>
+                          </td>
                           <td className="py-2 px-3 font-mono">{toEnglishDigits(item.app.phone)}</td>
-                          <td className="py-2 px-3">{item.app.district}</td>
-                          <td className="py-2 px-3 font-mono text-emerald-700 font-semibold">{item.paymentId}</td>
+                          <td className="py-2 px-3">
+                            <div className="font-bold text-emerald-700">₹{item.amountRupees || 220}</div>
+                            <div className="text-[11px] text-slate-500">
+                              {matchByLabel(item.matchBy)}
+                              {item.paidAtIso ? ` · ${formatDateWithEnglishDigits(item.paidAtIso)}` : ''}
+                            </div>
+                          </td>
+                          <td className="py-2 px-3 font-mono text-emerald-800 font-semibold">{item.paymentId}</td>
+                          <td className="py-2 px-3 text-right">
+                            <button
+                              type="button"
+                              disabled={isBulkApprovingRazorpay || approvingSingleRazorpayId === item.app.id}
+                              onClick={async () => {
+                                setApprovingSingleRazorpayId(item.app.id);
+                                try {
+                                  const memberNo = await approveSingleRazorpayMatchedItem(item);
+                                  setRazorpayMatchedList((prev) => prev.filter((m) => m.app.id !== item.app.id));
+                                  showAdminFeedback(`✓ ${item.app.fullName} यांचा अर्ज मंजूर (क्र.: ${memberNo}).`, 'success');
+                                  if (onFetchApplications) await onFetchApplications(true);
+                                } catch (err: any) {
+                                  showAdminFeedback('मंजूर करताना त्रुटी: ' + (err?.message || 'Error'), 'error');
+                                } finally {
+                                  setApprovingSingleRazorpayId(null);
+                                }
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-2.5 py-1.5 rounded-lg text-[11px] cursor-pointer whitespace-nowrap"
+                            >
+                              {approvingSingleRazorpayId === item.app.id ? 'मंजूर...' : 'मंजूर करा'}
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -8399,38 +8656,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               <div className="flex flex-col sm:flex-row justify-end gap-2.5 pt-2">
                 <button
                   type="button"
-                  disabled={razorpayMatchedList.length === 0 || isBulkApprovingRazorpay}
+                  disabled={selectedItems.length === 0 || isBulkApprovingRazorpay || Boolean(approvingSingleRazorpayId)}
                   onClick={async () => {
                     setIsBulkApprovingRazorpay(true);
                     let successCount = 0;
+                    const approvedIds = new Set<string>();
                     try {
-                      for (const item of razorpayMatchedList) {
+                      for (const item of selectedItems) {
                         try {
-                          const atomicResult = await approveApplicationAtomicInFirestore({
-                            appId: item.app.id,
-                            district: item.app.district,
-                            knownRecords: applications,
-                            extraUpdates: {
-                              paymentConfirmed: true
-                            }
-                          });
-                          const resolvedNum = atomicResult.memberNumber;
-                          onApproveApplication(item.app.id, resolvedNum, { skipFirestore: true });
-                          addApprovedMemberToCache({
-                            ...item.app,
-                            ...atomicResult.application,
-                            status: 'approved',
-                            memberNumber: resolvedNum,
-                            approvedAt: atomicResult.application.approvedAt || new Date().toISOString(),
-                            paymentConfirmed: true
-                          });
+                          await approveSingleRazorpayMatchedItem(item);
+                          approvedIds.add(item.app.id);
                           successCount++;
                         } catch (e) {
                           console.error('Error auto-approving app:', item.app.id, e);
                         }
                       }
-                      showAdminFeedback(`यशस्वी! एकूण ${successCount} प्रलंबित अर्ज स्वयंचलितपणे मंजूर करण्यात आले व सदस्य क्रमांक दिले गेले.`, 'success');
-                      setShowRazorpayMatchModal(false);
+                      showAdminFeedback(
+                        `यशस्वी! एकूण ${successCount} प्रलंबित अर्ज एका क्लिकवर मंजूर करण्यात आले व सदस्य क्रमांक दिले गेले.`,
+                        'success'
+                      );
+                      setRazorpayMatchedList((prev) => prev.filter((m) => !approvedIds.has(m.app.id)));
+                      if (successCount === selectedItems.length) {
+                        setShowRazorpayMatchModal(false);
+                      }
                       if (onFetchApplications) await onFetchApplications(true);
                     } catch (err: any) {
                       showAdminFeedback('त्रुटी: ' + err.message, 'error');
@@ -8441,20 +8689,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   className="min-h-[46px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-6 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer disabled:opacity-50"
                 >
                   <CheckCircle2 className={`w-4 h-4 text-emerald-200 ${isBulkApprovingRazorpay ? 'animate-spin' : ''}`} />
-                  <span>{isBulkApprovingRazorpay ? 'मंजूर करत आहे...' : `सर्व (${razorpayMatchedList.length}) अर्ज मंजूर करा`}</span>
+                  <span>
+                    {isBulkApprovingRazorpay
+                      ? 'मंजूर करत आहे...'
+                      : `एका क्लिकवर सर्व (${selectedItems.length}) अर्ज मंजूर करा`}
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowRazorpayMatchModal(false)}
                   className="min-h-[46px] bg-slate-200 hover:bg-slate-300 text-[#0b1e36] font-bold px-5 py-2.5 rounded-xl text-xs cursor-pointer"
                 >
-                  रद्द करा
+                  बंद करा
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
