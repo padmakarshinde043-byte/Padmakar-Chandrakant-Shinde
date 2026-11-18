@@ -919,8 +919,29 @@ export async function mysqlDeleteNews(newsId: string): Promise<void> {
   await pool.execute('DELETE FROM `news` WHERE `id` = ?', [newsId]);
 }
 
+let latestBannersColumnsChecked = false;
+
+async function ensureLatestBannersVideoColumns(): Promise<void> {
+  if (latestBannersColumnsChecked) return;
+  const pool = getMysqlPool();
+  try {
+    const [colsVideo] = await pool.query<RowDataPacket[]>("SHOW COLUMNS FROM `latest_banners` LIKE 'video_url'");
+    if (!colsVideo || colsVideo.length === 0) {
+      await pool.query('ALTER TABLE `latest_banners` ADD COLUMN `video_url` TEXT NULL AFTER `image_url`');
+    }
+    const [colsMedia] = await pool.query<RowDataPacket[]>("SHOW COLUMNS FROM `latest_banners` LIKE 'media_type'");
+    if (!colsMedia || colsMedia.length === 0) {
+      await pool.query("ALTER TABLE `latest_banners` ADD COLUMN `media_type` VARCHAR(32) NOT NULL DEFAULT 'image' AFTER `video_url`");
+    }
+    latestBannersColumnsChecked = true;
+  } catch (err) {
+    console.warn('ensureLatestBannersVideoColumns notice:', err);
+  }
+}
+
 export async function mysqlListLatestBanners(): Promise<LatestBannerItem[]> {
   await ensureMysqlSchema();
+  await ensureLatestBannersVideoColumns();
   const pool = getMysqlPool();
   const [rows] = await pool.query<RowDataPacket[]>(
     "SELECT * FROM `latest_banners` WHERE `id` NOT IN ('banner-1', 'banner-2')"
@@ -939,6 +960,7 @@ export async function mysqlListLatestBanners(): Promise<LatestBannerItem[]> {
 
 export async function mysqlSaveLatestBanner(banner: LatestBannerItem): Promise<void> {
   await ensureMysqlSchema();
+  await ensureLatestBannersVideoColumns();
   const pool = getMysqlPool();
   await pool.execute(
     `INSERT INTO \`latest_banners\` (id, title, summary, image_url, video_url, media_type, banner_date, created_at)
