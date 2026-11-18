@@ -19,6 +19,7 @@ import {
   computeNextSafeSeq,
   buildSequentialMemberNumber,
 } from './src/utils/memberNumberAllocator';
+import { computeNextVisitorStats } from './src/utils/visitorCounter';
 import { isMysqlActive, isMysqlConfigured } from './src/db/mysqlPool';
 import {
   mysqlListApplications,
@@ -2198,10 +2199,27 @@ app.post('/api/db/admin-auth', requireSuperAdmin, async (req, res) => {
   }
 });
 
+let mockVisitorState = { total: 5155, today: 0, lastDate: '' };
+
 app.post('/api/db/site-stats/visit', async (req, res) => {
   try {
     const increment = Boolean(req.body?.increment);
-    res.json(await mysqlRecordOrReadVisit(increment));
+    if (isMysqlActive()) {
+      return res.json(await mysqlRecordOrReadVisit(increment));
+    }
+    const istDateStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const next = computeNextVisitorStats({
+      currentTotal: mockVisitorState.total,
+      currentToday: mockVisitorState.today,
+      lastDate: mockVisitorState.lastDate,
+      todayDateStr: istDateStr,
+      incrementVisit: increment,
+      minBaseline: 5155,
+    });
+    if (next.shouldPersist) {
+      mockVisitorState = { total: next.total, today: next.today, lastDate: istDateStr };
+    }
+    return res.json({ today: next.today, total: next.total });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }

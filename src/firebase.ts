@@ -1003,49 +1003,121 @@ export interface VisitorStats {
   lastUpdated?: string;
 }
 
-export function getTodayISTString(): string {
-  const now = new Date();
+const VISITOR_STORAGE_KEY = 'mhs_real_visit_count_v6';
+
+export function getTodayISTString(now: Date = new Date()): string {
   const istOffset = 5.5 * 60 * 60 * 1000;
   const istDate = new Date(now.getTime() + istOffset);
   return istDate.toISOString().slice(0, 10);
 }
 
-export function getMsUntilNextISTMidnight(): number {
-  const now = new Date();
+export function getMsUntilNextISTMidnight(now: Date = new Date()): number {
   const istOffset = 5.5 * 60 * 60 * 1000;
   const istDate = new Date(now.getTime() + istOffset);
   const midnight = new Date(istDate);
   midnight.setUTCHours(24, 0, 0, 0);
-  return midnight.getTime() - istDate.getTime();
+  // Add a 500ms buffer past 00:00:00 IST so date rollover has definitely occurred
+  return Math.max(1000, midnight.getTime() - istDate.getTime() + 500);
 }
+
+let visitorStatsInFlight: Promise<VisitorStats> | null = null;
+let visitorStatsInFlightDate = '';
 
 export async function getVisitorCountsOncePerSession(): Promise<VisitorStats> {
   const today = getTodayISTString();
-  const KEY = 'mahasangh_visitor_stats_v1';
-  let stats: VisitorStats = {
-    total: 5155,
-    today: 1,
-    lastDate: today,
-    lastUpdated: new Date().toISOString(),
-  };
 
-  const stored = safeStorageGet(KEY);
-  if (stored) {
-    try {
-      const p = JSON.parse(stored);
-      if (p && typeof p.total === 'number') {
-        stats = {
-          total: p.total + 1,
-          today: p.lastDate === today ? (p.today || 0) + 1 : 1,
-          lastDate: today,
-          lastUpdated: new Date().toISOString(),
-        };
-      }
-    } catch {}
+  if (visitorStatsInFlight && visitorStatsInFlightDate === today) {
+    return visitorStatsInFlight;
   }
 
-  safeStorageSet(KEY, JSON.stringify(stats));
-  return stats;
+  visitorStatsInFlightDate = today;
+  visitorStatsInFlight = (async (): Promise<VisitorStats> => {
+    let cachedTotal = 5155;
+    let cachedToday = 0;
+    let cachedDate = '';
+
+    const rawStored = safeStorageGet(VISITOR_STORAGE_KEY);
+    if (rawStored) {
+      try {
+        const p = JSON.parse(rawStored);
+        if (p && typeof p.total === 'number' && Number.isFinite(p.total)) {
+          cachedTotal = Math.max(p.total, 5155);
+          cachedToday = typeof p.today === 'number' && Number.isFinite(p.today) ? Math.max(p.today, 0) : 0;
+          cachedDate = typeof p.date === 'string' ? p.date : (typeof p.lastDate === 'string' ? p.lastDate : '');
+        }
+      } catch {}
+    }
+
+    // Remove legacy unused key if present
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem('mahasangh_visitor_stats_v1');
+      }
+    } catch {}
+
+    const shouldIncrementVisit = cachedDate !== today;
+
+    if (await isSqlBackendActive()) {
+      try {
+        const res = await sqlApiRequest<{ today: number; total: number }>('/api/db/site-stats/visit', {
+          method: 'POST',
+          body: JSON.stringify({ increment: shouldIncrementVisit }),
+        });
+        if (res && typeof res.total === 'number' && typeof res.today === 'number') {
+          const syncedStats: VisitorStats = {
+            total: res.total,
+            today: Math.max(res.today, 1),
+            lastDate: today,
+            lastUpdated: new Date().toISOString(),
+          };
+          safeStorageSet(
+            VISITOR_STORAGE_KEY,
+            JSON.stringify({
+              total: syncedStats.total,
+              today: syncedStats.today,
+              date: today,
+              lastUpdated: syncedStats.lastUpdated,
+            })
+          );
+          return syncedStats;
+        }
+      } catch (err) {
+        console.warn('SQL visitor stats fetch failed, falling back to local:', err);
+      }
+    }
+
+    const next = computeNextVisitorStats({
+      currentTotal: cachedTotal,
+      currentToday: cachedToday,
+      lastDate: cachedDate,
+      todayDateStr: today,
+      incrementVisit: shouldIncrementVisit,
+      minBaseline: 5155,
+    });
+
+    const localStats: VisitorStats = {
+      total: next.total,
+      today: Math.max(next.today, 1),
+      lastDate: today,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    safeStorageSet(
+      VISITOR_STORAGE_KEY,
+      JSON.stringify({
+        total: localStats.total,
+        today: localStats.today,
+        date: today,
+        lastUpdated: localStats.lastUpdated,
+      })
+    );
+
+    return localStats;
+  })().finally(() => {
+    visitorStatsInFlight = null;
+  });
+
+  return visitorStatsInFlight;
 }
 
 // -------------------------------------------------------------
