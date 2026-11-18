@@ -1517,8 +1517,8 @@ export async function mysqlSetAppointedPosts(posts: AppointedPostItem[]): Promis
         level,
       };
       await conn.execute(
-        'INSERT INTO `appointed_posts` (id, title, level, sort_order, extra_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [`post-${i}-${Date.now()}`, normalized.name, level, i + 1, JSON.stringify(normalized), new Date().toISOString()]
+        'INSERT INTO `appointed_posts` (id, sort_order, title, level, extra_json) VALUES (?, ?, ?, ?, ?)',
+        [`post-${i}-${Date.now()}`, i + 1, normalized.name, level, JSON.stringify(normalized)]
       );
     }
     await conn.commit();

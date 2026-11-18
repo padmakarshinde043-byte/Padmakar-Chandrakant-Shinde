@@ -112,6 +112,30 @@ export async function ensureMysqlSchema(): Promise<void> {
         throw err;
       }
     }
+
+    // Safely migrate newer columns on pre-existing production MySQL tables
+    const migrations: Array<{ table: string; column: string; ddl: string }> = [
+      {
+        table: 'applications',
+        column: 'welcome_email_sent',
+        ddl: 'ALTER TABLE `applications` ADD COLUMN `welcome_email_sent` TINYINT(1) NOT NULL DEFAULT 0 AFTER `id_card_email_sent_at`',
+      },
+      {
+        table: 'applications',
+        column: 'welcome_email_sent_at',
+        ddl: "ALTER TABLE `applications` ADD COLUMN `welcome_email_sent_at` VARCHAR(64) NOT NULL DEFAULT '' AFTER `welcome_email_sent`",
+      },
+    ];
+    for (const m of migrations) {
+      try {
+        const [cols] = await pool.query(`SHOW COLUMNS FROM \`${m.table}\` LIKE ?`, [m.column]);
+        if (Array.isArray(cols) && cols.length === 0) {
+          await pool.query(m.ddl);
+        }
+      } catch (migErr) {
+        console.warn(`Safe schema migration notice (${m.table}.${m.column}):`, migErr);
+      }
+    }
   })().catch((err) => {
     global._mahasanghMysqlSchemaPromise = undefined;
     throw err;
