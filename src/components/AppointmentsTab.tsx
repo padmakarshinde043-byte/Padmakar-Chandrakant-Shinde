@@ -253,6 +253,16 @@ export const AppointmentsTab: React.FC = () => {
   // Load Initial Data on Mount (Cache-first, non-blocking: public list never waits on Firestore or passwords)
   useEffect(() => {
     loadData(false);
+    const handlePostsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (Array.isArray(customEvent.detail) && customEvent.detail.length > 0) {
+        setPostsList(customEvent.detail);
+      } else {
+        setPostsList(getPostsFromStorageSync());
+      }
+    };
+    window.addEventListener('mahasangh_posts_updated', handlePostsUpdated);
+    return () => window.removeEventListener('mahasangh_posts_updated', handlePostsUpdated);
   }, []);
 
   // Lazy-load approved registered members ONLY when President Letters / Status Matrix is opened

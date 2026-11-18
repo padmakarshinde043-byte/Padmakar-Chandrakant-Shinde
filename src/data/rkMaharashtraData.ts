@@ -139,7 +139,10 @@ export const DEFAULT_APPOINTED_POSTS: AppointedPostItem[] = [
   { name: "सहकोषाध्यक्ष", isTaluka: false },
   { name: "तालुका अध्यक्ष", isTaluka: true },
   { name: "तालुका सरचिटणीस", isTaluka: true },
-  { name: "तालुका उपाध्यक्ष", isTaluka: true }
+  { name: "तालुका कोषाध्यक्ष", isTaluka: true },
+  { name: "तालुका कार्याध्यक्ष", isTaluka: true },
+  { name: "तालुका उपाध्यक्ष", isTaluka: true },
+  { name: "तालुका संघटक", isTaluka: true }
 ];
 
 export const SUPER_ADMIN_PASSWORD = "RK2026";

@@ -49,7 +49,18 @@ export function getOfficialsFromStorageSync(storage?: StorageLike | null): Offic
 
 export function getPostsFromStorageSync(storage?: StorageLike | null): AppointedPostItem[] {
   const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
-  return readCachedJson<AppointedPostItem[]>(store, CACHE_KEY_POSTS, DEFAULT_APPOINTED_POSTS, isPostArray);
+  const posts = readCachedJson<AppointedPostItem[]>(store, CACHE_KEY_POSTS, DEFAULT_APPOINTED_POSTS, isPostArray);
+  if (Array.isArray(posts) && posts.length < DEFAULT_APPOINTED_POSTS.length) {
+    const existing = new Set(posts.map((p) => (p.name || '').trim()));
+    const merged = [...posts];
+    for (const d of DEFAULT_APPOINTED_POSTS) {
+      if (!existing.has(d.name.trim())) {
+        merged.push(d);
+      }
+    }
+    return merged;
+  }
+  return posts;
 }
 
 export function getDistrictPasswordsFromStorageSync(storage?: StorageLike | null): Record<string, string> {

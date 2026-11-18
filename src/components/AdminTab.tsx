@@ -60,9 +60,11 @@ import {
   fetchDynamicLeaders,
   updateDistrictPasswordInRtdb,
   fetchDistrictPasswords,
+  fetchAppointedPosts,
   saveAppointedPostsToRtdb,
   updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
+import { CACHE_KEY_POSTS } from '../utils/officialsCache';
 import {
   getCloudinaryConfig,
   saveCloudinaryConfig,
@@ -351,14 +353,38 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Master Studio Post & Password Management state
   const [postsList, setPostsList] = useState<Array<{ name: string; isTaluka: boolean }>>(() => {
     try {
+      const cachedRk = localStorage.getItem(CACHE_KEY_POSTS);
+      if (cachedRk) {
+        const parsedRk = JSON.parse(cachedRk);
+        if (Array.isArray(parsedRk) && parsedRk.length >= DEFAULT_APPOINTED_POSTS.length) {
+          return parsedRk;
+        }
+      }
       const stored = localStorage.getItem('mahasangh_posts_v1');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= DEFAULT_APPOINTED_POSTS.length) {
+          return parsed;
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingNames = new Set(parsed.map((p: any) => String(p.name || '').trim()));
+          const merged = [...parsed];
+          for (const defPost of DEFAULT_APPOINTED_POSTS) {
+            if (!existingNames.has(defPost.name.trim())) {
+              merged.push(defPost);
+            }
+          }
+          return merged;
+        }
       }
     } catch {}
     return DEFAULT_APPOINTED_POSTS;
   });
+  const [isLoadingPosts, setIsLoadingPosts] = useState<boolean>(false);
+  const [editingPostIndex, setEditingPostIndex] = useState<number | null>(null);
+  const [editingPostName, setEditingPostName] = useState<string>('');
+  const [editingPostLevel, setEditingPostLevel] = useState<string>('district');
+
   const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>({});
   const [isLoadingDistrictPasswords, setIsLoadingDistrictPasswords] = useState<boolean>(false);
   const [selectedDistrictForReset, setSelectedDistrictForReset] = useState<string>('अहिल्यानगर');
@@ -366,6 +392,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isResettingPresidentPassword, setIsResettingPresidentPassword] = useState<boolean>(false);
   const [districtSearchFilter, setDistrictSearchFilter] = useState<string>('');
   const [customResetPassword, setCustomResetPassword] = useState<string>('');
+
+  const loadAllAppointedPosts = async (force = true) => {
+    setIsLoadingPosts(true);
+    try {
+      const data = await fetchAppointedPosts(force);
+      if (Array.isArray(data) && data.length > 0) {
+        setPostsList(data);
+        localStorage.setItem('mahasangh_posts_v1', JSON.stringify(data));
+        localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
+      }
+    } catch (err) {
+      console.warn('Failed to load appointed posts:', err);
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  };
 
   const loadAllDistrictPasswords = async (force = true) => {
     setIsLoadingDistrictPasswords(true);
@@ -384,6 +426,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   useEffect(() => {
     if (isLoggedIn && currentUser?.isSuperAdmin && activeAdminSubTab === 'master_studio') {
       loadAllDistrictPasswords(true);
+      loadAllAppointedPosts(true);
     }
   }, [isLoggedIn, currentUser?.isSuperAdmin, activeAdminSubTab]);
 
@@ -393,8 +436,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         loadAllDistrictPasswords(false);
       }
     };
+    const handlePostsSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (Array.isArray(customEvent.detail) && customEvent.detail.length > 0) {
+        setPostsList(customEvent.detail);
+      }
+    };
     window.addEventListener('mahasangh_district_passwords_updated', handleUpdate);
-    return () => window.removeEventListener('mahasangh_district_passwords_updated', handleUpdate);
+    window.addEventListener('mahasangh_posts_updated', handlePostsSync);
+    return () => {
+      window.removeEventListener('mahasangh_district_passwords_updated', handleUpdate);
+      window.removeEventListener('mahasangh_posts_updated', handlePostsSync);
+    };
   }, [isLoggedIn, currentUser?.isSuperAdmin]);
 
   const handleResetDistrictToAD2026 = async (distName: string) => {
@@ -4530,15 +4583,50 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {/* Part 1: Post Management */}
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <h4 className="font-serifDevanagari font-bold text-base text-[#17366d]">
-                          1. बहाल करावयाची पदे व्यवस्थापन (Post Management)
-                        </h4>
-                        <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                          एकूण पदे: {postsList.length}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-serifDevanagari font-bold text-base text-[#17366d]">
+                            1. बहाल करावयाची पदे व्यवस्थापन (Post Management)
+                          </h4>
+                          <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                            एकूण पदे: {postsList.length}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => loadAllAppointedPosts(true)}
+                            disabled={isLoadingPosts}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                            title="डेटाबेसवरून ताजी पदे रिफ्रेश करा"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPosts ? 'animate-spin' : ''}`} />
+                            डेटाबेस रिफ्रेश
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!window.confirm(`तुम्हाला खरोखर सर्व मूळ ${DEFAULT_APPOINTED_POSTS.length} पदे पूर्ववत (Restore/Reset) करून सेव्ह करायची आहेत का?`)) return;
+                              setPostsList(DEFAULT_APPOINTED_POSTS);
+                              localStorage.setItem('mahasangh_posts_v1', JSON.stringify(DEFAULT_APPOINTED_POSTS));
+                              localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(DEFAULT_APPOINTED_POSTS));
+                              window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: DEFAULT_APPOINTED_POSTS }));
+                              try {
+                                await saveAppointedPostsToRtdb(DEFAULT_APPOINTED_POSTS);
+                                showAdminFeedback(`सर्व मूळ ${DEFAULT_APPOINTED_POSTS.length} पदे पूर्ववत रिसेट करून सेव्ह करण्यात आली आहेत!`, 'success');
+                              } catch (err: any) {
+                                showAdminFeedback(`पदे सेव्ह करताना त्रुटी आली: ${err?.message || ''}`, 'error');
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+                            title="सर्व मूळ पदे पुन्हा आणा"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            सर्व मूळ पदे आणा
+                          </button>
+                        </div>
                       </div>
                       <p className="text-xs text-slate-600 mb-4">
-                        नियुक्ती पत्रासाठी व अर्जांसाठी उपलब्ध असणारी पदे जोडा, क्रम बदला किंवा वगळा. हे बदल थेट सर्व्हर डेटाबेसमध्ये सेव्ह होतात.
+                        येथून आपण सर्व अधिकृत पदे तयार करू शकता, त्यांचे नाव संपादित (Edit) करू शकता, क्रम बदलू शकता किंवा वगळू शकता. येथे केलेले बदल थेट सर्व्हर डेटाबेसमध्ये सेव्ह होतात आणि जिल्हा पदाधिकारी पानावर त्वरित दिसतात.
                       </p>
                       
                       <form onSubmit={async (e) => {
@@ -4551,7 +4639,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         const updatedPosts = [...postsList, { name: nameInput, isTaluka }];
                         setPostsList(updatedPosts);
                         localStorage.setItem('mahasangh_posts_v1', JSON.stringify(updatedPosts));
-                        window.dispatchEvent(new Event('mahasangh_posts_updated'));
+                        localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(updatedPosts));
+                        window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: updatedPosts }));
                         try {
                           await saveAppointedPostsToRtdb(updatedPosts);
                         } catch (err) {
@@ -4572,91 +4661,184 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         </div>
                         <div className="w-full sm:w-48">
                           <label className="font-bold text-slate-700 text-xs block mb-1">पदाचा स्तर:</label>
-                          <select name="newPostLevel" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs">
+                          <select name="newPostLevel" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800">
                             <option value="district">जिल्हास्तर (District)</option>
                             <option value="taluka">तालुकास्तर (Taluka)</option>
                             <option value="state">राज्यस्तर (State)</option>
                             <option value="division">विभागस्तर (Division)</option>
+                            <option value="mahila">महिला आघाडी (Mahila)</option>
                           </select>
                         </div>
-                        <button type="submit" className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] text-white font-bold px-5 py-2.5 rounded-lg text-xs cursor-pointer">
+                        <button type="submit" className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] text-white font-bold px-5 py-2.5 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0">
+                          <PlusCircle className="w-4 h-4" />
                           पद जोडा
                         </button>
                       </form>
 
-                      <div className="mt-4 space-y-2">
-                        <h5 className="font-bold text-xs text-slate-700">विद्यमान पदे (कुल: {postsList.length}):</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-1">
-                          {postsList.map((p, idx) => (
-                            <div key={p.name} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-mono text-slate-400 font-bold">{idx + 1}.</span>
-                                <span className="font-bold text-[#17366d] truncate">{p.name}</span>
-                                <span className="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
-                                  {getPostLevelLabel(p.name)}
-                                </span>
+                      <div className="mt-5 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h5 className="font-bold text-xs text-slate-700">विद्यमान पदे (एकूण: {postsList.length}):</h5>
+                          {isLoadingPosts && <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> लोड होत आहे...</span>}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-1">
+                          {postsList.map((p, idx) => {
+                            const isEditing = editingPostIndex === idx;
+
+                            if (isEditing) {
+                              return (
+                                <div key={idx} className="p-3 bg-amber-50/90 border-2 border-amber-400 rounded-xl space-y-2 text-xs col-span-1 sm:col-span-2 shadow-sm">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold text-amber-900">पद #{idx + 1} संपादन (Edit):</span>
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row gap-2 items-center">
+                                    <input
+                                      type="text"
+                                      value={editingPostName}
+                                      onChange={(e) => setEditingPostName(e.target.value)}
+                                      className="flex-1 w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                                      placeholder="पदाचे नाव"
+                                      autoFocus
+                                    />
+                                    <select
+                                      value={editingPostLevel}
+                                      onChange={(e) => setEditingPostLevel(e.target.value)}
+                                      className="w-full sm:w-44 p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
+                                    >
+                                      <option value="district">जिल्हास्तर (District)</option>
+                                      <option value="taluka">तालुकास्तर (Taluka)</option>
+                                      <option value="state">राज्यस्तर (State)</option>
+                                      <option value="division">विभागस्तर (Division)</option>
+                                      <option value="mahila">महिला आघाडी (Mahila)</option>
+                                    </select>
+                                    <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          if (!editingPostName.trim()) return;
+                                          const isTaluka = editingPostLevel === 'taluka';
+                                          const arr = [...postsList];
+                                          arr[idx] = { name: editingPostName.trim(), isTaluka };
+                                          setPostsList(arr);
+                                          setEditingPostIndex(null);
+                                          localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                          localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
+                                          window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
+                                          try {
+                                            await saveAppointedPostsToRtdb(arr);
+                                            showAdminFeedback(`पद '${editingPostName.trim()}' यशस्वीरीत्या दुरुस्त केले!`, 'success');
+                                          } catch (err) {
+                                            console.warn('Failed to update post:', err);
+                                          }
+                                        }}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 cursor-pointer"
+                                        title="बदल जतन करा"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                        जतन
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingPostIndex(null)}
+                                        className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg flex items-center gap-1 cursor-pointer"
+                                        title="रद्द करा"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                        रद्द
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div key={p.name + '_' + idx} className="p-2.5 bg-white border border-slate-200 rounded-lg flex items-center justify-between text-xs hover:border-slate-300 transition-colors">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-mono text-slate-400 font-bold">{idx + 1}.</span>
+                                  <span className="font-bold text-[#17366d] truncate" title={p.name}>{p.name}</span>
+                                  <span className="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 shrink-0 font-semibold">
+                                    {getPostLevelLabel(p.name)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingPostIndex(idx);
+                                      setEditingPostName(p.name);
+                                      const defaultLvl = p.isTaluka ? 'taluka' : (p.name.includes('महिला') ? 'mahila' : (p.name.includes('राज्य') ? 'state' : (p.name.includes('विभाग') ? 'division' : 'district')));
+                                      setEditingPostLevel(defaultLvl);
+                                    }}
+                                    className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md cursor-pointer transition-colors"
+                                    title="पद संपादन करा (Edit Name/Level)"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={idx === 0}
+                                    onClick={async () => {
+                                      const arr = [...postsList];
+                                      const temp = arr[idx];
+                                      arr[idx] = arr[idx - 1];
+                                      arr[idx - 1] = temp;
+                                      setPostsList(arr);
+                                      localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
+                                      window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
+                                      try {
+                                        await saveAppointedPostsToRtdb(arr);
+                                      } catch {}
+                                    }}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold transition-colors"
+                                    title="वर सरकवा"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={idx === postsList.length - 1}
+                                    onClick={async () => {
+                                      const arr = [...postsList];
+                                      const temp = arr[idx];
+                                      arr[idx] = arr[idx + 1];
+                                      arr[idx + 1] = temp;
+                                      setPostsList(arr);
+                                      localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
+                                      window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
+                                      try {
+                                        await saveAppointedPostsToRtdb(arr);
+                                      } catch {}
+                                    }}
+                                    className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold transition-colors"
+                                    title="खाली सरकवा"
+                                  >
+                                    ▼
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!window.confirm(`तुम्हाला खरोखर पद '${p.name}' वगळायचे आहे का?`)) return;
+                                      const arr = postsList.filter((_, i) => i !== idx);
+                                      setPostsList(arr);
+                                      localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
+                                      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
+                                      window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
+                                      try {
+                                        await saveAppointedPostsToRtdb(arr);
+                                      } catch {}
+                                      showAdminFeedback(`पद '${p.name}' वगळण्यात आले आहे.`, 'success');
+                                    }}
+                                    className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md cursor-pointer transition-colors"
+                                    title="वगळा (Delete)"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  type="button"
-                                  disabled={idx === 0}
-                                  onClick={async () => {
-                                    const arr = [...postsList];
-                                    const temp = arr[idx];
-                                    arr[idx] = arr[idx - 1];
-                                    arr[idx - 1] = temp;
-                                    setPostsList(arr);
-                                    localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                    window.dispatchEvent(new Event('mahasangh_posts_updated'));
-                                    try {
-                                      await saveAppointedPostsToRtdb(arr);
-                                    } catch {}
-                                  }}
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold"
-                                  title="वर सरकवा"
-                                >
-                                  ▲
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={idx === postsList.length - 1}
-                                  onClick={async () => {
-                                    const arr = [...postsList];
-                                    const temp = arr[idx];
-                                    arr[idx] = arr[idx + 1];
-                                    arr[idx + 1] = temp;
-                                    setPostsList(arr);
-                                    localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                    window.dispatchEvent(new Event('mahasangh_posts_updated'));
-                                    try {
-                                      await saveAppointedPostsToRtdb(arr);
-                                    } catch {}
-                                  }}
-                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold"
-                                  title="खाली सरकवा"
-                                >
-                                  ▼
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    const arr = postsList.filter((_, i) => i !== idx);
-                                    setPostsList(arr);
-                                    localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                    window.dispatchEvent(new Event('mahasangh_posts_updated'));
-                                    try {
-                                      await saveAppointedPostsToRtdb(arr);
-                                    } catch {}
-                                    showAdminFeedback(`पद '${p.name}' वगळण्यात आले आहे.`, 'success');
-                                  }}
-                                  className="p-1.5 hover:bg-rose-50 text-rose-600 rounded cursor-pointer"
-                                  title="वगळा"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>

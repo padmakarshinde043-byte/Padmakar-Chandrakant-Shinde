@@ -255,9 +255,19 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
         const sqlRes = await res.json();
         const data = sqlRes?.items;
         if (Array.isArray(data) && data.length > 0) {
-          localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
+          let merged = data;
+          if (data.length < DEFAULT_APPOINTED_POSTS.length) {
+            const existingNames = new Set(data.map((p: any) => String(p.name || '').trim()));
+            merged = [...data];
+            for (const d of DEFAULT_APPOINTED_POSTS) {
+              if (!existingNames.has(d.name.trim())) {
+                merged.push(d);
+              }
+            }
+          }
+          localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(merged));
           localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
-          return data;
+          return merged;
         }
       }
     } catch (error) {
@@ -269,7 +279,20 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
     const cached = localStorage.getItem(CACHE_KEY_POSTS);
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (parsed.length < DEFAULT_APPOINTED_POSTS.length) {
+            const existingNames = new Set(parsed.map((p: any) => String(p.name || '').trim()));
+            const merged = [...parsed];
+            for (const d of DEFAULT_APPOINTED_POSTS) {
+              if (!existingNames.has(d.name.trim())) {
+                merged.push(d);
+              }
+            }
+            return merged;
+          }
+          return parsed;
+        }
       } catch {}
     }
 
@@ -302,7 +325,11 @@ export async function saveAppointedPostsToRtdb(posts: AppointedPostItem[]): Prom
     throw err;
   }
   localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(posts));
+  localStorage.setItem('mahasangh_posts_v1', JSON.stringify(posts));
   localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: posts }));
+  }
 }
 
 /**
