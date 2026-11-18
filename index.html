@@ -24,15 +24,6 @@
       if (window.location.hostname === 'www.mahasangh.in') {
         window.location.replace('https://mahasangh.in' + window.location.pathname + window.location.search + window.location.hash);
       }
-
-      // Service Worker Registration for PWABuilder Offline Test & PWA support
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.warn('Service worker registration failed:', err);
-          });
-        });
-      }
     </script>
 
     <!-- Preconnect & non-blocking Google Fonts -->

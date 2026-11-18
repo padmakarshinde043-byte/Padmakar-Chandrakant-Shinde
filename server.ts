@@ -75,6 +75,7 @@ import {
   mysqlSetPresidentPassword,
 } from './src/db/mysqlRepository';
 import {
+  AppointedPostItem,
   SUPER_ADMIN_PASSWORD,
   MASTER_DEV_ADMIN_PASSWORD,
   DEFAULT_DISTRICT_PASSWORD,
@@ -126,11 +127,9 @@ interface RazorpayConfig {
 }
 
 // =========================================================================
-// Server-side Firestore is completely disabled; all persistent storage uses MySQL
+// Persistent storage uses HostKarle MySQL (or Mock store in AI Studio Preview)
 // =========================================================================
-let serverDb: any = null;
-
-function getServerFirestore(_allowWhenMysqlActive = false): any {
+function getServerFirestore(_allowWhenMysqlActive = false): null {
   return null;
 }
 
@@ -483,19 +482,6 @@ async function sendMembershipEmail(params: {
     return { sent: false, reason: 'Recipient email is not valid' };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: emailCfg.host,
-    port: emailCfg.port,
-    secure: emailCfg.port === 465,
-    auth: {
-      user: emailCfg.user,
-      pass: emailCfg.pass,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
-
   const plainText =
     params.text ||
     params.html
@@ -504,74 +490,168 @@ async function sendMembershipEmail(params: {
       .replace(/\s+/g, ' ')
       .trim();
 
-  await transporter.sendMail({
-    from: `"महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" <${emailCfg.from}>`,
-    replyTo: emailCfg.from,
-    to: params.to.trim(),
-    subject: params.subject,
-    text: plainText,
-    html: params.html,
-  });
+  const hosts = getContactMailHostCandidates(emailCfg.host);
+  let lastErr: any = null;
 
-  return { sent: true };
+  for (const hostCandidate of hosts) {
+    const transporter = nodemailer.createTransport({
+      host: hostCandidate,
+      port: emailCfg.port,
+      secure: emailCfg.port === 465,
+      auth: {
+        user: emailCfg.user,
+        pass: emailCfg.pass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 8000,
+      socketTimeout: 12000,
+    });
+
+    try {
+      await transporter.sendMail({
+        from: `"महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ" <${emailCfg.from}>`,
+        replyTo: emailCfg.from,
+        to: params.to.trim(),
+        subject: params.subject,
+        text: plainText,
+        html: params.html,
+      });
+      return { sent: true };
+    } catch (err: any) {
+      lastErr = err;
+      const errCode = String(err?.code || '').toUpperCase();
+      const errMsg = String(err?.message || '');
+      const isNetworkOrHostErr =
+        errCode === 'ENOTFOUND' ||
+        errCode === 'EAI_AGAIN' ||
+        errCode === 'ECONNREFUSED' ||
+        errCode === 'ETIMEDOUT' ||
+        errCode === 'ESOCKET' ||
+        /ENOTFOUND|getaddrinfo|ECONNREFUSED|timeout/i.test(errMsg);
+      if (!isNetworkOrHostErr) {
+        throw err;
+      }
+    }
+  }
+
+  throw lastErr || new Error('SMTP delivery failed');
 }
+
+const welcomeEmailInFlight = new Map<
+  string,
+  Promise<{ sent: boolean; alreadySent?: boolean; reason?: string }>
+>();
+const recentMockWelcomeEmailsSent = new Set<string>();
 
 /**
  * Automatically dispatches official congratulatory email from contact@mahasangh.in
  * containing member number and membership details when an application is approved.
+ * Uses single-flight deduplication so concurrent triggers (verify-payment, webhook,
+ * approve-atomic, client confirmation) never send duplicate emails.
  */
 async function sendApprovalCongratulatoryEmail(
   app: Record<string, any>,
   req?: express.Request
-): Promise<{ sent: boolean; reason?: string }> {
-  try {
-    const email = String(app.email || '').trim();
-    if (!isRealMemberEmail(email)) {
-      return { sent: false, reason: 'Recipient email is not valid' };
-    }
-    if (app.welcomeEmailSent === true) {
-      return { sent: true, reason: 'Already sent' };
-    }
-
-    const memberNo = String(app.memberNumber || '').trim();
-    const host = req?.get('host') || 'mahasangh.in';
-    const origin = host.includes('mahasangh.in')
-      ? 'https://mahasangh.in'
-      : `${req?.protocol || 'https'}://${host}`;
-    const trackUrl = `${origin}/?track=${encodeURIComponent(memberNo || app.phone || app.applicationNumber || '')}`;
-
-    const html = buildMembershipEmailHtml({
-      salutation: app.salutation,
-      fullName: app.fullName || 'सदस्य',
-      memberNumber: memberNo,
-      applicationNumber: app.applicationNumber,
-      district: app.district,
-      professional: app.professional,
-      paymentId: app.razorpayPaymentId || app.paymentRef,
-      trackUrl,
-    });
-
-    const subject = `महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - सदस्यत्व मंजूर व सदस्य क्रमांक: ${memberNo || app.applicationNumber || ''}`.trim();
-    const text = `सप्रेम नमस्कार ${app.fullName || 'सदस्य'}, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${memberNo}) यशस्वीरीत्या मंजूर करण्यात आले आहे. आपले मनःपूर्वक अभिनंदन! महासंघाच्या पोर्टलवर अर्जाची स्थिती व आय-कार्ड तपासण्यासाठी लिंक: ${trackUrl}`;
-
-    const result = await sendMembershipEmail({
-      to: email,
-      subject,
-      text,
-      html,
-    });
-
-    if (result.sent) {
-      if (isMysqlActive() && app.id) {
-        await mysqlMarkEmailSent(app.id, 'welcomeEmailSent');
-      }
-      console.log(`✓ Automatically sent approval congratulatory email from contact@mahasangh.in to ${email} (${memberNo})`);
-    }
-    return result;
-  } catch (err: any) {
-    console.error('Failed to auto-send approval congratulatory email:', err);
-    return { sent: false, reason: err?.message || 'SMTP send failure' };
+): Promise<{ sent: boolean; alreadySent?: boolean; reason?: string }> {
+  const lockKey = String(app.id || app.applicationNumber || app.email || '').trim().toLowerCase();
+  if (lockKey && welcomeEmailInFlight.has(lockKey)) {
+    return welcomeEmailInFlight.get(lockKey)!;
   }
+
+  const runTask = (async (): Promise<{ sent: boolean; alreadySent?: boolean; reason?: string }> => {
+    try {
+      let effectiveApp: Record<string, any> = { ...app };
+
+      // Enrich with authoritative MySQL row so fresh email/memberNumber/welcomeEmailSent flag are respected
+      if (isMysqlActive() && app.id) {
+        try {
+          const fresh = await mysqlGetApplicationById(String(app.id));
+          if (fresh) {
+            effectiveApp = {
+              ...effectiveApp,
+              ...fresh,
+              email: fresh.email || effectiveApp.email,
+              memberNumber: fresh.memberNumber || effectiveApp.memberNumber,
+            };
+          }
+        } catch {}
+      }
+
+      const email = String(effectiveApp.email || '').trim();
+      if (!isRealMemberEmail(email)) {
+        return { sent: false, reason: 'Recipient email is not valid' };
+      }
+
+      if (effectiveApp.welcomeEmailSent === true || (lockKey && recentMockWelcomeEmailsSent.has(lockKey))) {
+        return { sent: true, alreadySent: true, reason: 'Already sent' };
+      }
+
+      // On localhost/AI Studio preview mock mode without explicit SMTP credentials configured, skip cleanly
+      if (!isMysqlActive() && !fs.existsSync(EMAIL_CONFIG_FILE) && !process.env.SMTP_PASS) {
+        return { sent: false, reason: 'Preview mock mode: live SMTP disabled' };
+      }
+
+      const memberNo = String(effectiveApp.memberNumber || '').trim();
+      const host = req?.get('host') || 'mahasangh.in';
+      const origin = host.includes('mahasangh.in')
+        ? 'https://mahasangh.in'
+        : `${req?.protocol || 'https'}://${host}`;
+      const trackUrl = `${origin}/?track=${encodeURIComponent(
+        memberNo || effectiveApp.phone || effectiveApp.applicationNumber || ''
+      )}`;
+
+      const html = buildMembershipEmailHtml({
+        salutation: effectiveApp.salutation,
+        fullName: effectiveApp.fullName || 'सदस्य',
+        memberNumber: memberNo,
+        applicationNumber: effectiveApp.applicationNumber,
+        district: effectiveApp.district,
+        professional: effectiveApp.professional,
+        paymentId: effectiveApp.razorpayPaymentId || effectiveApp.paymentRef,
+        trackUrl,
+      });
+
+      const subject = `महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - सदस्यत्व मंजूर व सदस्य क्रमांक: ${
+        memberNo || effectiveApp.applicationNumber || ''
+      }`.trim();
+      const text = `सप्रेम नमस्कार ${
+        effectiveApp.fullName || 'सदस्य'
+      }, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${memberNo}) यशस्वीरीत्या मंजूर करण्यात आले आहे. आपले मनःपूर्वक अभिनंदन! महासंघाच्या पोर्टलवर अर्जाची स्थिती व आय-कार्ड तपासण्यासाठी लिंक: ${trackUrl}`;
+
+      const result = await sendMembershipEmail({
+        to: email,
+        subject,
+        text,
+        html,
+      });
+
+      if (result.sent) {
+        if (lockKey) recentMockWelcomeEmailsSent.add(lockKey);
+        if (isMysqlActive() && effectiveApp.id) {
+          await mysqlMarkEmailSent(String(effectiveApp.id), 'welcomeEmailSent');
+        }
+        console.log(
+          `✓ Automatically sent approval congratulatory email from contact@mahasangh.in to ${email} (${memberNo})`
+        );
+      }
+      return result;
+    } catch (err: any) {
+      console.error('Failed to auto-send approval congratulatory email:', err);
+      return { sent: false, reason: err?.message || 'SMTP send failure' };
+    }
+  })();
+
+  if (lockKey) {
+    welcomeEmailInFlight.set(lockKey, runTask);
+    runTask.finally(() => {
+      welcomeEmailInFlight.delete(lockKey);
+    });
+  }
+
+  return runTask;
 }
 
 // =========================================================================
@@ -668,7 +748,6 @@ function isAllowedCorsOrigin(origin?: string): boolean {
       hostname.endsWith('.mahasangh.in') ||
       hostname.endsWith('.run.app') ||
       hostname.endsWith('.googleusercontent.com') ||
-      hostname.endsWith('.web.app') ||
       hostname === 'localhost' ||
       hostname === '127.0.0.1'
     ) {
@@ -878,7 +957,6 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     razorpayConfigured: Boolean(config.keyId && config.keySecret && config.enabled),
     webhookSecretConfigured: Boolean(config.webhookSecret),
-    firebaseConfigured: false,
     mysqlConfigured: isMysqlConfigured(),
     activeBackend: mysqlActive ? 'mysql' : 'mock',
     emailConfigured: emailConfig.enabled
@@ -975,18 +1053,24 @@ async function getServerSubAdminsUnified(): Promise<Record<string, any>[]> {
   return [];
 }
 
+// In-memory mock fallback state when MySQL is inactive (AI Studio preview only)
+let mockAppointedPosts: AppointedPostItem[] | null = null;
+const mockOfficials: Record<string, any>[] = [];
+const mockDistrictPasswords: Record<string, string> = {};
+let mockPresidentPassword: string | null = null;
+
 async function getServerDistrictPasswordsUnified(): Promise<Record<string, string>> {
   if (isMysqlActive()) {
     return mysqlListDistrictPasswords();
   }
-  return {};
+  return { ...mockDistrictPasswords };
 }
 
 async function getServerPresidentPasswordUnified(): Promise<string> {
   if (isMysqlActive()) {
     return mysqlGetPresidentPassword();
   }
-  return SUPER_ADMIN_PASSWORD;
+  return mockPresidentPassword || SUPER_ADMIN_PASSWORD;
 }
 
 app.get('/api/auth/session', (req, res) => {
@@ -1273,11 +1357,7 @@ app.post('/api/auth/district-set-initial-password', async (req, res) => {
     if (isMysqlActive()) {
       await mysqlSetDistrictPassword(district, newPassword);
     } else {
-      await fetch(`${RK_RTDB_BASE_URL}/district_passwords/${encodeURIComponent(district)}.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(hashPassword(newPassword)),
-      });
+      mockDistrictPasswords[district] = hashPassword(newPassword);
     }
 
     const token = signSessionToken({ role: 'district_admin', district });
@@ -1345,11 +1425,7 @@ app.post('/api/auth/president-set-initial-password', async (req, res) => {
     if (isMysqlActive()) {
       await mysqlSetPresidentPassword(newPassword);
     } else {
-      await fetch(`${RK_RTDB_BASE_URL}/president_password.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(hashPassword(newPassword)),
-      });
+      mockPresidentPassword = hashPassword(newPassword);
     }
 
     const token = signSessionToken({ role: 'state_president' });
@@ -1385,11 +1461,7 @@ app.post('/api/auth/president-change-password', requirePresidentOrSuperAdmin, as
     if (isMysqlActive()) {
       await mysqlSetPresidentPassword(newPassword);
     } else {
-      await fetch(`${RK_RTDB_BASE_URL}/president_password.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(hashPassword(newPassword)),
-      });
+      mockPresidentPassword = hashPassword(newPassword);
     }
 
     res.json({ status: 'success' });
@@ -1442,8 +1514,11 @@ app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (r
     let appData: Record<string, any> | null = null;
 
     if (isMysqlActive() && targetId) {
-      const tracked = await mysqlTrackApplication(targetId);
-      appData = tracked.app;
+      appData = await mysqlGetApplicationById(targetId);
+      if (!appData) {
+        const tracked = await mysqlTrackApplication(targetId);
+        appData = tracked.app;
+      }
     }
 
     if (!appData) {
@@ -1459,6 +1534,8 @@ app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (r
         status: 'approved',
         paymentConfirmed: true,
       };
+    } else if (!appData.email && toEmail) {
+      appData.email = toEmail;
     }
 
     const sendResult = await sendApprovalCongratulatoryEmail(appData, req);
@@ -1466,6 +1543,7 @@ app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (r
       return res.json({
         status: 'success',
         sent: true,
+        alreadySent: Boolean(sendResult.alreadySent),
         to: appData.email,
         memberNumber: appData.memberNumber
       });
@@ -1474,6 +1552,7 @@ app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (r
     return res.json({
       status: 'skipped',
       sent: false,
+      alreadySent: false,
       reason: sendResult.reason
     });
   } catch (err: any) {
@@ -1494,7 +1573,7 @@ app.get('/api/backup/list', requireSuperAdmin, (_req, res) => {
   try {
     res.json({
       status: 'ok',
-      activeBackend: isMysqlActive() ? 'mysql' : 'firebase',
+      activeBackend: isMysqlActive() ? 'mysql' : 'mock',
       snapshots: listBackupSnapshots(),
     });
   } catch (err: any) {
@@ -1878,7 +1957,7 @@ app.post('/api/db/applications/approve-atomic', async (req, res) => {
 
     if (
       !isPrivilegedAdmin &&
-      !verifyPaymentProof(paymentProofToken, body.appId, expectedPaymentId)
+      !verifyPaymentProof(paymentProofToken, String(body.appId || body.applicationId || ''), expectedPaymentId)
     ) {
       return res.status(401).json({
         status: 'error',
@@ -1887,7 +1966,7 @@ app.post('/api/db/applications/approve-atomic', async (req, res) => {
     }
 
     const result = await mysqlApproveApplicationAtomic(body);
-    if (result && result.application && !result.alreadyApproved) {
+    if (result && result.application && !result.application.welcomeEmailSent) {
       sendApprovalCongratulatoryEmail(result.application, req).catch((err) => {
         console.warn('Auto approval congratulatory email notice:', err?.message || err);
       });
@@ -2148,7 +2227,11 @@ app.post('/api/db/rk/leaders', requireAdminOrSubAdmin('manageLeadership'), async
 
 app.get('/api/db/rk/officials', async (req, res) => {
   try {
-    sendFreshJson(req, res, { items: await mysqlListOfficials() });
+    if (isMysqlActive()) {
+      sendFreshJson(req, res, { items: await mysqlListOfficials() });
+      return;
+    }
+    sendFreshJson(req, res, { items: [...mockOfficials] });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2171,7 +2254,16 @@ app.post('/api/db/rk/officials', requireOfficialEditor, async (req, res) => {
         });
       }
     }
-    await mysqlSaveOfficial(member);
+    if (isMysqlActive()) {
+      await mysqlSaveOfficial(member);
+    } else {
+      const idx = mockOfficials.findIndex((o) => String(o.id) === String(member.id));
+      if (idx >= 0) {
+        mockOfficials[idx] = { ...member };
+      } else {
+        mockOfficials.unshift({ ...member });
+      }
+    }
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2182,7 +2274,7 @@ app.delete('/api/db/rk/officials/:id', requireOfficialEditor, async (req, res) =
   try {
     const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
     if (session?.role === 'district_admin' && session.district) {
-      const officials = await mysqlListOfficials();
+      const officials = isMysqlActive() ? await mysqlListOfficials() : mockOfficials;
       const target = officials.find((o) => String(o.id) === String(req.params.id));
       const allowedAliases =
         session.district === 'अहिल्यानगर'
@@ -2195,7 +2287,12 @@ app.delete('/api/db/rk/officials/:id', requireOfficialEditor, async (req, res) =
         });
       }
     }
-    await mysqlDeleteOfficial(req.params.id);
+    if (isMysqlActive()) {
+      await mysqlDeleteOfficial(req.params.id);
+    } else {
+      const idx = mockOfficials.findIndex((o) => String(o.id) === String(req.params.id));
+      if (idx >= 0) mockOfficials.splice(idx, 1);
+    }
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2204,7 +2301,15 @@ app.delete('/api/db/rk/officials/:id', requireOfficialEditor, async (req, res) =
 
 app.get('/api/db/rk/district-passwords', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
-    sendFreshJson(req, res, { map: await mysqlListDistrictPasswordStatuses() });
+    if (isMysqlActive()) {
+      sendFreshJson(req, res, { map: await mysqlListDistrictPasswordStatuses() });
+      return;
+    }
+    const statusMap: Record<string, string> = {};
+    for (const [k, v] of Object.entries(mockDistrictPasswords)) {
+      statusMap[k] = !v || verifyPassword(DEFAULT_DISTRICT_PASSWORD, v) ? 'AD2026' : '__CUSTOM__';
+    }
+    sendFreshJson(req, res, { map: statusMap });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2224,7 +2329,11 @@ app.post('/api/db/rk/district-passwords', requireOfficialEditor, async (req, res
         message: 'आपण फक्त स्वतःच्या जिल्ह्याचाच पासवर्ड बदलू शकता.',
       });
     }
-    await mysqlSetDistrictPassword(district, password);
+    if (isMysqlActive()) {
+      await mysqlSetDistrictPassword(district, password);
+    } else {
+      mockDistrictPasswords[district] = hashPassword(password);
+    }
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2233,7 +2342,11 @@ app.post('/api/db/rk/district-passwords', requireOfficialEditor, async (req, res
 
 app.get('/api/db/rk/appointed-posts', async (req, res) => {
   try {
-    sendFreshJson(req, res, { items: await mysqlListAppointedPosts() });
+    if (isMysqlActive()) {
+      sendFreshJson(req, res, { items: await mysqlListAppointedPosts(), backend: 'mysql' });
+      return;
+    }
+    sendFreshJson(req, res, { items: mockAppointedPosts ?? [], backend: 'mock' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2241,9 +2354,35 @@ app.get('/api/db/rk/appointed-posts', async (req, res) => {
 
 app.post('/api/db/rk/appointed-posts', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
-    const items = Array.isArray(req.body?.items) ? req.body.items : [];
-    await mysqlSetAppointedPosts(items);
-    res.json({ status: 'success' });
+    const rawItems = Array.isArray(req.body?.items) ? req.body.items : [];
+    const items: AppointedPostItem[] = rawItems
+      .filter((p: any) => p && typeof p.name === 'string' && p.name.trim())
+      .map((p: any) => {
+        const level =
+          p.level === 'mahila' ||
+          p.level === 'state' ||
+          p.level === 'division' ||
+          p.level === 'district' ||
+          p.level === 'taluka'
+            ? p.level
+            : undefined;
+        return {
+          name: String(p.name).trim(),
+          isTaluka: level ? level === 'taluka' : Boolean(p.isTaluka),
+          ...(level ? { level } : {}),
+        };
+      });
+
+    if (items.length === 0) {
+      return res.status(400).json({ status: 'error', message: 'किमान एक वैध पद आवश्यक आहे.' });
+    }
+
+    if (isMysqlActive()) {
+      await mysqlSetAppointedPosts(items);
+    } else {
+      mockAppointedPosts = items;
+    }
+    res.json({ status: 'success', items });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2251,7 +2390,12 @@ app.post('/api/db/rk/appointed-posts', requirePresidentOrSuperAdmin, async (req,
 
 app.get('/api/db/rk/president-password', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
-    const isDefault = await mysqlIsPresidentPasswordDefault();
+    if (isMysqlActive()) {
+      const isDefault = await mysqlIsPresidentPasswordDefault();
+      sendFreshJson(req, res, { isDefault, configured: true });
+      return;
+    }
+    const isDefault = !mockPresidentPassword || verifyPassword(SUPER_ADMIN_PASSWORD, mockPresidentPassword);
     sendFreshJson(req, res, { isDefault, configured: true });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2260,7 +2404,12 @@ app.get('/api/db/rk/president-password', requirePresidentOrSuperAdmin, async (re
 
 app.post('/api/db/rk/president-password', requirePresidentOrSuperAdmin, async (req, res) => {
   try {
-    await mysqlSetPresidentPassword(String(req.body?.password || ''));
+    const pass = String(req.body?.password || '').trim();
+    if (isMysqlActive()) {
+      await mysqlSetPresidentPassword(pass);
+    } else {
+      mockPresidentPassword = hashPassword(pass);
+    }
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2413,6 +2562,11 @@ app.post('/api/razorpay/verify-payment', async (req, res) => {
         orderId: razorpay_order_id,
         source: 'razorpay_checkout'
       });
+      if (approvedApplication && !approvedApplication.welcomeEmailSent) {
+        sendApprovalCongratulatoryEmail(approvedApplication, req).catch((e) => {
+          console.warn('Verify-payment auto congratulatory email error:', e);
+        });
+      }
     } catch (approveErr) {
       console.error('Server approval after verify-payment warning:', approveErr);
     }
@@ -2497,7 +2651,7 @@ app.post('/api/razorpay/webhook', async (req, res) => {
           });
           if (updated) {
             console.log(`✓ Application ${updated.id} approved via Webhook -> ${updated.memberNumber}`);
-            if (!updated.alreadyApproved) {
+            if (!updated.welcomeEmailSent) {
               sendApprovalCongratulatoryEmail(updated, req).catch((e) => {
                 console.warn('Webhook auto approval congratulatory email error:', e);
               });

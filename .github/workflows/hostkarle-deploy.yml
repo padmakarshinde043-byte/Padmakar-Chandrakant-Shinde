@@ -39,7 +39,6 @@ jobs:
           cp server.cjs deploy_bundle/server.cjs
           cp package.json deploy_bundle/package.json
           cp package-lock.json deploy_bundle/package-lock.json
-          cp firebase-applet-config.json deploy_bundle/firebase-applet-config.json
           date -u +"%Y-%m-%dT%H:%M:%SZ" > deploy_bundle/tmp/restart.txt
 
       - name: Deploy files via FTP to HostKarle

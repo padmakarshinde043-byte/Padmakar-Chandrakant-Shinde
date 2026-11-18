@@ -52,7 +52,7 @@ export interface FullWebsiteBackupBundle {
   format: 'mahasangh-full-backup-v1';
   createdAt: string;
   createdBy: string;
-  sourceBackend: 'mysql' | 'firebase';
+  sourceBackend: 'mysql' | 'mock' | 'firebase';
   appVersion: string;
   database: MigrationDataset;
   extraSystemSettings: Record<string, any>;
@@ -68,7 +68,7 @@ export interface BackupSnapshotSummary {
   fileName: string;
   createdAt: string;
   createdBy: string;
-  sourceBackend: 'mysql' | 'firebase';
+  sourceBackend: 'mysql' | 'mock' | 'firebase';
   sizeBytes: number;
   publicFileCount: number;
   counts: MigrationCounts;
@@ -278,7 +278,7 @@ export async function collectActiveWebsiteAndDatabaseBackup(params: {
     format: 'mahasangh-full-backup-v1',
     createdAt: new Date().toISOString(),
     createdBy: params.createdBy || 'super_admin',
-    sourceBackend: mysqlMode ? 'mysql' : 'firebase',
+    sourceBackend: mysqlMode ? 'mysql' : 'mock',
     appVersion: await readAppPackageVersion(),
     database: dataset,
     extraSystemSettings,

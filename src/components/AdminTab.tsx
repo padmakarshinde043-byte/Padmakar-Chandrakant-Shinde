@@ -30,7 +30,7 @@ import {
   findMissingVacantLeaders,
   mergeMissingVacantLeaders,
 } from '../data/recoveredVacantLeaders';
-import { DEFAULT_DISTRICT_PASSWORD, DEFAULT_APPOINTED_POSTS, getPostLevelLabel } from '../data/rkMaharashtraData';
+import { AppointedPostItem, PostLevelType, DEFAULT_DISTRICT_PASSWORD, getPostLevel, getPostLevelLabel } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import {
   getAdminCredentials,
@@ -64,7 +64,12 @@ import {
   saveAppointedPostsToRtdb,
   updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
-import { CACHE_KEY_POSTS } from '../utils/officialsCache';
+import {
+  CACHE_KEY_POSTS,
+  LEGACY_CACHE_KEY_POSTS,
+  POSTS_BROADCAST_CHANNEL,
+  getPostsFromStorageSync,
+} from '../utils/officialsCache';
 import {
   getCloudinaryConfig,
   saveCloudinaryConfig,
@@ -351,36 +356,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   // Master Studio Post & Password Management state
-  const [postsList, setPostsList] = useState<Array<{ name: string; isTaluka: boolean }>>(() => {
-    try {
-      const cachedRk = localStorage.getItem(CACHE_KEY_POSTS);
-      if (cachedRk) {
-        const parsedRk = JSON.parse(cachedRk);
-        if (Array.isArray(parsedRk) && parsedRk.length >= DEFAULT_APPOINTED_POSTS.length) {
-          return parsedRk;
-        }
-      }
-      const stored = localStorage.getItem('mahasangh_posts_v1');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length >= DEFAULT_APPOINTED_POSTS.length) {
-          return parsed;
-        }
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingNames = new Set(parsed.map((p: any) => String(p.name || '').trim()));
-          const merged = [...parsed];
-          for (const defPost of DEFAULT_APPOINTED_POSTS) {
-            if (!existingNames.has(defPost.name.trim())) {
-              merged.push(defPost);
-            }
-          }
-          return merged;
-        }
-      }
-    } catch {}
-    return DEFAULT_APPOINTED_POSTS;
-  });
+  const [postsList, setPostsList] = useState<AppointedPostItem[]>(() => getPostsFromStorageSync());
   const [isLoadingPosts, setIsLoadingPosts] = useState<boolean>(false);
+  const [isSavingPosts, setIsSavingPosts] = useState<boolean>(false);
+  const [hasUnsavedPostChanges, setHasUnsavedPostChanges] = useState<boolean>(false);
   const [editingPostIndex, setEditingPostIndex] = useState<number | null>(null);
   const [editingPostName, setEditingPostName] = useState<string>('');
   const [editingPostLevel, setEditingPostLevel] = useState<string>('district');
@@ -399,13 +378,45 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const data = await fetchAppointedPosts(force);
       if (Array.isArray(data) && data.length > 0) {
         setPostsList(data);
-        localStorage.setItem('mahasangh_posts_v1', JSON.stringify(data));
-        localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(data));
+        setHasUnsavedPostChanges(false);
+        const json = JSON.stringify(data);
+        localStorage.setItem(LEGACY_CACHE_KEY_POSTS, json);
+        localStorage.setItem(CACHE_KEY_POSTS, json);
       }
     } catch (err) {
       console.warn('Failed to load appointed posts:', err);
     } finally {
       setIsLoadingPosts(false);
+    }
+  };
+
+  const handleSaveAllPostsChanges = async () => {
+    let listToSave = [...postsList];
+    if (editingPostIndex !== null && editingPostName.trim()) {
+      const lvl = (editingPostLevel || 'district') as PostLevelType;
+      listToSave[editingPostIndex] = {
+        name: editingPostName.trim(),
+        isTaluka: lvl === 'taluka',
+        level: lvl,
+      };
+      setPostsList(listToSave);
+      setEditingPostIndex(null);
+    }
+
+    if (listToSave.length === 0) {
+      showAdminFeedback('कृपया किमान एक पद यादीत ठेवा.', 'error');
+      return;
+    }
+
+    setIsSavingPosts(true);
+    try {
+      await saveAppointedPostsToRtdb(listToSave);
+      setHasUnsavedPostChanges(false);
+      showAdminFeedback('बदल यशस्वीरीत्या सेव्ह झाले! नवीन पदे व त्यांचा क्रम जिल्हा पदाधिकारी पानावरील ड्रॉपडाऊनमध्ये त्वरित अपडेट करण्यात आला आहे.', 'success');
+    } catch (err: any) {
+      showAdminFeedback(`पदे सेव्ह करताना त्रुटी आली: ${err?.message || 'सर्व्हर त्रुटी'}`, 'error');
+    } finally {
+      setIsSavingPosts(false);
     }
   };
 
@@ -442,11 +453,30 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setPostsList(customEvent.detail);
       }
     };
+    const handleStoragePostsSync = (e: StorageEvent) => {
+      if (e.key === CACHE_KEY_POSTS || e.key === LEGACY_CACHE_KEY_POSTS) {
+        setPostsList(getPostsFromStorageSync());
+      }
+    };
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel(POSTS_BROADCAST_CHANNEL);
+        bc.onmessage = (ev) => {
+          if (ev?.data?.type === 'POSTS_UPDATED' && Array.isArray(ev.data.posts) && ev.data.posts.length > 0) {
+            setPostsList(ev.data.posts);
+          }
+        };
+      } catch {}
+    }
     window.addEventListener('mahasangh_district_passwords_updated', handleUpdate);
     window.addEventListener('mahasangh_posts_updated', handlePostsSync);
+    window.addEventListener('storage', handleStoragePostsSync);
     return () => {
       window.removeEventListener('mahasangh_district_passwords_updated', handleUpdate);
       window.removeEventListener('mahasangh_posts_updated', handlePostsSync);
+      window.removeEventListener('storage', handleStoragePostsSync);
+      if (bc) bc.close();
     };
   }, [isLoggedIn, currentUser?.isSuperAdmin]);
 
@@ -2011,12 +2041,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  const hasAutoLoadedMailboxRef = useRef(false);
   useEffect(() => {
+    if (!isLoggedIn) {
+      hasAutoLoadedMailboxRef.current = false;
+      return;
+    }
     if (
-      isLoggedIn &&
       (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) &&
-      (activeAdminSubTab === 'contact_messages' || (contactMessages.length === 0 && mailboxEmails.length === 0))
+      (activeAdminSubTab === 'contact_messages' || !hasAutoLoadedMailboxRef.current)
     ) {
+      hasAutoLoadedMailboxRef.current = true;
       loadContactMessages();
     }
   }, [isLoggedIn, activeAdminSubTab, currentUser?.isSuperAdmin, currentUser?.permissions.manageContactMessages]);
@@ -4590,63 +4625,56 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
                             एकूण पदे: {postsList.length}
                           </span>
+                          {hasUnsavedPostChanges && (
+                            <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                              बदल सेव करणे बाकी
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => loadAllAppointedPosts(true)}
-                            disabled={isLoadingPosts}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-800 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
-                            title="डेटाबेसवरून ताजी पदे रिफ्रेश करा"
+                            onClick={handleSaveAllPostsChanges}
+                            disabled={isSavingPosts}
+                            className={`inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer shadow-xs ${
+                              hasUnsavedPostChanges
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300'
+                                : 'bg-[#17366d] hover:bg-[#0f2752] text-white'
+                            } disabled:opacity-60`}
+                            title="सर्व केलेले बदल डेटाबेसमध्ये सेव करून जिल्हा पदाधिकारी ड्रॉपडाऊनमध्ये त्वरित अपडेट करा"
                           >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPosts ? 'animate-spin' : ''}`} />
-                            डेटाबेस रिफ्रेश
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!window.confirm(`तुम्हाला खरोखर सर्व मूळ ${DEFAULT_APPOINTED_POSTS.length} पदे पूर्ववत (Restore/Reset) करून सेव्ह करायची आहेत का?`)) return;
-                              setPostsList(DEFAULT_APPOINTED_POSTS);
-                              localStorage.setItem('mahasangh_posts_v1', JSON.stringify(DEFAULT_APPOINTED_POSTS));
-                              localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(DEFAULT_APPOINTED_POSTS));
-                              window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: DEFAULT_APPOINTED_POSTS }));
-                              try {
-                                await saveAppointedPostsToRtdb(DEFAULT_APPOINTED_POSTS);
-                                showAdminFeedback(`सर्व मूळ ${DEFAULT_APPOINTED_POSTS.length} पदे पूर्ववत रिसेट करून सेव्ह करण्यात आली आहेत!`, 'success');
-                              } catch (err: any) {
-                                showAdminFeedback(`पदे सेव्ह करताना त्रुटी आली: ${err?.message || ''}`, 'error');
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
-                            title="सर्व मूळ पदे पुन्हा आणा"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            सर्व मूळ पदे आणा
+                            {isSavingPosts ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                सेव होत आहे...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                बदल सेव करा
+                              </>
+                            )}
                           </button>
                         </div>
                       </div>
                       <p className="text-xs text-slate-600 mb-4">
-                        येथून आपण सर्व अधिकृत पदे तयार करू शकता, त्यांचे नाव संपादित (Edit) करू शकता, क्रम बदलू शकता किंवा वगळू शकता. येथे केलेले बदल थेट सर्व्हर डेटाबेसमध्ये सेव्ह होतात आणि जिल्हा पदाधिकारी पानावर त्वरित दिसतात.
+                        येथून आपण सर्व अधिकृत पदे तयार करू शकता, त्यांचे नाव संपादित (Edit) करू शकता, क्रम बदलू शकता (▲/▼) किंवा वगळू शकता. बदल केल्यानंतर वरती असलेल्या <strong>'बदल सेव करा'</strong> बटनावर क्लिक करताच ते डेटाबेसमध्ये सेव होऊन जिल्हा पदाधिकारी पानावर जिल्हाध्यक्ष लॉगिनमधील ड्रॉपडाऊनमध्ये त्वरित अपडेट होतात.
                       </p>
                       
-                      <form onSubmit={async (e) => {
+                      <form onSubmit={(e) => {
                         e.preventDefault();
                         const form = e.currentTarget;
                         const nameInput = (form.elements.namedItem('newPostName') as HTMLInputElement)?.value?.trim();
-                        const levelInput = (form.elements.namedItem('newPostLevel') as HTMLSelectElement)?.value;
+                        const levelInput = ((form.elements.namedItem('newPostLevel') as HTMLSelectElement)?.value || 'district') as PostLevelType;
                         if (!nameInput) return;
                         const isTaluka = levelInput === 'taluka';
-                        const updatedPosts = [...postsList, { name: nameInput, isTaluka }];
+                        const updatedPosts: AppointedPostItem[] = [
+                          ...postsList,
+                          { name: nameInput, isTaluka, level: levelInput },
+                        ];
                         setPostsList(updatedPosts);
-                        localStorage.setItem('mahasangh_posts_v1', JSON.stringify(updatedPosts));
-                        localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(updatedPosts));
-                        window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: updatedPosts }));
-                        try {
-                          await saveAppointedPostsToRtdb(updatedPosts);
-                        } catch (err) {
-                          console.warn('Failed to sync posts to DB:', err);
-                        }
-                        showAdminFeedback(`पद '${nameInput}' यशस्वीरीत्या जोडले गेले व सेव्ह झाले!`, 'success');
+                        setHasUnsavedPostChanges(true);
+                        showAdminFeedback(`पद '${nameInput}' यादीत जोडले आहे. जिल्हा पदाधिकारी पानावर लागू करण्यासाठी 'बदल सेव करा' क्लिक करा.`, 'success');
                         form.reset();
                       }} className="flex flex-col sm:flex-row gap-3 items-end">
                         <div className="flex-1 w-full">
@@ -4713,25 +4741,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end shrink-0">
                                       <button
                                         type="button"
-                                        onClick={async () => {
+                                        onClick={() => {
                                           if (!editingPostName.trim()) return;
-                                          const isTaluka = editingPostLevel === 'taluka';
+                                          const lvl = (editingPostLevel || 'district') as PostLevelType;
                                           const arr = [...postsList];
-                                          arr[idx] = { name: editingPostName.trim(), isTaluka };
+                                          arr[idx] = {
+                                            name: editingPostName.trim(),
+                                            isTaluka: lvl === 'taluka',
+                                            level: lvl,
+                                          };
                                           setPostsList(arr);
                                           setEditingPostIndex(null);
-                                          localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                          localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
-                                          window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
-                                          try {
-                                            await saveAppointedPostsToRtdb(arr);
-                                            showAdminFeedback(`पद '${editingPostName.trim()}' यशस्वीरीत्या दुरुस्त केले!`, 'success');
-                                          } catch (err) {
-                                            console.warn('Failed to update post:', err);
-                                          }
+                                          setHasUnsavedPostChanges(true);
+                                          showAdminFeedback(`पद '${editingPostName.trim()}' अद्ययावत केले. कायमस्वरूपी सेव करण्यासाठी 'बदल सेव करा' क्लिक करा.`, 'success');
                                         }}
                                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 cursor-pointer"
-                                        title="बदल जतन करा"
+                                        title="बदल तात्पुरते लागू करा"
                                       >
                                         <Check className="w-3.5 h-3.5" />
                                         जतन
@@ -4757,17 +4782,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <span className="font-mono text-slate-400 font-bold">{idx + 1}.</span>
                                   <span className="font-bold text-[#17366d] truncate" title={p.name}>{p.name}</span>
                                   <span className="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 shrink-0 font-semibold">
-                                    {getPostLevelLabel(p.name)}
+                                    {getPostLevelLabel(p.name, p.level, p.isTaluka)}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
                                     type="button"
+                                    aria-label={`${p.name} संपादन करा`}
                                     onClick={() => {
                                       setEditingPostIndex(idx);
                                       setEditingPostName(p.name);
-                                      const defaultLvl = p.isTaluka ? 'taluka' : (p.name.includes('महिला') ? 'mahila' : (p.name.includes('राज्य') ? 'state' : (p.name.includes('विभाग') ? 'division' : 'district')));
-                                      setEditingPostLevel(defaultLvl);
+                                      setEditingPostLevel(getPostLevel(p.name, p.level, p.isTaluka));
                                     }}
                                     className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md cursor-pointer transition-colors"
                                     title="पद संपादन करा (Edit Name/Level)"
@@ -4776,19 +4801,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   </button>
                                   <button
                                     type="button"
+                                    aria-label={`${p.name} वर सरकवा`}
                                     disabled={idx === 0}
-                                    onClick={async () => {
+                                    onClick={() => {
                                       const arr = [...postsList];
                                       const temp = arr[idx];
                                       arr[idx] = arr[idx - 1];
                                       arr[idx - 1] = temp;
                                       setPostsList(arr);
-                                      localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
-                                      window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
-                                      try {
-                                        await saveAppointedPostsToRtdb(arr);
-                                      } catch {}
+                                      setHasUnsavedPostChanges(true);
                                     }}
                                     className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold transition-colors"
                                     title="वर सरकवा"
@@ -4797,19 +4818,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   </button>
                                   <button
                                     type="button"
+                                    aria-label={`${p.name} खाली सरकवा`}
                                     disabled={idx === postsList.length - 1}
-                                    onClick={async () => {
+                                    onClick={() => {
                                       const arr = [...postsList];
                                       const temp = arr[idx];
                                       arr[idx] = arr[idx + 1];
                                       arr[idx + 1] = temp;
                                       setPostsList(arr);
-                                      localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
-                                      window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
-                                      try {
-                                        await saveAppointedPostsToRtdb(arr);
-                                      } catch {}
+                                      setHasUnsavedPostChanges(true);
                                     }}
                                     className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold transition-colors"
                                     title="खाली सरकवा"
@@ -4818,17 +4835,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={async () => {
-                                      if (!window.confirm(`तुम्हाला खरोखर पद '${p.name}' वगळायचे आहे का?`)) return;
+                                    aria-label={`${p.name} वगळा`}
+                                    onClick={() => {
+                                      if (postsList.length <= 1) {
+                                        showAdminFeedback('यादीत किमान एक पद असणे आवश्यक आहे.', 'error');
+                                        return;
+                                      }
                                       const arr = postsList.filter((_, i) => i !== idx);
                                       setPostsList(arr);
-                                      localStorage.setItem('mahasangh_posts_v1', JSON.stringify(arr));
-                                      localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(arr));
-                                      window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: arr }));
-                                      try {
-                                        await saveAppointedPostsToRtdb(arr);
-                                      } catch {}
-                                      showAdminFeedback(`पद '${p.name}' वगळण्यात आले आहे.`, 'success');
+                                      setHasUnsavedPostChanges(true);
+                                      showAdminFeedback(`पद '${p.name}' यादीतून काढले आहे. सेव करण्यासाठी 'बदल सेव करा' क्लिक करा.`, 'success');
                                     }}
                                     className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md cursor-pointer transition-colors"
                                     title="वगळा (Delete)"

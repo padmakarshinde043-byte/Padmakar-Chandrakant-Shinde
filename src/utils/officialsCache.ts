@@ -1,9 +1,17 @@
-import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS } from '../data/rkMaharashtraData';
+import {
+  OfficialMember,
+  AppointedPostItem,
+  DEFAULT_APPOINTED_POSTS,
+  PostLevelType,
+  getPostLevel,
+} from '../data/rkMaharashtraData';
 
 export const CACHE_KEY_OFFICIALS = 'rk2026_officials_cache_v1';
 export const CACHE_KEY_OFFICIALS_TIMESTAMP = 'rk2026_officials_ts_v1';
 export const CACHE_KEY_POSTS = 'rk2026_posts_cache_v1';
+export const LEGACY_CACHE_KEY_POSTS = 'mahasangh_posts_v1';
 export const CACHE_KEY_POSTS_TIMESTAMP = 'rk2026_posts_ts_v1';
+export const POSTS_BROADCAST_CHANNEL = 'mahasangh_posts_channel';
 export const CACHE_KEY_DIST_PASSWORDS = 'rk2026_dist_passwords_cache_v1';
 export const CACHE_KEY_DIST_PASSWORDS_TS = 'rk2026_dist_passwords_ts_v1';
 export const CACHE_KEY_PRESIDENT_PASS = 'rk2026_president_password_cache';
@@ -35,7 +43,11 @@ export function isOfficialArray(val: unknown): val is OfficialMember[] {
 }
 
 export function isPostArray(val: unknown): val is AppointedPostItem[] {
-  return Array.isArray(val) && val.length > 0;
+  return (
+    Array.isArray(val) &&
+    val.length > 0 &&
+    val.every((item) => Boolean(item) && typeof item === 'object' && typeof (item as any).name === 'string' && (item as any).name.trim().length > 0)
+  );
 }
 
 export function isPasswordRecord(val: unknown): val is Record<string, string> {
@@ -49,18 +61,15 @@ export function getOfficialsFromStorageSync(storage?: StorageLike | null): Offic
 
 export function getPostsFromStorageSync(storage?: StorageLike | null): AppointedPostItem[] {
   const store = storage ?? (typeof localStorage !== 'undefined' ? localStorage : null);
-  const posts = readCachedJson<AppointedPostItem[]>(store, CACHE_KEY_POSTS, DEFAULT_APPOINTED_POSTS, isPostArray);
-  if (Array.isArray(posts) && posts.length < DEFAULT_APPOINTED_POSTS.length) {
-    const existing = new Set(posts.map((p) => (p.name || '').trim()));
-    const merged = [...posts];
-    for (const d of DEFAULT_APPOINTED_POSTS) {
-      if (!existing.has(d.name.trim())) {
-        merged.push(d);
-      }
-    }
-    return merged;
+  const primary = readCachedJson<AppointedPostItem[] | null>(store, CACHE_KEY_POSTS, null, isPostArray);
+  if (primary && primary.length > 0) {
+    return primary;
   }
-  return posts;
+  const legacy = readCachedJson<AppointedPostItem[] | null>(store, LEGACY_CACHE_KEY_POSTS, null, isPostArray);
+  if (legacy && legacy.length > 0) {
+    return legacy;
+  }
+  return DEFAULT_APPOINTED_POSTS;
 }
 
 export function getDistrictPasswordsFromStorageSync(storage?: StorageLike | null): Record<string, string> {
@@ -143,21 +152,21 @@ export function matchesDistrictName(memberDistrict?: string, selectedDistrict?: 
 export function filterAndSortDistrictOfficials(
   officials: OfficialMember[],
   district: string,
-  postsList: Array<{ name: string; isTaluka: boolean }>
+  postsList: Array<{ name: string; isTaluka: boolean; level?: PostLevelType }>
 ): OfficialMember[] {
   const list = officials.filter((m) => m && matchesDistrictName(m.district, district));
-  const rankList =
-    postsList && postsList.length > 0
-      ? postsList.map((p) => p.name)
-      : DEFAULT_APPOINTED_POSTS.map((p) => p.name);
+  const activePosts = postsList && postsList.length > 0 ? postsList : DEFAULT_APPOINTED_POSTS;
+  const rankList = activePosts.map((p) => (p.name || '').trim());
 
   const getLevelPriority = (postName: string) => {
     if (!postName) return 3;
-    const p = postName.trim();
-    if (p.includes('राज्य')) return 1;
-    if (p.includes('विभाग') || p.includes('विभागीय')) return 2;
-    if (p.includes('तालुका')) return 4;
-    return 3; // district
+    const clean = postName.trim();
+    const matched = activePosts.find((p) => (p.name || '').trim() === clean);
+    const lvl = getPostLevel(clean, matched?.level, matched?.isTaluka);
+    if (lvl === 'state') return 1;
+    if (lvl === 'division') return 2;
+    if (lvl === 'taluka') return 4;
+    return 3; // district / mahila
   };
 
   const getRank = (postName: string) => {
@@ -165,18 +174,21 @@ export function filterAndSortDistrictOfficials(
     const cleanPost = postName.trim();
     const exactIdx = rankList.findIndex((p) => p === cleanPost);
     if (exactIdx !== -1) return exactIdx;
-    const partialIdx = rankList.findIndex((p) => cleanPost.includes(p) || p.includes(cleanPost));
+    const partialIdx = rankList.findIndex((p) => p && (cleanPost.includes(p) || p.includes(cleanPost)));
     if (partialIdx !== -1) return partialIdx;
     return 999;
   };
 
   return [...list].sort((a, b) => {
+    const rankA = getRank(a.appointedPost);
+    const rankB = getRank(b.appointedPost);
+    if (rankA !== 999 && rankB !== 999 && rankA !== rankB) {
+      return rankA - rankB;
+    }
+
     const levelA = getLevelPriority(a.appointedPost);
     const levelB = getLevelPriority(b.appointedPost);
     if (levelA !== levelB) return levelA - levelB;
-
-    const rankA = getRank(a.appointedPost);
-    const rankB = getRank(b.appointedPost);
     if (rankA !== rankB) return rankA - rankB;
 
     // If same post / level, newest added / updated first (newest timestamp / id first)

@@ -520,11 +520,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               prev && prev.id === finalApp.id ? { ...prev, welcomeEmailSent: true } : prev
             );
           } else {
-            setEmailDeliveryStatus('sent');
+            setEmailDeliveryStatus('skipped');
           }
         } catch (emailErr) {
           console.warn('Auto approval email delivery notice:', emailErr);
-          setEmailDeliveryStatus('sent');
+          setEmailDeliveryStatus('skipped');
         }
       })();
     } else {
@@ -1419,6 +1419,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md px-3 py-2 text-sm font-medium flex items-center gap-2">
                       <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
                       <span>आपले मनःपूर्वक अभिनंदन व अधिकृत सदस्य क्रमांक <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले आहे (कृपया Inbox / Spam तपासा).</span>
+                    </div>
+                  )}
+
+                  {emailDeliveryStatus === 'skipped' && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-md px-3 py-2 text-sm font-medium flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>आपले सदस्यत्व मंजूर झाले असून खालील बटणावरून आपण आय-कार्ड डाऊनलोड करू शकता. (ई-मेल पाठवताना तात्पुरती तांत्रिक अडचण आली असल्यास कृपया <strong>{emailDeliveryAddress}</strong> नंतर तपासा.)</span>
                     </div>
                   )}
 

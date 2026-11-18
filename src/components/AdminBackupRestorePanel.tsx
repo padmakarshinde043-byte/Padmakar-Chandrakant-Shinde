@@ -33,7 +33,7 @@ interface BackupSnapshotSummary {
   fileName: string;
   createdAt: string;
   createdBy: string;
-  sourceBackend: 'mysql' | 'firebase';
+  sourceBackend: 'mysql' | 'mock' | 'firebase';
   sizeBytes: number;
   publicFileCount: number;
   counts: BackupCounts;
@@ -55,7 +55,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
   onRestoreCompleted,
 }) => {
   const [snapshots, setSnapshots] = useState<BackupSnapshotSummary[]>([]);
-  const [activeBackend, setActiveBackend] = useState<'mysql' | 'firebase'>('mysql');
+  const [activeBackend, setActiveBackend] = useState<'mysql' | 'mock' | 'firebase'>('mysql');
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
@@ -534,7 +534,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                           {snap.fileName}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          {snap.sourceBackend === 'mysql' ? 'MySQL' : 'Firebase'} · {toEnglishDigits(String(snap.publicFileCount))} वेबसाईट फाइल्स
+                          {snap.sourceBackend === 'mysql' ? 'MySQL' : snap.sourceBackend === 'mock' ? 'Preview' : 'Legacy Archive'} · {toEnglishDigits(String(snap.publicFileCount))} वेबसाईट फाइल्स
                         </div>
                       </td>
                       <td className="py-3 px-3 text-slate-700 tabular-nums">

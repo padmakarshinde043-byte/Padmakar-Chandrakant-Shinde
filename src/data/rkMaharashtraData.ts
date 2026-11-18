@@ -117,6 +117,7 @@ export const MAHARASHTRA_36_DISTRICTS = MAHARASHTRA_34_DISTRICTS;
 export interface AppointedPostItem {
   name: string;
   isTaluka: boolean;
+  level?: PostLevelType;
 }
 
 export const DEFAULT_APPOINTED_POSTS: AppointedPostItem[] = [
@@ -249,7 +250,21 @@ export function getAppointmentCommitteeInfo(postName?: string, taluka?: string):
   };
 }
 
-export function getPostLevel(postName?: string): PostLevelType {
+export function getPostLevel(
+  postName?: string,
+  explicitLevel?: PostLevelType,
+  isTaluka?: boolean
+): PostLevelType {
+  if (
+    explicitLevel === 'mahila' ||
+    explicitLevel === 'state' ||
+    explicitLevel === 'division' ||
+    explicitLevel === 'district' ||
+    explicitLevel === 'taluka'
+  ) {
+    return explicitLevel;
+  }
+  if (isTaluka === true) return 'taluka';
   if (!postName) return 'district';
   const p = postName.trim();
   if (p.includes('महिला')) return 'mahila';
@@ -259,8 +274,12 @@ export function getPostLevel(postName?: string): PostLevelType {
   return 'district';
 }
 
-export function getPostLevelLabel(postName?: string): string {
-  const lvl = getPostLevel(postName);
+export function getPostLevelLabel(
+  postName?: string,
+  explicitLevel?: PostLevelType,
+  isTaluka?: boolean
+): string {
+  const lvl = getPostLevel(postName, explicitLevel, isTaluka);
   if (lvl === 'mahila') return 'महिला आघाडी';
   if (lvl === 'state') return 'राज्य स्तर';
   if (lvl === 'division') return 'विभाग स्तर';
@@ -272,7 +291,13 @@ export function getPostLevelLabel(postName?: string): string {
  * Determines whether an appointed post is specifically at the taluka level.
  * State, division, or district posts must NEVER be classified as taluka level.
  */
-export function isTalukaLevelPost(postName?: string): boolean {
+export function isTalukaLevelPost(
+  postName?: string,
+  explicitIsTaluka?: boolean,
+  explicitLevel?: PostLevelType
+): boolean {
+  if (explicitLevel) return explicitLevel === 'taluka';
+  if (typeof explicitIsTaluka === 'boolean') return explicitIsTaluka;
   if (!postName) return false;
   const p = postName.trim();
   if (p.includes('राज्य') || p.includes('विभाग') || p.includes('जिल्हा')) {

@@ -13,7 +13,7 @@ import {
 } from '../utils/cloudinary';
 import { compressImageFile } from '../utils/imageCompressor';
 import {
-  DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember,
+  DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember, AppointedPostItem,
   SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
   DEFAULT_APPOINTED_POSTS, formatAppointedPostWithTaluka, isTalukaLevelPost, getPostLevelLabel, getPostLevel,
   getAppointmentCommitteeInfo
@@ -36,6 +36,9 @@ import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatter
 import { ORG_DETAILS, MembershipApplication, OFFICIAL_CADRES } from '../data/mahasanghData';
 import { fetchApprovedMembersCached } from '../firebase';
 import {
+  CACHE_KEY_POSTS,
+  LEGACY_CACHE_KEY_POSTS,
+  POSTS_BROADCAST_CHANNEL,
   getOfficialsFromStorageSync,
   getPostsFromStorageSync,
   getDistrictPasswordsFromStorageSync,
@@ -130,7 +133,7 @@ export const AppointmentsTab: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(() => getOfficialsFromStorageSync().length === 0);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string>('');
-  const [postsList, setPostsList] = useState<Array<{ name: string; isTaluka: boolean }>>(() =>
+  const [postsList, setPostsList] = useState<AppointedPostItem[]>(() =>
     getPostsFromStorageSync()
   );
   const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>(() =>
@@ -250,9 +253,10 @@ export const AppointmentsTab: React.FC = () => {
     }, 3500);
   };
 
-  // Load Initial Data on Mount (Cache-first, non-blocking: public list never waits on Firestore or passwords)
+  // Load Initial Data on Mount + Keep postsList synchronized across same-tab & cross-tab updates
   useEffect(() => {
     loadData(false);
+
     const handlePostsUpdated = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (Array.isArray(customEvent.detail) && customEvent.detail.length > 0) {
@@ -261,9 +265,64 @@ export const AppointmentsTab: React.FC = () => {
         setPostsList(getPostsFromStorageSync());
       }
     };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CACHE_KEY_POSTS || e.key === LEGACY_CACHE_KEY_POSTS || e.key === null) {
+        setPostsList(getPostsFromStorageSync());
+      }
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      setPostsList(getPostsFromStorageSync());
+      fetchAppointedPosts(true)
+        .then((freshPosts) => {
+          if (Array.isArray(freshPosts) && freshPosts.length > 0) {
+            setPostsList(freshPosts);
+          }
+        })
+        .catch(() => {});
+    };
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel(POSTS_BROADCAST_CHANNEL);
+        bc.onmessage = (ev) => {
+          if (ev?.data?.type === 'POSTS_UPDATED' && Array.isArray(ev.data.posts) && ev.data.posts.length > 0) {
+            setPostsList(ev.data.posts);
+          }
+        };
+      } catch {}
+    }
+
     window.addEventListener('mahasangh_posts_updated', handlePostsUpdated);
-    return () => window.removeEventListener('mahasangh_posts_updated', handlePostsUpdated);
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      window.removeEventListener('mahasangh_posts_updated', handlePostsUpdated);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      if (bc) bc.close();
+    };
   }, []);
+
+  // Ensure postsList is freshly synced whenever District President opens Management view
+  useEffect(() => {
+    if (activeSubTab === 'manage') {
+      setPostsList(getPostsFromStorageSync());
+      fetchAppointedPosts(true)
+        .then((freshPosts) => {
+          if (Array.isArray(freshPosts) && freshPosts.length > 0) {
+            setPostsList(freshPosts);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeSubTab]);
 
   // Lazy-load approved registered members ONLY when President Letters / Status Matrix is opened
   useEffect(() => {
@@ -331,11 +390,8 @@ export const AppointmentsTab: React.FC = () => {
 
   // Is selected post a taluka-level post? (State, Division, or District posts NEVER take a taluka)
   const isPostNeedsTaluka = useMemo(() => {
-    if (formPost.includes('राज्य') || formPost.includes('विभाग') || formPost.includes('जिल्हा')) {
-      return false;
-    }
     const found = postsList.find((p) => p.name === formPost);
-    if (found) return Boolean(found.isTaluka);
+    if (found) return isTalukaLevelPost(found.name, found.isTaluka, found.level);
     return isTalukaLevelPost(formPost);
   }, [postsList, formPost]);
 
@@ -669,13 +725,18 @@ export const AppointmentsTab: React.FC = () => {
   // Open Add Member Modal
   const handleOpenAddModal = () => {
     const activeDist = isSuperAdmin ? currentDistrict : (lockedDistrictName || currentDistrict);
+    const latestLocalPosts = getPostsFromStorageSync();
+    if (latestLocalPosts.length > 0) {
+      setPostsList(latestLocalPosts);
+    }
+    const initialDefaultPost = latestLocalPosts[0]?.name || postsList[0]?.name || 'जिल्हाध्यक्ष';
     setFormError('');
     setEditingMemberId(null);
     setFormSalutation('श्री.');
     setFormFirstName('');
     setFormMiddleName('');
     setFormLastName('');
-    setFormPost(postsList[0]?.name || 'जिल्हाध्यक्ष');
+    setFormPost(initialDefaultPost);
     setFormDistrict(activeDist);
     setFormTaluka('');
     setFormCadre('केंद्रप्रमुख');
@@ -686,6 +747,16 @@ export const AppointmentsTab: React.FC = () => {
     setFormPhoto('');
     setFormPhotoUrl('');
     setIsMemberModalOpen(true);
+
+    // Sync latest order/posts from server right as modal opens without blocking UI
+    fetchAppointedPosts(true)
+      .then((freshPosts) => {
+        if (Array.isArray(freshPosts) && freshPosts.length > 0) {
+          setPostsList(freshPosts);
+          setFormPost((prev) => (prev === initialDefaultPost ? freshPosts[0].name : prev));
+        }
+      })
+      .catch(() => {});
   };
 
   // Open Edit Member Modal
@@ -695,6 +766,17 @@ export const AppointmentsTab: React.FC = () => {
       showToast(`अवैध कृती! आपणास केवळ '${lockedDistrictName}' जिल्ह्यातील पदाधिकारी संपादित करण्याचा अधिकार आहे!`, 'error');
       return;
     }
+    const latestLocalPosts = getPostsFromStorageSync();
+    if (latestLocalPosts.length > 0) {
+      setPostsList(latestLocalPosts);
+    }
+    fetchAppointedPosts(true)
+      .then((freshPosts) => {
+        if (Array.isArray(freshPosts) && freshPosts.length > 0) {
+          setPostsList(freshPosts);
+        }
+      })
+      .catch(() => {});
     setEditingMemberId(m.id);
     setFormSalutation(m.salutation || 'श्री.');
     setFormFirstName(m.firstName || '');
@@ -2492,20 +2574,23 @@ export const AppointmentsTab: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className={isPostNeedsTaluka ? '' : 'sm:col-span-2'}>
-                  <label className="font-semibold text-slate-700 block mb-1">बहाल करण्यात येणारे पद *</label>
+                  <label htmlFor="appointed-post-select" className="font-semibold text-slate-700 block mb-1">बहाल करण्यात येणारे पद *</label>
                   <select
+                    id="appointed-post-select"
                     value={formPost}
                     onChange={(e) => {
-                      setFormPost(e.target.value);
-                      if (!isTalukaLevelPost(e.target.value)) {
+                      const val = e.target.value;
+                      setFormPost(val);
+                      const matched = postsList.find((p) => p.name === val);
+                      if (!isTalukaLevelPost(val, matched?.isTaluka, matched?.level)) {
                         setFormTaluka('');
                       }
                     }}
                     className="w-full p-2 border border-slate-300 rounded-md bg-white font-semibold focus:outline-none focus:border-[#193568]"
                   >
-                    {postsList.map((p) => (
-                      <option key={p.name} value={p.name}>
-                        {p.name} ({getPostLevelLabel(p.name)})
+                    {postsList.map((p, idx) => (
+                      <option key={`${p.name}_${idx}`} value={p.name}>
+                        {p.name} ({getPostLevelLabel(p.name, p.level, p.isTaluka)})
                       </option>
                     ))}
                   </select>

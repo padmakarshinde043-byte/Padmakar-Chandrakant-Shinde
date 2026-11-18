@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CACHE_KEY_OFFICIALS,
   CACHE_KEY_POSTS,
+  LEGACY_CACHE_KEY_POSTS,
   CACHE_KEY_DIST_PASSWORDS,
   CACHE_KEY_PRESIDENT_PASS,
   getOfficialsFromStorageSync,
@@ -12,7 +13,7 @@ import {
   filterAndSortDistrictOfficials,
   matchesDistrictName,
 } from './officialsCache';
-import { OfficialMember, DEFAULT_APPOINTED_POSTS } from '../data/rkMaharashtraData';
+import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS } from '../data/rkMaharashtraData';
 
 function createMemoryStorage(initial: Record<string, string>) {
   return {
@@ -50,15 +51,23 @@ test('getOfficialsFromStorageSync returns parsed cached officials immediately an
   assert.deepEqual(getOfficialsFromStorageSync(corruptStore), []);
 });
 
-test('getPostsFromStorageSync falls back to DEFAULT_APPOINTED_POSTS when empty or invalid', () => {
+test('getPostsFromStorageSync falls back to DEFAULT_APPOINTED_POSTS when empty or invalid and preserves custom order without re-adding deleted defaults', () => {
   const emptyStore = createMemoryStorage({});
   assert.deepEqual(getPostsFromStorageSync(emptyStore), DEFAULT_APPOINTED_POSTS);
 
-  const customPosts = [{ name: 'जिल्हाध्यक्ष', isTaluka: false }];
+  const customPosts: AppointedPostItem[] = [
+    { name: 'नवीन विशेष पद', isTaluka: false, level: 'state' },
+    { name: 'जिल्हाध्यक्ष', isTaluka: false, level: 'district' },
+  ];
   const validStore = createMemoryStorage({
     [CACHE_KEY_POSTS]: JSON.stringify(customPosts),
   });
   assert.deepEqual(getPostsFromStorageSync(validStore), customPosts);
+
+  const legacyStore = createMemoryStorage({
+    [LEGACY_CACHE_KEY_POSTS]: JSON.stringify(customPosts),
+  });
+  assert.deepEqual(getPostsFromStorageSync(legacyStore), customPosts);
 });
 
 test('getDistrictPasswordsFromStorageSync and getPresidentPasswordFromStorageSync hydrate safely', () => {

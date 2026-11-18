@@ -212,10 +212,10 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
       official_district = VALUES(official_district),
       official_taluka = VALUES(official_taluka),
       approved_by = VALUES(approved_by),
-      id_card_email_sent = VALUES(id_card_email_sent),
-      id_card_email_sent_at = VALUES(id_card_email_sent_at),
-      welcome_email_sent = VALUES(welcome_email_sent),
-      welcome_email_sent_at = VALUES(welcome_email_sent_at),
+      id_card_email_sent = GREATEST(id_card_email_sent, VALUES(id_card_email_sent)),
+      id_card_email_sent_at = IF(VALUES(id_card_email_sent) = 1 AND id_card_email_sent_at = '', VALUES(id_card_email_sent_at), id_card_email_sent_at),
+      welcome_email_sent = GREATEST(welcome_email_sent, VALUES(welcome_email_sent)),
+      welcome_email_sent_at = IF(VALUES(welcome_email_sent) = 1 AND welcome_email_sent_at = '', VALUES(welcome_email_sent_at), welcome_email_sent_at),
       approved_at = VALUES(approved_at),
       rejected_at = VALUES(rejected_at),
       updated_at = VALUES(updated_at),
@@ -1481,14 +1481,22 @@ export async function mysqlListAppointedPosts(): Promise<AppointedPostItem[]> {
   const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `appointed_posts` ORDER BY `sort_order` ASC');
   if (!rows.length) return DEFAULT_APPOINTED_POSTS;
   return rows.map((r) => {
+    const rowLevel = String(r.level || '').trim() as AppointedPostItem['level'];
     if (r.extra_json) {
       try {
-        return JSON.parse(String(r.extra_json)) as AppointedPostItem;
+        const parsed = JSON.parse(String(r.extra_json)) as AppointedPostItem;
+        if (parsed && parsed.name) {
+          return {
+            ...parsed,
+            level: parsed.level || rowLevel || (parsed.isTaluka ? 'taluka' : 'district'),
+          };
+        }
       } catch {}
     }
     return {
       name: String(r.title || ''),
       isTaluka: String(r.level || '') === 'taluka',
+      ...(rowLevel ? { level: rowLevel } : {}),
     };
   });
 }
@@ -1502,10 +1510,15 @@ export async function mysqlSetAppointedPosts(posts: AppointedPostItem[]): Promis
     await conn.execute('DELETE FROM `appointed_posts`');
     for (let i = 0; i < posts.length; i++) {
       const p = posts[i];
-      const level = p.isTaluka ? 'taluka' : 'district';
+      const level = p.level || (p.isTaluka ? 'taluka' : 'district');
+      const normalized: AppointedPostItem = {
+        name: String(p.name || '').trim(),
+        isTaluka: level === 'taluka' || Boolean(p.isTaluka),
+        level,
+      };
       await conn.execute(
         'INSERT INTO `appointed_posts` (id, title, level, sort_order, extra_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-        [`post-${i}-${Date.now()}`, p.name, level, i + 1, JSON.stringify(p), new Date().toISOString()]
+        [`post-${i}-${Date.now()}`, normalized.name, level, i + 1, JSON.stringify(normalized), new Date().toISOString()]
       );
     }
     await conn.commit();

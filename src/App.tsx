@@ -180,16 +180,6 @@ export function App() {
     return INITIAL_LATEST_BANNERS;
   });
 
-  useEffect(() => {
-    fetchLatestBannersCached(false)
-      .then((banners) => {
-        if (Array.isArray(banners)) {
-          setLatestBanners(banners);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
   const handleRefreshLatestBanners = async () => {
     const fresh = await fetchLatestBannersCached(true);
     setLatestBanners(fresh);
@@ -283,18 +273,23 @@ export function App() {
     };
   }, []);
 
-  // On initial mount: load cached news & circulars immediately without blocking UI, then idle-prefetch directories
+  // On initial mount (and when switching from /admin to public site): load cached data cleanly without blocking UI
+  const hasLoadedPublicStartupRef = React.useRef(false);
   useEffect(() => {
-    // 1. Session-level connection check runs asynchronously without blocking data or paint
+    if (currentTab === 'admin' || hasLoadedPublicStartupRef.current) return;
+    hasLoadedPublicStartupRef.current = true;
+
     testConnectionOncePerSession().catch(() => {});
 
-    // 2. Load news, gov orders, and once-per-visit registered members count in parallel
+    // Load banners, news, gov orders, and lightweight count in parallel
     Promise.allSettled([
+      fetchLatestBannersCached(false),
       fetchNewsCached(false),
-      fetchGovOrders(),
+      fetchGovOrders(false),
       getRegisteredMembersCountOncePerSession(),
     ])
-      .then(([newsRes, govRes, countRes]) => {
+      .then(([bannerRes, newsRes, govRes, countRes]) => {
+        if (bannerRes.status === 'fulfilled' && Array.isArray(bannerRes.value)) setLatestBanners(bannerRes.value);
         if (newsRes.status === 'fulfilled') setNewsList(newsRes.value);
         if (govRes.status === 'fulfilled') setGovOrders(govRes.value);
         if (countRes.status === 'fulfilled' && typeof countRes.value === 'number') {
@@ -305,7 +300,7 @@ export function App() {
         console.warn('Data init error:', err);
       });
 
-    // 3. Defer secondary leadership/officials prefetch until browser is idle after first paint
+    // Defer secondary leadership/officials prefetch until browser is idle after first paint
     const runIdlePrefetch = () => {
       fetchDynamicLeaders(false).catch((err) => {
         console.warn('Dynamic leaders prefetch warning:', err);
@@ -326,6 +321,18 @@ export function App() {
     } else {
       timerId = window.setTimeout(runIdlePrefetch, 1500);
     }
+
+    return () => {
+      if (idleId !== undefined && typeof win.cancelIdleCallback === 'function') {
+        win.cancelIdleCallback(idleId);
+      }
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [currentTab]);
+
+  useEffect(() => {
 
     // Instant local synchronization when admin publishes news or circulars
     const handleNewsSync = (e: Event) => {
@@ -358,12 +365,6 @@ export function App() {
       window.removeEventListener('mahasangh_news_updated', handleNewsSync);
       window.removeEventListener('mahasangh_banners_updated', handleBannersSync);
       window.removeEventListener('mahasangh_approved_updated', handleApprovedSync);
-      if (idleId !== undefined && typeof win.cancelIdleCallback === 'function') {
-        win.cancelIdleCallback(idleId);
-      }
-      if (timerId !== undefined) {
-        window.clearTimeout(timerId);
-      }
     };
   }, []);
 
@@ -492,9 +493,20 @@ export function App() {
   const handleFetchAdminApplications = async (forceRefresh = false) => {
     setIsLoadingAdminApps(true);
     try {
-      const list = await fetchApplicationsForAdmin(forceRefresh);
-      setApplications(list);
-      safeCacheApplications(list);
+      const promises: Promise<any>[] = [fetchApplicationsForAdmin(forceRefresh)];
+      if (!hasLoadedPublicStartupRef.current) {
+        hasLoadedPublicStartupRef.current = true;
+        promises.push(
+          fetchLatestBannersCached(false).then((b) => Array.isArray(b) && setLatestBanners(b)).catch(() => {}),
+          fetchNewsCached(false).then((n) => Array.isArray(n) && setNewsList(n)).catch(() => {}),
+          fetchGovOrders(false).then((g) => Array.isArray(g) && setGovOrders(g)).catch(() => {})
+        );
+      }
+      const [list] = await Promise.all(promises);
+      if (Array.isArray(list)) {
+        setApplications(list);
+        safeCacheApplications(list);
+      }
     } catch (err) {
       console.warn('Fetch admin applications error:', err);
     } finally {

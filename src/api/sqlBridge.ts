@@ -1,14 +1,25 @@
-import { isAiStudioPreviewHostname } from '../utils/previewFirebaseGuard';
-
 /**
  * Transparent SQL / Preview Bridge
- * - On live production hosts (mahasangh.in), ALL reads/writes route 100% to HostKarle MySQL (/api/db/*).
- *   Firebase is COMPLETELY DISABLED on production domains even during transient network delays.
- * - Only inside AI Studio Preview / localhost (when MySQL is not configured) is read-safe,
- *   quota-capped Firebase Preview mode permitted.
+ * - Production hosts (mahasangh.in): ALL reads/writes route 100% to HostKarle MySQL (/api/db/*).
+ * - AI Studio Preview / localhost (when MySQL is not configured): uses local Mock & LocalStorage engine.
  */
 
 export type ActiveBackendMode = 'mysql' | 'mock';
+
+export function isAiStudioPreviewHostname(hostname: string): boolean {
+  const host = String(hostname || '').trim().toLowerCase();
+  if (!host) return false;
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+    return true;
+  }
+  if (/^ais-(dev|pre)-[a-z0-9-]+\..*run\.app$/i.test(host)) {
+    return true;
+  }
+  if (host.endsWith('.aistudio.google.com') || host === 'aistudio.google.com') {
+    return true;
+  }
+  return false;
+}
 
 let resolvedMode: ActiveBackendMode | null = null;
 let modeCheckPromise: Promise<ActiveBackendMode> | null = null;

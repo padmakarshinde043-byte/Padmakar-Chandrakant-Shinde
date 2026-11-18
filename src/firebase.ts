@@ -172,30 +172,59 @@ export function sortNewsDescending(list: NewsItem[]): NewsItem[] {
   });
 }
 
+const SHORT_SESSION_TTL_MS = 3 * 60 * 1000; // 3 minutes client TTL for instant tab switching
+
+let newsInFlight: Promise<NewsItem[]> | null = null;
+let newsLastFetchedAt = 0;
+
 export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]> {
-  if (await isSqlBackendActive()) {
-    try {
-      const res = await sqlApiRequest<{ items: NewsItem[] }>(`/api/db/news?_t=${Date.now()}`);
-      if (Array.isArray(res?.items)) {
-        const sorted = sortNewsDescending(res.items);
-        safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(sorted));
-        return sorted;
-      }
-    } catch (e) {
-      console.warn('SQL news fetch failed, falling back to local:', e);
+  if (!forceRefresh && newsLastFetchedAt > 0 && Date.now() - newsLastFetchedAt < SHORT_SESSION_TTL_MS) {
+    const cached = safeStorageGet(NEWS_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return sortNewsDescending(parsed);
+      } catch {}
     }
   }
-
-  const cached = safeStorageGet(NEWS_CACHE_KEY);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return sortNewsDescending(parsed);
-      }
-    } catch {}
+  if (!forceRefresh && newsInFlight) {
+    return newsInFlight;
   }
-  return sortNewsDescending(INITIAL_NEWS);
+
+  const runFetch = (async (): Promise<NewsItem[]> => {
+    if (await isSqlBackendActive()) {
+      try {
+        const res = await sqlApiRequest<{ items: NewsItem[] }>('/api/db/news');
+        if (Array.isArray(res?.items)) {
+          const sorted = sortNewsDescending(res.items);
+          newsLastFetchedAt = Date.now();
+          safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(sorted));
+          return sorted;
+        }
+      } catch (e) {
+        console.warn('SQL news fetch failed, falling back to local:', e);
+      }
+    }
+
+    newsLastFetchedAt = Date.now();
+    const cached = safeStorageGet(NEWS_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sortNewsDescending(parsed);
+        }
+      } catch {}
+    }
+    return sortNewsDescending(INITIAL_NEWS);
+  })().finally(() => {
+    newsInFlight = null;
+  });
+
+  if (!forceRefresh) {
+    newsInFlight = runFetch;
+  }
+  return runFetch;
 }
 
 export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
@@ -212,8 +241,9 @@ export async function saveNewsToFirestore(news: NewsItem): Promise<void> {
     });
   }
 
-  const current = await fetchNewsCached();
-  const updated = [item, ...current.filter((n) => n.id !== item.id)];
+  const current = await fetchNewsCached(false);
+  const updated = sortNewsDescending([item, ...current.filter((n) => n.id !== item.id)]);
+  newsLastFetchedAt = Date.now();
   safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(updated));
 }
 
@@ -224,8 +254,9 @@ export async function deleteNewsFromFirestore(newsId: string): Promise<void> {
     });
   }
 
-  const current = await fetchNewsCached();
+  const current = await fetchNewsCached(false);
   const updated = current.filter((n) => n.id !== newsId);
+  newsLastFetchedAt = Date.now();
   safeStorageSet(NEWS_CACHE_KEY, JSON.stringify(updated));
 }
 
@@ -246,30 +277,57 @@ export function updateLatestBannersCache(list: LatestBannerItem[]): void {
   safeStorageSet(BANNER_CACHE_KEY, JSON.stringify(list));
 }
 
-export async function fetchLatestBannersCached(_forceRefresh = false): Promise<LatestBannerItem[]> {
-  if (await isSqlBackendActive()) {
-    try {
-      const res = await sqlApiRequest<{ items: LatestBannerItem[] }>(`/api/db/latest-banners?_t=${Date.now()}`);
-      if (Array.isArray(res?.items)) {
-        const sorted = sortLatestBannersDescending(res.items);
-        updateLatestBannersCache(sorted);
-        return sorted;
-      }
-    } catch (e) {
-      console.warn('SQL latest banners fetch failed, falling back to local:', e);
+let bannersInFlight: Promise<LatestBannerItem[]> | null = null;
+let bannersLastFetchedAt = 0;
+
+export async function fetchLatestBannersCached(forceRefresh = false): Promise<LatestBannerItem[]> {
+  if (!forceRefresh && bannersLastFetchedAt > 0 && Date.now() - bannersLastFetchedAt < SHORT_SESSION_TTL_MS) {
+    const cached = safeStorageGet(BANNER_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return sortLatestBannersDescending(parsed);
+      } catch {}
     }
   }
-
-  const cached = safeStorageGet(BANNER_CACHE_KEY);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return sortLatestBannersDescending(parsed);
-      }
-    } catch {}
+  if (!forceRefresh && bannersInFlight) {
+    return bannersInFlight;
   }
-  return sortLatestBannersDescending(INITIAL_LATEST_BANNERS);
+
+  const runFetch = (async (): Promise<LatestBannerItem[]> => {
+    if (await isSqlBackendActive()) {
+      try {
+        const res = await sqlApiRequest<{ items: LatestBannerItem[] }>('/api/db/latest-banners');
+        if (Array.isArray(res?.items)) {
+          const sorted = sortLatestBannersDescending(res.items);
+          bannersLastFetchedAt = Date.now();
+          updateLatestBannersCache(sorted);
+          return sorted;
+        }
+      } catch (e) {
+        console.warn('SQL latest banners fetch failed, falling back to local:', e);
+      }
+    }
+
+    bannersLastFetchedAt = Date.now();
+    const cached = safeStorageGet(BANNER_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return sortLatestBannersDescending(parsed);
+        }
+      } catch {}
+    }
+    return sortLatestBannersDescending(INITIAL_LATEST_BANNERS);
+  })().finally(() => {
+    bannersInFlight = null;
+  });
+
+  if (!forceRefresh) {
+    bannersInFlight = runFetch;
+  }
+  return runFetch;
 }
 
 export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Promise<void> {
@@ -286,8 +344,9 @@ export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Pro
     });
   }
 
-  const current = await fetchLatestBannersCached();
+  const current = await fetchLatestBannersCached(false);
   const updated = sortLatestBannersDescending([item, ...current.filter((b) => b.id !== item.id)]);
+  bannersLastFetchedAt = Date.now();
   updateLatestBannersCache(updated);
 }
 
@@ -298,35 +357,63 @@ export async function deleteLatestBannerFromFirestore(bannerId: string): Promise
     });
   }
 
-  const current = await fetchLatestBannersCached();
+  const current = await fetchLatestBannersCached(false);
   const updated = current.filter((b) => b.id !== bannerId);
+  bannersLastFetchedAt = Date.now();
   updateLatestBannersCache(updated);
 }
 
 // -------------------------------------------------------------
 // GOV ORDERS (शासन निर्णय)
 // -------------------------------------------------------------
-export async function fetchGovOrders(_forceRefresh = false): Promise<GovOrder[]> {
-  if (await isSqlBackendActive()) {
-    try {
-      const res = await sqlApiRequest<{ items: GovOrder[] }>(`/api/db/gov-orders?_t=${Date.now()}`);
-      if (Array.isArray(res?.items)) {
-        safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(res.items));
-        return res.items;
-      }
-    } catch (e) {
-      console.warn('SQL gov orders fetch failed, falling back to local:', e);
+let govOrdersInFlight: Promise<GovOrder[]> | null = null;
+let govOrdersLastFetchedAt = 0;
+
+export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> {
+  if (!forceRefresh && govOrdersLastFetchedAt > 0 && Date.now() - govOrdersLastFetchedAt < SHORT_SESSION_TTL_MS) {
+    const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
     }
   }
-
-  const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch {}
+  if (!forceRefresh && govOrdersInFlight) {
+    return govOrdersInFlight;
   }
-  return INITIAL_GOV_ORDERS;
+
+  const runFetch = (async (): Promise<GovOrder[]> => {
+    if (await isSqlBackendActive()) {
+      try {
+        const res = await sqlApiRequest<{ items: GovOrder[] }>('/api/db/gov-orders');
+        if (Array.isArray(res?.items)) {
+          govOrdersLastFetchedAt = Date.now();
+          safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(res.items));
+          return res.items;
+        }
+      } catch (e) {
+        console.warn('SQL gov orders fetch failed, falling back to local:', e);
+      }
+    }
+
+    govOrdersLastFetchedAt = Date.now();
+    const cached = safeStorageGet(GOV_ORDERS_CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch {}
+    }
+    return INITIAL_GOV_ORDERS;
+  })().finally(() => {
+    govOrdersInFlight = null;
+  });
+
+  if (!forceRefresh) {
+    govOrdersInFlight = runFetch;
+  }
+  return runFetch;
 }
 
 export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void> {
@@ -343,8 +430,9 @@ export async function saveGovOrderToFirestore(govOrder: GovOrder): Promise<void>
     });
   }
 
-  const current = await fetchGovOrders();
+  const current = await fetchGovOrders(false);
   const updated = [item, ...current.filter((g) => g.id !== item.id)];
+  govOrdersLastFetchedAt = Date.now();
   safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(updated));
 }
 
@@ -355,8 +443,9 @@ export async function deleteGovOrderFromFirestore(id: string): Promise<void> {
     });
   }
 
-  const current = await fetchGovOrders();
+  const current = await fetchGovOrders(false);
   const updated = current.filter((g) => g.id !== id);
+  govOrdersLastFetchedAt = Date.now();
   safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(updated));
 }
 
@@ -505,6 +594,8 @@ export async function findExistingApplicationInFirestore(params: {
 }
 
 export async function updateMemberInFirestore(member: MembershipApplication): Promise<void> {
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
   if (await isSqlBackendActive()) {
     await sqlApiRequest(`/api/db/applications/${encodeURIComponent(member.id)}`, {
       method: 'PUT',
@@ -525,10 +616,21 @@ export async function approveApplicationInFirestore(
   paymentId?: string,
   approvedBy?: string
 ): Promise<void> {
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
   if (await isSqlBackendActive()) {
-    await sqlApiRequest(`/api/db/applications/${encodeURIComponent(appId)}/approve`, {
+    await sqlApiRequest('/api/db/applications/approve-atomic', {
       method: 'POST',
-      body: JSON.stringify({ memberNumber, paymentId, approvedBy }),
+      body: JSON.stringify({
+        appId,
+        applicationId: appId,
+        approvedBy: approvedBy || 'Admin',
+        extraUpdates: {
+          memberNumber,
+          ...(paymentId ? { paymentRef: paymentId, razorpayPaymentId: paymentId } : {}),
+          paymentConfirmed: true,
+        },
+      }),
     });
     return;
   }
@@ -556,6 +658,8 @@ export async function rejectApplicationInFirestore(
   rejectReason?: string,
   rejectedBy?: string
 ): Promise<void> {
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
   const reason = rejectReason || '';
   const by = rejectedBy || 'Admin';
   if (await isSqlBackendActive()) {
@@ -586,6 +690,8 @@ export async function deleteApplicationFromFirestore(
   appId: string,
   _targetApp?: any
 ): Promise<{ success: boolean; deletedDocIds: string[]; removedAllForPhone?: boolean }> {
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
   if (await isSqlBackendActive()) {
     try {
       await sqlApiRequest(`/api/db/applications/${encodeURIComponent(appId)}`, {
@@ -657,11 +763,13 @@ export async function approveApplicationAtomicInFirestore(params: {
   message: string;
   alreadyApproved?: boolean;
 }> {
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
   const targetId = params.applicationId || params.appId || '';
   if (await isSqlBackendActive()) {
     const res = await sqlApiRequest('/api/db/applications/approve-atomic', {
       method: 'POST',
-      body: JSON.stringify({ ...params, applicationId: targetId }),
+      body: JSON.stringify({ ...params, appId: params.appId || targetId, applicationId: targetId }),
     });
     return res;
   }
@@ -733,36 +841,116 @@ export async function syncMemberCounter(highestKnownCount: number): Promise<void
 }
 
 export function getCachedApprovedMembersSync(): MembershipApplication[] | null {
+  if (approvedMembersCache && approvedMembersCache.length > 0) {
+    return approvedMembersCache;
+  }
   const apps = loadLocalApplications();
   return apps.filter((a) => a.status === 'approved');
 }
 
+let approvedMembersCache: MembershipApplication[] | null = null;
+let approvedMembersInFlight: Promise<MembershipApplication[]> | null = null;
+let approvedMembersLastFetchedAt = 0;
+
+let registeredCountCache: number | null = null;
+let registeredCountInFlight: Promise<number> | null = null;
+
 export async function fetchApprovedMembersCached(forceRefresh = false): Promise<MembershipApplication[]> {
-  if (await isSqlBackendActive()) {
-    try {
-      const res = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications/approved-directory');
-      if (Array.isArray(res?.items)) return res.items;
-    } catch {}
+  if (
+    !forceRefresh &&
+    approvedMembersCache &&
+    approvedMembersLastFetchedAt > 0 &&
+    Date.now() - approvedMembersLastFetchedAt < SHORT_SESSION_TTL_MS
+  ) {
+    return approvedMembersCache;
+  }
+  if (!forceRefresh && approvedMembersInFlight) {
+    return approvedMembersInFlight;
   }
 
-  const apps = await fetchApplicationsForAdmin(forceRefresh);
-  return apps.filter((a) => a.status === 'approved');
+  const runFetch = (async (): Promise<MembershipApplication[]> => {
+    if (await isSqlBackendActive()) {
+      try {
+        const res = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications/approved-directory');
+        if (Array.isArray(res?.items)) {
+          approvedMembersCache = res.items;
+          approvedMembersLastFetchedAt = Date.now();
+          registeredCountCache = res.items.length;
+          return res.items;
+        }
+      } catch {}
+    }
+
+    const apps = await fetchApplicationsForAdmin(forceRefresh);
+    const approved = apps.filter((a) => a.status === 'approved');
+    approvedMembersCache = approved;
+    approvedMembersLastFetchedAt = Date.now();
+    registeredCountCache = approved.length;
+    return approved;
+  })().finally(() => {
+    approvedMembersInFlight = null;
+  });
+
+  if (!forceRefresh) {
+    approvedMembersInFlight = runFetch;
+  }
+  return runFetch;
 }
 
 export function getCachedRegisteredMembersCountSync(): number | null {
+  if (typeof registeredCountCache === 'number') return registeredCountCache;
+  const cachedCount = safeStorageGet('mahasangh_registered_count_cache_v1');
+  if (cachedCount !== null) {
+    const parsed = Number(cachedCount);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
   const apps = loadLocalApplications();
   return apps.filter((a) => a.status === 'approved').length;
 }
 
 export async function getRegisteredMembersCountOncePerSession(): Promise<number> {
-  const list = await fetchApprovedMembersCached();
-  return list.length;
+  if (typeof registeredCountCache === 'number') {
+    return registeredCountCache;
+  }
+  if (registeredCountInFlight) {
+    return registeredCountInFlight;
+  }
+
+  registeredCountInFlight = (async (): Promise<number> => {
+    if (await isSqlBackendActive()) {
+      try {
+        const res = await sqlApiRequest<{ count: number }>('/api/db/applications/approved-count');
+        if (typeof res?.count === 'number' && res.count >= 0) {
+          registeredCountCache = res.count;
+          safeStorageSet('mahasangh_registered_count_cache_v1', String(res.count));
+          return res.count;
+        }
+      } catch {}
+    }
+
+    const apps = loadLocalApplications();
+    const count = apps.filter((a) => a.status === 'approved').length;
+    registeredCountCache = count;
+    return count;
+  })().finally(() => {
+    registeredCountInFlight = null;
+  });
+
+  return registeredCountInFlight;
 }
 
 export function addApprovedMemberToCache(app: MembershipApplication): void {
   const current = loadLocalApplications();
   const updated = [app, ...current.filter((a) => a.id !== app.id)];
   persistLocalApplications(updated);
+  if (approvedMembersCache) {
+    approvedMembersCache = [app, ...approvedMembersCache.filter((a) => a.id !== app.id)];
+    approvedMembersLastFetchedAt = Date.now();
+    registeredCountCache = approvedMembersCache.length;
+  } else {
+    approvedMembersLastFetchedAt = 0;
+    registeredCountCache = null;
+  }
 }
 
 export function syncSingleMemberInCaches(app: MembershipApplication): void {
@@ -779,6 +967,15 @@ export function removeMemberFromCaches(identifier: string): void {
       toEnglishDigits(a.memberNumber || '').toLowerCase() !== term
   );
   persistLocalApplications(updated);
+  if (approvedMembersCache) {
+    approvedMembersCache = approvedMembersCache.filter(
+      (a) =>
+        a.id !== identifier &&
+        toEnglishDigits(a.phone || '').toLowerCase() !== term &&
+        toEnglishDigits(a.memberNumber || '').toLowerCase() !== term
+    );
+    registeredCountCache = approvedMembersCache.length;
+  }
 }
 
 export function purgeStaleApplicationFromCachesByContact(params: {

@@ -1,12 +1,9 @@
 /**
- * Secondary Firebase Realtime Database Service for RK2026 (greetings.mahasangh.in)
- * Firebase project: rk2026-207ee
- * Realtime DB: https://rk2026-207ee-default-rtdb.firebaseio.com
+ * Mahasangh Leadership, Officials & Master Studio Posts Service
  *
- * Designed with a cache-first & on-demand strategy:
- * - Only queries Firebase when the user views the appointments tab or explicitly requests a refresh/save
- * - Zero background listeners when browsing other pages of the website
- * - Fully protects Firebase quota while keeping data synchronized
+ * - Production (mahasangh.in): HostKarle MySQL (/api/db/rk/*)
+ * - AI Studio Preview / Localhost: In-Memory Mock + LocalStorage fallback
+ * - Uses in-flight deduplication and short TTL caching for instant navigation
  */
 
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
@@ -18,10 +15,13 @@ import {
   CACHE_KEY_OFFICIALS,
   CACHE_KEY_OFFICIALS_TIMESTAMP,
   CACHE_KEY_POSTS,
+  LEGACY_CACHE_KEY_POSTS,
   CACHE_KEY_POSTS_TIMESTAMP,
+  POSTS_BROADCAST_CHANNEL,
   CACHE_KEY_DIST_PASSWORDS,
   CACHE_KEY_DIST_PASSWORDS_TS,
   CACHE_KEY_PRESIDENT_PASS,
+  getPostsFromStorageSync,
 } from '../utils/officialsCache';
 
 const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
@@ -30,17 +30,32 @@ const CACHE_KEY_LEADERSHIP_TS = 'mahasangh_leadership_ts_v1';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes cache TTL
 
 let officialsInFlight: Promise<OfficialMember[]> | null = null;
+let officialsLastFetchedAt = 0;
 let postsInFlight: Promise<AppointedPostItem[]> | null = null;
+let postsLastFetchedAt = 0;
+let leadersInFlight: Promise<Leader[]> | null = null;
+let leadersLastFetchedAt = 0;
+const SHORT_RK_TTL_MS = 90 * 1000;
 
 /**
- * Fetch all officials from the HostKarle MySQL backend (/api/db/rk/officials).
- * Always pulls fresh SQL data so that newly added officials (e.g. 27 Beed district officials)
- * immediately appear in President Login, Status Matrix, and Excel exports.
+ * Fetch all officials from the HostKarle MySQL / Mock backend (/api/db/rk/officials).
  */
 export async function fetchOfficials(forceRefresh = false): Promise<OfficialMember[]> {
+  if (!forceRefresh && officialsLastFetchedAt > 0 && Date.now() - officialsLastFetchedAt < SHORT_RK_TTL_MS) {
+    const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+  }
+  if (!forceRefresh && officialsInFlight) {
+    return officialsInFlight;
+  }
+
   const runFetch = (async (): Promise<OfficialMember[]> => {
     try {
-      const res = await fetch(`/api/db/rk/officials?_t=${Date.now()}`, {
+      const res = await fetch('/api/db/rk/officials', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -68,8 +83,9 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
             orderNumber: item.orderNumber || item.order_number || ''
           }));
 
+          officialsLastFetchedAt = Date.now();
           localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-          localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+          localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
           return list;
         }
       }
@@ -133,11 +149,12 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
   }
 
   // Update local cache
+  officialsLastFetchedAt = Date.now();
   const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
   let list: OfficialMember[] = cached ? JSON.parse(cached) : [];
   list = [member, ...list.filter((x) => x.id !== member.id)];
   localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-  localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+  localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
 }
 
 /**
@@ -160,13 +177,14 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
   }
 
   // Update local cache
+  officialsLastFetchedAt = Date.now();
   const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
   if (cached) {
     try {
       const list: OfficialMember[] = JSON.parse(cached);
       const updated = list.filter((x) => x.id !== id);
       localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(updated));
-      localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(Date.now()));
+      localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
     } catch {}
   }
 }
@@ -234,13 +252,44 @@ export async function updateDistrictPasswordInRtdb(district: string, newPass: st
   } catch {}
 }
 
+let postsSaveQueue: Promise<void> = Promise.resolve();
+
+export function broadcastPostsUpdated(posts: AppointedPostItem[]): void {
+  postsLastFetchedAt = Date.now();
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const json = JSON.stringify(posts);
+      localStorage.setItem(CACHE_KEY_POSTS, json);
+      localStorage.setItem(LEGACY_CACHE_KEY_POSTS, json);
+      localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(postsLastFetchedAt));
+    }
+  } catch {}
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: posts }));
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel(POSTS_BROADCAST_CHANNEL);
+        bc.postMessage({ type: 'POSTS_UPDATED', posts, updatedAt: postsLastFetchedAt });
+        bc.close();
+      } catch {}
+    }
+  }
+}
+
 /**
- * Fetch dynamic appointed posts from HostKarle MySQL.
+ * Fetch dynamic appointed posts from HostKarle MySQL (or local cache / mock store).
+ * Preserves the exact saved list and order without re-appending deleted defaults.
  */
 export async function fetchAppointedPosts(forceRefresh = false): Promise<AppointedPostItem[]> {
+  if (!forceRefresh && postsLastFetchedAt > 0 && Date.now() - postsLastFetchedAt < SHORT_RK_TTL_MS) {
+    return getPostsFromStorageSync();
+  }
+  if (!forceRefresh && postsInFlight) {
+    return postsInFlight;
+  }
   const runFetch = (async (): Promise<AppointedPostItem[]> => {
     try {
-      const res = await fetch(`/api/db/rk/appointed-posts?_t=${Date.now()}`, {
+      const res = await fetch('/api/db/rk/appointed-posts', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -251,19 +300,23 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
         const sqlRes = await res.json();
         const data = sqlRes?.items;
         if (Array.isArray(data) && data.length > 0) {
-          let merged = data;
-          if (data.length < DEFAULT_APPOINTED_POSTS.length) {
-            const existingNames = new Set(data.map((p: any) => String(p.name || '').trim()));
-            merged = [...data];
-            for (const d of DEFAULT_APPOINTED_POSTS) {
-              if (!existingNames.has(d.name.trim())) {
-                merged.push(d);
-              }
-            }
+          const normalized: AppointedPostItem[] = data
+            .filter((p: any) => p && typeof p.name === 'string' && p.name.trim())
+            .map((p: any) => ({
+              name: String(p.name).trim(),
+              isTaluka: Boolean(p.isTaluka),
+              ...(p.level ? { level: p.level } : {}),
+            }));
+          if (normalized.length > 0) {
+            postsLastFetchedAt = Date.now();
+            try {
+              const json = JSON.stringify(normalized);
+              localStorage.setItem(CACHE_KEY_POSTS, json);
+              localStorage.setItem(LEGACY_CACHE_KEY_POSTS, json);
+              localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(postsLastFetchedAt));
+            } catch {}
+            return normalized;
           }
-          localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(merged));
-          localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
-          return merged;
         }
       }
     } catch (error) {
@@ -272,27 +325,7 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
       postsInFlight = null;
     }
 
-    const cached = localStorage.getItem(CACHE_KEY_POSTS);
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          if (parsed.length < DEFAULT_APPOINTED_POSTS.length) {
-            const existingNames = new Set(parsed.map((p: any) => String(p.name || '').trim()));
-            const merged = [...parsed];
-            for (const d of DEFAULT_APPOINTED_POSTS) {
-              if (!existingNames.has(d.name.trim())) {
-                merged.push(d);
-              }
-            }
-            return merged;
-          }
-          return parsed;
-        }
-      } catch {}
-    }
-
-    return DEFAULT_APPOINTED_POSTS;
+    return getPostsFromStorageSync();
   })();
 
   if (!forceRefresh) {
@@ -302,30 +335,41 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
 }
 
 /**
- * Save custom appointed posts to HostKarle MySQL.
+ * Save custom appointed posts atomically to HostKarle MySQL and broadcast immediately
+ * across tabs and components via localStorage + CustomEvent + BroadcastChannel.
  */
 export async function saveAppointedPostsToRtdb(posts: AppointedPostItem[]): Promise<void> {
-  try {
+  const normalized: AppointedPostItem[] = posts
+    .filter((p) => p && typeof p.name === 'string' && p.name.trim().length > 0)
+    .map((p) => ({
+      name: String(p.name).trim(),
+      isTaluka: p.level ? p.level === 'taluka' : Boolean(p.isTaluka),
+      ...(p.level ? { level: p.level } : {}),
+    }));
+
+  const task = postsSaveQueue.then(async () => {
+    // Update local caches & cross-tab listeners right away so same-device tabs sync instantly
+    broadcastPostsUpdated(normalized);
+
     const res = await fetch('/api/db/rk/appointed-posts', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-      body: JSON.stringify({ items: posts }),
+      body: JSON.stringify({ items: normalized }),
     });
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      throw new Error(errData?.message || res.statusText || 'Failed to save posts');
+      throw new Error(errData?.message || res.statusText || 'पदे सेव्ह करताना सर्व्हर त्रुटी आली.');
     }
-  } catch (err) {
-    console.warn('Error saving appointed posts to SQL:', err);
-    throw err;
-  }
-  localStorage.setItem(CACHE_KEY_POSTS, JSON.stringify(posts));
-  localStorage.setItem('mahasangh_posts_v1', JSON.stringify(posts));
-  localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(Date.now()));
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('mahasangh_posts_updated', { detail: posts }));
-  }
+    const resData = await res.json().catch(() => null);
+    if (Array.isArray(resData?.items) && resData.items.length > 0) {
+      broadcastPostsUpdated(resData.items);
+    }
+  });
+
+  // Keep queue healthy even if one call throws
+  postsSaveQueue = task.catch(() => {});
+  return task;
 }
 
 /**
@@ -382,63 +426,65 @@ export async function updatePresidentPasswordInFirebase(newPass: string): Promis
 }
 
 /**
- * Fetch dynamic leadership members:
- * - Always ensures that live changes made in Firebase (RTDB & Firestore) are authoritative.
- * - Prioritizes fresh remote fetch so modified names, photos, and structure are shown accurately.
- * - Falls back to Firestore /leadership if RTDB is unavailable.
- * - Only uses DEFAULT_AUTHORITATIVE_LEADERS as initial offline seed.
+ * Fetch dynamic leadership members from HostKarle MySQL / local cache with in-flight deduplication.
  */
 export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[]> {
-  const useSql = await isSqlBackendActive();
-
-  // If not forcing refresh, check local cache first (30-min TTL + tiny version check)
-  if (!forceRefresh) {
+  if (!forceRefresh && leadersLastFetchedAt > 0 && Date.now() - leadersLastFetchedAt < CACHE_TTL_MS) {
     try {
       const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
-      const cachedTs = localStorage.getItem(CACHE_KEY_LEADERSHIP_TS);
-      const cachedVer = localStorage.getItem(CACHE_KEY_LEADERSHIP_VER);
-
       if (cached) {
         const parsed = JSON.parse(cached);
-        const hasLegalAdvisors = Array.isArray(parsed) && parsed.some(
-          (l: Leader) => l.name && (l.name.includes('काटनेश्वर') || l.name.includes('मानव'))
-        );
-
-        if (hasLegalAdvisors && parsed.length >= 50) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
     } catch {}
   }
 
-  if (useSql) {
-    try {
-      const sqlRes = await sqlApiRequest<{ items: Leader[]; version?: string | number }>('/api/db/rk/leaders');
-      if (Array.isArray(sqlRes?.items) && sqlRes.items.length > 0) {
-        localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(sqlRes.items));
-        localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-        if (sqlRes.version !== undefined && sqlRes.version !== null) {
-          localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(sqlRes.version));
-        }
-        window.dispatchEvent(new Event('mahasangh_leadership_updated'));
-        return sqlRes.items;
-      }
-    } catch (err) {
-      console.warn('SQL dynamic leaders fetch failed:', err);
-    }
+  if (!forceRefresh && leadersInFlight) {
+    return leadersInFlight;
   }
 
-  try {
-    const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+  const runFetch = (async (): Promise<Leader[]> => {
+    const useSql = await isSqlBackendActive();
+
+    if (useSql) {
+      try {
+        const sqlRes = await sqlApiRequest<{ items: Leader[]; version?: string | number }>('/api/db/rk/leaders');
+        if (Array.isArray(sqlRes?.items) && sqlRes.items.length > 0) {
+          leadersLastFetchedAt = Date.now();
+          localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(sqlRes.items));
+          localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
+          if (sqlRes.version !== undefined && sqlRes.version !== null) {
+            localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(sqlRes.version));
+          }
+          return sqlRes.items;
+        }
+      } catch (err) {
+        console.warn('SQL dynamic leaders fetch failed:', err);
       }
     }
-  } catch {}
 
-  return DEFAULT_AUTHORITATIVE_LEADERS;
+    leadersLastFetchedAt = Date.now();
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch {}
+
+    return DEFAULT_AUTHORITATIVE_LEADERS;
+  })().finally(() => {
+    leadersInFlight = null;
+  });
+
+  if (!forceRefresh) {
+    leadersInFlight = runFetch;
+  }
+  return runFetch;
 }
 
 /**
@@ -474,9 +520,10 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
         body: JSON.stringify({ leaders: cleanLeaders }),
       });
       const newVer = res?.version || Date.now();
+      leadersLastFetchedAt = Date.now();
       localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
       localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
-      localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+      localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
       window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
       return;
     } catch (err) {
@@ -485,8 +532,9 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
   }
 
   const newVer = Date.now();
+  leadersLastFetchedAt = Date.now();
   localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
   localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
-  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
   window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
 }
