@@ -22,6 +22,8 @@ import {
   CACHE_KEY_DIST_PASSWORDS_TS,
   CACHE_KEY_PRESIDENT_PASS,
   getPostsFromStorageSync,
+  stripHeavyPhotosForCache,
+  safeStorageSetItem,
 } from '../utils/officialsCache';
 
 const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
@@ -29,25 +31,53 @@ const CACHE_KEY_LEADERSHIP_VER = 'mahasangh_leadership_ver_v1';
 const CACHE_KEY_LEADERSHIP_TS = 'mahasangh_leadership_ts_v1';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes cache TTL
 
+let officialsMemoryCache: OfficialMember[] | null = null;
 let officialsInFlight: Promise<OfficialMember[]> | null = null;
 let officialsLastFetchedAt = 0;
 let postsInFlight: Promise<AppointedPostItem[]> | null = null;
 let postsLastFetchedAt = 0;
+let leadersMemoryCache: Leader[] | null = null;
 let leadersInFlight: Promise<Leader[]> | null = null;
 let leadersLastFetchedAt = 0;
 const SHORT_RK_TTL_MS = 90 * 1000;
+
+function safeRkStorageSet(key: string, val: string): void {
+  const store = typeof localStorage !== 'undefined' ? localStorage : null;
+  safeStorageSetItem(store, key, val);
+}
+
+function safeCacheOfficials(list: OfficialMember[]): void {
+  officialsMemoryCache = list;
+  const lightweight = stripHeavyPhotosForCache(list);
+  safeRkStorageSet(CACHE_KEY_OFFICIALS, JSON.stringify(lightweight));
+  safeRkStorageSet(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
+}
+
+function safeCacheLeaders(list: Leader[], version?: string | number): void {
+  leadersMemoryCache = list;
+  const lightweight = stripHeavyPhotosForCache(list);
+  safeRkStorageSet(CACHE_KEY_LEADERSHIP, JSON.stringify(lightweight));
+  safeRkStorageSet(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
+  if (version !== undefined && version !== null) {
+    safeRkStorageSet(CACHE_KEY_LEADERSHIP_VER, String(version));
+  }
+}
 
 /**
  * Fetch all officials from the HostKarle MySQL / Mock backend (/api/db/rk/officials).
  */
 export async function fetchOfficials(forceRefresh = false): Promise<OfficialMember[]> {
   if (!forceRefresh && officialsLastFetchedAt > 0 && Date.now() - officialsLastFetchedAt < SHORT_RK_TTL_MS) {
-    const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {}
+    if (officialsMemoryCache) {
+      return officialsMemoryCache;
     }
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
   }
   if (!forceRefresh && officialsInFlight) {
     return officialsInFlight;
@@ -84,8 +114,7 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
           }));
 
           officialsLastFetchedAt = Date.now();
-          localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-          localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
+          safeCacheOfficials(list);
           return list;
         }
       }
@@ -95,13 +124,16 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
       officialsInFlight = null;
     }
 
-    // Fallback to cache if network is offline/unavailable
-    const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {}
+    if (officialsMemoryCache) {
+      return officialsMemoryCache;
     }
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
     return [];
   })();
 
@@ -148,13 +180,18 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
     throw err;
   }
 
-  // Update local cache
+  // Update in-memory + safe local cache (never throws QuotaExceededError)
   officialsLastFetchedAt = Date.now();
-  const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-  let list: OfficialMember[] = cached ? JSON.parse(cached) : [];
-  list = [member, ...list.filter((x) => x.id !== member.id)];
-  localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(list));
-  localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
+  let baseList: OfficialMember[] = officialsMemoryCache ? [...officialsMemoryCache] : [];
+  if (baseList.length === 0) {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+      const parsed = cached ? JSON.parse(cached) : [];
+      if (Array.isArray(parsed)) baseList = parsed;
+    } catch {}
+  }
+  const updatedList = [member, ...baseList.filter((x) => x.id !== member.id)];
+  safeCacheOfficials(updatedList);
 }
 
 /**
@@ -176,16 +213,18 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
     throw err;
   }
 
-  // Update local cache
+  // Update in-memory + safe local cache
   officialsLastFetchedAt = Date.now();
-  const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
-  if (cached) {
+  let baseList: OfficialMember[] = officialsMemoryCache ? [...officialsMemoryCache] : [];
+  if (baseList.length === 0) {
     try {
-      const list: OfficialMember[] = JSON.parse(cached);
-      const updated = list.filter((x) => x.id !== id);
-      localStorage.setItem(CACHE_KEY_OFFICIALS, JSON.stringify(updated));
-      localStorage.setItem(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
+      const cached = localStorage.getItem(CACHE_KEY_OFFICIALS);
+      const parsed = cached ? JSON.parse(cached) : [];
+      if (Array.isArray(parsed)) baseList = parsed;
     } catch {}
+  }
+  if (baseList.length > 0) {
+    safeCacheOfficials(baseList.filter((x) => x.id !== id));
   }
 }
 
@@ -206,8 +245,8 @@ export async function fetchDistrictPasswords(forceRefresh = false): Promise<Reco
     if (res.ok) {
       const sqlRes = await res.json();
       const result = sqlRes?.map || {};
-      localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(result));
-      localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
+      safeRkStorageSet(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(result));
+      safeRkStorageSet(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
       return result;
     }
   } catch (error) {
@@ -247,8 +286,8 @@ export async function updateDistrictPasswordInRtdb(district: string, newPass: st
     const cached = localStorage.getItem(CACHE_KEY_DIST_PASSWORDS);
     const map = cached ? JSON.parse(cached) : {};
     map[district] = newPass === 'AD2026' ? 'AD2026' : '__CUSTOM__';
-    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(map));
-    localStorage.setItem(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
+    safeRkStorageSet(CACHE_KEY_DIST_PASSWORDS, JSON.stringify(map));
+    safeRkStorageSet(CACHE_KEY_DIST_PASSWORDS_TS, String(Date.now()));
   } catch {}
 }
 
@@ -259,9 +298,9 @@ export function broadcastPostsUpdated(posts: AppointedPostItem[]): void {
   try {
     if (typeof localStorage !== 'undefined') {
       const json = JSON.stringify(posts);
-      localStorage.setItem(CACHE_KEY_POSTS, json);
-      localStorage.setItem(LEGACY_CACHE_KEY_POSTS, json);
-      localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(postsLastFetchedAt));
+      safeRkStorageSet(CACHE_KEY_POSTS, json);
+      safeRkStorageSet(LEGACY_CACHE_KEY_POSTS, json);
+      safeRkStorageSet(CACHE_KEY_POSTS_TIMESTAMP, String(postsLastFetchedAt));
     }
   } catch {}
   if (typeof window !== 'undefined') {
@@ -311,9 +350,9 @@ export async function fetchAppointedPosts(forceRefresh = false): Promise<Appoint
             postsLastFetchedAt = Date.now();
             try {
               const json = JSON.stringify(normalized);
-              localStorage.setItem(CACHE_KEY_POSTS, json);
-              localStorage.setItem(LEGACY_CACHE_KEY_POSTS, json);
-              localStorage.setItem(CACHE_KEY_POSTS_TIMESTAMP, String(postsLastFetchedAt));
+              safeRkStorageSet(CACHE_KEY_POSTS, json);
+              safeRkStorageSet(LEGACY_CACHE_KEY_POSTS, json);
+              safeRkStorageSet(CACHE_KEY_POSTS_TIMESTAMP, String(postsLastFetchedAt));
             } catch {}
             return normalized;
           }
@@ -430,6 +469,9 @@ export async function updatePresidentPasswordInFirebase(newPass: string): Promis
  */
 export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[]> {
   if (!forceRefresh && leadersLastFetchedAt > 0 && Date.now() - leadersLastFetchedAt < CACHE_TTL_MS) {
+    if (leadersMemoryCache && leadersMemoryCache.length > 0) {
+      return leadersMemoryCache;
+    }
     try {
       const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
       if (cached) {
@@ -453,16 +495,16 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
         const sqlRes = await sqlApiRequest<{ items: Leader[]; version?: string | number }>('/api/db/rk/leaders');
         if (Array.isArray(sqlRes?.items) && sqlRes.items.length > 0) {
           leadersLastFetchedAt = Date.now();
-          localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(sqlRes.items));
-          localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
-          if (sqlRes.version !== undefined && sqlRes.version !== null) {
-            localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(sqlRes.version));
-          }
+          safeCacheLeaders(sqlRes.items, sqlRes.version);
           return sqlRes.items;
         }
       } catch (err) {
         console.warn('SQL dynamic leaders fetch failed:', err);
       }
+    }
+
+    if (leadersMemoryCache && leadersMemoryCache.length > 0) {
+      return leadersMemoryCache;
     }
 
     leadersLastFetchedAt = Date.now();
@@ -521,9 +563,7 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
       });
       const newVer = res?.version || Date.now();
       leadersLastFetchedAt = Date.now();
-      localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
-      localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
-      localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
+      safeCacheLeaders(cleanLeaders, newVer);
       window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
       return;
     } catch (err) {
@@ -533,8 +573,6 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
 
   const newVer = Date.now();
   leadersLastFetchedAt = Date.now();
-  localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
-  localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
-  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(leadersLastFetchedAt));
+  safeCacheLeaders(cleanLeaders, newVer);
   window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
 }

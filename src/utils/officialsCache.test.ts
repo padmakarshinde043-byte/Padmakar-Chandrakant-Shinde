@@ -12,6 +12,8 @@ import {
   getPresidentPasswordFromStorageSync,
   filterAndSortDistrictOfficials,
   matchesDistrictName,
+  stripHeavyPhotosForCache,
+  safeStorageSetItem,
 } from './officialsCache';
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS } from '../data/rkMaharashtraData';
 
@@ -142,4 +144,103 @@ test('matchesDistrictName correctly matches Beed and other aliases in all variat
   assert.equal(matchesDistrictName('पुणे', 'बीड'), false);
   assert.equal(matchesDistrictName('लातूर', 'बीड'), false);
   assert.equal(matchesDistrictName('वाशीम', 'अकोला'), false);
+});
+
+test('stripHeavyPhotosForCache strips base64 data URLs > 2000 chars while preserving HTTPS URLs and metadata', () => {
+  const largeBase64 = 'data:image/jpeg;base64,' + 'A'.repeat(2500);
+  const httpsUrl = 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg';
+  const shortData = 'data:image/png;base64,SHORT';
+
+  const result = stripHeavyPhotosForCache([
+    { id: '1', name: 'A', photo: largeBase64 },
+    { id: '2', name: 'B', photo: httpsUrl },
+    { id: '3', name: 'C', photo: shortData },
+    { id: '4', name: 'D' },
+  ]);
+
+  assert.equal(result[0].photo, '');
+  assert.equal(result[0].name, 'A');
+  assert.equal(result[1].photo, httpsUrl);
+  assert.equal(result[2].photo, shortData);
+  assert.equal(result[3].photo, undefined);
+});
+
+test('safeStorageSetItem catches QuotaExceededError, evicts heavy keys, retries cleanly, and never throws', () => {
+  const data: Record<string, string> = {
+    mahasangh_dynamic_leadership_v1: 'heavy-data',
+    rk2026_officials_cache_v1: 'old-officials',
+  };
+  let quotaFull = true;
+  const evicted: string[] = [];
+
+  const mockQuotaStore = {
+    getItem(k: string) {
+      return data[k] ?? null;
+    },
+    setItem(k: string, v: string) {
+      if (quotaFull) {
+        const err = new Error("Failed to execute 'setItem' on 'Storage': Setting the value exceeded the quota.");
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      data[k] = v;
+    },
+    removeItem(k: string) {
+      evicted.push(k);
+      delete data[k];
+      quotaFull = false;
+    },
+  };
+
+  // Should succeed on retry after evicting heavy keys
+  const ok = safeStorageSetItem(mockQuotaStore, CACHE_KEY_OFFICIALS, '[{"id":"1"}]');
+  assert.equal(ok, true);
+  assert.ok(evicted.includes('mahasangh_dynamic_leadership_v1'));
+  assert.equal(data[CACHE_KEY_OFFICIALS], '[{"id":"1"}]');
+
+  // If storage remains permanently full, returns false without throwing
+  const alwaysFullStore = {
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+    removeItem: () => {},
+  };
+  assert.equal(safeStorageSetItem(alwaysFullStore, CACHE_KEY_OFFICIALS, 'x'), false);
+});
+
+test('safeStorageSetItem handles QuotaExceededError cleanly for mahasangh_applications and evicts duplicate admin cache', () => {
+  const storeData: Record<string, string> = {
+    mahasangh_admin_applications_cache_v1: 'stale-duplicate-copy',
+    rk2026_officials_cache_v1: 'stale-officials',
+  };
+  let failFirstWrite = true;
+  const storageMock = {
+    getItem(k: string) {
+      return storeData[k] ?? null;
+    },
+    setItem(k: string, v: string) {
+      if (failFirstWrite) {
+        failFirstWrite = false;
+        const err = new Error("Setting the value of 'mahasangh_applications' exceeded the quota.");
+        err.name = 'QuotaExceededError';
+        throw err;
+      }
+      storeData[k] = v;
+    },
+    removeItem(k: string) {
+      delete storeData[k];
+    },
+  };
+
+  const ok = safeStorageSetItem(
+    storageMock,
+    'mahasangh_applications',
+    JSON.stringify([{ id: 'm1', fullName: 'टेस्ट', photo: 'https://res.cloudinary.com/demo/a.jpg' }]),
+    ['mahasangh_admin_applications_cache_v1', 'rk2026_officials_cache_v1']
+  );
+
+  assert.equal(ok, true);
+  assert.equal(storeData.mahasangh_admin_applications_cache_v1, undefined);
+  assert.ok(storeData.mahasangh_applications.includes('https://res.cloudinary.com/demo/a.jpg'));
 });

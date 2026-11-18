@@ -54,7 +54,7 @@ test('getMigrationCounts and generateFullSqlDump include all 13 tables across bo
     news: [{ id: 'news-1', title: 'अधिवेशन बातमी', date: '2026-05-01', featured: true }],
     latestBanners: [{ id: 'ban-1', title: 'बॅनर', imageUrl: 'https://example.com/a.jpg', date: '2026-05-01' }],
     govOrders: [{ id: 'gr-1', title: 'शासन निर्णय', date: '2026-05-01', type: 'शासन निर्णय' }],
-    contacts: [{ id: 'con-1', name: 'सदस्य', phone: '9876543210', message: 'नमस्कार' }],
+    contacts: [{ id: 'con-1', name: 'सदस्य', phone: '9876543210', message: 'नमस्कार', photo: 'https://example.com/p.jpg' }],
     subAdmins: [{ id: 'adm-1', email: 'sub@mahasangh.in', permissions: { approveMembers: true } }],
     adminAuth: { email: 'padmakarshinde043@gmail.com', password: 'secret' },
     memberCounter: { totalApproved: 1729, lastMemberNumber: 1729 },
@@ -82,7 +82,8 @@ test('getMigrationCounts and generateFullSqlDump include all 13 tables across bo
   assert.ok(dump.includes("INSERT INTO `news`"));
   assert.ok(dump.includes("INSERT INTO `latest_banners`"));
   assert.ok(dump.includes("INSERT INTO `gov_orders`"));
-  assert.ok(dump.includes("INSERT INTO `contacts`"));
+  assert.ok(dump.includes("INSERT INTO `contacts` (`id`, `name`, `phone`, `email`, `district`, `subject`, `message`, `photo`, `created_at`)"));
+  assert.ok(dump.includes("https://example.com/p.jpg"));
   assert.ok(dump.includes("INSERT INTO `sub_admins`"));
   assert.ok(dump.includes("INSERT INTO `system_settings`"));
   assert.ok(dump.includes("INSERT INTO `site_stats`"));

@@ -211,7 +211,7 @@ export const MembershipIdCardPreview: React.FC<MembershipIdCardPreviewProps> = (
         }}
       >
         {photoSrc ? (
-          <img src={photoSrc} alt={displayName} className="w-full h-full object-cover object-top" />
+          <img key={photoSrc} src={photoSrc} alt={displayName} className="w-full h-full object-cover object-top" />
         ) : (
           <div className="text-slate-400 font-bold" style={{ fontSize: '2cqw' }}>
             फोटो

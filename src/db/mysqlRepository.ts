@@ -65,7 +65,7 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
     professional: String(row.professional || extra.professional || ''),
     status: (row.status as 'pending' | 'approved' | 'rejected') || 'pending',
     rejectReason: row.reject_reason ? String(row.reject_reason) : extra.rejectReason || undefined,
-    photo: row.photo ? String(row.photo) : extra.photo || '',
+    photo: row.photo !== null && row.photo !== undefined ? String(row.photo) : String(extra.photo || ''),
     paymentRef: row.payment_ref ? String(row.payment_ref) : extra.paymentRef || undefined,
     paymentConfirmed: Boolean(row.payment_confirmed),
     razorpayPaymentId: row.razorpay_payment_id ? String(row.razorpay_payment_id) : undefined,
@@ -260,6 +260,37 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
       JSON.stringify({ ...app, id }),
     ]
   );
+}
+
+export async function mysqlUpdateApplication(
+  id: string,
+  updates: Record<string, any>
+): Promise<MembershipApplication & Record<string, any>> {
+  const targetId = String(id || updates?.id || '').trim();
+  if (!targetId) {
+    throw new Error('सदस्य ओळख (Application ID) उपलब्ध नाही.');
+  }
+
+  const existing = await mysqlGetApplicationById(targetId);
+  const nowIso = new Date().toISOString();
+
+  const resolvedPhoto =
+    updates.photo !== undefined ? String(updates.photo || '') : String(existing?.photo || '');
+
+  const merged: Record<string, any> = {
+    ...(existing || {}),
+    ...updates,
+    id: targetId,
+    photo: resolvedPhoto,
+    createdAt: existing?.createdAt || updates.createdAt || nowIso,
+    idCardEmailSent: Boolean(existing?.idCardEmailSent || updates.idCardEmailSent),
+    welcomeEmailSent: Boolean(existing?.welcomeEmailSent || updates.welcomeEmailSent),
+    updatedAt: nowIso,
+  };
+
+  await mysqlUpsertApplication(merged);
+  const fresh = await mysqlGetApplicationById(targetId);
+  return fresh || (merged as MembershipApplication & Record<string, any>);
 }
 
 export async function mysqlTrackApplication(identifier: string): Promise<{
@@ -470,10 +501,11 @@ export async function mysqlApproveApplicationAtomic(params: {
       if (Object.keys(extraUpdates).length > 0) {
         await conn.execute(
           `UPDATE \`applications\` SET
-            payment_confirmed = ?, payment_ref = ?, razorpay_payment_id = ?, razorpay_order_id = ?,
+            photo = ?, payment_confirmed = ?, payment_ref = ?, razorpay_payment_id = ?, razorpay_order_id = ?,
             approved_by = ?, updated_at = ?, extra_json = ?
            WHERE id = ?`,
           [
+            String(merged.photo || ''),
             merged.paymentConfirmed ? 1 : 0,
             String(merged.paymentRef || ''),
             String(merged.razorpayPaymentId || ''),

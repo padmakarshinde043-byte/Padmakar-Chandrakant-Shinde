@@ -250,22 +250,25 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
   const handleEditPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhotoError('');
-    const file = e.target.files?.[0];
-    if (!file || !editingMember) return;
+    const inputEl = e.target;
+    const file = inputEl.files?.[0];
+    if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       setPhotoError('कृपया वैध फोटो फाईल (JPG किंवा PNG) निवडा.');
+      inputEl.value = '';
       return;
     }
 
     setIsUploadingPhoto(true);
     try {
       const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.75);
-      setEditingMember({ ...editingMember, photo: urlOrBase64 });
+      setEditingMember((prev) => (prev ? { ...prev, photo: urlOrBase64 } : prev));
     } catch (err: any) {
       setPhotoError('फोटो प्रोसेस करताना त्रुटी: ' + (err.message || 'Error'));
     } finally {
       setIsUploadingPhoto(false);
+      inputEl.value = '';
     }
   };
 
@@ -577,6 +580,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <div className="flex items-start gap-3">
                   {app.photo ? (
                     <img
+                      key={app.photo}
                       src={app.photo}
                       alt={app.fullName}
                       loading="lazy"
@@ -700,6 +704,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     <td className="py-3 px-3">
                       {app.photo ? (
                         <img
+                          key={app.photo}
                           src={app.photo}
                           alt={app.fullName}
                           loading="lazy"
@@ -998,6 +1003,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <div className="w-20 h-24 rounded-lg border-2 border-[#d4af37] bg-white overflow-hidden flex items-center justify-center shrink-0">
                   {editingMember.photo ? (
                     <img
+                      key={editingMember.photo}
                       src={editingMember.photo}
                       alt={editingMember.fullName}
                       className="w-full h-full object-cover"
@@ -1021,8 +1027,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     {editingMember.photo && (
                       <button
                         type="button"
-                        onClick={() => setEditingMember({ ...editingMember, photo: '' })}
-                        className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+                        disabled={isUploadingPhoto}
+                        onClick={() => {
+                          setPhotoError('');
+                          if (photoInputRef.current) photoInputRef.current.value = '';
+                          setEditingMember((prev) => (prev ? { ...prev, photo: '' } : prev));
+                        }}
+                        className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-60"
                       >
                         फोटो काढा
                       </button>
@@ -1322,11 +1333,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving}
+                  disabled={isSaving || isUploadingPhoto}
                   className="flex-1 sm:flex-none min-h-[44px] px-6 py-2.5 bg-[#df6b16] hover:bg-[#c85c0e] disabled:opacity-60 text-white font-bold rounded-xl shadow-sm flex items-center justify-center gap-2 cursor-pointer text-xs"
                 >
                   <Check className="w-4 h-4" />
-                  <span>{isSaving ? 'सेव्ह होत आहे...' : 'बदल सेव्ह करा'}</span>
+                  <span>
+                    {isUploadingPhoto ? 'फोटो अपलोड होत आहे...' : isSaving ? 'सेव्ह होत आहे...' : 'बदल सेव्ह करा'}
+                  </span>
                 </button>
               </div>
             </form>

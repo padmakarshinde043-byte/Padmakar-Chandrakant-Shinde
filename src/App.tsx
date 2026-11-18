@@ -594,8 +594,10 @@ export function App() {
     });
   };
 
-  // Admin: Full Member Edit / Update (memberNumber & all fields, syncs state, cache & Firestore)
+  // Admin: Full Member Edit / Update (memberNumber & all fields, syncs state, cache & MySQL backend)
   const handleUpdateMember = async (updatedMember: MembershipApplication) => {
+    await updateMemberInFirestore(updatedMember);
+
     setApplications((prev) => {
       const exists = prev.some((app) => app.id === updatedMember.id);
       const updated = exists
@@ -604,8 +606,6 @@ export function App() {
       safeCacheApplications(updated);
       return updated;
     });
-
-    await updateMemberInFirestore(updatedMember);
   };
 
   // Admin: Add news (Single write, sorted newest first)

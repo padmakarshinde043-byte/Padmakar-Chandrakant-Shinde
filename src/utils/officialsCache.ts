@@ -18,6 +18,56 @@ export const CACHE_KEY_PRESIDENT_PASS = 'rk2026_president_password_cache';
 
 export interface StorageLike {
   getItem: (key: string) => string | null;
+  setItem?: (key: string, value: string) => void;
+  removeItem?: (key: string) => void;
+}
+
+export function stripHeavyPhotosForCache<T extends { photo?: string }>(items: T[]): T[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => {
+    if (
+      item &&
+      typeof item.photo === 'string' &&
+      item.photo.length > 2000 &&
+      item.photo.startsWith('data:')
+    ) {
+      return { ...item, photo: '' };
+    }
+    return item;
+  });
+}
+
+export function safeStorageSetItem(
+  storage: StorageLike | null | undefined,
+  key: string,
+  value: string,
+  evictKeysOnQuota: string[] = [
+    CACHE_KEY_OFFICIALS,
+    'mahasangh_dynamic_leadership_v1',
+    'mahasangh_admin_applications_cache_v1',
+    'mahasangh_applications',
+  ]
+): boolean {
+  if (!storage || typeof storage.setItem !== 'function') return false;
+  try {
+    storage.setItem(key, value);
+    return true;
+  } catch {
+    if (typeof storage.removeItem === 'function') {
+      for (const k of evictKeysOnQuota) {
+        if (k !== key) {
+          try {
+            storage.removeItem(k);
+          } catch {}
+        }
+      }
+      try {
+        storage.setItem(key, value);
+        return true;
+      } catch {}
+    }
+    return false;
+  }
 }
 
 export function readCachedJson<T>(

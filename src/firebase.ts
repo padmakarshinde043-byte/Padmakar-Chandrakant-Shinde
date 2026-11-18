@@ -29,6 +29,7 @@ import {
   normalizeEmail,
   isSyntheticMahasanghEmail,
   pickActiveDuplicateMatch,
+  classifyGhostApplicationsToPurge,
 } from './utils/applicationCleanup';
 import {
   isSqlBackendActive,
@@ -37,6 +38,10 @@ import {
 } from './api/sqlBridge';
 import { computeNextVisitorStats } from './utils/visitorCounter';
 import { toEnglishDigits } from './utils/formatters';
+import {
+  safeStorageSetItem,
+  stripHeavyPhotosForCache,
+} from './utils/officialsCache';
 
 // Firebase stubs for complete backwards compatibility
 export function getPreviewDb(): null {
@@ -115,7 +120,7 @@ export function safeStorageGet(key: string): string | null {
 export function safeStorageSet(key: string, val: string): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, val);
+      safeStorageSetItem(localStorage, key, val);
     }
   } catch {}
 }
@@ -137,15 +142,28 @@ export function cleanForFirestore<T extends Record<string, any>>(obj: T): Record
 export function safeCacheApplications(apps: MembershipApplication[]): void {
   try {
     if (typeof localStorage === 'undefined' || !Array.isArray(apps)) return;
-    const lightweightApps = apps.map((app) => {
-      if (app.photo && app.photo.length > 2000 && app.photo.startsWith('data:image')) {
-        const { photo, ...rest } = app;
-        return rest;
-      }
-      return app;
-    });
-    safeStorageSet(APPLICATIONS_STORAGE_KEY, JSON.stringify(lightweightApps));
-    safeStorageSet(ADMIN_APPS_CACHE_KEY, JSON.stringify(lightweightApps));
+    // Remove legacy duplicate copy immediately to free ~1.5-2 MB of quota
+    try {
+      localStorage.removeItem(ADMIN_APPS_CACHE_KEY);
+    } catch {}
+
+    const lightweightApps = stripHeavyPhotosForCache(apps);
+    const serialized = JSON.stringify(lightweightApps);
+    const saved = safeStorageSetItem(localStorage, APPLICATIONS_STORAGE_KEY, serialized, [
+      ADMIN_APPS_CACHE_KEY,
+      'mahasangh_dynamic_leadership_v1',
+      'rk2026_officials_cache_v1',
+    ]);
+
+    if (!saved && lightweightApps.length > 400) {
+      // Full dataset stays in memoryAppsCache; keep a bounded fallback slice on disk if storage is tiny
+      safeStorageSetItem(
+        localStorage,
+        APPLICATIONS_STORAGE_KEY,
+        JSON.stringify(lightweightApps.slice(0, 400)),
+        [ADMIN_APPS_CACHE_KEY, 'mahasangh_dynamic_leadership_v1', 'rk2026_officials_cache_v1']
+      );
+    }
   } catch (err) {
     console.warn('safeCacheApplications notice:', err);
   }
@@ -514,6 +532,8 @@ export async function saveApplicationToFirestore(app: MembershipApplication): Pr
       method: 'POST',
       body: JSON.stringify(cleaned),
     });
+    syncSingleMemberInCaches(cleaned);
+    window.dispatchEvent(new Event('mahasangh_apps_updated'));
     return;
   }
 
@@ -531,9 +551,13 @@ export async function trackSingleApplicationDetailed(
 
   if (await isSqlBackendActive()) {
     try {
-      return await sqlApiRequest<{ app: MembershipApplication | null; verifiedFromServer: boolean }>(
+      const res = await sqlApiRequest<{ app: MembershipApplication | null; verifiedFromServer: boolean }>(
         `/api/db/applications/track?q=${encodeURIComponent(term)}`
       );
+      if (res?.app && memoryAppsCache && memoryAppsCache.length > 0) {
+        syncSingleMemberInCaches(res.app);
+      }
+      return res;
     } catch (e) {
       console.warn('SQL track query error:', e);
     }
@@ -594,18 +618,29 @@ export async function findExistingApplicationInFirestore(params: {
 }
 
 export async function updateMemberInFirestore(member: MembershipApplication): Promise<void> {
+  approvedMembersCache = null;
   approvedMembersLastFetchedAt = 0;
   registeredCountCache = null;
+
   if (await isSqlBackendActive()) {
-    await sqlApiRequest(`/api/db/applications/${encodeURIComponent(member.id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(member),
-    });
+    const res = await sqlApiRequest<{ status?: string; application?: MembershipApplication }>(
+      `/api/db/applications/${encodeURIComponent(member.id)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(member),
+      }
+    );
+    const savedMember = res?.application ? res.application : member;
+    syncSingleMemberInCaches(savedMember);
+    window.dispatchEvent(new Event('mahasangh_apps_updated'));
     return;
   }
 
   const current = loadLocalApplications();
-  const updated = current.map((a) => (a.id === member.id ? { ...a, ...member } : a));
+  const exists = current.some((a) => a.id === member.id);
+  const updated = exists
+    ? current.map((a) => (a.id === member.id ? { ...a, ...member } : a))
+    : [member, ...current];
   persistLocalApplications(updated);
   window.dispatchEvent(new Event('mahasangh_apps_updated'));
 }
@@ -616,22 +651,30 @@ export async function approveApplicationInFirestore(
   paymentId?: string,
   approvedBy?: string
 ): Promise<void> {
+  approvedMembersCache = null;
   approvedMembersLastFetchedAt = 0;
   registeredCountCache = null;
   if (await isSqlBackendActive()) {
-    await sqlApiRequest('/api/db/applications/approve-atomic', {
-      method: 'POST',
-      body: JSON.stringify({
-        appId,
-        applicationId: appId,
-        approvedBy: approvedBy || 'Admin',
-        extraUpdates: {
-          memberNumber,
-          ...(paymentId ? { paymentRef: paymentId, razorpayPaymentId: paymentId } : {}),
-          paymentConfirmed: true,
-        },
-      }),
-    });
+    const res = await sqlApiRequest<{ application?: MembershipApplication }>(
+      '/api/db/applications/approve-atomic',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          appId,
+          applicationId: appId,
+          approvedBy: approvedBy || 'Admin',
+          extraUpdates: {
+            memberNumber,
+            ...(paymentId ? { paymentRef: paymentId, razorpayPaymentId: paymentId } : {}),
+            paymentConfirmed: true,
+          },
+        }),
+      }
+    );
+    if (res?.application) {
+      syncSingleMemberInCaches(res.application);
+      window.dispatchEvent(new Event('mahasangh_apps_updated'));
+    }
     return;
   }
 
@@ -658,6 +701,7 @@ export async function rejectApplicationInFirestore(
   rejectReason?: string,
   rejectedBy?: string
 ): Promise<void> {
+  approvedMembersCache = null;
   approvedMembersLastFetchedAt = 0;
   registeredCountCache = null;
   const reason = rejectReason || '';
@@ -667,6 +711,23 @@ export async function rejectApplicationInFirestore(
       method: 'POST',
       body: JSON.stringify({ rejectedBy: by, rejectReason: reason }),
     });
+    const current = loadLocalApplications();
+    if (current.some((a) => a.id === appId)) {
+      persistLocalApplications(
+        current.map((a) =>
+          a.id === appId
+            ? {
+                ...a,
+                status: 'rejected' as const,
+                rejectedBy: by,
+                rejectReason: reason,
+                rejectedAt: new Date().toISOString(),
+              }
+            : a
+        )
+      );
+      window.dispatchEvent(new Event('mahasangh_apps_updated'));
+    }
     return;
   }
 
@@ -763,6 +824,7 @@ export async function approveApplicationAtomicInFirestore(params: {
   message: string;
   alreadyApproved?: boolean;
 }> {
+  approvedMembersCache = null;
   approvedMembersLastFetchedAt = 0;
   registeredCountCache = null;
   const targetId = params.applicationId || params.appId || '';
@@ -771,6 +833,10 @@ export async function approveApplicationAtomicInFirestore(params: {
       method: 'POST',
       body: JSON.stringify({ ...params, appId: params.appId || targetId, applicationId: targetId }),
     });
+    if (res?.application) {
+      syncSingleMemberInCaches(res.application);
+      window.dispatchEvent(new Event('mahasangh_apps_updated'));
+    }
     return res;
   }
 
@@ -941,10 +1007,18 @@ export async function getRegisteredMembersCountOncePerSession(): Promise<number>
 
 export function addApprovedMemberToCache(app: MembershipApplication): void {
   const current = loadLocalApplications();
-  const updated = [app, ...current.filter((a) => a.id !== app.id)];
+  const exists = current.some((a) => a.id === app.id);
+  const updated = exists ? current.map((a) => (a.id === app.id ? app : a)) : [app, ...current];
   persistLocalApplications(updated);
   if (approvedMembersCache) {
-    approvedMembersCache = [app, ...approvedMembersCache.filter((a) => a.id !== app.id)];
+    if (app.status === 'approved') {
+      const inApproved = approvedMembersCache.some((a) => a.id === app.id);
+      approvedMembersCache = inApproved
+        ? approvedMembersCache.map((a) => (a.id === app.id ? app : a))
+        : [app, ...approvedMembersCache];
+    } else {
+      approvedMembersCache = approvedMembersCache.filter((a) => a.id !== app.id);
+    }
     approvedMembersLastFetchedAt = Date.now();
     registeredCountCache = approvedMembersCache.length;
   } else {
@@ -1340,6 +1414,13 @@ export async function resequenceAllApprovedMembersInFirestore(): Promise<{ count
 }
 
 export async function resetMemberCounterToActualHighest(): Promise<{ highestSeq: number; message: string }> {
+  if (await isSqlBackendActive()) {
+    return await sqlApiRequest<{ highestSeq: number; message: string }>(
+      '/api/db/applications/reset-counter',
+      { method: 'POST' }
+    );
+  }
+
   const apps = loadLocalApplications();
   const highest = extractHighestMemberSeq(apps);
   return { highestSeq: highest, message: `सदस्य काऊंटर मूळ सर्वोच्च क्रमांकावर (${highest}) रिसेट केला.` };
@@ -1349,5 +1430,36 @@ export async function purgeDeletedAndGhostApplicationsInFirestore(): Promise<{
   purgedCount: number;
   message: string;
 }> {
-  return { purgedCount: 0, message: 'सर्व अर्ज व्यवस्थित आहेत.' };
+  approvedMembersCache = null;
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
+
+  if (await isSqlBackendActive()) {
+    const res = await sqlApiRequest<{ totalDeleted?: number; message?: string }>(
+      '/api/db/applications/purge-ghosts',
+      { method: 'POST' }
+    );
+    memoryAppsCache = null;
+    window.dispatchEvent(new Event('mahasangh_apps_updated'));
+    return {
+      purgedCount: Number(res?.totalDeleted || 0),
+      message: res?.message || 'डेटाबेस स्वच्छता पूर्ण झाली.',
+    };
+  }
+
+  const current = loadLocalApplications();
+  const docs = current.map((a) => ({ ...a, docId: a.id }));
+  const classification = classifyGhostApplicationsToPurge(docs);
+  const deleteIds = new Set(classification.toDelete.map((d) => d.docId));
+  if (deleteIds.size > 0) {
+    persistLocalApplications(current.filter((a) => !deleteIds.has(a.id)));
+    window.dispatchEvent(new Event('mahasangh_apps_updated'));
+  }
+  return {
+    purgedCount: deleteIds.size,
+    message:
+      deleteIds.size > 0
+        ? `✓ स्वच्छता पूर्ण! एकूण ${deleteIds.size} नाकारलेले/दुबार/अपूर्ण अर्ज काढले गेले.`
+        : 'सर्व अर्ज व्यवस्थित आहेत.',
+  };
 }

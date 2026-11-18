@@ -265,7 +265,7 @@ export function generateFullSqlDump(
     lines.push(
       buildUpsertSql(
         'contacts',
-        ['id', 'name', 'phone', 'email', 'district', 'subject', 'message', 'created_at'],
+        ['id', 'name', 'phone', 'email', 'district', 'subject', 'message', 'photo', 'created_at'],
         [
           String(contact.id),
           String(contact.name || ''),
@@ -274,6 +274,7 @@ export function generateFullSqlDump(
           String(contact.district || ''),
           String(contact.subject || ''),
           String(contact.message || ''),
+          String(contact.photo || ''),
           String(contact.createdAt || ''),
         ]
       )

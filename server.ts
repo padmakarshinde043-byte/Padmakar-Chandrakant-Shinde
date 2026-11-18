@@ -27,6 +27,7 @@ import {
   mysqlCountApprovedMembers,
   mysqlGetApplicationById,
   mysqlUpsertApplication,
+  mysqlUpdateApplication,
   mysqlTrackApplication,
   mysqlFindExistingApplication,
   mysqlFindApplicationForPayment,
@@ -1927,7 +1928,19 @@ app.get('/api/db/applications/track', async (req, res) => {
   try {
     const q = String(req.query.q || '');
     const result = await mysqlTrackApplication(q);
-    res.json(result);
+    sendFreshJson(req, res, result);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.put('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
+  try {
+    if (!isMysqlActive()) {
+      return sendFreshJson(req, res, { status: 'success', application: { ...(req.body || {}), id: req.params.id } });
+    }
+    const application = await mysqlUpdateApplication(req.params.id, req.body || {});
+    sendFreshJson(req, res, { status: 'success', application });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2176,6 +2189,49 @@ app.delete('/api/db/sub-admins/:id', requireAdminOrSubAdmin('manageAdmins'), asy
   try {
     await mysqlDeleteSubAdmin(req.params.id);
     res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/sub-admins/change-password', async (req, res) => {
+  try {
+    const targetEmail = String(req.body?.email || '').trim().toLowerCase();
+    const newPassword = String(req.body?.newPassword || '').trim();
+    if (!targetEmail || !newPassword || newPassword.length < 4) {
+      return res.status(400).json({ status: 'error', message: 'ई-मेल व किमान 4 अक्षरांचा नवीन पासवर्ड आवश्यक आहे.' });
+    }
+
+    const session = extractRequestSession(req);
+    const isAdminAllowed =
+      session &&
+      (session.role === 'super_admin' ||
+        (session.role === 'sub_admin' &&
+          (Boolean(session.permissions?.manageAdmins) ||
+            String(session.email || '').trim().toLowerCase() === targetEmail)));
+
+    if (!isAdminAllowed) {
+      const subAdmins = await getServerSubAdminsUnified();
+      const matching = subAdmins.find(
+        (a) => String(a.email || '').trim().toLowerCase() === targetEmail
+      );
+      if (!matching || (!matching.isFirstLogin && Boolean(matching.password))) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'पासवर्ड बदलण्यासाठी आवश्यक परवानगी नाही.',
+        });
+      }
+    }
+
+    if (isMysqlActive()) {
+      const updatedUser = await mysqlUpdateSubAdminPassword(targetEmail, newPassword);
+      if (!updatedUser) {
+        return res.status(404).json({ status: 'error', message: 'सब-ॲडमिन खाते सापडले नाही.' });
+      }
+      return res.json({ status: 'success', user: updatedUser });
+    }
+
+    return res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }

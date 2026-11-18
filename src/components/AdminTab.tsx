@@ -64,6 +64,7 @@ import {
   saveAppointedPostsToRtdb,
   updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
+import { safeStorageSetItem } from '../utils/officialsCache';
 import {
   CACHE_KEY_POSTS,
   LEGACY_CACHE_KEY_POSTS,
@@ -380,8 +381,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setPostsList(data);
         setHasUnsavedPostChanges(false);
         const json = JSON.stringify(data);
-        localStorage.setItem(LEGACY_CACHE_KEY_POSTS, json);
-        localStorage.setItem(CACHE_KEY_POSTS, json);
+        safeStorageSetItem(typeof localStorage !== 'undefined' ? localStorage : null, LEGACY_CACHE_KEY_POSTS, json);
+        safeStorageSetItem(typeof localStorage !== 'undefined' ? localStorage : null, CACHE_KEY_POSTS, json);
       }
     } catch (err) {
       console.warn('Failed to load appointed posts:', err);
@@ -1334,7 +1335,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       if (remote && remote.length > 0) {
         const normalized = normalizeDynamicLeadersList(remote);
         setDynamicLeaders(normalized);
-        localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(normalized));
+        safeStorageSetItem(typeof localStorage !== 'undefined' ? localStorage : null, DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(normalized));
       }
     }).catch(() => {});
   }, []);
@@ -7777,7 +7778,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     if (freshLeaders && freshLeaders.length > 0) {
                       const normalized = normalizeDynamicLeadersList(freshLeaders);
                       setDynamicLeaders(normalized);
-                      localStorage.setItem(DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(normalized));
+                      safeStorageSetItem(typeof localStorage !== 'undefined' ? localStorage : null, DYNAMIC_LEADERSHIP_STORAGE_KEY, JSON.stringify(normalized));
                     }
                   } catch (e) {
                     console.warn('Post-restore refresh warning:', e);
@@ -8279,7 +8280,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       {/* ============================================================== */}
       {/* Official Lifetime Membership ID Card Modal Preview             */}
       {/* ============================================================== */}
-      {certModalApp && (
+      {certModalApp && (() => {
+        const activeCertApp = applications.find((a) => a.id === certModalApp.id) || certModalApp;
+        return (
         <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
           onClick={() => setCertModalApp(null)}
@@ -8305,13 +8308,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
             <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
               <div className="flex justify-center">
-                <MembershipIdCardPreview app={certModalApp} photoFallbackUrl="" />
+                <MembershipIdCardPreview app={activeCertApp} photoFallbackUrl="" />
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-2.5 pt-2">
                 <button
                   type="button"
-                  onClick={() => generateMembershipIdCardPdf(certModalApp)}
+                  onClick={() => generateMembershipIdCardPdf(activeCertApp)}
                   className="min-h-[46px] bg-[#0b1e36] hover:bg-[#193568] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md cursor-pointer"
                 >
                   <Download className="w-4 h-4 text-[#efb24b]" />
@@ -8328,7 +8331,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ============================================================== */}
       {/* Razorpay Excel Auto-Approve Match Modal                          */}
