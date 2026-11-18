@@ -46,7 +46,8 @@ export interface MembershipApplication {
   createdAt: string;
   approvedAt?: string;
   paymentRef?: string;
-  photo?: string; // Passport photo DataURL / Base64 under 200KB
+  photo?: string; // Passport photo DataURL / Base64 under 200KB or Cloudinary URL
+  hasPhoto?: boolean; // Set in lite admin list when legacy Base64 photo is stored on server
   isOfficial?: boolean; // आपण सध्या संघटनेचे पदाधिकारी आहात काय?
   officialPost?: string; // संघटनेतील पद
   officialDistrict?: string;

@@ -51,7 +51,10 @@ import {
   addApprovedMemberToCache,
   resequenceAllApprovedMembersInFirestore,
   resetMemberCounterToActualHighest,
-  purgeDeletedAndGhostApplicationsInFirestore
+  purgeDeletedAndGhostApplicationsInFirestore,
+  fetchApplicationPhotosBatch,
+  fetchSingleApplicationForAdmin,
+  fetchApprovedApplicationsWithPhotosByDistricts
 } from '../firebase';
 import { generateMembershipIdCardPdf, generateDistrictBatchIdCardsPdf } from '../services/rkPdfGenerator';
 import { compressImageFile } from '../utils/imageCompressor';
@@ -537,11 +540,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handleGenerateBatchPrintPdf = async () => {
     setIsGeneratingBatchPrint(true);
-    setBatchPrintProgressMsg('आय-कार्ड पीडीएफ तयार करत आहे...');
+    setBatchPrintProgressMsg('जिल्ह्यातील सदस्यांची माहिती व फोटो लोड करत आहे...');
     try {
+      const fullDistrictApps = await fetchApprovedApplicationsWithPhotosByDistricts([batchPrintDistrict]);
       await generateDistrictBatchIdCardsPdf(
         batchPrintDistrict,
-        applications,
+        fullDistrictApps,
         (msg) => setBatchPrintProgressMsg(msg)
       );
       showAdminFeedback(`'${batchPrintDistrict}' जिल्ह्यातील सर्व सदस्यांचे आय-कार्ड पीडीएफ यशस्वीरीत्या डाऊनलोड झाले!`, 'success');
@@ -564,32 +568,33 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    const approvedWithPhotos = applications.filter(
-      (m) =>
-        m.status === 'approved' &&
-        m.photo &&
-        passportPhotoDistricts.includes(m.district || '')
-    );
-
-    if (approvedWithPhotos.length === 0) {
-      alert('निवडलेल्या जिल्ह्यांमध्ये एकही फोटो उपलब्ध असलेला मंजूर सदस्य आढळला नाही.');
-      return;
-    }
-
     setIsGeneratingPassportZip(true);
-    setPassportZipProgressMsg('ZIP फाईल तयार होत आहे...');
+    setPassportZipProgressMsg('निवडलेल्या जिल्ह्यांमधील फोटो लोड करत आहे...');
 
     try {
+      const approvedWithPhotos = await fetchApprovedApplicationsWithPhotosByDistricts(passportPhotoDistricts);
+      const validPhotosList = approvedWithPhotos.filter(
+        (m) => m.status === 'approved' && Boolean(m.photo && m.photo.trim())
+      );
+
+      if (validPhotosList.length === 0) {
+        alert('निवडलेल्या जिल्ह्यांमध्ये एकही फोटो उपलब्ध असलेला मंजूर सदस्य आढळला नाही.');
+        setIsGeneratingPassportZip(false);
+        setPassportZipProgressMsg('');
+        return;
+      }
+
+      setPassportZipProgressMsg('ZIP फाईल तयार होत आहे...');
       const zip = new JSZip();
       const folder = zip.folder('mahasangh_passport_photos');
       if (!folder) throw new Error('ZIP folder creation failed');
 
       let processedCount = 0;
 
-      for (const member of approvedWithPhotos) {
+      for (const member of validPhotosList) {
         processedCount++;
         setPassportZipProgressMsg(
-          `फोटो प्रक्रिया करत आहे (${toEnglishDigits(String(processedCount))}/${toEnglishDigits(String(approvedWithPhotos.length))}): ${member.fullName}`
+          `फोटो प्रक्रिया करत आहे (${toEnglishDigits(String(processedCount))}/${toEnglishDigits(String(validPhotosList.length))}): ${member.fullName}`
         );
 
         try {
@@ -2653,6 +2658,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   });
 
   const visibleFilteredApps = filteredApps.slice(0, appsVisibleCount);
+
+  const requestedPhotoIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (activeAdminSubTab !== 'applications' || !isLoggedIn) return;
+    const missingPhotoIds = visibleFilteredApps
+      .filter((app) => !app.photo && app.hasPhoto && !requestedPhotoIdsRef.current.has(app.id))
+      .map((app) => app.id);
+    if (missingPhotoIds.length === 0) return;
+    missingPhotoIds.forEach((id) => requestedPhotoIdsRef.current.add(id));
+    fetchApplicationPhotosBatch(missingPhotoIds)
+      .then((photos) => {
+        if (photos && Object.keys(photos).length > 0) {
+          window.dispatchEvent(new CustomEvent('mahasangh_app_photos_hydrated', { detail: photos }));
+        }
+      })
+      .catch(() => {});
+  }, [visibleFilteredApps, activeAdminSubTab, isLoggedIn]);
 
   const totalCount = applications.length;
   const approvedCount = applications.filter((a) => a.status === 'approved').length;

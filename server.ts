@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -9,7 +10,6 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import fs from 'fs';
 import path from 'path';
-import zlib from 'zlib';
 import dns from 'dns/promises';
 import { isPrivateOrReservedIpAddress, isSafeExternalImageProxyUrl } from './src/utils/pdfImageSafety';
 type Firestore = any;
@@ -23,6 +23,9 @@ import { computeNextVisitorStats } from './src/utils/visitorCounter';
 import { ensureMysqlSchema, isMysqlActive, isMysqlConfigured, runMysqlSchemaAuditAndHeal } from './src/db/mysqlPool';
 import {
   mysqlListApplications,
+  mysqlListApplicationsAdminLite,
+  mysqlGetApplicationPhotosByIds,
+  mysqlListApprovedApplicationsWithPhotosByDistricts,
   mysqlListApprovedDirectory,
   mysqlCountApprovedMembers,
   mysqlGetApplicationById,
@@ -835,6 +838,9 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma'],
   })
 );
+
+// Enable fast gzip compression for all API JSON payloads and Vite dist assets
+app.use(compression({ threshold: 1024 }));
 
 const rateLimitMessage = {
   status: 'error',
@@ -1673,6 +1679,7 @@ app.post('/api/backup/restore', requireSuperAdmin, async (req, res) => {
       firestoreDb: getServerFirestore(true),
       createdBy: session?.email || 'super_admin',
     });
+    invalidateReadCache('');
 
     res.json({
       status: 'success',
@@ -1833,40 +1840,74 @@ app.post('/api/whatsapp/broadcast', requireSuperAdmin, async (req, res) => {
   }
 });
 
-function sendFreshJson(req: express.Request, res: express.Response, payload: unknown): void {
+const READ_CACHE_TTL_MS = 20_000;
+const serverReadCache = new Map<string, { value: unknown; expiresAt: number }>();
+const serverReadInFlight = new Map<string, Promise<unknown>>();
+
+function invalidateReadCache(prefix: string): void {
+  if (!prefix) {
+    serverReadCache.clear();
+    return;
+  }
+  for (const key of Array.from(serverReadCache.keys())) {
+    if (key.startsWith(prefix)) {
+      serverReadCache.delete(key);
+    }
+  }
+}
+
+async function getCachedOrFetch<T>(
+  key: string,
+  bypass: boolean,
+  loader: () => Promise<T>,
+  ttlMs = READ_CACHE_TTL_MS
+): Promise<T> {
+  const now = Date.now();
+  if (!bypass) {
+    const hit = serverReadCache.get(key);
+    if (hit && hit.expiresAt > now) {
+      return hit.value as T;
+    }
+    const existingInFlight = serverReadInFlight.get(key);
+    if (existingInFlight) {
+      return (await existingInFlight) as T;
+    }
+  }
+
+  const run = loader()
+    .then((val) => {
+      serverReadCache.set(key, { value: val, expiresAt: Date.now() + ttlMs });
+      return val;
+    })
+    .finally(() => {
+      serverReadInFlight.delete(key);
+    });
+
+  serverReadInFlight.set(key, run);
+  return run;
+}
+
+function sendFreshJson(_req: express.Request, res: express.Response, payload: unknown): void {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-
-  const jsonStr = JSON.stringify(payload);
-  const acceptEncoding = String(req.headers['accept-encoding'] || '');
-  if (jsonStr.length >= 1024 && /\bgzip\b/i.test(acceptEncoding)) {
-    zlib.gzip(Buffer.from(jsonStr, 'utf-8'), (err, compressed) => {
-      if (err) {
-        res.type('application/json; charset=utf-8').send(jsonStr);
-        return;
-      }
-      res.setHeader('Content-Encoding', 'gzip');
-      res.setHeader('Vary', 'Accept-Encoding');
-      res.type('application/json; charset=utf-8').send(compressed);
-    });
-    return;
-  }
-  res.type('application/json; charset=utf-8').send(jsonStr);
+  res.json(payload);
 }
 
 app.get('/api/db/applications/approved-directory', async (req, res) => {
   try {
-    const list = await mysqlListApprovedDirectory();
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const list = await getCachedOrFetch('apps:approved-dir', bypass, () => mysqlListApprovedDirectory());
     sendFreshJson(req, res, { items: list });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.get('/api/db/applications/approved-count', async (_req, res) => {
+app.get('/api/db/applications/approved-count', async (req, res) => {
   try {
-    const count = await mysqlCountApprovedMembers();
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const count = await getCachedOrFetch('apps:approved-count', bypass, () => mysqlCountApprovedMembers());
     res.setHeader('Cache-Control', 'no-store');
     res.json({ count });
   } catch (err: any) {
@@ -1878,6 +1919,9 @@ app.get('/api/db/applications', async (req, res) => {
   try {
     const onlyApproved = req.query.status === 'approved';
     const isSummary = req.query.summary === '1' || req.query.summary === 'true';
+    const isLite = req.query.lite === '1' || req.query.lite === 'true';
+    const withPhotos = req.query.withPhotos === '1' || req.query.withPhotos === 'true';
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
 
     if (!(onlyApproved && isSummary)) {
       const session = extractRequestSession(req);
@@ -1899,11 +1943,41 @@ app.get('/api/db/applications', async (req, res) => {
       }
     }
 
-    const list =
-      onlyApproved && isSummary
-        ? await mysqlListApprovedDirectory()
-        : await mysqlListApplications(onlyApproved);
+    if (withPhotos) {
+      const rawDistricts = typeof req.query.districts === 'string' ? req.query.districts : '';
+      const districts = rawDistricts
+        .split(',')
+        .map((d) => d.trim())
+        .filter(Boolean);
+      const list = await mysqlListApprovedApplicationsWithPhotosByDistricts(districts);
+      sendFreshJson(req, res, { items: list });
+      return;
+    }
+
+    if (onlyApproved && isSummary) {
+      const list = await getCachedOrFetch('apps:approved-dir', bypass, () => mysqlListApprovedDirectory());
+      sendFreshJson(req, res, { items: list });
+      return;
+    }
+
+    const cacheKey = isLite
+      ? `apps:lite:${onlyApproved ? 'approved' : 'all'}`
+      : `apps:full:${onlyApproved ? 'approved' : 'all'}`;
+
+    const list = await getCachedOrFetch(cacheKey, bypass, () =>
+      isLite ? mysqlListApplicationsAdminLite(onlyApproved) : mysqlListApplications(onlyApproved)
+    );
     sendFreshJson(req, res, { items: list });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/applications/photos-batch', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.map((v: any) => String(v || '')) : [];
+    const photos = await mysqlGetApplicationPhotosByIds(ids);
+    sendFreshJson(req, res, { photos });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -1941,6 +2015,7 @@ app.post('/api/db/applications', appSubmitLimiter, async (req, res) => {
     }
 
     await mysqlUpsertApplication(payload);
+    invalidateReadCache('apps:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -1957,12 +2032,25 @@ app.get('/api/db/applications/track', async (req, res) => {
   }
 });
 
+app.get('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
+  try {
+    const application = await mysqlGetApplicationById(req.params.id);
+    if (!application) {
+      return res.status(404).json({ status: 'error', message: 'अर्ज सापडला नाही.' });
+    }
+    sendFreshJson(req, res, { status: 'success', application });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
 app.put('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
   try {
     if (!isMysqlActive()) {
       return sendFreshJson(req, res, { status: 'success', application: { ...(req.body || {}), id: req.params.id } });
     }
     const application = await mysqlUpdateApplication(req.params.id, req.body || {});
+    invalidateReadCache('apps:');
     sendFreshJson(req, res, { status: 'success', application });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2003,6 +2091,7 @@ app.post('/api/db/applications/approve-atomic', async (req, res) => {
     }
 
     const result = await mysqlApproveApplicationAtomic(body);
+    invalidateReadCache('apps:');
     if (result && result.application && !result.application.welcomeEmailSent) {
       sendApprovalCongratulatoryEmail(result.application, req).catch((err) => {
         console.warn('Auto approval congratulatory email notice:', err?.message || err);
@@ -2017,6 +2106,7 @@ app.post('/api/db/applications/approve-atomic', async (req, res) => {
 app.post('/api/db/applications/:id/reject', requireAdminOrSubAdmin('approveMembers'), async (req, res) => {
   try {
     await mysqlRejectApplication(req.params.id, String(req.body?.reason || ''));
+    invalidateReadCache('apps:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2026,6 +2116,7 @@ app.post('/api/db/applications/:id/reject', requireAdminOrSubAdmin('approveMembe
 app.delete('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (req, res) => {
   try {
     const result = await mysqlDeleteApplication(req.params.id, req.body || {});
+    invalidateReadCache('apps:');
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2034,7 +2125,9 @@ app.delete('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers',
 
 app.post('/api/db/applications/resequence', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (_req, res) => {
   try {
-    res.json(await mysqlResequenceApproved());
+    const out = await mysqlResequenceApproved();
+    invalidateReadCache('apps:');
+    res.json(out);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2042,7 +2135,9 @@ app.post('/api/db/applications/resequence', requireAdminOrSubAdmin(['approveMemb
 
 app.post('/api/db/applications/reset-counter', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (_req, res) => {
   try {
-    res.json(await mysqlResetMemberCounter());
+    const out = await mysqlResetMemberCounter();
+    invalidateReadCache('apps:');
+    res.json(out);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2050,7 +2145,9 @@ app.post('/api/db/applications/reset-counter', requireAdminOrSubAdmin(['approveM
 
 app.post('/api/db/applications/purge-ghosts', requireAdminOrSubAdmin(['approveMembers', 'editMembers']), async (_req, res) => {
   try {
-    res.json(await mysqlPurgeGhostApplications());
+    const out = await mysqlPurgeGhostApplications();
+    invalidateReadCache('apps:');
+    res.json(out);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2081,9 +2178,11 @@ app.post('/api/db/member-counter/sync', requireAdminOrSubAdmin(['approveMembers'
   }
 });
 
-app.get('/api/db/news', async (_req, res) => {
+app.get('/api/db/news', async (req, res) => {
   try {
-    res.json({ items: await mysqlListNews() });
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const items = await getCachedOrFetch('news:list', bypass, () => mysqlListNews());
+    sendFreshJson(req, res, { items });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2092,6 +2191,7 @@ app.get('/api/db/news', async (_req, res) => {
 app.post('/api/db/news', requireAdminOrSubAdmin('manageNews'), async (req, res) => {
   try {
     await mysqlSaveNews(req.body);
+    invalidateReadCache('news:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2101,15 +2201,18 @@ app.post('/api/db/news', requireAdminOrSubAdmin('manageNews'), async (req, res) 
 app.delete('/api/db/news/:id', requireAdminOrSubAdmin('manageNews'), async (req, res) => {
   try {
     await mysqlDeleteNews(req.params.id);
+    invalidateReadCache('news:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.get('/api/db/latest-banners', async (_req, res) => {
+app.get('/api/db/latest-banners', async (req, res) => {
   try {
-    res.json({ items: await mysqlListLatestBanners() });
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const items = await getCachedOrFetch('banners:list', bypass, () => mysqlListLatestBanners());
+    sendFreshJson(req, res, { items });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2118,6 +2221,7 @@ app.get('/api/db/latest-banners', async (_req, res) => {
 app.post('/api/db/latest-banners', requireAdminOrSubAdmin('manageLatestBanners'), async (req, res) => {
   try {
     await mysqlSaveLatestBanner(req.body);
+    invalidateReadCache('banners:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2127,15 +2231,18 @@ app.post('/api/db/latest-banners', requireAdminOrSubAdmin('manageLatestBanners')
 app.delete('/api/db/latest-banners/:id', requireAdminOrSubAdmin('manageLatestBanners'), async (req, res) => {
   try {
     await mysqlDeleteLatestBanner(req.params.id);
+    invalidateReadCache('banners:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.get('/api/db/gov-orders', async (_req, res) => {
+app.get('/api/db/gov-orders', async (req, res) => {
   try {
-    res.json({ items: await mysqlListGovOrders() });
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const items = await getCachedOrFetch('gov:list', bypass, () => mysqlListGovOrders());
+    sendFreshJson(req, res, { items });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2144,6 +2251,7 @@ app.get('/api/db/gov-orders', async (_req, res) => {
 app.post('/api/db/gov-orders', requireAdminOrSubAdmin('manageGovOrders'), async (req, res) => {
   try {
     await mysqlSaveGovOrder(req.body);
+    invalidateReadCache('gov:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2153,15 +2261,16 @@ app.post('/api/db/gov-orders', requireAdminOrSubAdmin('manageGovOrders'), async 
 app.delete('/api/db/gov-orders/:id', requireAdminOrSubAdmin('manageGovOrders'), async (req, res) => {
   try {
     await mysqlDeleteGovOrder(req.params.id);
+    invalidateReadCache('gov:');
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 
-app.get('/api/db/contacts', requireAdminOrSubAdmin('manageContactMessages'), async (_req, res) => {
+app.get('/api/db/contacts', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   try {
-    res.json({ items: await mysqlListContacts() });
+    sendFreshJson(req, res, { items: await mysqlListContacts() });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2304,10 +2413,14 @@ app.post('/api/db/site-stats/visit', async (req, res) => {
   }
 });
 
-app.get('/api/db/rk/leaders', async (_req, res) => {
+app.get('/api/db/rk/leaders', async (req, res) => {
   try {
-    const [items, version] = await Promise.all([mysqlListLeaders(), mysqlGetLeadershipVersion()]);
-    res.json({ items, version });
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const data = await getCachedOrFetch('leaders:list', bypass, async () => {
+      const [items, version] = await Promise.all([mysqlListLeaders(), mysqlGetLeadershipVersion()]);
+      return { items, version };
+    });
+    sendFreshJson(req, res, data);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
@@ -2316,6 +2429,7 @@ app.get('/api/db/rk/leaders', async (_req, res) => {
 app.post('/api/db/rk/leaders', requireAdminOrSubAdmin('manageLeadership'), async (req, res) => {
   try {
     const version = await mysqlSaveLeaders(Array.isArray(req.body?.leaders) ? req.body.leaders : []);
+    invalidateReadCache('leaders:');
     res.json({ status: 'success', version });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2325,7 +2439,9 @@ app.post('/api/db/rk/leaders', requireAdminOrSubAdmin('manageLeadership'), async
 app.get('/api/db/rk/officials', async (req, res) => {
   try {
     if (isMysqlActive()) {
-      sendFreshJson(req, res, { items: await mysqlListOfficials() });
+      const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+      const items = await getCachedOrFetch('officials:list', bypass, () => mysqlListOfficials());
+      sendFreshJson(req, res, { items });
       return;
     }
     sendFreshJson(req, res, { items: [...mockOfficials] });
@@ -2353,6 +2469,7 @@ app.post('/api/db/rk/officials', requireOfficialEditor, async (req, res) => {
     }
     if (isMysqlActive()) {
       await mysqlSaveOfficial(member);
+      invalidateReadCache('officials:');
     } else {
       const idx = mockOfficials.findIndex((o) => String(o.id) === String(member.id));
       if (idx >= 0) {
@@ -2386,6 +2503,7 @@ app.delete('/api/db/rk/officials/:id', requireOfficialEditor, async (req, res) =
     }
     if (isMysqlActive()) {
       await mysqlDeleteOfficial(req.params.id);
+      invalidateReadCache('officials:');
     } else {
       const idx = mockOfficials.findIndex((o) => String(o.id) === String(req.params.id));
       if (idx >= 0) mockOfficials.splice(idx, 1);
@@ -2440,7 +2558,9 @@ app.post('/api/db/rk/district-passwords', requireOfficialEditor, async (req, res
 app.get('/api/db/rk/appointed-posts', async (req, res) => {
   try {
     if (isMysqlActive()) {
-      sendFreshJson(req, res, { items: await mysqlListAppointedPosts(), backend: 'mysql' });
+      const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+      const items = await getCachedOrFetch('posts:list', bypass, () => mysqlListAppointedPosts());
+      sendFreshJson(req, res, { items, backend: 'mysql' });
       return;
     }
     sendFreshJson(req, res, { items: mockAppointedPosts ?? [], backend: 'mock' });
@@ -2476,6 +2596,7 @@ app.post('/api/db/rk/appointed-posts', requirePresidentOrSuperAdmin, async (req,
 
     if (isMysqlActive()) {
       await mysqlSetAppointedPosts(items);
+      invalidateReadCache('posts:');
     } else {
       mockAppointedPosts = items;
     }
@@ -2659,6 +2780,7 @@ app.post('/api/razorpay/verify-payment', async (req, res) => {
         orderId: razorpay_order_id,
         source: 'razorpay_checkout'
       });
+      invalidateReadCache('apps:');
       if (approvedApplication && !approvedApplication.welcomeEmailSent) {
         sendApprovalCongratulatoryEmail(approvedApplication, req).catch((e) => {
           console.warn('Verify-payment auto congratulatory email error:', e);
@@ -2746,6 +2868,7 @@ app.post('/api/razorpay/webhook', async (req, res) => {
             orderId,
             source: 'razorpay_webhook'
           });
+          invalidateReadCache('apps:');
           if (updated) {
             console.log(`✓ Application ${updated.id} approved via Webhook -> ${updated.memberNumber}`);
             if (!updated.welcomeEmailSent) {
@@ -3254,9 +3377,23 @@ async function startServer() {
   });
 
   if (!useViteDev) {
-    app.use(express.static(path.resolve(process.cwd(), 'dist')));
+    app.use(
+      express.static(path.resolve(process.cwd(), 'dist'), {
+        setHeaders: (res, filePath) => {
+          const normalized = filePath.replace(/\\/g, '/');
+          if (normalized.includes('/assets/')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          } else if (normalized.endsWith('/index.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          } else {
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+          }
+        },
+      })
+    );
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
       } else {
         next();

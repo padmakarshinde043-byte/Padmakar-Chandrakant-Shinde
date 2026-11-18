@@ -212,7 +212,9 @@ export async function fetchNewsCached(forceRefresh = false): Promise<NewsItem[]>
   const runFetch = (async (): Promise<NewsItem[]> => {
     if (await isSqlBackendActive()) {
       try {
-        const res = await sqlApiRequest<{ items: NewsItem[] }>('/api/db/news');
+        const res = await sqlApiRequest<{ items: NewsItem[] }>(
+          `/api/db/news${forceRefresh ? '?refresh=1' : ''}`
+        );
         if (Array.isArray(res?.items)) {
           const sorted = sortNewsDescending(res.items);
           newsLastFetchedAt = Date.now();
@@ -315,7 +317,9 @@ export async function fetchLatestBannersCached(forceRefresh = false): Promise<La
   const runFetch = (async (): Promise<LatestBannerItem[]> => {
     if (await isSqlBackendActive()) {
       try {
-        const res = await sqlApiRequest<{ items: LatestBannerItem[] }>('/api/db/latest-banners');
+        const res = await sqlApiRequest<{ items: LatestBannerItem[] }>(
+          `/api/db/latest-banners${forceRefresh ? '?refresh=1' : ''}`
+        );
         if (Array.isArray(res?.items)) {
           const sorted = sortLatestBannersDescending(res.items);
           bannersLastFetchedAt = Date.now();
@@ -404,7 +408,9 @@ export async function fetchGovOrders(forceRefresh = false): Promise<GovOrder[]> 
   const runFetch = (async (): Promise<GovOrder[]> => {
     if (await isSqlBackendActive()) {
       try {
-        const res = await sqlApiRequest<{ items: GovOrder[] }>('/api/db/gov-orders');
+        const res = await sqlApiRequest<{ items: GovOrder[] }>(
+          `/api/db/gov-orders${forceRefresh ? '?refresh=1' : ''}`
+        );
         if (Array.isArray(res?.items)) {
           govOrdersLastFetchedAt = Date.now();
           safeStorageSet(GOV_ORDERS_CACHE_KEY, JSON.stringify(res.items));
@@ -496,17 +502,113 @@ function persistLocalApplications(apps: MembershipApplication[]): void {
 export async function fetchApplicationsForAdmin(forceRefresh = false): Promise<MembershipApplication[]> {
   if (await isSqlBackendActive()) {
     try {
-      const data = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications');
+      const qs = forceRefresh ? '?lite=1&refresh=1' : '?lite=1';
+      const data = await sqlApiRequest<{ items: MembershipApplication[] }>(`/api/db/applications${qs}`);
       const list = Array.isArray(data?.items) ? data.items : [];
       list.sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime());
-      persistLocalApplications(list);
-      return list;
+      // Preserve any already-hydrated Base64 photos in memory for the current session
+      const existingPhotoMap = new Map<string, string>();
+      if (!forceRefresh && Array.isArray(memoryAppsCache)) {
+        for (const item of memoryAppsCache) {
+          if (item?.id && item?.photo) {
+            existingPhotoMap.set(item.id, item.photo);
+          }
+        }
+      }
+      const hydratedList =
+        existingPhotoMap.size > 0
+          ? list.map((item) =>
+              !item.photo && existingPhotoMap.has(item.id)
+                ? { ...item, photo: existingPhotoMap.get(item.id)! }
+                : item
+            )
+          : list;
+      persistLocalApplications(hydratedList);
+      return hydratedList;
     } catch (e) {
       console.warn('SQL fetch applications error:', e);
     }
   }
 
   return loadLocalApplications();
+}
+
+export async function fetchSingleApplicationForAdmin(id: string): Promise<MembershipApplication | null> {
+  const cleanId = String(id || '').trim();
+  if (!cleanId) return null;
+
+  if (await isSqlBackendActive()) {
+    try {
+      const res = await sqlApiRequest<{ application?: MembershipApplication }>(
+        `/api/db/applications/${encodeURIComponent(cleanId)}`
+      );
+      if (res?.application) {
+        syncSingleMemberInCaches(res.application);
+        return res.application;
+      }
+    } catch (e) {
+      console.warn('SQL single application fetch notice:', e);
+    }
+  }
+
+  const local = loadLocalApplications();
+  return local.find((a) => a.id === cleanId) || null;
+}
+
+export async function fetchApplicationPhotosBatch(ids: string[]): Promise<Record<string, string>> {
+  const cleanIds = Array.from(new Set((ids || []).map((v) => String(v || '').trim()).filter(Boolean))).slice(0, 60);
+  if (cleanIds.length === 0) return {};
+
+  if (await isSqlBackendActive()) {
+    try {
+      const res = await sqlApiRequest<{ photos?: Record<string, string> }>(
+        '/api/db/applications/photos-batch',
+        {
+          method: 'POST',
+          body: JSON.stringify({ ids: cleanIds }),
+        }
+      );
+      const photos = res?.photos && typeof res.photos === 'object' ? res.photos : {};
+      if (memoryAppsCache && Object.keys(photos).length > 0) {
+        memoryAppsCache = memoryAppsCache.map((app) =>
+          photos[app.id] && !app.photo ? { ...app, photo: photos[app.id], hasPhoto: true } : app
+        );
+      }
+      return photos;
+    } catch (e) {
+      console.warn('SQL batch photo fetch notice:', e);
+    }
+  }
+
+  const local = loadLocalApplications();
+  const out: Record<string, string> = {};
+  for (const app of local) {
+    if (cleanIds.includes(app.id) && app.photo) {
+      out[app.id] = app.photo;
+    }
+  }
+  return out;
+}
+
+export async function fetchApprovedApplicationsWithPhotosByDistricts(
+  districts: string[]
+): Promise<MembershipApplication[]> {
+  if (await isSqlBackendActive()) {
+    const qs =
+      districts && districts.length > 0
+        ? `?withPhotos=1&districts=${encodeURIComponent(districts.join(','))}`
+        : '?withPhotos=1&status=approved';
+    const res = await sqlApiRequest<{ items?: MembershipApplication[] }>(`/api/db/applications${qs}`);
+    if (Array.isArray(res?.items)) {
+      return res.items;
+    }
+  }
+
+  const local = loadLocalApplications();
+  if (!districts || districts.length === 0) {
+    return local.filter((a) => a.status === 'approved');
+  }
+  return local.filter((a) => a.status === 'approved' && districts.includes(a.district || ''));
 }
 
 export function subscribeToApplicationsForAdmin(
@@ -942,7 +1044,9 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
   const runFetch = (async (): Promise<MembershipApplication[]> => {
     if (await isSqlBackendActive()) {
       try {
-        const res = await sqlApiRequest<{ items: MembershipApplication[] }>('/api/db/applications/approved-directory');
+        const res = await sqlApiRequest<{ items: MembershipApplication[] }>(
+          `/api/db/applications/approved-directory${forceRefresh ? '?refresh=1' : ''}`
+        );
         if (Array.isArray(res?.items)) {
           approvedMembersCache = res.items;
           approvedMembersLastFetchedAt = Date.now();

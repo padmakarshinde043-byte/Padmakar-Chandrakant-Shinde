@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search,
   Edit3,
@@ -27,7 +27,7 @@ import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
-import { syncMemberCounter, purgeDeletedAndGhostApplicationsInFirestore } from '../firebase';
+import { syncMemberCounter, purgeDeletedAndGhostApplicationsInFirestore, fetchApplicationPhotosBatch, fetchSingleApplicationForAdmin } from '../firebase';
 import { parseMemberNumberSeq } from '../utils/memberNumberAllocator';
 
 interface MemberEditManagerProps {
@@ -206,6 +206,22 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     [filteredMembers, visibleCount]
   );
 
+  const requestedEditPhotoIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const missingPhotoIds = visibleMembers
+      .filter((app) => !app.photo && app.hasPhoto && !requestedEditPhotoIdsRef.current.has(app.id))
+      .map((app) => app.id);
+    if (missingPhotoIds.length === 0) return;
+    missingPhotoIds.forEach((id) => requestedEditPhotoIdsRef.current.add(id));
+    fetchApplicationPhotosBatch(missingPhotoIds)
+      .then((photos) => {
+        if (photos && Object.keys(photos).length > 0) {
+          window.dispatchEvent(new CustomEvent('mahasangh_app_photos_hydrated', { detail: photos }));
+        }
+      })
+      .catch(() => {});
+  }, [visibleMembers]);
+
   // Talukas available for the currently edited member's district
   const availableTalukasForEdit = useMemo(() => {
     if (!editingMember?.district) return [];
@@ -233,10 +249,15 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     ) || null;
   }, [editingMember, applications]);
 
-  const handleOpenEdit = (member: MembershipApplication) => {
+  const handleOpenEdit = async (member: MembershipApplication) => {
     setPhotoError('');
-    setEditingMember({ ...member });
-    const parsedSeq = parseMemberNumberSeq(member.memberNumber);
+    let target = member;
+    if (!member.photo && member.hasPhoto) {
+      const full = await fetchSingleApplicationForAdmin(member.id);
+      if (full) target = full;
+    }
+    setEditingMember({ ...target });
+    const parsedSeq = parseMemberNumberSeq(target.memberNumber);
     setSeqInputForFormat(parsedSeq > 0 ? String(parsedSeq) : '');
   };
 

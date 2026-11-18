@@ -45,6 +45,11 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
     } catch {}
   }
 
+  const colPhoto = row.photo !== null && row.photo !== undefined ? String(row.photo) : '';
+  const resolvedPhoto = colPhoto.trim() !== '' ? colPhoto : String(extra.photo || '');
+  const hasPhoto =
+    row.has_photo !== undefined ? Boolean(Number(row.has_photo)) : Boolean(resolvedPhoto.trim());
+
   return {
     ...extra,
     id: String(row.id),
@@ -65,7 +70,8 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
     professional: String(row.professional || extra.professional || ''),
     status: (row.status as 'pending' | 'approved' | 'rejected') || 'pending',
     rejectReason: row.reject_reason ? String(row.reject_reason) : extra.rejectReason || undefined,
-    photo: row.photo !== null && row.photo !== undefined ? String(row.photo) : String(extra.photo || ''),
+    photo: resolvedPhoto,
+    hasPhoto,
     paymentRef: row.payment_ref ? String(row.payment_ref) : extra.paymentRef || undefined,
     paymentConfirmed: Boolean(row.payment_confirmed),
     razorpayPaymentId: row.razorpay_payment_id ? String(row.razorpay_payment_id) : undefined,
@@ -81,6 +87,15 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
     approvedAt: row.approved_at ? String(row.approved_at) : undefined,
     updatedAt: row.updated_at ? String(row.updated_at) : undefined,
   };
+}
+
+function buildCompactExtraJson(app: Record<string, any>, id: string): string {
+  const { photo, ...rest } = app;
+  const compact: Record<string, any> = { ...rest, id };
+  if (typeof photo === 'string' && !photo.startsWith('data:')) {
+    compact.photo = photo;
+  }
+  return JSON.stringify(compact);
 }
 
 // =========================================================================
@@ -103,71 +118,164 @@ export async function mysqlListApplications(onlyApproved = false): Promise<Membe
   });
 }
 
+/**
+ * Fast lightweight Admin query: omits duplicate `extra_json` and large legacy Base64 blobs
+ * on already-approved/rejected rows (while keeping URLs and all pending photos intact),
+ * cutting initial Admin payload from 40+ MB down to ~300 KB.
+ */
+export async function mysqlListApplicationsAdminLite(onlyApproved = false): Promise<MembershipApplication[]> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const whereClause = onlyApproved ? "WHERE `status` = 'approved'" : '';
+    const sql = `SELECT
+        \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
+        \`phone\`, \`email\`, \`address\`, \`district\`, \`taluka\`, \`center_name\`,
+        \`family_members\`, \`hobby\`, \`education\`, \`professional_qualification\`, \`professional\`,
+        \`status\`, \`reject_reason\`,
+        CASE
+          WHEN \`status\` = 'pending' OR \`photo\` LIKE 'http%' OR \`photo\` LIKE '/%' THEN \`photo\`
+          ELSE ''
+        END AS \`photo\`,
+        IF(\`photo\` IS NOT NULL AND \`photo\` != '', 1, 0) AS \`has_photo\`,
+        \`payment_ref\`, \`payment_confirmed\`, \`razorpay_payment_id\`, \`razorpay_order_id\`,
+        \`is_official\`, \`official_post\`, \`official_district\`, \`official_taluka\`,
+        \`approved_by\`, \`id_card_email_sent\`, \`welcome_email_sent\`,
+        \`created_at\`, \`approved_at\`, \`updated_at\`
+      FROM \`applications\` ${whereClause}`;
+    const [rows] = await pool.query<RowDataPacket[]>(sql);
+    const list = rows.map(mapAppRow);
+    list.sort(
+      (a, b) =>
+        new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
+    );
+    return list;
+  });
+}
+
+export async function mysqlGetApplicationPhotosByIds(ids: string[]): Promise<Record<string, string>> {
+  const cleanIds = Array.from(
+    new Set((ids || []).map((id) => String(id || '').trim()).filter(Boolean))
+  ).slice(0, 100);
+  if (cleanIds.length === 0) return {};
+
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const placeholders = cleanIds.map(() => '?').join(', ');
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT \`id\`, \`photo\`, \`extra_json\` FROM \`applications\` WHERE \`id\` IN (${placeholders})`,
+      cleanIds
+    );
+    const photos: Record<string, string> = {};
+    for (const row of rows) {
+      const id = String(row.id || '');
+      let photo = row.photo !== null && row.photo !== undefined ? String(row.photo) : '';
+      if (!photo.trim() && row.extra_json) {
+        try {
+          const parsed = JSON.parse(String(row.extra_json));
+          if (parsed?.photo) photo = String(parsed.photo);
+        } catch {}
+      }
+      if (id && photo.trim()) {
+        photos[id] = photo;
+      }
+    }
+    return photos;
+  });
+}
+
+export async function mysqlListApprovedApplicationsWithPhotosByDistricts(
+  districts: string[]
+): Promise<MembershipApplication[]> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const cleanDistricts = Array.from(
+      new Set((districts || []).map((d) => String(d || '').trim()).filter(Boolean))
+    );
+    if (cleanDistricts.length === 0) {
+      return mysqlListApplications(true);
+    }
+    const placeholders = cleanDistricts.map(() => '?').join(', ');
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT * FROM \`applications\` WHERE \`status\` = 'approved' AND \`district\` IN (${placeholders})`,
+      cleanDistricts
+    );
+    const list = rows.map(mapAppRow);
+    list.sort(
+      (a, b) =>
+        new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
+    );
+    return list;
+  });
+}
+
 export async function mysqlListApprovedDirectory(): Promise<MembershipApplication[]> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
-            \`phone\`, \`district\`, \`taluka\`, \`center_name\`, \`professional\`,
-            \`is_official\`, \`official_post\`, \`official_district\`, \`official_taluka\`,
-            \`status\`, \`approved_at\`, \`created_at\`
-     FROM \`applications\`
-     WHERE \`status\` = 'approved'
-        OR \`member_number\` != ''
-        OR \`approved_at\` != ''`
-  );
-  const list: MembershipApplication[] = rows.map((row) => ({
-    id: String(row.id),
-    applicationNumber: String(row.application_number || ''),
-    memberNumber: row.member_number ? String(row.member_number) : '',
-    salutation: String(row.salutation || ''),
-    fullName: String(row.full_name || ''),
-    phone: String(row.phone || ''),
-    email: '',
-    address: '',
-    district: String(row.district || ''),
-    taluka: String(row.taluka || ''),
-    centerName: String(row.center_name || ''),
-    education: '',
-    professional: String(row.professional || ''),
-    status: (row.status as 'pending' | 'approved' | 'rejected') || 'approved',
-    isOfficial: Boolean(row.is_official),
-    officialPost: row.official_post ? String(row.official_post) : '',
-    officialDistrict: row.official_district ? String(row.official_district) : '',
-    officialTaluka: row.official_taluka ? String(row.official_taluka) : '',
-    approvedAt: row.approved_at ? String(row.approved_at) : undefined,
-    createdAt: String(row.created_at || ''),
-  }));
-  list.sort(
-    (a, b) =>
-      new Date(b.approvedAt || b.createdAt || '').getTime() -
-      new Date(a.approvedAt || a.createdAt || '').getTime()
-  );
-  return list;
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
+              \`phone\`, \`district\`, \`taluka\`, \`center_name\`, \`professional\`,
+              \`is_official\`, \`official_post\`, \`official_district\`, \`official_taluka\`,
+              \`status\`, \`approved_at\`, \`created_at\`
+       FROM \`applications\`
+       WHERE \`status\` = 'approved'
+          OR \`member_number\` != ''
+          OR \`approved_at\` != ''`
+    );
+    const list: MembershipApplication[] = rows.map((row) => ({
+      id: String(row.id),
+      applicationNumber: String(row.application_number || ''),
+      memberNumber: row.member_number ? String(row.member_number) : '',
+      salutation: String(row.salutation || ''),
+      fullName: String(row.full_name || ''),
+      phone: String(row.phone || ''),
+      email: '',
+      address: '',
+      district: String(row.district || ''),
+      taluka: String(row.taluka || ''),
+      centerName: String(row.center_name || ''),
+      education: '',
+      professional: String(row.professional || ''),
+      status: (row.status as 'pending' | 'approved' | 'rejected') || 'approved',
+      isOfficial: Boolean(row.is_official),
+      officialPost: row.official_post ? String(row.official_post) : '',
+      officialDistrict: row.official_district ? String(row.official_district) : '',
+      officialTaluka: row.official_taluka ? String(row.official_taluka) : '',
+      approvedAt: row.approved_at ? String(row.approved_at) : undefined,
+      createdAt: String(row.created_at || ''),
+    }));
+    list.sort(
+      (a, b) =>
+        new Date(b.approvedAt || b.createdAt || '').getTime() -
+        new Date(a.approvedAt || a.createdAt || '').getTime()
+    );
+    return list;
+  });
 }
 
 export async function mysqlCountApprovedMembers(): Promise<number> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) AS cnt
-     FROM \`applications\`
-     WHERE \`status\` = 'approved'
-        OR \`member_number\` != ''
-        OR \`approved_at\` != ''`
-  );
-  return Number(rows[0]?.cnt || 0);
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt
+       FROM \`applications\`
+       WHERE \`status\` = 'approved'
+          OR \`member_number\` != ''
+          OR \`approved_at\` != ''`
+    );
+    return Number(rows[0]?.cnt || 0);
+  });
 }
 
 export async function mysqlGetApplicationById(id: string): Promise<(MembershipApplication & Record<string, any>) | null> {
   if (!id) return null;
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const [rows] = await pool.query<RowDataPacket[]>(
-    'SELECT * FROM `applications` WHERE `id` = ? LIMIT 1',
-    [String(id).trim()]
-  );
-  return rows.length ? mapAppRow(rows[0]) : null;
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM `applications` WHERE `id` = ? LIMIT 1',
+      [String(id).trim()]
+    );
+    return rows.length ? mapAppRow(rows[0]) : null;
+  });
 }
 
 export async function mysqlUpsertApplication(app: Record<string, any>): Promise<void> {
@@ -258,7 +366,7 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
       String(app.approvedAt || ''),
       String(app.rejectedAt || ''),
       String(app.updatedAt || nowIso),
-      JSON.stringify({ ...app, id }),
+      buildCompactExtraJson(app, id),
     ]
   );
   });

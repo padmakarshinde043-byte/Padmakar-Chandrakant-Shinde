@@ -150,7 +150,16 @@ export function App() {
     return [];
   });
 
-  const [govOrders, setGovOrders] = useState<GovOrder[]>([]);
+  const [govOrders, setGovOrders] = useState<GovOrder[]>(() => {
+    try {
+      const saved = localStorage.getItem('mahasangh_gov_orders_cache_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_GOV_ORDERS;
+  });
 
   // News state (Starts from local storage or cached data, always newest first)
   const [newsList, setNewsList] = useState<NewsItem[]>(() => {
@@ -300,39 +309,24 @@ export function App() {
         console.warn('Data init error:', err);
       });
 
-    // Defer secondary leadership/officials prefetch until browser is idle after first paint
-    const runIdlePrefetch = () => {
-      fetchDynamicLeaders(false).catch((err) => {
-        console.warn('Dynamic leaders prefetch warning:', err);
-      });
-      fetchOfficials(false).catch(() => {});
-      fetchAppointedPosts(false).catch(() => {});
-    };
-
-    const win = window as Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-
-    let idleId: number | undefined;
-    let timerId: number | undefined;
-    if (typeof win.requestIdleCallback === 'function') {
-      idleId = win.requestIdleCallback(runIdlePrefetch, { timeout: 2500 });
-    } else {
-      timerId = window.setTimeout(runIdlePrefetch, 1500);
-    }
-
-    return () => {
-      if (idleId !== undefined && typeof win.cancelIdleCallback === 'function') {
-        win.cancelIdleCallback(idleId);
-      }
-      if (timerId !== undefined) {
-        window.clearTimeout(timerId);
-      }
-    };
+    // Prefetch secondary leadership/officials data immediately
+    fetchDynamicLeaders(false).catch(() => {});
+    fetchOfficials(false).catch(() => {});
+    fetchAppointedPosts(false).catch(() => {});
   }, [currentTab]);
 
   useEffect(() => {
+    // Listen to photo hydration across components
+    const handlePhotosHydrated = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const photosMap = customEvent.detail as Record<string, string>;
+      if (photosMap && typeof photosMap === 'object') {
+        setApplications((prev) =>
+          prev.map((app) => (photosMap[app.id] && !app.photo ? { ...app, photo: photosMap[app.id], hasPhoto: true } : app))
+        );
+      }
+    };
+    window.addEventListener('mahasangh_app_photos_hydrated', handlePhotosHydrated);
 
     // Instant local synchronization when admin publishes news or circulars
     const handleNewsSync = (e: Event) => {
@@ -362,6 +356,7 @@ export function App() {
     };
     window.addEventListener('mahasangh_approved_updated', handleApprovedSync);
     return () => {
+      window.removeEventListener('mahasangh_app_photos_hydrated', handlePhotosHydrated);
       window.removeEventListener('mahasangh_news_updated', handleNewsSync);
       window.removeEventListener('mahasangh_banners_updated', handleBannersSync);
       window.removeEventListener('mahasangh_approved_updated', handleApprovedSync);
