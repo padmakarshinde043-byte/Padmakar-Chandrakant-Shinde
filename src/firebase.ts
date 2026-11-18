@@ -829,9 +829,14 @@ export async function approveApplicationAtomicInFirestore(params: {
   registeredCountCache = null;
   const targetId = params.applicationId || params.appId || '';
   if (await isSqlBackendActive()) {
+    const { knownRecords: _unusedKnownRecords, ...safeServerParams } = params;
     const res = await sqlApiRequest('/api/db/applications/approve-atomic', {
       method: 'POST',
-      body: JSON.stringify({ ...params, appId: params.appId || targetId, applicationId: targetId }),
+      body: JSON.stringify({
+        ...safeServerParams,
+        appId: params.appId || targetId,
+        applicationId: targetId,
+      }),
     });
     if (res?.application) {
       syncSingleMemberInCaches(res.application);

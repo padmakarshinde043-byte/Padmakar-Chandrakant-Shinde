@@ -473,6 +473,9 @@ async function getTrueHighestApprovedSeqInMysql(conn: PoolConnection): Promise<n
 export async function mysqlApproveApplicationAtomic(params: {
   appId: string;
   district?: string;
+  paymentId?: string;
+  orderId?: string;
+  approvedBy?: string;
   extraUpdates?: Partial<MembershipApplication>;
 }): Promise<{
   memberNumber: string;
@@ -487,7 +490,15 @@ export async function mysqlApproveApplicationAtomic(params: {
     );
     const existingApp = appRows.length ? mapAppRow(appRows[0]) : ({ id: params.appId } as Record<string, any>);
     const nowIso = new Date().toISOString();
-    const extraUpdates = params.extraUpdates || {};
+    const cleanTopPaymentId = String(params.paymentId || '').trim();
+    const cleanTopOrderId = String(params.orderId || '').trim();
+    const cleanTopApprovedBy = String(params.approvedBy || '').trim();
+    const extraUpdates: Partial<MembershipApplication> = {
+      ...(cleanTopPaymentId ? { paymentRef: cleanTopPaymentId, razorpayPaymentId: cleanTopPaymentId } : {}),
+      ...(cleanTopOrderId ? { razorpayOrderId: cleanTopOrderId } : {}),
+      ...(cleanTopApprovedBy ? { approvedBy: cleanTopApprovedBy } : {}),
+      ...(params.extraUpdates || {}),
+    };
 
     const existingMemberNo = String(existingApp.memberNumber || '').trim();
     if (existingApp.status === 'approved' && existingMemberNo !== '') {
@@ -605,9 +616,9 @@ export async function mysqlApproveApplicationAtomic(params: {
       await conn.execute(
         `INSERT INTO \`applications\` (
           id, application_number, member_number, full_name, phone, email, district,
-          status, payment_ref, payment_confirmed, razorpay_payment_id, razorpay_order_id,
+          status, photo, payment_ref, payment_confirmed, razorpay_payment_id, razorpay_order_id,
           approved_by, created_at, approved_at, updated_at, extra_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           params.appId,
           String(approvalPayload.applicationNumber || ''),
@@ -616,6 +627,7 @@ export async function mysqlApproveApplicationAtomic(params: {
           String(approvalPayload.phone || ''),
           String(approvalPayload.email || ''),
           String(effectiveDistrict),
+          String(approvalPayload.photo || ''),
           String(approvalPayload.paymentRef || ''),
           approvalPayload.paymentConfirmed ? 1 : 0,
           String(approvalPayload.razorpayPaymentId || ''),

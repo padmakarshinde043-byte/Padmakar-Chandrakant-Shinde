@@ -131,19 +131,36 @@ export async function sqlApiRequest<T = any>(
   url: string,
   options?: RequestInit
 ): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    cache: options?.cache ?? 'no-store',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...(options?.headers || {}),
-    },
-  });
+  const controller = typeof AbortController !== 'undefined' && !options?.signal ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 25000) : null;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      cache: options?.cache ?? 'no-store',
+      signal: options?.signal || controller?.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+        ...(options?.headers || {}),
+      },
+    });
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('सर्व्हरचा प्रतिसाद वेळ मर्यादेत आला नाही (Timeout). कृपया इंटरनेट तपासून पुन्हा प्रयत्न करा.');
+    }
+    throw err;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
-    let errMsg = `SQL API error (${res.status})`;
+    let errMsg =
+      res.status === 413
+        ? 'पाठवलेल्या डेटाचा आकार सर्व्हरच्या मर्यादेपेक्षा मोठा आहे (413 Payload Too Large).'
+        : `सर्व्हर त्रुटी (${res.status})`;
     try {
       const errBody = await res.json();
       if (errBody?.message) errMsg = errBody.message;

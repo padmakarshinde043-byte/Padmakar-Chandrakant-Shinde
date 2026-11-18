@@ -455,7 +455,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       const atomicResult = await approveApplicationAtomicInFirestore({
         appId: appToApprove.id,
         district: appToApprove.district,
-        knownRecords: applications,
         paymentProofToken: verifiedPayment.paymentProofToken,
         extraUpdates: {
           ...profileFields,

@@ -1111,7 +1111,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       orderId: cleanOrderId || undefined,
       approvedBy: currentUser?.email || 'Admin',
       source: 'razorpay_direct_sync',
-      knownRecords: applications,
       extraUpdates: {
         paymentConfirmed: true,
         ...(cleanPayId ? { paymentRef: cleanPayId, razorpayPaymentId: cleanPayId } : {}),
@@ -2210,7 +2209,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const atomicResult = await approveApplicationAtomicInFirestore({
         appId: selectedAppForVerification.id,
         district: selectedAppForVerification.district,
-        knownRecords: applications,
+        approvedBy: currentUser?.email || 'Admin',
+        source: 'admin_manual_verification',
         extraUpdates: {
           paymentConfirmed: true,
         },
