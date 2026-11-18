@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS `latest_banners` (
   `title` VARCHAR(500) NOT NULL DEFAULT '',
   `summary` TEXT NULL,
   `image_url` TEXT NOT NULL,
+  `video_url` TEXT NULL,
+  `media_type` VARCHAR(32) NOT NULL DEFAULT 'image',
   `banner_date` VARCHAR(64) NOT NULL DEFAULT '',
   `created_at` VARCHAR(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)

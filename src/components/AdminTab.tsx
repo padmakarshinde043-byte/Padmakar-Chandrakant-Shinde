@@ -8,6 +8,7 @@ import {
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
   Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database
 } from 'lucide-react';
+import JSZip from 'jszip';
 import {
   MembershipApplication,
   NewsItem,
@@ -69,6 +70,7 @@ import {
   uploadBannerPhotoToCloudinary,
   uploadBannerVideoToCloudinary,
   uploadDataUrlToCloudinary,
+  resolveImageUrlForPdf,
   CloudinaryConfig
 } from '../utils/cloudinary';
 import {
@@ -124,6 +126,7 @@ type AdminSubTabKey =
   | 'add_news'
   | 'latest_banners'
   | 'print_id_cards'
+  | 'passport_photo'
   | 'id_card_preview'
   | 'gov_order'
   | 'manage_admins'
@@ -468,6 +471,114 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     } finally {
       setIsGeneratingBatchPrint(false);
       setBatchPrintProgressMsg('');
+    }
+  };
+
+  // Passport photos ZIP download state & handler
+  const [passportPhotoDistricts, setPassportPhotoDistricts] = useState<string[]>(MAHARASHTRA_DISTRICTS);
+  const [isGeneratingPassportZip, setIsGeneratingPassportZip] = useState(false);
+  const [passportZipProgressMsg, setPassportZipProgressMsg] = useState('');
+
+  const handleDownloadPassportPhotosZip = async () => {
+    if (passportPhotoDistricts.length === 0) {
+      alert('कृपया किमान एक जिल्हा निवडा.');
+      return;
+    }
+
+    const approvedWithPhotos = applications.filter(
+      (m) =>
+        m.status === 'approved' &&
+        m.photo &&
+        passportPhotoDistricts.includes(m.district || '')
+    );
+
+    if (approvedWithPhotos.length === 0) {
+      alert('निवडलेल्या जिल्ह्यांमध्ये एकही फोटो उपलब्ध असलेला मंजूर सदस्य आढळला नाही.');
+      return;
+    }
+
+    setIsGeneratingPassportZip(true);
+    setPassportZipProgressMsg('ZIP फाईल तयार होत आहे...');
+
+    try {
+      const zip = new JSZip();
+      const folder = zip.folder('mahasangh_passport_photos');
+      if (!folder) throw new Error('ZIP folder creation failed');
+
+      let processedCount = 0;
+
+      for (const member of approvedWithPhotos) {
+        processedCount++;
+        setPassportZipProgressMsg(
+          `फोटो प्रक्रिया करत आहे (${toEnglishDigits(String(processedCount))}/${toEnglishDigits(String(approvedWithPhotos.length))}): ${member.fullName}`
+        );
+
+        try {
+          const rawPhoto = member.photo;
+          if (!rawPhoto) continue;
+
+          const safeDataUrl = await resolveImageUrlForPdf(rawPhoto);
+          if (!safeDataUrl || !safeDataUrl.startsWith('data:image/')) continue;
+
+          const img = new Image();
+          const loadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+            img.onload = () => resolve(img);
+            img.onerror = (err) => reject(err);
+            img.src = safeDataUrl;
+          });
+
+          const timeoutPromise = new Promise<HTMLImageElement>((_, reject) =>
+            setTimeout(() => reject(new Error('Image load timeout')), 8000)
+          );
+
+          const loadedImg = await Promise.race([loadPromise, timeoutPromise]).catch(() => null);
+          if (!loadedImg || !loadedImg.naturalWidth) continue;
+
+          const canvas = document.createElement('canvas');
+          canvas.width = loadedImg.naturalWidth || 400;
+          canvas.height = loadedImg.naturalHeight || 500;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) continue;
+
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(loadedImg, 0, 0);
+
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          const base64Data = jpegDataUrl.split(',')[1];
+          if (!base64Data) continue;
+
+          const safeName = (member.fullName || 'Member').replace(/[^\w\u0900-\u097F]/g, '_');
+          const safeDist = (member.district || 'District').replace(/[^\w\u0900-\u097F]/g, '_');
+          const safeNum = (member.memberNumber || member.applicationNumber || '000').replace(/[^a-zA-Z0-9_-]/g, '_');
+          const fileName = `${safeName}_${safeDist}_${safeNum}.jpg`;
+
+          folder.file(fileName, base64Data, { base64: true });
+        } catch (imgErr) {
+          console.warn('Could not process member photo for ZIP:', member.fullName, imgErr);
+        }
+      }
+
+      setPassportZipProgressMsg('ZIP संकलित (Compressing) होत आहे...');
+      const content = await zip.generateAsync({ type: 'blob' }, (metadata) => {
+        setPassportZipProgressMsg(`ZIP फाईल तयार होत आहे: ${toEnglishDigits(Math.round(metadata.percent).toString())}%`);
+      });
+
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Mahasangh_Passport_Photos_${Date.now()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setPassportZipProgressMsg('ZIP डाऊनलोड यशस्वीरीत्या सुरू झाले!');
+      setTimeout(() => setPassportZipProgressMsg(''), 4000);
+    } catch (err: any) {
+      alert('ZIP फाईल तयार करताना त्रुटी आली: ' + (err?.message || 'Error'));
+    } finally {
+      setIsGeneratingPassportZip(false);
     }
   };
 
@@ -2420,6 +2531,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       label: 'नवीन आयकार्ड प्रिंट करा',
       shortLabel: 'प्रिंट आयकार्ड',
       icon: <Award className="w-4 h-4 shrink-0 text-amber-600" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
+    },
+    {
+      key: 'passport_photo',
+      label: 'पासपोर्ट फोटो ZIP',
+      shortLabel: 'फोटो ZIP',
+      icon: <ImageIcon className="w-4 h-4 shrink-0 text-amber-500" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
@@ -5926,6 +6044,128 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 flex items-center gap-2 animate-pulse">
                         <RefreshCw className="w-4 h-4 animate-spin text-sky-600 shrink-0" />
                         <span>{batchPrintProgressMsg || 'कृपया प्रतीक्षा करा, सर्व सदस्यांचे हाई-डिफ़िंक्शन आय-कार्ड्स एकत्र केले जात आहेत...'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sub-tab: Passport Photos ZIP Download (सुपर ॲडमिन पॅनल - पासपोर्ट फोटो ZIP) */}
+            {activeAdminSubTab === 'passport_photo' && currentUser?.isSuperAdmin && (
+              <div className="space-y-6 max-w-4xl mx-auto">
+                <div className="bg-white p-6 sm:p-8 rounded-2xl border border-amber-300 shadow-md space-y-5">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                    <div>
+                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                        <ImageIcon className="w-5 h-5 text-amber-600" />
+                        <span>सभासद पासपोर्ट फोटो ZIP डाऊनलोड कक्ष (फक्त JPEG / JPG फॉर्मेट)</span>
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                        येथून हव्या त्या जिल्ह्यांची निवड (Tick) करून सर्व मंजूर सदस्यांचे पासपोर्ट फोटो एकाच ZIP फोल्डरमध्ये केवळ <strong className="text-amber-700">.jpg / .jpeg</strong> फॉरमॅटमध्ये झटपट डाऊनलोड करू शकता.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Select All / Deselect All Controls */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="text-xs sm:text-sm font-bold text-slate-700">
+                      निवडलेले जिल्हे: <span className="text-[#17366d] font-mono">{passportPhotoDistricts.length}</span> / {MAHARASHTRA_DISTRICTS.length}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPassportPhotoDistricts([...MAHARASHTRA_DISTRICTS])}
+                        className="px-3 py-1.5 bg-[#17366d] hover:bg-[#11254a] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      >
+                        सर्व जिल्हे निवडा
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPassportPhotoDistricts([])}
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+                      >
+                        सर्व रद्द करा
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Districts Checkbox Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-[360px] overflow-y-auto p-2 bg-slate-50/50 rounded-xl border border-slate-200">
+                    {MAHARASHTRA_DISTRICTS.map((dist) => {
+                      const isChecked = passportPhotoDistricts.includes(dist);
+                      const photoCount = applications.filter(
+                        (m) => m.status === 'approved' && m.photo && m.district === dist
+                      ).length;
+
+                      return (
+                        <label
+                          key={dist}
+                          className={`flex items-center justify-between p-2.5 rounded-lg border text-xs sm:text-sm cursor-pointer transition-all ${
+                            isChecked
+                              ? 'bg-amber-50/70 border-amber-400 font-bold text-[#0b1e33]'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setPassportPhotoDistricts((prev) => [...prev, dist]);
+                                } else {
+                                  setPassportPhotoDistricts((prev) => prev.filter((d) => d !== dist));
+                                }
+                              }}
+                              className="rounded text-[#17366d] focus:ring-[#17366d] cursor-pointer"
+                            />
+                            <span className="truncate">{dist}</span>
+                          </div>
+                          <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                            {toEnglishDigits(String(photoCount))} फोटो
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Summary & Download Action */}
+                  <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <strong className="text-amber-900 text-sm sm:text-base block">ZIP डाऊनलोड माहिती:</strong>
+                        <span className="text-xs sm:text-sm text-slate-700">
+                          निवडलेल्या जिल्ह्यांमधील एकूण उपलब्ध फोटो असलेले मंजूर सदस्य:{' '}
+                          <strong className="font-mono text-[#17366d] text-base">
+                            {toEnglishDigits(
+                              String(
+                                applications.filter(
+                                  (m) =>
+                                    m.status === 'approved' &&
+                                    m.photo &&
+                                    passportPhotoDistricts.includes(m.district || '')
+                                ).length
+                              )
+                            )}
+                          </strong>
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadPassportPhotosZip}
+                        disabled={isGeneratingPassportZip || passportPhotoDistricts.length === 0}
+                        className="bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
+                      >
+                        <Download className={`w-5 h-5 ${isGeneratingPassportZip ? 'animate-spin' : ''}`} />
+                        <span>{isGeneratingPassportZip ? 'ZIP तयार होत आहे...' : 'पासपोर्ट फोटो ZIP डाऊनलोड करा (.jpg)'}</span>
+                      </button>
+                    </div>
+
+                    {passportZipProgressMsg && (
+                      <div className="p-3 bg-white border border-amber-300 rounded-lg text-xs sm:text-sm font-bold text-[#17366d] animate-pulse">
+                        {passportZipProgressMsg}
                       </div>
                     )}
                   </div>

@@ -930,6 +930,8 @@ export async function mysqlListLatestBanners(): Promise<LatestBannerItem[]> {
     title: String(r.title || ''),
     ...(r.summary ? { summary: String(r.summary) } : {}),
     imageUrl: String(r.image_url || ''),
+    ...(r.video_url ? { videoUrl: String(r.video_url) } : {}),
+    ...(r.media_type ? { mediaType: r.media_type as 'image' | 'video' } : {}),
     date: String(r.banner_date || ''),
     createdAt: String(r.created_at || ''),
   }));
@@ -939,16 +941,19 @@ export async function mysqlSaveLatestBanner(banner: LatestBannerItem): Promise<v
   await ensureMysqlSchema();
   const pool = getMysqlPool();
   await pool.execute(
-    `INSERT INTO \`latest_banners\` (id, title, summary, image_url, banner_date, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO \`latest_banners\` (id, title, summary, image_url, video_url, media_type, banner_date, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
        title = VALUES(title), summary = VALUES(summary), image_url = VALUES(image_url),
+       video_url = VALUES(video_url), media_type = VALUES(media_type),
        banner_date = VALUES(banner_date), created_at = VALUES(created_at)`,
     [
       String(banner.id),
       String(banner.title || ''),
       banner.summary ? String(banner.summary) : '',
       String(banner.imageUrl || ''),
+      banner.videoUrl ? String(banner.videoUrl) : '',
+      banner.mediaType || 'image',
       String(banner.date || ''),
       String(banner.createdAt || new Date().toISOString()),
     ]

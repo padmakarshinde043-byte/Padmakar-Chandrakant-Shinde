@@ -330,6 +330,13 @@ export function App() {
       }
     };
     window.addEventListener('mahasangh_news_updated', handleNewsSync);
+    const handleBannersSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setLatestBanners(customEvent.detail);
+      }
+    };
+    window.addEventListener('mahasangh_banners_updated', handleBannersSync);
     const handleApprovedSync = (e: Event) => {
       const customEvent = e as CustomEvent;
       if (Array.isArray(customEvent.detail)) {
@@ -344,6 +351,7 @@ export function App() {
     window.addEventListener('mahasangh_approved_updated', handleApprovedSync);
     return () => {
       window.removeEventListener('mahasangh_news_updated', handleNewsSync);
+      window.removeEventListener('mahasangh_banners_updated', handleBannersSync);
       window.removeEventListener('mahasangh_approved_updated', handleApprovedSync);
       if (idleId !== undefined && typeof win.cancelIdleCallback === 'function') {
         win.cancelIdleCallback(idleId);

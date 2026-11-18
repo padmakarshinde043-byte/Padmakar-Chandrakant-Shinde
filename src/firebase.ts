@@ -356,6 +356,12 @@ function cleanLatestBannerPayload(banner: LatestBannerItem): LatestBannerItem {
   if (banner.summary && banner.summary.trim()) {
     payload.summary = banner.summary.trim();
   }
+  if (banner.videoUrl && banner.videoUrl.trim()) {
+    payload.videoUrl = banner.videoUrl.trim();
+  }
+  if (banner.mediaType) {
+    payload.mediaType = banner.mediaType;
+  }
   return payload;
 }
 
@@ -483,8 +489,11 @@ export async function saveLatestBannerToFirestore(banner: LatestBannerItem): Pro
     try {
       const existingRaw = safeStorageGet(LATEST_BANNERS_CACHE_KEY);
       const existing: LatestBannerItem[] = existingRaw ? JSON.parse(existingRaw) : [];
-      const next = [cleanPayload, ...existing.filter((b) => b.id !== cleanPayload.id)];
+      const next = sortLatestBannersDescending([cleanPayload, ...existing.filter((b) => b.id !== cleanPayload.id)]);
       updateLatestBannersCache(next);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mahasangh_banners_updated', { detail: next }));
+      }
     } catch {
       localStorage.removeItem(LATEST_BANNERS_CACHE_TIME_KEY);
     }

@@ -227,12 +227,14 @@ export function generateFullSqlDump(
     lines.push(
       buildUpsertSql(
         'latest_banners',
-        ['id', 'title', 'summary', 'image_url', 'banner_date', 'created_at'],
+        ['id', 'title', 'summary', 'image_url', 'video_url', 'media_type', 'banner_date', 'created_at'],
         [
           String(banner.id),
           String(banner.title || ''),
           String(banner.summary || ''),
           String(banner.imageUrl || ''),
+          String(banner.videoUrl || ''),
+          String(banner.mediaType || 'image'),
           String(banner.date || ''),
           String(banner.createdAt || ''),
         ]
