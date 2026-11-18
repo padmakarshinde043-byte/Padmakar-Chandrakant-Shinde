@@ -341,38 +341,6 @@ export const NewsTab: React.FC<NewsTabProps> = ({
           </div>
         </section>
 
-        {/* Copyright Policy (कॉपीराइट धोरण) */}
-        <div className="mt-8 pt-4 border-t border-slate-200">
-          <div className="bg-slate-100/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-              <h4 className="font-serifDevanagari text-base sm:text-lg font-bold text-[#0b1e36]">
-                कॉपीराइट धोरण (Copyright Policy)
-              </h4>
-            </div>
-
-            <p className="text-sm sm:text-base text-slate-700 leading-relaxed font-medium mb-3">
-              या संकेतस्थळावरील सर्व मजकूर, लोगो, परिपत्रके, छायाचित्रे आणि डिजिटल साहित्य हे 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ' यांच्या मालकीचे असून ते कॉपीराइट कायद्यानुसार संरक्षित आहे.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-slate-200 text-sm text-slate-700 leading-relaxed">
-              <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
-                <span className="font-bold text-[#0b1e36] block">● वापराची मर्यादा:</span>
-                <p>या संकेतस्थळावरील माहिती केवळ केंद्रप्रमुख, अधिकारी, शिक्षक आणि शैक्षणिक संदर्भासाठी माहितीच्या उद्देशाने वापरता येईल.</p>
-              </div>
-
-              <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
-                <span className="font-bold text-[#0b1e36] block">● परवानगीशिवाय पुनर्वापर मनाई:</span>
-                <p>महासंघाच्या पूर्वपरवानगीशिवाय या संकेतस्थळावरील कोणताही मजकूर, लोगो किंवा डेटा व्यावसायिक कारणांसाठी कॉपी करणे, विकृत करणे अथवा पुनरुत्पादित करण्यास सक्त मनाई आहे.</p>
-              </div>
-
-              <div className="bg-white/80 p-3 rounded-lg border border-slate-200/70 space-y-1">
-                <span className="font-bold text-[#0b1e36] block">● अधिकृतता:</span>
-                <p>संकेतस्थळावर प्रसिद्ध करण्यात आलेली परिपत्रके व सूचना संबंधित शासकीय विभागाच्या मूळ आदेशांशी सुसंगत असतील; कोणत्याही कायदेशीर बाबींसाठी मूळ शासकीय राजपत्राचा/परिपत्रकाचा आधार घ्यावा.</p>
-              </div>
-            </div>
-          </div>
-        </div>
         </>
         )}
       </div>

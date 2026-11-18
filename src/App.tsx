@@ -13,6 +13,7 @@ const loadMembershipTab = () => import('./components/MembershipTab');
 const loadContactTab = () => import('./components/ContactTab');
 const loadAdminTab = () => import('./components/AdminTab');
 const loadAppointmentsTab = () => import('./components/AppointmentsTab');
+const loadPrivacyPolicyTab = () => import('./components/PrivacyPolicyTab');
 
 const AboutTab = lazy(() => loadAboutTab().then((m) => ({ default: m.AboutTab })));
 const LeadershipTab = lazy(() => loadLeadershipTab().then((m) => ({ default: m.LeadershipTab })));
@@ -23,6 +24,7 @@ const MembershipTab = lazy(() => loadMembershipTab().then((m) => ({ default: m.M
 const ContactTab = lazy(() => loadContactTab().then((m) => ({ default: m.ContactTab })));
 const AdminTab = lazy(() => loadAdminTab().then((m) => ({ default: m.AdminTab })));
 const AppointmentsTab = lazy(() => loadAppointmentsTab().then((m) => ({ default: m.AppointmentsTab })));
+const PrivacyPolicyTab = lazy(() => loadPrivacyPolicyTab().then((m) => ({ default: m.PrivacyPolicyTab })));
 
 const prefetchTabChunk = (tabId: string) => {
   switch (tabId) {
@@ -51,6 +53,9 @@ const prefetchTabChunk = (tabId: string) => {
       break;
     case 'contact':
       loadContactTab();
+      break;
+    case 'privacy':
+      loadPrivacyPolicyTab();
       break;
     case 'admin':
       loadAdminTab();
@@ -775,6 +780,11 @@ export function App() {
           {(visitedTabs.contact || currentTab === 'contact') && (
             <div className={currentTab === 'contact' ? 'block mhs-tab-enter' : 'hidden'}>
               <ContactTab onSaveContact={handleSaveContact} />
+            </div>
+          )}
+          {(visitedTabs.privacy || currentTab === 'privacy') && (
+            <div className={currentTab === 'privacy' ? 'block mhs-tab-enter' : 'hidden'}>
+              <PrivacyPolicyTab />
             </div>
           )}
         </Suspense>
