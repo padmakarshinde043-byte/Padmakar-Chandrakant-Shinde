@@ -18,10 +18,20 @@
     <link rel="shortcut icon" type="image/png" href="/pwa-192x192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
+    <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       // www व non-www एकसंध ठेवण्यासाठी ऑटोमॅटिक कॅनॉनिकल रिडायरेक्ट
       if (window.location.hostname === 'www.mahasangh.in') {
         window.location.replace('https://mahasangh.in' + window.location.pathname + window.location.search + window.location.hash);
+      }
+
+      // Service Worker Registration for PWABuilder Offline Test & PWA support
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.warn('Service worker registration failed:', err);
+          });
+        });
       }
     </script>
 
