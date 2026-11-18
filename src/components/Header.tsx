@@ -99,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
       <div className="bg-[#0b1e36] border-y border-amber-500/60 shadow-inner">
         <div className="max-w-[1240px] mx-auto px-2 sm:px-6">
           {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex flex-wrap items-center justify-center gap-1 xl:gap-1.5 py-1.5" aria-label="मुख्य नेव्हिगेशन">
+          <nav className="hidden lg:flex flex-nowrap items-center overflow-x-auto no-scrollbar justify-start lg:justify-center gap-1 xl:gap-1.5 py-1.5" aria-label="मुख्य नेव्हिगेशन">
             {navItems.map((item) => {
               const isActive = currentTab === item.id;
               return (
@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
                   onMouseEnter={() => onPrefetchTab?.(item.id)}
                   onFocus={() => onPrefetchTab?.(item.id)}
                   onClick={() => handleNavClick(item.id)}
-                  className={`mhs-btn-press whitespace-nowrap shrink-0 text-[13px] xl:text-sm px-2.5 xl:px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`mhs-btn-press whitespace-nowrap shrink-0 text-[12px] xl:text-[13px] px-2 xl:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
                     isActive
                       ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
                       : 'text-slate-100 hover:text-white hover:bg-white/10 font-bold'
