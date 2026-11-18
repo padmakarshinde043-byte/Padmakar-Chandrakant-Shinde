@@ -14,10 +14,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
   const navItems = [
     { id: 'home', label: 'मुख्यपृष्ठ' },
     { id: 'about', label: 'आमच्याबद्दल' },
-    { id: 'leadership', label: 'राज्य पदाधिकारी' },
-    { id: 'district_leadership', label: 'जिल्हा पदाधिकारी' },
+    { id: 'leadership', label: 'राज्य नेतृत्व' },
+    { id: 'district_leadership', label: 'जिल्हा नेतृत्व' },
+    { id: 'appointments', label: 'जिल्हा पदाधिकारी' },
     { id: 'advisory', label: 'राज्य सल्लागार मंडळ' },
-    { id: 'appointments', label: 'पदाधिकारी' },
     { id: 'news', label: 'बातम्या' },
     { id: 'circulars', label: 'शासन निर्णय व परिपत्रके' },
     { id: 'membership', label: 'सदस्यत्व नोंदणी' },

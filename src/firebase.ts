@@ -133,6 +133,12 @@ export function handleFirestoreError(
   operationType: OperationType,
   path: string | null
 ) {
+  if (isQuotaExceededError(error)) {
+    markFirestoreQuotaExceeded(error);
+    console.warn(`Firestore Quota Exceeded during [${operationType}] at [${path}]. Using local cache fallback.`);
+    throw new Error('Firestore Quota Exceeded. Using local cache fallback.');
+  }
+
   const currentUser = cachedPreviewAuth?.currentUser;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),

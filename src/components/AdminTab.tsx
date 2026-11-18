@@ -30,7 +30,7 @@ import {
   findMissingVacantLeaders,
   mergeMissingVacantLeaders,
 } from '../data/recoveredVacantLeaders';
-import { DEFAULT_DISTRICT_PASSWORD } from '../data/rkMaharashtraData';
+import { DEFAULT_DISTRICT_PASSWORD, DEFAULT_APPOINTED_POSTS, getPostLevelLabel } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
 import {
   getAdminCredentials,
@@ -357,14 +357,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return [
-      { name: 'जिल्हाध्यक्ष', isTaluka: false },
-      { name: 'जिल्हा कार्याध्यक्ष', isTaluka: false },
-      { name: 'जिल्हा सरचिटणीस', isTaluka: false },
-      { name: 'जिल्हा कोषाध्यक्ष', isTaluka: false },
-      { name: 'तालुकाध्यक्ष', isTaluka: true },
-      { name: 'तालुका सरचिटणीस', isTaluka: true }
-    ];
+    return DEFAULT_APPOINTED_POSTS;
   });
   const [districtPasswords, setDistrictPasswords] = useState<Record<string, string>>({});
   const [isLoadingDistrictPasswords, setIsLoadingDistrictPasswords] = useState<boolean>(false);
@@ -4600,7 +4593,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <span className="font-mono text-slate-400 font-bold">{idx + 1}.</span>
                                 <span className="font-bold text-[#17366d] truncate">{p.name}</span>
                                 <span className="text-[10px] bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
-                                  {p.isTaluka ? 'तालुकास्तर' : 'मुख्य स्तर'}
+                                  {getPostLevelLabel(p.name)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
