@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { Firestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { isMysqlActive } from '../db/mysqlPool';
 import { mysqlGetSystemSetting, mysqlSaveSystemSetting } from '../db/mysqlRepository';
 
@@ -180,18 +179,13 @@ export function sanitizeWhatsAppConfig(cfg: WhatsAppApiConfig): SanitizedWhatsAp
   };
 }
 
-export async function loadWhatsAppConfig(firestoreDb?: Firestore | null): Promise<WhatsAppApiConfig> {
+export async function loadWhatsAppConfig(_ignored?: any): Promise<WhatsAppApiConfig> {
   let stored: Partial<WhatsAppApiConfig> = {};
 
   if (isMysqlActive()) {
     try {
       const fromDb = await mysqlGetSystemSetting<Partial<WhatsAppApiConfig>>(SETTING_KEY_CONFIG);
       if (fromDb && typeof fromDb === 'object') stored = fromDb;
-    } catch {}
-  } else if (firestoreDb) {
-    try {
-      const snap = await getDoc(doc(firestoreDb, 'settings', SETTING_KEY_CONFIG));
-      if (snap.exists()) stored = snap.data() as Partial<WhatsAppApiConfig>;
     } catch {}
   }
 
@@ -216,9 +210,9 @@ export async function loadWhatsAppConfig(firestoreDb?: Firestore | null): Promis
 
 export async function saveWhatsAppConfig(
   incoming: Partial<WhatsAppApiConfig>,
-  firestoreDb?: Firestore | null
+  _ignored?: any
 ): Promise<WhatsAppApiConfig> {
-  const current = await loadWhatsAppConfig(firestoreDb);
+  const current = await loadWhatsAppConfig();
 
   const next: WhatsAppApiConfig = {
     ...current,
@@ -243,15 +237,13 @@ export async function saveWhatsAppConfig(
 
   if (isMysqlActive()) {
     await mysqlSaveSystemSetting(SETTING_KEY_CONFIG, next);
-  } else if (firestoreDb) {
-    await setDoc(doc(firestoreDb, 'settings', SETTING_KEY_CONFIG), next);
   }
 
   return next;
 }
 
 export async function loadWhatsAppBroadcastLogs(
-  firestoreDb?: Firestore | null
+  _ignored?: any
 ): Promise<WhatsAppBroadcastCampaignLog[]> {
   if (isMysqlActive()) {
     try {
@@ -259,12 +251,6 @@ export async function loadWhatsAppBroadcastLogs(
         SETTING_KEY_LOGS
       );
       if (Array.isArray(fromDb?.items)) return fromDb.items;
-    } catch {}
-  } else if (firestoreDb) {
-    try {
-      const snap = await getDoc(doc(firestoreDb, 'settings', SETTING_KEY_LOGS));
-      const data = snap.exists() ? (snap.data() as { items?: WhatsAppBroadcastCampaignLog[] }) : null;
-      if (Array.isArray(data?.items)) return data.items;
     } catch {}
   }
 
@@ -279,9 +265,9 @@ export async function loadWhatsAppBroadcastLogs(
 
 async function appendWhatsAppBroadcastLog(
   log: WhatsAppBroadcastCampaignLog,
-  firestoreDb?: Firestore | null
+  _ignored?: any
 ): Promise<void> {
-  const existing = await loadWhatsAppBroadcastLogs(firestoreDb);
+  const existing = await loadWhatsAppBroadcastLogs();
   const updated = [log, ...existing].slice(0, 30);
 
   try {
@@ -290,8 +276,6 @@ async function appendWhatsAppBroadcastLog(
 
   if (isMysqlActive()) {
     await mysqlSaveSystemSetting(SETTING_KEY_LOGS, { items: updated }).catch(() => {});
-  } else if (firestoreDb) {
-    await setDoc(doc(firestoreDb, 'settings', SETTING_KEY_LOGS), { items: updated }).catch(() => {});
   }
 }
 
@@ -491,7 +475,7 @@ export async function runWhatsAppBroadcastCampaign(params: {
   sentBy: string;
   includeSignatureHeader?: boolean;
   originHint?: string;
-  firestoreDb?: Firestore | null;
+  firestoreDb?: any;
 }): Promise<{
   campaignId: string;
   totalTargeted: number;

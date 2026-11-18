@@ -12,10 +12,7 @@
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
 import { Leader, DEFAULT_AUTHORITATIVE_LEADERS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
-import { getPreviewDb } from '../firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
-import { isSqlBackendActive, isFirebaseAllowedInCurrentEnvironment, sqlApiRequest, getAuthHeaders } from '../api/sqlBridge';
-import { canUsePreviewRead, recordPreviewFirestoreReads } from '../utils/previewFirebaseGuard';
+import { isSqlBackendActive, sqlApiRequest, getAuthHeaders } from '../api/sqlBridge';
 
 import {
   CACHE_KEY_OFFICIALS,
@@ -27,11 +24,10 @@ import {
   CACHE_KEY_PRESIDENT_PASS,
 } from '../utils/officialsCache';
 
-const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 const CACHE_KEY_LEADERSHIP = 'mahasangh_dynamic_leadership_v1';
 const CACHE_KEY_LEADERSHIP_VER = 'mahasangh_leadership_ver_v1';
 const CACHE_KEY_LEADERSHIP_TS = 'mahasangh_leadership_ts_v1';
-const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes smart cache TTL to minimize Preview quota usage
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes cache TTL
 
 let officialsInFlight: Promise<OfficialMember[]> | null = null;
 let postsInFlight: Promise<AppointedPostItem[]> | null = null;
@@ -409,30 +405,7 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
         );
 
         if (hasLegalAdvisors && parsed.length >= 50) {
-          // Within 30-min TTL: ZERO network bandwidth used!
-          if (cachedTs && Date.now() - Number(cachedTs) < CACHE_TTL_MS) {
-            return parsed;
-          }
-
-          if (!useSql && (await isFirebaseAllowedInCurrentEnvironment()) && canUsePreviewRead('rtdb_leaders_ver', false)) {
-            // Beyond 60-min TTL in AI Studio Preview mode: check tiny 13-byte leadership_version.json
-            try {
-              const verRes = await fetch(`${RTDB_BASE_URL}/leadership_version.json`, { cache: 'no-store' });
-              recordPreviewFirestoreReads(1, 'rtdb_leaders_ver', false);
-              if (verRes.ok) {
-                const remoteVer = await verRes.json();
-                if (remoteVer && cachedVer && String(remoteVer) === String(cachedVer)) {
-                  localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-                  return parsed;
-                }
-                if (remoteVer) {
-                  localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(remoteVer));
-                }
-              }
-            } catch {
-              return parsed;
-            }
-          }
+          return parsed;
         }
       }
     } catch {}
@@ -453,71 +426,8 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
     } catch (err) {
       console.warn('SQL dynamic leaders fetch failed:', err);
     }
-
-    try {
-      const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {}
-
-    return DEFAULT_AUTHORITATIVE_LEADERS;
   }
 
-  if (!(await isFirebaseAllowedInCurrentEnvironment()) || !canUsePreviewRead('rtdb_leaders', false)) {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return DEFAULT_AUTHORITATIVE_LEADERS;
-  }
-
-  // 1. Direct fetch from Firebase RTDB (AI Studio Preview only)
-  try {
-    const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, { cache: 'no-store' });
-    recordPreviewFirestoreReads(1, 'rtdb_leaders', false);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(data));
-        localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-        window.dispatchEvent(new Event('mahasangh_leadership_updated'));
-        return data;
-      }
-    }
-  } catch (err) {
-    console.warn('RTDB dynamic leaders fetch failed, trying Firestore:', err);
-  }
-
-  // 2. Fallback to Firestore `/leadership` collection (AI Studio Preview only)
-  try {
-    const previewDb = getPreviewDb();
-    if (previewDb && canUsePreviewRead('leadership', true)) {
-      const snap = await getDocs(collection(previewDb, 'leadership'));
-      recordPreviewFirestoreReads(snap.size || 1, 'leadership', true);
-      if (!snap.empty) {
-        const firestoreLeaders: Leader[] = [];
-        snap.forEach((d) => {
-          firestoreLeaders.push(d.data() as Leader);
-        });
-        if (firestoreLeaders.length > 0) {
-          firestoreLeaders.sort((a: any, b: any) => (a.orderIndex ?? 999) - (b.orderIndex ?? 999));
-          localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(firestoreLeaders));
-          return firestoreLeaders;
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('Firestore leadership fallback failed:', err);
-  }
-
-  // 3. Fallback to valid localStorage cache if present
   try {
     const cached = localStorage.getItem(CACHE_KEY_LEADERSHIP);
     if (cached) {
@@ -528,12 +438,11 @@ export async function fetchDynamicLeaders(forceRefresh = false): Promise<Leader[
     }
   } catch {}
 
-  // 4. Default to authoritative live seed (with legal advisors and photos)
   return DEFAULT_AUTHORITATIVE_LEADERS;
 }
 
 /**
- * Save dynamic leaders list to SQL or Firebase and update version.
+ * Save dynamic leaders list to SQL or LocalStorage and update version.
  */
 export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<void> {
   const seenIds = new Set<string>();
@@ -559,74 +468,25 @@ export async function saveDynamicLeadersToFirebase(leaders: Leader[]): Promise<v
   });
 
   if (await isSqlBackendActive()) {
-    const res = await sqlApiRequest<{ status: string; version?: number }>('/api/db/rk/leaders', {
-      method: 'POST',
-      body: JSON.stringify({ leaders: cleanLeaders }),
-    });
-    const newVer = res?.version || Date.now();
-    localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
-    localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
-    localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-    window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
-    return;
-  }
-
-  if (!(await isFirebaseAllowedInCurrentEnvironment())) {
-    throw new Error('Firebase is disabled outside AI Studio Preview.');
+    try {
+      const res = await sqlApiRequest<{ status: string; version?: number }>('/api/db/rk/leaders', {
+        method: 'POST',
+        body: JSON.stringify({ leaders: cleanLeaders }),
+      });
+      const newVer = res?.version || Date.now();
+      localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
+      localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
+      localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
+      window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
+      return;
+    } catch (err) {
+      console.warn('SQL leaders save failed, using local storage:', err);
+    }
   }
 
   const newVer = Date.now();
-
-  // Save leaders to RTDB
-  const res = await fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(cleanLeaders)
-  });
-
-  if (!res.ok) {
-    throw new Error(`Failed to save leaders to Firebase: ${res.statusText}`);
-  }
-
-  // Update version in RTDB
-  await fetch(`${RTDB_BASE_URL}/leadership_version.json`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newVer)
-  }).catch(() => {});
-
   localStorage.setItem(CACHE_KEY_LEADERSHIP, JSON.stringify(cleanLeaders));
   localStorage.setItem(CACHE_KEY_LEADERSHIP_VER, String(newVer));
   localStorage.setItem(CACHE_KEY_LEADERSHIP_TS, String(Date.now()));
-
-  // Dual-sync to Firestore `/leadership` collection (AI Studio Preview only)
-  try {
-    const previewDb = getPreviewDb();
-    if (previewDb) {
-      await Promise.all(
-        cleanLeaders.map((l, i) => {
-          const id = l.id || `leader_${i}`;
-          const fsPayload: Record<string, any> = {
-            id,
-            name: l.name,
-            role: l.role,
-            region: l.region,
-            education: l.education || '',
-            phone: l.phone || '-',
-            photo: l.photo || '',
-            isKey: Boolean(l.isKey),
-            orderIndex: i,
-            updatedAt: new Date().toISOString(),
-          };
-          if (l.email) fsPayload.email = l.email;
-          if (l.category) fsPayload.category = l.category;
-          return setDoc(doc(previewDb, 'leadership', id), fsPayload).catch(() => {});
-        })
-      );
-    }
-  } catch (err) {
-    console.warn('Firestore leadership sync warning:', err);
-  }
-
   window.dispatchEvent(new CustomEvent('mahasangh_leadership_updated', { detail: cleanLeaders }));
 }

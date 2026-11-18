@@ -52,7 +52,7 @@ export function isMysqlConfigured(): boolean {
 
 export function isMysqlActive(): boolean {
   const backend = String(process.env.DB_BACKEND || '').trim().toLowerCase();
-  if (backend === 'firebase') return false;
+  if (backend === 'mock') return false;
   if (backend === 'mysql') return isMysqlConfigured();
   // Auto-enable MySQL if mysql-config.json or MYSQL_* env vars are explicitly configured
   return isMysqlConfigured();

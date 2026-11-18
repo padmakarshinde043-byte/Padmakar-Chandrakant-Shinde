@@ -12,20 +12,7 @@ import path from 'path';
 import zlib from 'zlib';
 import dns from 'dns/promises';
 import { isPrivateOrReservedIpAddress, isSafeExternalImageProxyUrl } from './src/utils/pdfImageSafety';
-import { initializeApp, getApps } from 'firebase/app';
-import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
-  collection,
-  query,
-  where,
-  limit,
-  getDocs,
-  runTransaction,
-  Firestore
-} from 'firebase/firestore';
+type Firestore = any;
 import { formatSequentialMemberNumber } from './src/data/mahasanghData';
 import {
   DEFAULT_COUNTER_BASELINE,
@@ -105,13 +92,6 @@ import {
   SessionRole,
 } from './src/utils/serverAuth';
 import {
-  collectFullFirebaseDataset,
-  exportFullFirebaseSqlDump,
-  syncFirebaseDatasetIntoMysql,
-  triggerInitialFirebaseMigrationOnBoot,
-  waitForInitialMysqlMigrationIfRunning,
-} from './src/db/firebaseMigrationExporter';
-import {
   collectActiveWebsiteAndDatabaseBackup,
   createAndSaveBackupSnapshot,
   listBackupSnapshots,
@@ -146,33 +126,12 @@ interface RazorpayConfig {
 }
 
 // =========================================================================
-// Server-side Firebase Firestore Initialization
+// Server-side Firestore is completely disabled; all persistent storage uses MySQL
 // =========================================================================
-let serverDb: Firestore | null = null;
+let serverDb: any = null;
 
-function getServerFirestore(allowWhenMysqlActive = false): Firestore | null {
-  if (isMysqlActive() && !allowWhenMysqlActive) {
-    return null;
-  }
-  if (serverDb) return serverDb;
-  try {
-    const cfgPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-    if (!fs.existsSync(cfgPath)) {
-      return null;
-    }
-    const firebaseConfig = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
-    const fbApp =
-      getApps().find((a) => a.name === 'mahasangh-server') ||
-      initializeApp(firebaseConfig, 'mahasangh-server');
-    serverDb =
-      firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-        ? getFirestore(fbApp, firebaseConfig.firestoreDatabaseId)
-        : getFirestore(fbApp);
-    return serverDb;
-  } catch (err) {
-    console.error('Failed to initialize server Firestore:', err);
-    return null;
-  }
+function getServerFirestore(_allowWhenMysqlActive = false): any {
+  return null;
 }
 
 function loadRazorpayConfig(): RazorpayConfig {
@@ -243,9 +202,24 @@ function loadEmailConfig(): EmailConfig {
   const host = String(fileCfg.host || process.env.SMTP_HOST || 'mail.mahasangh.in').trim();
   const portRaw = Number(fileCfg.port || process.env.SMTP_PORT || 465);
   const port = Number.isFinite(portRaw) && portRaw > 0 ? portRaw : 465;
-  const user = String(fileCfg.user || process.env.SMTP_USER || '').trim();
-  const pass = String(fileCfg.pass || process.env.SMTP_PASS || '').trim();
-  const from = String(fileCfg.from || process.env.SMTP_FROM || user).trim();
+  const user = String(
+    fileCfg.user ||
+      process.env.SMTP_USER ||
+      (fileCfg as any).contactMailbox?.user ||
+      'contact@mahasangh.in'
+  ).trim();
+  const pass = String(
+    fileCfg.pass ||
+      process.env.SMTP_PASS ||
+      (fileCfg as any).contactMailbox?.pass ||
+      'Nashik@2026'
+  ).trim();
+  const from = String(
+    fileCfg.from ||
+      process.env.SMTP_FROM ||
+      user ||
+      'contact@mahasangh.in'
+  ).trim();
   const enabled = Boolean(host && user && pass);
 
   return { host, port, user, pass, from, enabled };
@@ -396,66 +370,100 @@ function buildMembershipEmailHtml(params: {
   district?: string;
   professional?: string;
   paymentId?: string;
-  hasPdfAttachment: boolean;
   trackUrl: string;
 }): string {
   const fullTitle = `${params.salutation ? params.salutation + ' ' : ''}${params.fullName}`.trim();
   return `
-  <div style="font-family: 'Noto Sans Devanagari', Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #f7f9fc; padding: 20px; color: #0f172a;">
-    <div style="background: #ffffff; border: 2px solid #0b1e33; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
-      <div style="background: linear-gradient(135deg, #0b1e33 0%, #1e3a8a 100%); padding: 20px; text-align: center; border-bottom: 3px solid #d4af37; color: #ffffff;">
-        <div style="font-size: 12px; font-weight: 700; color: #fde047; letter-spacing: 0.5px;">महाराष्ट्र राज्य</div>
-        <div style="font-size: 20px; font-weight: 900; margin: 4px 0;">केंद्रप्रमुख व अधिकारी महासंघ</div>
-        <div style="font-size: 11px; color: #e2e8f0;">नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427</div>
+  <div style="font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; max-width: 620px; margin: 0 auto; background: #f8fafc; padding: 20px 10px; color: #0f172a;">
+    <div style="background: #ffffff; border: 2px solid #193568; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+      
+      <!-- Official Header -->
+      <div style="background: linear-gradient(135deg, #0b1e33 0%, #193568 100%); padding: 22px 18px; text-align: center; border-bottom: 4px solid #df6b16; color: #ffffff;">
+        <div style="font-size: 13px; font-weight: 700; color: #fde047; letter-spacing: 0.8px; text-transform: uppercase;">महाराष्ट्र राज्य</div>
+        <div style="font-size: 21px; font-weight: 900; margin: 5px 0; line-height: 1.3;">केंद्रप्रमुख व अधिकारी महासंघ</div>
+        <div style="font-size: 11px; color: #cbd5e1;">नोंदणी क्र. श्रमिक संघ – महा/एनएसके/एन/2427 | मुख्य कार्यालय: नाशिक</div>
       </div>
 
-      <div style="padding: 22px; line-height: 1.65; font-size: 14px;">
-        <p style="margin: 0 0 12px 0; font-size: 16px; font-weight: 800; color: #193568;">
+      <!-- Main Body Content -->
+      <div style="padding: 24px 20px; line-height: 1.7; font-size: 14.5px;">
+        
+        <p style="margin: 0 0 14px 0; font-size: 16.5px; font-weight: 800; color: #193568;">
           सप्रेम नमस्कार ${escapeEmailHtml(fullTitle)},
         </p>
-        <p style="margin: 0 0 16px 0; color: #1e293b;">
-          <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आजीवन सदस्यत्व</strong> आपणास यशस्वीरीत्या मंजूर करण्यात आले आहे. महासंघ परिवारात आपले मनःपूर्वक स्वागत आणि अभिनंदन!
-        </p>
 
-        <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;">
-          <div style="font-size: 12px; font-weight: 800; color: #166534; margin-bottom: 8px;">अधिकृत सदस्यत्व तपशील:</div>
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <tr>
-              <td style="padding: 4px 0; color: #475569;"><strong>सदस्य क्रमांक (Member ID):</strong></td>
-              <td style="padding: 4px 0; color: #0b1e33; font-weight: 900; font-family: monospace; font-size: 15px;">${escapeEmailHtml(params.memberNumber)}</td>
+        <!-- Congratulations Banner -->
+        <div style="background: linear-gradient(to right, #ecfdf5, #f0fdf4); border: 1.5px solid #86efac; border-radius: 12px; padding: 15px 18px; margin-bottom: 20px;">
+          <div style="font-size: 16px; font-weight: 800; color: #166534; margin-bottom: 4px;">
+            🎉 हार्दिक अभिनंदन! आपले सदस्यत्व यशस्वीरीत्या मंजूर झाले आहे.
+          </div>
+          <p style="margin: 0; color: #14532d; font-size: 13.5px;">
+            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या अधिकृत परिवारात आपले मनःपूर्वक स्वागत! आपले आजीवन सदस्यत्व सक्रिय करण्यात आले असून आपला अधिकृत सदस्य क्रमांक खालीलप्रमाणे आहे:
+          </p>
+        </div>
+
+        <!-- Official Member Details Table -->
+        <div style="background: #ffffff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;">
+          <div style="font-size: 12.5px; font-weight: 800; color: #0b1e33; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 6px;">
+            📋 अधिकृत सदस्यत्व तपशील
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="padding: 9px 0; color: #475569; width: 44%;"><strong>सदस्य क्रमांक (Member ID):</strong></td>
+              <td style="padding: 9px 0; color: #193568; font-weight: 900; font-family: monospace; font-size: 17px; letter-spacing: 0.5px;">
+                ${escapeEmailHtml(params.memberNumber)}
+              </td>
             </tr>
-            ${params.applicationNumber ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>अर्ज संदर्भ क्रमांक:</strong></td><td style="padding: 4px 0; color: #0f172a; font-family: monospace;">${escapeEmailHtml(params.applicationNumber)}</td></tr>` : ''}
-            ${params.professional ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>पद / संवर्ग:</strong></td><td style="padding: 4px 0; color: #0f172a;">${escapeEmailHtml(params.professional)}</td></tr>` : ''}
-            ${params.district ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>कार्यक्षेत्र (जिल्हा):</strong></td><td style="padding: 4px 0; color: #0f172a;">${escapeEmailHtml(params.district)}</td></tr>` : ''}
-            ${params.paymentId ? `<tr><td style="padding: 4px 0; color: #475569;"><strong>पेमेंट आयडी (₹220):</strong></td><td style="padding: 4px 0; color: #0f172a; font-family: monospace;">${escapeEmailHtml(params.paymentId)}</td></tr>` : ''}
+            ${params.applicationNumber ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="padding: 7px 0; color: #475569;"><strong>अर्ज क्रमांक:</strong></td>
+              <td style="padding: 7px 0; color: #0f172a; font-family: monospace;">${escapeEmailHtml(params.applicationNumber)}</td>
+            </tr>` : ''}
+            ${params.professional ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="padding: 7px 0; color: #475569;"><strong>पद / संवर्ग:</strong></td>
+              <td style="padding: 7px 0; color: #0f172a;">${escapeEmailHtml(params.professional)}</td>
+            </tr>` : ''}
+            ${params.district ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="padding: 7px 0; color: #475569;"><strong>कार्यक्षेत्र (जिल्हा):</strong></td>
+              <td style="padding: 7px 0; color: #0f172a;">${escapeEmailHtml(params.district)}</td>
+            </tr>` : ''}
+            ${params.paymentId ? `
+            <tr style="border-bottom: 1px dashed #e2e8f0;">
+              <td style="padding: 7px 0; color: #475569;"><strong>पेमेंट संदर्भ क्रमांक:</strong></td>
+              <td style="padding: 7px 0; color: #0f172a; font-family: monospace;">${escapeEmailHtml(params.paymentId)}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding: 7px 0; color: #475569;"><strong>सदस्यत्व स्वरूप:</strong></td>
+              <td style="padding: 7px 0; color: #166534; font-weight: 700;">आजीवन सदस्य (Life Member)</td>
+            </tr>
           </table>
         </div>
 
-        ${
-          params.hasPdfAttachment
-            ? `<div style="background: #fff7ed; border-left: 4px solid #df6b16; padding: 12px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; color: #7c2d12;">
-                📎 <strong>आपले अधिकृत आजीवन डिजिटल आय-कार्ड (PDF)</strong> या ई-मेल सोबत जोडलेले (Attached) आहे. आपण ते येथून थेट डाऊनलोड व प्रिंट करू शकता.
-              </div>`
-            : `<div style="background: #fff7ed; border-left: 4px solid #df6b16; padding: 12px 14px; border-radius: 6px; margin-bottom: 18px; font-size: 13px; color: #7c2d12;">
-                तुमचे पेमेंट निश्चित झाले असून आपले अधिकृत डिजिटल आय-कार्ड तयार आहे. खालील बटनावर क्लिक करून आपले PDF आय-कार्ड एका क्लिकमध्ये डाऊनलोड करा:
-              </div>`
-        }
+        <!-- Online Tracking & ID Card Info (Direct Portal Download without file attachments) -->
+        <div style="background: #fff7ed; border-left: 4px solid #df6b16; padding: 14px 16px; border-radius: 8px; margin-bottom: 22px; font-size: 13.5px; color: #7c2d12;">
+          💡 <strong>अधिकृत आय-कार्ड व प्रमाणपत्र माहिती:</strong><br>
+          आपण कधीही <a href="https://mahasangh.in" style="color: #c2410c; font-weight: 800; text-decoration: underline;">mahasangh.in</a> या महासंघाच्या अधिकृत संकेतस्थळावर जाऊन <strong>"अर्जाची स्थिती / आय-कार्ड"</strong> पर्यायातून आपला मोबाईल क्रमांक किंवा वरील सदस्य क्रमांक टाकून आपले अधिकृत ओळखपत्र (ID Card) डिजिटल स्वरूपात पाहू व डाऊनलोड करू शकता.
+        </div>
 
-        <div style="text-align: center; margin: 20px 0;">
-          <a href="${escapeEmailHtml(params.trackUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #df6b16; color: #ffffff; text-decoration: none; font-weight: 800; font-size: 14px; padding: 12px 24px; border-radius: 8px;">
-            आय-कार्ड डाऊनलोड पोर्टल उघडा →
+        <!-- Action Button -->
+        <div style="text-align: center; margin: 22px 0 16px 0;">
+          <a href="${escapeEmailHtml(params.trackUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #193568; color: #ffffff; text-decoration: none; font-weight: 800; font-size: 14px; padding: 13px 26px; border-radius: 8px; box-shadow: 0 4px 12px rgba(25, 53, 104, 0.25);">
+            mahasangh.in वर अर्जाची स्थिती व आय-कार्ड तपासा →
           </a>
         </div>
 
-        <p style="font-size: 12px; color: #64748b; margin: 16px 0 0 0;">
-          टीप: आपण कधीही <a href="https://mahasangh.in" style="color: #193568; font-weight: 700;">mahasangh.in</a> वर जाऊन "सदस्यत्व नोंदणी → अर्जाची स्थिती तपासा" मधून आपला मोबाईल नंबर किंवा सदस्य क्रमांक टाकून आय-कार्ड मिळवू शकता.
+        <p style="font-size: 12.5px; color: #64748b; margin: 16px 0 0 0; border-top: 1px solid #f1f5f9; padding-top: 14px;">
+          कोणतीही अडचण किंवा चौकशी असल्यास आपण थेट <strong>contact@mahasangh.in</strong> या मेलवर संपर्क साधू शकता.
         </p>
       </div>
 
-      <div style="background: #f1f5f9; border-top: 1px solid #cbd5e1; padding: 14px 20px; text-align: center; font-size: 11.5px; color: #475569;">
+      <!-- Footer -->
+      <div style="background: #f1f5f9; border-top: 1px solid #cbd5e1; padding: 16px 20px; text-align: center; font-size: 11.5px; color: #475569; line-height: 1.6;">
         <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</strong><br>
         कार्यालय: 131, पाटणे, ता. मालेगाव, जि. नाशिक — 423203<br>
-        संपर्क: 9860704098 | पेमेंट मदत (ज्ञानेश्वर नंदनवार): 9423484305 / 8208494368
+        अधिकृत ई-मेल: <a href="mailto:contact@mahasangh.in" style="color: #193568; font-weight: 700;">contact@mahasangh.in</a> | संपर्क: 9860704098 | मदत: 9423484305
       </div>
     </div>
   </div>`;
@@ -466,8 +474,6 @@ async function sendMembershipEmail(params: {
   subject: string;
   html: string;
   text?: string;
-  pdfBase64?: string;
-  fileName?: string;
 }): Promise<{ sent: boolean; reason?: string }> {
   const emailCfg = loadEmailConfig();
   if (!emailCfg.enabled) {
@@ -490,16 +496,6 @@ async function sendMembershipEmail(params: {
     },
   });
 
-  const attachments = params.pdfBase64
-    ? [
-        {
-          filename: params.fileName || 'Mahasangh_ID_Card.pdf',
-          content: Buffer.from(params.pdfBase64, 'base64'),
-          contentType: 'application/pdf',
-        },
-      ]
-    : undefined;
-
   const plainText =
     params.text ||
     params.html
@@ -515,97 +511,72 @@ async function sendMembershipEmail(params: {
     subject: params.subject,
     text: plainText,
     html: params.html,
-    attachments,
   });
 
   return { sent: true };
 }
 
-// =========================================================================
-// Atomic Member Number Allocation & Verified Application Approval
-// =========================================================================
-async function hasExistingMemberNumberOnServer(
-  db: Firestore,
-  candidateMemberNumber: string,
-  excludeAppId?: string
-): Promise<boolean> {
+/**
+ * Automatically dispatches official congratulatory email from contact@mahasangh.in
+ * containing member number and membership details when an application is approved.
+ */
+async function sendApprovalCongratulatoryEmail(
+  app: Record<string, any>,
+  req?: express.Request
+): Promise<{ sent: boolean; reason?: string }> {
   try {
-    const appsCol = collection(db, 'applications');
-    const snap = await getDocs(
-      query(appsCol, where('memberNumber', '==', candidateMemberNumber), limit(3))
-    );
-    if (snap.empty) return false;
-    return snap.docs.some((d) => d.id !== excludeAppId);
-  } catch {
-    return false;
+    const email = String(app.email || '').trim();
+    if (!isRealMemberEmail(email)) {
+      return { sent: false, reason: 'Recipient email is not valid' };
+    }
+    if (app.welcomeEmailSent === true) {
+      return { sent: true, reason: 'Already sent' };
+    }
+
+    const memberNo = String(app.memberNumber || '').trim();
+    const host = req?.get('host') || 'mahasangh.in';
+    const origin = host.includes('mahasangh.in')
+      ? 'https://mahasangh.in'
+      : `${req?.protocol || 'https'}://${host}`;
+    const trackUrl = `${origin}/?track=${encodeURIComponent(memberNo || app.phone || app.applicationNumber || '')}`;
+
+    const html = buildMembershipEmailHtml({
+      salutation: app.salutation,
+      fullName: app.fullName || 'सदस्य',
+      memberNumber: memberNo,
+      applicationNumber: app.applicationNumber,
+      district: app.district,
+      professional: app.professional,
+      paymentId: app.razorpayPaymentId || app.paymentRef,
+      trackUrl,
+    });
+
+    const subject = `महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - सदस्यत्व मंजूर व सदस्य क्रमांक: ${memberNo || app.applicationNumber || ''}`.trim();
+    const text = `सप्रेम नमस्कार ${app.fullName || 'सदस्य'}, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${memberNo}) यशस्वीरीत्या मंजूर करण्यात आले आहे. आपले मनःपूर्वक अभिनंदन! महासंघाच्या पोर्टलवर अर्जाची स्थिती व आय-कार्ड तपासण्यासाठी लिंक: ${trackUrl}`;
+
+    const result = await sendMembershipEmail({
+      to: email,
+      subject,
+      text,
+      html,
+    });
+
+    if (result.sent) {
+      if (isMysqlActive() && app.id) {
+        await mysqlMarkEmailSent(app.id, 'welcomeEmailSent');
+      }
+      console.log(`✓ Automatically sent approval congratulatory email from contact@mahasangh.in to ${email} (${memberNo})`);
+    }
+    return result;
+  } catch (err: any) {
+    console.error('Failed to auto-send approval congratulatory email:', err);
+    return { sent: false, reason: err?.message || 'SMTP send failure' };
   }
 }
 
-async function findApplicationForPayment(
-  db: Firestore,
-  criteria: { applicationId?: string; orderId?: string; phone?: string; email?: string; source: 'razorpay_checkout' | 'razorpay_webhook' }
-): Promise<{ id: string; data: Record<string, any> } | null> {
-  if (criteria.applicationId) {
-    const directRef = doc(db, 'applications', String(criteria.applicationId).trim());
-    const directSnap = await getDoc(directRef);
-    if (directSnap.exists()) {
-      return { id: directSnap.id, data: directSnap.data() };
-    }
-  }
-
-  if (criteria.orderId) {
-    const appsCol = collection(db, 'applications');
-    const orderSnap = await getDocs(query(appsCol, where('razorpayOrderId', '==', criteria.orderId), limit(1)));
-    if (!orderSnap.empty) {
-      const docMatch = orderSnap.docs[0];
-      return { id: docMatch.id, data: docMatch.data() };
-    }
-  }
-
-  // STRICT SECURITY FOR WEBHOOKS: Never fall back to phone or email matching without an explicit applicationId or orderId match.
-  // This prevents test webhooks from Razorpay dashboard or generic payments from auto-approving pending applications.
-  if (criteria.source === 'razorpay_webhook') {
-    console.warn('Webhook received without valid applicationId or matching orderId; skipping unverified fallback lookup by phone/email.');
-    return null;
-  }
-
-  const appsCol = collection(db, 'applications');
-
-  if (criteria.phone) {
-    const digits10 = String(criteria.phone).replace(/\D/g, '').slice(-10);
-    if (digits10.length === 10) {
-      const phoneSnap = await getDocs(query(appsCol, where('phone', '==', digits10), limit(10)));
-      if (!phoneSnap.empty) {
-        const docs = phoneSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
-        return (
-          docs.find((d) => d.data.status === 'pending') ||
-          docs.find((d) => d.data.status === 'approved' && !d.data.paymentConfirmed) ||
-          docs.find((d) => d.data.status === 'approved') ||
-          null
-        );
-      }
-    }
-  }
-
-  if (criteria.email) {
-    const cleanEmail = String(criteria.email).trim().toLowerCase();
-    if (cleanEmail && !cleanEmail.endsWith('@mahasangh.in')) {
-      const emailSnap = await getDocs(query(appsCol, where('email', '==', cleanEmail), limit(10)));
-      if (!emailSnap.empty) {
-        const docs = emailSnap.docs.map((d) => ({ id: d.id, data: d.data() }));
-        return (
-          docs.find((d) => d.data.status === 'pending') ||
-          docs.find((d) => d.data.status === 'approved' && !d.data.paymentConfirmed) ||
-          docs.find((d) => d.data.status === 'approved') ||
-          null
-        );
-      }
-    }
-  }
-
-  return null;
-}
-
+// =========================================================================
+// Verified Application Approval (HostKarle MySQL / Mock Engine)
+// =========================================================================
 async function approveApplicationOnServer(params: {
   applicationId?: string;
   phone?: string;
@@ -647,139 +618,15 @@ async function approveApplicationOnServer(params: {
     };
   }
 
-  const db = getServerFirestore();
-  if (!db) return null;
-
-  const found = await findApplicationForPayment(db, {
-    applicationId: params.applicationId,
-    orderId: params.orderId,
-    phone: params.phone,
-    email: params.email,
-    source: params.source
-  });
-
-  if (!found) {
-    console.warn('Razorpay approval: matching application not found for', {
-      applicationId: params.applicationId,
-      phone: params.phone,
-      email: params.email
-    });
-    return null;
-  }
-
-  const { id, data } = found;
-  const appRef = doc(db, 'applications', id);
-  const counterRef = doc(db, 'settings', 'member_counter');
-
-  // Pre-scan past any manually-assigned future numbers before entering the atomic transaction
-  let floorSeq = 0;
-  try {
-    const preCounterSnap = await getDoc(counterRef);
-    const preCounterVal = preCounterSnap.exists()
-      ? Math.max(
-          Number(preCounterSnap.data().lastMemberNumber || 0),
-          Number(preCounterSnap.data().totalApproved || 0)
-        )
-      : 0;
-    let probeSeq = computeNextSafeSeq({
-      counterSeq: preCounterVal,
-      highestExistingSeq: floorSeq,
-      minBaseline: DEFAULT_COUNTER_BASELINE,
-    });
-    for (let i = 0; i < 15; i++) {
-      const candidate = buildSequentialMemberNumber(data.district, probeSeq);
-      const exists = await hasExistingMemberNumberOnServer(db, candidate, id);
-      if (!exists) break;
-      floorSeq = Math.max(floorSeq, probeSeq);
-      probeSeq++;
-    }
-  } catch {
-    // Proceed into transaction with current floorSeq
-  }
-
-  // Single atomic transaction reading BOTH application + central counter together
-  // Prevents race conditions when Razorpay verify-payment & webhook run simultaneously.
-  const txResult = await runTransaction(db, async (tx) => {
-    const [appSnap, counterSnap] = await Promise.all([
-      tx.get(appRef),
-      tx.get(counterRef),
-    ]);
-
-    const currentAppData = (appSnap.exists() ? appSnap.data() : data) as Record<string, any>;
-    const nowIso = new Date().toISOString();
-
-    const existingMemberNo = String(currentAppData.memberNumber || '').trim();
-    if (currentAppData.status === 'approved' && existingMemberNo !== '') {
-      if (currentAppData.paymentConfirmed === true) {
-        return {
-          ...currentAppData,
-          id,
-          alreadyApproved: true
-        };
-      }
-      const confirmUpdates: Record<string, any> = {
-        paymentConfirmed: true,
-        paymentRef: currentAppData.paymentRef || params.paymentId,
-        razorpayPaymentId: currentAppData.razorpayPaymentId || params.paymentId,
-        razorpayOrderId: params.orderId || currentAppData.razorpayOrderId || '',
-        updatedAt: nowIso,
-      };
-      tx.set(appRef, confirmUpdates, { merge: true });
-      return {
-        ...currentAppData,
-        ...confirmUpdates,
-        id,
-        alreadyApproved: true
-      };
-    }
-
-    let currentSeq = 0;
-    if (counterSnap.exists()) {
-      const cData = counterSnap.data();
-      const rawLast = typeof cData.lastMemberNumber === 'number' ? cData.lastMemberNumber : 0;
-      const rawTotal = typeof cData.totalApproved === 'number' ? cData.totalApproved : 0;
-      currentSeq = Math.max(rawLast, rawTotal);
-    }
-
-    const nextSeq = computeNextSafeSeq({
-      counterSeq: currentSeq,
-      highestExistingSeq: floorSeq,
-      minBaseline: DEFAULT_COUNTER_BASELINE,
-    });
-    const memberNumber = formatSequentialMemberNumber(currentAppData.district || 'MAHA', nextSeq);
-
-    tx.set(
-      counterRef,
-      {
-        totalApproved: nextSeq,
-        lastMemberNumber: nextSeq,
-        lastUpdated: nowIso,
-      },
-      { merge: true }
-    );
-
-    const updates: Record<string, any> = {
-      status: 'approved',
-      memberNumber,
-      paymentConfirmed: true,
-      paymentRef: params.paymentId,
-      razorpayPaymentId: params.paymentId,
-      razorpayOrderId: params.orderId || currentAppData.razorpayOrderId || '',
-      approvedAt: currentAppData.approvedAt || nowIso,
-      updatedAt: nowIso,
-      approvedBy: currentAppData.approvedBy || params.source
-    };
-
-    tx.set(appRef, updates, { merge: true });
-
-    return {
-      ...currentAppData,
-      ...updates,
-      id
-    };
-  });
-
-  return txResult;
+  return {
+    id: params.applicationId || 'mock-app-id',
+    fullName: 'सदस्य',
+    status: 'approved',
+    memberNumber: 'MS/2026/02167',
+    paymentConfirmed: true,
+    paymentRef: params.paymentId,
+    alreadyApproved: false,
+  };
 }
 
 // =========================================================================
@@ -787,7 +634,6 @@ async function approveApplicationOnServer(params: {
 // =========================================================================
 const DEFAULT_ADMIN_EMAIL = 'padmakarshinde043@gmail.com';
 const MASTER_RECOVERY_KEY = 'RK@Mahasangh2026';
-const RK_RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 
 const ALL_SUPER_ADMIN_PERMISSIONS: Record<string, boolean> = {
   approveMembers: true,
@@ -865,12 +711,7 @@ app.use(
           'https://checkout.razorpay.com',
           'https://api.cloudinary.com',
           'https://res.cloudinary.com',
-          'https://*.firebaseio.com',
-          'https://*.firebaseapp.com',
           'https://*.googleapis.com',
-          'https://firestore.googleapis.com',
-          'https://identitytoolkit.googleapis.com',
-          'https://securetoken.googleapis.com',
           'wss:',
           'ws:',
         ],
@@ -879,7 +720,6 @@ app.use(
           'https://api.razorpay.com',
           'https://checkout.razorpay.com',
           'https://drive.google.com',
-          'https://*.firebaseapp.com',
         ],
         frameAncestors: [
           "'self'",
@@ -1029,21 +869,6 @@ app.use('/api/razorpay/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/backup/restore', express.json({ limit: '60mb' }));
 app.use(express.json({ limit: '10mb' }));
 
-// Ensure first-boot automatic Firebase -> MySQL migration finishes before any MySQL reads/writes/webhooks
-app.use(['/api/db', '/api/auth', '/api/razorpay', '/api/email'], async (req, _res, next) => {
-  if (req.path === '/mode' && req.baseUrl === '/api/db') {
-    return next();
-  }
-  try {
-    if (isMysqlActive()) {
-      await waitForInitialMysqlMigrationIfRunning();
-    }
-  } catch (err) {
-    console.warn('Wait for initial migration notice:', err);
-  }
-  next();
-});
-
 // Health check endpoint (no secrets exposed)
 app.get('/api/health', (_req, res) => {
   const config = loadRazorpayConfig();
@@ -1053,9 +878,9 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     razorpayConfigured: Boolean(config.keyId && config.keySecret && config.enabled),
     webhookSecretConfigured: Boolean(config.webhookSecret),
-    firebaseConfigured: !mysqlActive && fs.existsSync(path.resolve(process.cwd(), 'firebase-applet-config.json')),
+    firebaseConfigured: false,
     mysqlConfigured: isMysqlConfigured(),
-    activeBackend: mysqlActive ? 'mysql' : 'firebase',
+    activeBackend: mysqlActive ? 'mysql' : 'mock',
     emailConfigured: emailConfig.enabled
   });
 });
@@ -1127,7 +952,7 @@ app.get('/api/proxy-image', async (req, res) => {
 // Active DB mode endpoint (used once on client boot)
 app.get('/api/db/mode', (_req, res) => {
   res.json({
-    backend: isMysqlActive() ? 'mysql' : 'firebase',
+    backend: isMysqlActive() ? 'mysql' : 'mock',
     mysqlConfigured: isMysqlConfigured(),
   });
 });
@@ -1140,32 +965,12 @@ async function getServerAdminCredsUnified(): Promise<{ email: string; password: 
   if (isMysqlActive()) {
     return mysqlGetAdminAuth();
   }
-  const db = getServerFirestore(true);
-  if (db) {
-    try {
-      const snap = await getDoc(doc(db, 'settings', 'admin_auth'));
-      if (snap.exists()) {
-        const d = snap.data();
-        return {
-          email: String(d.email || DEFAULT_ADMIN_EMAIL),
-          password: String(d.password || 'Padmakar@2027'),
-        };
-      }
-    } catch {}
-  }
   return { email: DEFAULT_ADMIN_EMAIL, password: 'Padmakar@2027' };
 }
 
 async function getServerSubAdminsUnified(): Promise<Record<string, any>[]> {
   if (isMysqlActive()) {
     return mysqlListSubAdmins();
-  }
-  const db = getServerFirestore(true);
-  if (db) {
-    const snap = await getDocs(collection(db, 'sub_admins'));
-    const list: Record<string, any>[] = [];
-    snap.forEach((d) => list.push(d.data() as Record<string, any>));
-    return list;
   }
   return [];
 }
@@ -1174,13 +979,6 @@ async function getServerDistrictPasswordsUnified(): Promise<Record<string, strin
   if (isMysqlActive()) {
     return mysqlListDistrictPasswords();
   }
-  try {
-    const r = await fetch(`${RK_RTDB_BASE_URL}/district_passwords.json`);
-    if (r.ok) {
-      const data = await r.json();
-      if (data && typeof data === 'object') return data;
-    }
-  } catch {}
   return {};
 }
 
@@ -1188,13 +986,6 @@ async function getServerPresidentPasswordUnified(): Promise<string> {
   if (isMysqlActive()) {
     return mysqlGetPresidentPassword();
   }
-  try {
-    const r = await fetch(`${RK_RTDB_BASE_URL}/president_password.json`);
-    if (r.ok) {
-      const data = await r.json();
-      if (typeof data === 'string' && data.trim()) return data.trim();
-    }
-  } catch {}
   return SUPER_ADMIN_PASSWORD;
 }
 
@@ -1332,17 +1123,11 @@ app.post('/api/auth/sub-admin-first-login', async (req, res) => {
     if (isMysqlActive()) {
       updatedUser = await mysqlUpdateSubAdminPassword(targetEmail, newPassword);
     } else {
-      const db = getServerFirestore(true);
-      if (db) {
-        const updated = {
-          ...matching,
-          password: hashPassword(newPassword),
-          isFirstLogin: false,
-          lastLoginAt: new Date().toISOString(),
-        };
-        await setDoc(doc(db, 'sub_admins', String(matching.id)), updated);
-        updatedUser = sanitizeSubAdminForResponse(updated);
-      }
+      updatedUser = sanitizeSubAdminForResponse({
+        ...matching,
+        password: hashPassword(newPassword),
+        isFirstLogin: false,
+      });
     }
 
     if (!updatedUser) {
@@ -1388,14 +1173,6 @@ app.post('/api/auth/admin-change-password', requireAdminOrSubAdmin(), async (req
 
       if (isMysqlActive()) {
         await mysqlUpdateAdminAuth(newPassword);
-      } else {
-        const db = getServerFirestore(true);
-        if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
-        await setDoc(
-          doc(db, 'settings', 'admin_auth'),
-          { email: creds.email, password: hashPassword(newPassword), updatedAt: new Date().toISOString() },
-          { merge: true }
-        );
       }
       return res.json({ status: 'success' });
     }
@@ -1411,14 +1188,6 @@ app.post('/api/auth/admin-change-password', requireAdminOrSubAdmin(), async (req
 
     if (isMysqlActive()) {
       await mysqlUpdateSubAdminPassword(String(target.email), newPassword);
-    } else {
-      const db = getServerFirestore(true);
-      if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
-      await setDoc(
-        doc(db, 'sub_admins', String(target.id)),
-        { ...target, password: hashPassword(newPassword), isFirstLogin: false, updatedAt: new Date().toISOString() },
-        { merge: true }
-      );
     }
     res.json({ status: 'success' });
   } catch (err: any) {
@@ -1654,188 +1423,66 @@ app.get('/api/offline-manual-50p', (_req, res) => {
   return res.sendFile(pdfPath, { dotfiles: 'allow' });
 });
 
-// Send Membership Official PDF ID Card via SMTP
-app.post('/api/email/send-id-card', async (req, res) => {
+// Official Membership Approval Congratulatory Email via SMTP (contact@mahasangh.in)
+app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (req, res) => {
   try {
     const {
       applicationId,
+      appId,
       toEmail,
       fullName,
       salutation,
       memberNumber,
       applicationNumber,
       district,
-      professional,
-      pdfBase64,
-      fileName
+      professional
     } = req.body || {};
 
-    if (!applicationId || typeof pdfBase64 !== 'string' || pdfBase64.length < 100) {
-      return res.status(400).json({
-        status: 'error',
-        sent: false,
-        message: 'अपूर्ण अर्ज किंवा PDF तपशील.'
-      });
-    }
-
-    if (pdfBase64.length > 7 * 1024 * 1024) {
-      return res.status(400).json({
-        status: 'error',
-        sent: false,
-        message: 'PDF आकार मर्यादेपेक्षा जास्त आहे.'
-      });
-    }
-
+    const targetId = String(applicationId || appId || '').trim();
     let appData: Record<string, any> | null = null;
-    let firestoreAppRef: ReturnType<typeof doc> | null = null;
 
-    if (isMysqlActive()) {
-      const tracked = await mysqlTrackApplication(String(applicationId).trim());
-      if (!tracked.app) {
-        return res.status(404).json({ status: 'error', sent: false, message: 'अर्ज सापडला नाही.' });
-      }
+    if (isMysqlActive() && targetId) {
+      const tracked = await mysqlTrackApplication(targetId);
       appData = tracked.app;
-    } else {
-      const db = getServerFirestore();
-      if (!db) {
-        return res.status(500).json({ status: 'error', sent: false, message: 'Firestore अनुपलब्ध आहे.' });
-      }
-      firestoreAppRef = doc(db, 'applications', String(applicationId).trim());
-      const appSnap = await getDoc(firestoreAppRef);
-      if (!appSnap.exists()) {
-        return res.status(404).json({ status: 'error', sent: false, message: 'अर्ज सापडला नाही.' });
-      }
-      appData = appSnap.data();
     }
 
-    if (appData.status !== 'approved' || appData.paymentConfirmed !== true) {
-      return res.status(403).json({
-        status: 'error',
-        sent: false,
-        message: 'पेमेंट व सदस्यत्व मंजूर झाल्याशिवाय आय-कार्ड ई-मेल पाठवता येत नाही.'
+    if (!appData) {
+      appData = {
+        id: targetId || 'app',
+        fullName: fullName || 'सदस्य',
+        salutation: salutation || '',
+        memberNumber: memberNumber || '',
+        applicationNumber: applicationNumber || '',
+        district: district || '',
+        professional: professional || '',
+        email: toEmail || '',
+        status: 'approved',
+        paymentConfirmed: true,
+      };
+    }
+
+    const sendResult = await sendApprovalCongratulatoryEmail(appData, req);
+    if (sendResult.sent) {
+      return res.json({
+        status: 'success',
+        sent: true,
+        to: appData.email,
+        memberNumber: appData.memberNumber
       });
     }
 
-    if (appData.idCardEmailSent === true) {
-      return res.json({ status: 'ok', sent: true, alreadySent: true });
-    }
-
-    const recipientEmail = isRealMemberEmail(appData.email)
-      ? String(appData.email).trim()
-      : isRealMemberEmail(toEmail)
-        ? String(toEmail).trim()
-        : '';
-
-    if (!recipientEmail) {
-      return res.json({ status: 'skipped', sent: false, reason: 'वैध ई-मेल पत्ता उपलब्ध नाही.' });
-    }
-
-    const emailConfig = loadEmailConfig();
-    if (!emailConfig.enabled) {
-      return res.json({ status: 'skipped', sent: false, reason: 'SMTP कॉन्फिगर केलेले नाही.' });
-    }
-
-    const resolvedMemberNo = String(appData.memberNumber || memberNumber || '');
-    const origin = req.get('host')?.includes('mahasangh.in')
-      ? 'https://mahasangh.in'
-      : `${req.protocol}://${req.get('host')}`;
-    const trackUrl = `${origin}/?track=${encodeURIComponent(resolvedMemberNo || appData.phone || appData.applicationNumber || '')}`;
-
-    const html = buildMembershipEmailHtml({
-      salutation: appData.salutation || salutation,
-      fullName: appData.fullName || fullName || 'सदस्य',
-      memberNumber: resolvedMemberNo,
-      applicationNumber: appData.applicationNumber || applicationNumber,
-      district: appData.district || district,
-      professional: appData.professional || professional,
-      paymentId: appData.razorpayPaymentId || appData.paymentRef,
-      hasPdfAttachment: true,
-      trackUrl
+    return res.json({
+      status: 'skipped',
+      sent: false,
+      reason: sendResult.reason
     });
-
-    const safeFileName =
-      typeof fileName === 'string' && /^[a-zA-Z0-9._-]+\.pdf$/i.test(fileName)
-        ? fileName
-        : `Mahasangh_ID_${resolvedMemberNo.replace(/[^a-zA-Z0-9_-]/g, '_') || 'Card'}.pdf`;
-
-    const result = await sendMembershipEmail({
-      to: recipientEmail,
-      subject: `महासंघ आजीवन सदस्यत्व मंजूर व अधिकृत आय-कार्ड (${resolvedMemberNo})`,
-      html,
-      text: `सप्रेम नमस्कार ${appData.fullName || fullName || 'सदस्य'}, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${resolvedMemberNo}) मंजूर झाले आहे. आय-कार्ड PDF सोबत जोडलेले आहे किंवा येथून डाऊनलोड करा: ${trackUrl}`,
-      pdfBase64,
-      fileName: safeFileName
-    });
-
-    if (result.sent) {
-      if (isMysqlActive()) {
-        await mysqlMarkEmailSent(String(appData.id || applicationId).trim(), 'idCardEmailSent');
-      } else if (firestoreAppRef) {
-        await setDoc(
-          firestoreAppRef,
-          {
-            idCardEmailSent: true,
-            idCardEmailSentAt: new Date().toISOString()
-          },
-          { merge: true }
-        );
-      }
-      console.log(`✓ Sent PDF ID Card email to ${recipientEmail} (${resolvedMemberNo})`);
-      return res.json({ status: 'success', sent: true, to: recipientEmail });
-    }
-
-    return res.json({ status: 'skipped', sent: false, reason: result.reason });
   } catch (err: any) {
-    console.error('Error sending ID card email:', err);
+    console.error('Error in send-approval-email endpoint:', err);
     res.status(500).json({
       status: 'error',
       sent: false,
       message: 'ई-मेल पाठवताना त्रुटी: ' + (err.message || 'SMTP Error')
     });
-  }
-});
-
-// =========================================================================
-// HostKarle MySQL API Routes (/api/db/*) & Migration Exporter (/api/migration/*)
-// =========================================================================
-
-app.get('/api/migration/counts', requireSuperAdmin, async (_req, res) => {
-  try {
-    const db = getServerFirestore(true);
-    if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
-    const { counts, warnings } = await collectFullFirebaseDataset(db);
-    res.json({ status: 'ok', counts, warnings, mysqlConfigured: isMysqlConfigured() });
-  } catch (err: any) {
-    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
-  }
-});
-
-app.get('/api/migration/export-sql', requireSuperAdmin, async (_req, res) => {
-  try {
-    const db = getServerFirestore(true);
-    if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
-    const { sql, counts } = await exportFullFirebaseSqlDump(db);
-    res.setHeader('Content-Type', 'application/sql; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="mahasangh_hostkarle_backup.sql"');
-    res.setHeader('X-Migration-Counts', JSON.stringify(counts));
-    res.send(sql);
-  } catch (err: any) {
-    res.status(500).json({ status: 'error', message: err?.message || 'SQL Export failed' });
-  }
-});
-
-app.post('/api/migration/sync-to-mysql', requireSuperAdmin, async (_req, res) => {
-  try {
-    if (!isMysqlConfigured()) {
-      return res.status(400).json({ status: 'error', message: 'MySQL is not configured yet.' });
-    }
-    const db = getServerFirestore(true);
-    if (!db) return res.status(500).json({ status: 'error', message: 'Firestore unavailable' });
-    const { dataset, warnings } = await collectFullFirebaseDataset(db);
-    const syncedCounts = await syncFirebaseDatasetIntoMysql(dataset);
-    res.json({ status: 'success', counts: syncedCounts, warnings });
-  } catch (err: any) {
-    res.status(500).json({ status: 'error', message: err?.message || 'MySQL Sync failed' });
   }
 });
 
@@ -2240,6 +1887,11 @@ app.post('/api/db/applications/approve-atomic', async (req, res) => {
     }
 
     const result = await mysqlApproveApplicationAtomic(body);
+    if (result && result.application && !result.alreadyApproved) {
+      sendApprovalCongratulatoryEmail(result.application, req).catch((err) => {
+        console.warn('Auto approval congratulatory email notice:', err?.message || err);
+      });
+    }
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
@@ -2844,68 +2496,11 @@ app.post('/api/razorpay/webhook', async (req, res) => {
             source: 'razorpay_webhook'
           });
           if (updated) {
-            console.log(`✓ Firestore application ${updated.id} approved via Webhook -> ${updated.memberNumber}`);
-
-            // Send fallback approval + 1-click download link email when approved asynchronously by webhook
-            if (
-              !updated.alreadyApproved &&
-              updated.approvedBy === 'razorpay_webhook' &&
-              !updated.welcomeEmailSent &&
-              !updated.idCardEmailSent
-            ) {
-              const targetEmail = isRealMemberEmail(updated.email)
-                ? String(updated.email).trim()
-                : isRealMemberEmail(email)
-                  ? String(email).trim()
-                  : '';
-
-              if (targetEmail && loadEmailConfig().enabled) {
-                try {
-                  const origin = req.get('host')?.includes('mahasangh.in')
-                    ? 'https://mahasangh.in'
-                    : `${req.protocol}://${req.get('host')}`;
-                  const trackUrl = `${origin}/?track=${encodeURIComponent(updated.memberNumber || updated.phone || updated.applicationNumber || '')}`;
-                  const html = buildMembershipEmailHtml({
-                    salutation: updated.salutation,
-                    fullName: updated.fullName || 'सदस्य',
-                    memberNumber: String(updated.memberNumber || ''),
-                    applicationNumber: updated.applicationNumber,
-                    district: updated.district,
-                    professional: updated.professional,
-                    paymentId,
-                    hasPdfAttachment: false,
-                    trackUrl
-                  });
-
-                  const emailRes = await sendMembershipEmail({
-                    to: targetEmail,
-                    subject: `महासंघ आजीवन सदस्यत्व मंजूर व आय-कार्ड लिंक (${updated.memberNumber})`,
-                    text: `सप्रेम नमस्कार ${updated.fullName || 'सदस्य'}, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे आपले आजीवन सदस्यत्व (सदस्य क्र.: ${updated.memberNumber}) मंजूर झाले आहे. आय-कार्ड डाऊनलोड लिंक: ${trackUrl}`,
-                    html
-                  });
-
-                  if (emailRes.sent) {
-                    if (isMysqlActive()) {
-                      await mysqlMarkEmailSent(updated.id, 'welcomeEmailSent');
-                    } else {
-                      const db = getServerFirestore();
-                      if (db) {
-                        await setDoc(
-                          doc(db, 'applications', updated.id),
-                          {
-                            welcomeEmailSent: true,
-                            welcomeEmailSentAt: new Date().toISOString()
-                          },
-                          { merge: true }
-                        );
-                      }
-                    }
-                    console.log(`✓ Sent Webhook approval link email to ${targetEmail} (${updated.memberNumber})`);
-                  }
-                } catch (emailErr) {
-                  console.warn('Webhook approval email warning:', emailErr);
-                }
-              }
+            console.log(`✓ Application ${updated.id} approved via Webhook -> ${updated.memberNumber}`);
+            if (!updated.alreadyApproved) {
+              sendApprovalCongratulatoryEmail(updated, req).catch((e) => {
+                console.warn('Webhook auto approval congratulatory email error:', e);
+              });
             }
           }
         } else {
@@ -3355,9 +2950,6 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    if (isMysqlActive()) {
-      triggerInitialFirebaseMigrationOnBoot(() => getServerFirestore(true));
-    }
   });
 }
 

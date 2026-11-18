@@ -9,7 +9,6 @@
     "build": "tsc && vite build && node scripts/build-server.mjs && python3 scripts/build-zip.py",
     "build:server": "node scripts/build-server.mjs",
     "lint": "tsc --noEmit",
-    "export:sql": "tsx scripts/export-firebase-to-sql.ts",
     "preview": "vite preview --port 3000"
   },
   "dependencies": {

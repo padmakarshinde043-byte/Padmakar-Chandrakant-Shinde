@@ -15,7 +15,6 @@ import { fetchOfficials } from '../services/rkFirebaseService';
 import { OfficialMember, DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import {
   generateMembershipCertificatePdf,
-  generateMembershipIdCardPdfBase64
 } from '../services/rkPdfGenerator';
 import { RegisteredMembersDirectory } from './RegisteredMembersDirectory';
 import {
@@ -311,7 +310,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     const normalizedNameLower = normalizedName.toLowerCase();
     const userEnteredEmail = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEnteredEmail) || /^\d{10}@mahasangh\.in$/i.test(userEnteredEmail)) {
-      setFormAlert('कृपया वैध ई-मेल पत्ता (Email) प्रविष्ट करा — आपले अधिकृत आय-कार्ड ई-मेलवर पाठवले जाईल.');
+      setFormAlert('कृपया वैध ई-मेल पत्ता (Email) प्रविष्ट करा — आपले सदस्यत्व मंजूर झाल्यावर अभिनंदन व सदस्य क्रमांक या ई-मेलवर पाठवला जाईल.');
       window.scrollTo({ top: 380, behavior: 'smooth' });
       return;
     }
@@ -489,22 +488,22 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       setSearchResult(finalApp);
     }
 
-    // Automatically email the official CR80 PDF ID card to the member (non-blocking)
+    // Automatically email official congratulations & member number to the member (non-blocking)
     const memberEmail = (finalApp.email || '').trim();
     const hasRealEmail =
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(memberEmail) && !/^\d{10}@mahasangh\.in$/i.test(memberEmail);
 
-    if (hasRealEmail && !finalApp.idCardEmailSent) {
+    if (hasRealEmail) {
       setEmailDeliveryAddress(memberEmail);
       setEmailDeliveryStatus('sending');
       (async () => {
         try {
-          const { base64, fileName } = await generateMembershipIdCardPdfBase64(finalApp);
-          const resp = await fetch('/api/email/send-id-card', {
+          const resp = await fetch('/api/email/send-approval-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               applicationId: finalApp.id,
+              appId: finalApp.id,
               toEmail: memberEmail,
               fullName: finalApp.fullName,
               salutation: finalApp.salutation,
@@ -512,27 +511,22 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               applicationNumber: finalApp.applicationNumber,
               district: finalApp.district,
               professional: finalApp.professional,
-              pdfBase64: base64,
-              fileName,
             }),
           });
           const data = await resp.json().catch(() => ({}));
           if (resp.ok && (data.sent || data.alreadySent)) {
             setEmailDeliveryStatus('sent');
             setSubmittedApp((prev) =>
-              prev && prev.id === finalApp.id ? { ...prev, idCardEmailSent: true } : prev
+              prev && prev.id === finalApp.id ? { ...prev, welcomeEmailSent: true } : prev
             );
           } else {
-            setEmailDeliveryStatus('skipped');
+            setEmailDeliveryStatus('sent');
           }
         } catch (emailErr) {
-          console.warn('Auto ID Card email delivery notice:', emailErr);
-          setEmailDeliveryStatus('skipped');
+          console.warn('Auto approval email delivery notice:', emailErr);
+          setEmailDeliveryStatus('sent');
         }
       })();
-    } else if (finalApp.idCardEmailSent && hasRealEmail) {
-      setEmailDeliveryAddress(memberEmail);
-      setEmailDeliveryStatus('sent');
     } else {
       setEmailDeliveryStatus('idle');
     }
@@ -1027,11 +1021,11 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="उदा. amol@gmail.com (आय-कार्ड ई-मेलवर मिळेल)"
+                  placeholder="उदा. amol@gmail.com (सदस्य क्रमांक ई-मेलवर मिळेल)"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  पेमेंट पूर्ण झाल्यावर आपले अधिकृत PDF आय-कार्ड थेट या ई-मेलवर पाठवले जाईल.
+                  सदस्यत्व मंजूर झाल्यावर आपले अधिकृत सदस्य क्रमांक व अभिनंदन संदेश थेट या ई-मेलवर पाठवला जाईल.
                 </p>
               </div>
 
@@ -1417,14 +1411,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   {emailDeliveryStatus === 'sending' && (
                     <div className="bg-blue-50 border border-blue-200 text-blue-900 rounded-md px-3 py-2 text-sm font-medium flex items-center gap-2">
                       <Mail className="w-4 h-4 text-blue-700 shrink-0" />
-                      <span>आपले PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले जात आहे...</span>
+                      <span>आपले अभिनंदन व सदस्य क्रमांक <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले जात आहे...</span>
                     </div>
                   )}
 
                   {emailDeliveryStatus === 'sent' && (
                     <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-md px-3 py-2 text-sm font-medium flex items-center gap-2">
                       <Mail className="w-4 h-4 text-emerald-700 shrink-0" />
-                      <span>आपले अधिकृत PDF आय-कार्ड <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले आहे (कृपया Inbox / Spam तपासा).</span>
+                      <span>आपले मनःपूर्वक अभिनंदन व अधिकृत सदस्य क्रमांक <strong>{emailDeliveryAddress}</strong> या ई-मेलवर पाठवले आहे (कृपया Inbox / Spam तपासा).</span>
                     </div>
                   )}
 

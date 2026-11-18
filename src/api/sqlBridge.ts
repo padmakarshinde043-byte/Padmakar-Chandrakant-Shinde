@@ -8,7 +8,7 @@ import { isAiStudioPreviewHostname } from '../utils/previewFirebaseGuard';
  *   quota-capped Firebase Preview mode permitted.
  */
 
-export type ActiveBackendMode = 'mysql' | 'firebase';
+export type ActiveBackendMode = 'mysql' | 'mock';
 
 let resolvedMode: ActiveBackendMode | null = null;
 let modeCheckPromise: Promise<ActiveBackendMode> | null = null;
@@ -57,8 +57,8 @@ export async function getActiveBackendMode(): Promise<ActiveBackendMode> {
       return 'mysql';
     }
 
-    resolvedMode = 'firebase';
-    return 'firebase';
+    resolvedMode = 'mock';
+    return 'mock';
   })().finally(() => {
     modeCheckPromise = null;
   });
@@ -70,13 +70,14 @@ export async function isSqlBackendActive(): Promise<boolean> {
   return (await getActiveBackendMode()) === 'mysql';
 }
 
+/** Firebase is 100% disabled across all environments */
 export async function isFirebaseAllowedInCurrentEnvironment(): Promise<boolean> {
-  if (!isAiStudioPreviewEnvironment()) return false;
-  return !(await isSqlBackendActive());
+  return false;
 }
 
+/** Firebase is 100% disabled synchronously */
 export function isFirebaseAllowedSync(): boolean {
-  return resolvedMode === 'firebase';
+  return false;
 }
 
 const AUTH_TOKEN_KEY = 'mahasangh_auth_token_v1';

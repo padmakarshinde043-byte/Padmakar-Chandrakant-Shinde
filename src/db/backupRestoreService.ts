@@ -2,14 +2,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
-import {
-  Firestore,
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-  deleteDoc,
-} from 'firebase/firestore';
+type Firestore = any;
 import { ensureMysqlSchema, getMysqlPool, isMysqlActive } from './mysqlPool';
 import {
   mysqlListApplications,
@@ -38,7 +31,6 @@ import {
   mysqlSetPresidentPassword,
   mysqlSaveSystemSetting,
 } from './mysqlRepository';
-import { collectFullFirebaseDataset } from './firebaseMigrationExporter';
 import {
   MigrationCounts,
   MigrationDataset,
@@ -46,7 +38,6 @@ import {
   getMigrationCounts,
 } from './sqlFormatter';
 
-const RTDB_BASE_URL = 'https://rk2026-207ee-default-rtdb.firebaseio.com';
 const BACKUPS_DIR = path.resolve(process.cwd(), 'backups');
 const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
 const MAX_ASSET_FILE_BYTES = 5 * 1024 * 1024; // 5MB per public file
@@ -243,20 +234,23 @@ export async function collectActiveWebsiteAndDatabaseBackup(params: {
       leadershipVersion,
     };
   } else {
-    if (!params.firestoreDb) {
-      throw new Error('डेटाबेस उपलब्ध नाही (Firestore & MySQL दोन्ही बंद आहेत).');
-    }
-    const collected = await collectFullFirebaseDataset(params.firestoreDb);
-    dataset = collected.dataset;
-    warnings.push(...collected.warnings);
-    try {
-      const settingsSnap = await getDocs(collection(params.firestoreDb, 'settings'));
-      settingsSnap.forEach((d) => {
-        extraSystemSettings[d.id] = d.data();
-      });
-    } catch (err: any) {
-      warnings.push(`Settings read warning: ${err?.message || String(err)}`);
-    }
+    dataset = {
+      applications: [],
+      news: [],
+      latestBanners: [],
+      govOrders: [],
+      contacts: [],
+      subAdmins: [],
+      leaders: [],
+      officials: [],
+      appointedPosts: [],
+      districtPasswords: {},
+      adminAuth: null,
+      memberCounter: null,
+      siteStats: null,
+      presidentPassword: null,
+      leadershipVersion: null,
+    };
   }
 
   const publicFiles = collectPublicWebsiteAssets();
@@ -420,42 +414,13 @@ export function parseAndValidateBackupPayload(input: Buffer | string): FullWebsi
 }
 
 async function restoreCollectionInFirestore(
-  db: Firestore,
-  collectionName: string,
-  items: Record<string, any>[],
-  preserveDocIds: string[] = []
+  _db: any,
+  _collectionName: string,
+  _items: Record<string, any>[],
+  _preserveDocIds: string[] = []
 ): Promise<void> {
-  const existingSnap = await getDocs(collection(db, collectionName));
-  const incomingIds = new Set<string>(
-    items.map((item, idx) => String(item.id || `${collectionName}_${idx}`))
-  );
-
-  // Delete docs removed since snapshot
-  const deletePromises: Promise<void>[] = [];
-  existingSnap.forEach((d) => {
-    if (!incomingIds.has(d.id) && !preserveDocIds.includes(d.id)) {
-      deletePromises.push(deleteDoc(doc(db, collectionName, d.id)));
-    }
-  });
-  for (let i = 0; i < deletePromises.length; i += 15) {
-    await Promise.all(deletePromises.slice(i, i + 15));
-  }
-
-  // Upsert restored docs
-  for (let i = 0; i < items.length; i += 15) {
-    const chunk = items.slice(i, i + 15);
-    await Promise.all(
-      chunk.map((raw, cIdx) => {
-        const idx = i + cIdx;
-        const docId = String(raw.id || `${collectionName}_${idx}`);
-        const clean: Record<string, any> = {};
-        for (const [k, v] of Object.entries(raw)) {
-          if (v !== undefined) clean[k] = v;
-        }
-        return setDoc(doc(db, collectionName, docId), clean);
-      })
-    );
-  }
+  // Firestore is removed; operations execute against MySQL
+  return;
 }
 
 export async function restoreWebsiteAndDatabaseBackup(params: {
@@ -587,81 +552,7 @@ export async function restoreWebsiteAndDatabaseBackup(params: {
       );
     }
   } else {
-    if (!params.firestoreDb) {
-      throw new Error('Firebase Firestore उपलब्ध नाही — रिस्टोअर पूर्ण होऊ शकले नाही.');
-    }
-
-    const db = params.firestoreDb;
-    await restoreCollectionInFirestore(db, 'applications', ds.applications || []);
-    await restoreCollectionInFirestore(db, 'news', ds.news || []);
-    await restoreCollectionInFirestore(db, 'latest_banners', ds.latestBanners || []);
-    await restoreCollectionInFirestore(db, 'gov_orders', ds.govOrders || []);
-    await restoreCollectionInFirestore(db, 'contacts', ds.contacts || []);
-    await restoreCollectionInFirestore(db, 'sub_admins', ds.subAdmins || []);
-
-    const leaderDocs = (ds.leaders || []).map((l, idx) => ({
-      ...l,
-      id: String(l.id || `leader_${idx}`),
-      orderIndex: idx,
-    }));
-    await restoreCollectionInFirestore(db, 'leadership', leaderDocs);
-
-    // Restore settings docs
-    for (const [docId, val] of Object.entries(extraSettings)) {
-      if (val && typeof val === 'object') {
-        await setDoc(doc(db, 'settings', docId), val);
-      }
-    }
-    if (ds.adminAuth) await setDoc(doc(db, 'settings', 'admin_auth'), ds.adminAuth);
-    if (ds.memberCounter) await setDoc(doc(db, 'settings', 'member_counter'), ds.memberCounter);
-    if (ds.siteStats) await setDoc(doc(db, 'site_stats', 'visits'), ds.siteStats);
-
-    // Restore Second Firebase RTDB nodes
-    const officialsMap: Record<string, any> = {};
-    for (const off of ds.officials || []) {
-      const id = String(off.id || `off_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
-      officialsMap[id] = off;
-    }
-
-    const rtdbWrites: Array<Promise<Response>> = [
-      fetch(`${RTDB_BASE_URL}/dynamic_leaders.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ds.leaders || []),
-      }),
-      fetch(`${RTDB_BASE_URL}/leadership_version.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Date.now()),
-      }),
-      fetch(`${RTDB_BASE_URL}/officials.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(officialsMap),
-      }),
-      fetch(`${RTDB_BASE_URL}/custom_appointed_posts_v2.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ds.appointedPosts || []),
-      }),
-      fetch(`${RTDB_BASE_URL}/district_passwords.json`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ds.districtPasswords || {}),
-      }),
-    ];
-
-    if (ds.presidentPassword) {
-      rtdbWrites.push(
-        fetch(`${RTDB_BASE_URL}/president_password.json`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(String(ds.presidentPassword)),
-        })
-      );
-    }
-
-    await Promise.all(rtdbWrites);
+    throw new Error('डेटाबेस रिस्टोअर करण्यासाठी MySQL डेटाबेस उपलब्ध असणे आवश्यक आहे.');
   }
 
   return {
