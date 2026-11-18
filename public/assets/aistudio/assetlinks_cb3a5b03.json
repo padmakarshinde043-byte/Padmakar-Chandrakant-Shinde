@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "in.mahasangh.twa",
+        "sha256_cert_fingerprints": ["35:F5:D2:73:B0:01:48:06:5B:5B:F7:5F:9F:A5:A4:D1:8B:6A:F9:09:7E:71:27:F5:1B:BD:F7:03:BD:D0:9B:C5"]
+      }
+    }]

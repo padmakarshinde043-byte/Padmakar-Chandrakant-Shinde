@@ -4,7 +4,9 @@
     "target": {
       "namespace": "android_app",
       "package_name": "in.mahasangh.twa",
-      "sha256_cert_fingerprints": []
+      "sha256_cert_fingerprints": [
+        "F1:CC:89:B2:B0:6C:C5:7B:C1:28:BC:18:73:70:9D:48:73:DB:A4:3C:9A:44:E3:7E:34:EA:71:79:A2:83:F3:F0"
+      ]
     }
   }
 ]
