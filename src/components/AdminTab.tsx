@@ -8661,27 +8661,43 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     setIsBulkApprovingRazorpay(true);
                     let successCount = 0;
                     const approvedIds = new Set<string>();
+                    const failedErrors: string[] = [];
                     try {
                       for (const item of selectedItems) {
                         try {
                           await approveSingleRazorpayMatchedItem(item);
                           approvedIds.add(item.app.id);
                           successCount++;
-                        } catch (e) {
+                        } catch (e: any) {
                           console.error('Error auto-approving app:', item.app.id, e);
+                          failedErrors.push(
+                            `${item.app.fullName}: ${e?.message || 'सर्व्हर त्रुटी'}`
+                          );
                         }
                       }
-                      showAdminFeedback(
-                        `यशस्वी! एकूण ${successCount} प्रलंबित अर्ज एका क्लिकवर मंजूर करण्यात आले व सदस्य क्रमांक दिले गेले.`,
-                        'success'
-                      );
+                      if (successCount === 0 && failedErrors.length > 0) {
+                        showAdminFeedback(
+                          `मंजुरी अयशस्वी: ${failedErrors[0]}`,
+                          'error'
+                        );
+                      } else if (failedErrors.length > 0) {
+                        showAdminFeedback(
+                          `${successCount} अर्ज मंजूर झाले; ${failedErrors.length} अर्जात त्रुटी: ${failedErrors[0]}`,
+                          'error'
+                        );
+                      } else {
+                        showAdminFeedback(
+                          `यशस्वी! एकूण ${successCount} प्रलंबित अर्ज एका क्लिकवर मंजूर करण्यात आले व सदस्य क्रमांक दिले गेले.`,
+                          'success'
+                        );
+                      }
                       setRazorpayMatchedList((prev) => prev.filter((m) => !approvedIds.has(m.app.id)));
-                      if (successCount === selectedItems.length) {
+                      if (successCount > 0 && successCount === selectedItems.length) {
                         setShowRazorpayMatchModal(false);
                       }
-                      if (onFetchApplications) await onFetchApplications(true);
+                      if (successCount > 0 && onFetchApplications) await onFetchApplications(true);
                     } catch (err: any) {
-                      showAdminFeedback('त्रुटी: ' + err.message, 'error');
+                      showAdminFeedback('त्रुटी: ' + (err?.message || 'Error'), 'error');
                     } finally {
                       setIsBulkApprovingRazorpay(false);
                     }

@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS `appointed_posts` (
   `title` VARCHAR(255) NOT NULL DEFAULT '',
   `level` VARCHAR(64) NOT NULL DEFAULT 'district',
   `extra_json` TEXT NULL,
+  `updated_at` VARCHAR(64) NOT NULL DEFAULT '',
   PRIMARY KEY (`id`),
   INDEX `idx_posts_order` (`sort_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

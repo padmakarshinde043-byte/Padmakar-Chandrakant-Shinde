@@ -20,7 +20,7 @@ import {
   buildSequentialMemberNumber,
 } from './src/utils/memberNumberAllocator';
 import { computeNextVisitorStats } from './src/utils/visitorCounter';
-import { isMysqlActive, isMysqlConfigured } from './src/db/mysqlPool';
+import { ensureMysqlSchema, isMysqlActive, isMysqlConfigured, runMysqlSchemaAuditAndHeal } from './src/db/mysqlPool';
 import {
   mysqlListApplications,
   mysqlListApprovedDirectory,
@@ -1574,6 +1574,25 @@ app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (r
 // =========================================================================
 // Super Admin 1-Click Full Website + Database Backup & Restore (/api/backup/*)
 // =========================================================================
+
+app.get('/api/db/schema-audit', requireSuperAdmin, async (req, res) => {
+  try {
+    const shouldRepair = String(req.query.repair || '') === '1';
+    const report = await runMysqlSchemaAuditAndHeal(shouldRepair);
+    sendFreshJson(req, res, report);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'डेटाबेस स्कीमा तपासताना त्रुटी आली.' });
+  }
+});
+
+app.post('/api/db/schema-audit/repair', requireSuperAdmin, async (req, res) => {
+  try {
+    const report = await runMysqlSchemaAuditAndHeal(true);
+    sendFreshJson(req, res, report);
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'डेटाबेस स्कीमा दुरुस्त करताना त्रुटी आली.' });
+  }
+});
 
 app.get('/api/backup/list', requireSuperAdmin, (_req, res) => {
   try {
@@ -3247,6 +3266,11 @@ async function startServer() {
 
   app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    if (isMysqlActive()) {
+      ensureMysqlSchema().catch((err) => {
+        console.warn('Startup MySQL schema auto-heal notice:', err?.message || err);
+      });
+    }
   });
 }
 

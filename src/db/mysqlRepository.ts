@@ -1,5 +1,5 @@
 import { RowDataPacket, PoolConnection } from 'mysql2/promise';
-import { ensureMysqlSchema, getMysqlPool, withMysqlTransaction } from './mysqlPool';
+import { ensureMysqlSchema, getMysqlPool, withMysqlSchemaRetry, withMysqlTransaction } from './mysqlPool';
 import {
   MembershipApplication,
   NewsItem,
@@ -88,18 +88,19 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
 // =========================================================================
 
 export async function mysqlListApplications(onlyApproved = false): Promise<MembershipApplication[]> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const sql = onlyApproved
-    ? "SELECT * FROM `applications` WHERE `status` = 'approved'"
-    : 'SELECT * FROM `applications`';
-  const [rows] = await pool.query<RowDataPacket[]>(sql);
-  const list = rows.map(mapAppRow);
-  list.sort(
-    (a, b) =>
-      new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
-  );
-  return list;
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const sql = onlyApproved
+      ? "SELECT * FROM `applications` WHERE `status` = 'approved'"
+      : 'SELECT * FROM `applications`';
+    const [rows] = await pool.query<RowDataPacket[]>(sql);
+    const list = rows.map(mapAppRow);
+    list.sort(
+      (a, b) =>
+        new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime()
+    );
+    return list;
+  });
 }
 
 export async function mysqlListApprovedDirectory(): Promise<MembershipApplication[]> {
@@ -170,12 +171,12 @@ export async function mysqlGetApplicationById(id: string): Promise<(MembershipAp
 }
 
 export async function mysqlUpsertApplication(app: Record<string, any>): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const nowIso = new Date().toISOString();
-  const id = String(app.id || app.applicationNumber || `app_${Date.now()}`);
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const nowIso = new Date().toISOString();
+    const id = String(app.id || app.applicationNumber || `app_${Date.now()}`);
 
-  await pool.execute(
+    await pool.execute(
     `INSERT INTO \`applications\` (
       id, application_number, member_number, salutation, full_name, phone, email, address,
       district, taluka, center_name, family_members, hobby, education, professional_qualification,
@@ -260,6 +261,7 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
       JSON.stringify({ ...app, id }),
     ]
   );
+  });
 }
 
 export async function mysqlUpdateApplication(
@@ -723,13 +725,14 @@ export async function mysqlSyncMemberCounter(highestKnownCount: number): Promise
 }
 
 export async function mysqlRejectApplication(appId: string, reason = ''): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const nowIso = new Date().toISOString();
-  await pool.execute(
-    "UPDATE `applications` SET `status` = 'rejected', `reject_reason` = ?, `rejected_at` = ?, `updated_at` = ? WHERE `id` = ?",
-    [reason, nowIso, nowIso, appId]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const nowIso = new Date().toISOString();
+    await pool.execute(
+      "UPDATE `applications` SET `status` = 'rejected', `reject_reason` = ?, `rejected_at` = ?, `updated_at` = ? WHERE `id` = ?",
+      [reason, nowIso, nowIso, appId]
+    );
+  });
 }
 
 export async function mysqlDeleteApplication(
@@ -882,20 +885,21 @@ export async function mysqlPurgeGhostApplications(): Promise<{
 }
 
 export async function mysqlMarkEmailSent(appId: string, field: 'idCardEmailSent' | 'welcomeEmailSent'): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const nowIso = new Date().toISOString();
-  if (field === 'idCardEmailSent') {
-    await pool.execute(
-      'UPDATE `applications` SET `id_card_email_sent` = 1, `id_card_email_sent_at` = ?, `updated_at` = ? WHERE `id` = ?',
-      [nowIso, nowIso, appId]
-    );
-  } else {
-    await pool.execute(
-      'UPDATE `applications` SET `welcome_email_sent` = 1, `welcome_email_sent_at` = ?, `updated_at` = ? WHERE `id` = ?',
-      [nowIso, nowIso, appId]
-    );
-  }
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const nowIso = new Date().toISOString();
+    if (field === 'idCardEmailSent') {
+      await pool.execute(
+        'UPDATE `applications` SET `id_card_email_sent` = 1, `id_card_email_sent_at` = ?, `updated_at` = ? WHERE `id` = ?',
+        [nowIso, nowIso, appId]
+      );
+    } else {
+      await pool.execute(
+        'UPDATE `applications` SET `welcome_email_sent` = 1, `welcome_email_sent_at` = ?, `updated_at` = ? WHERE `id` = ?',
+        [nowIso, nowIso, appId]
+      );
+    }
+  });
 }
 
 // =========================================================================
@@ -922,27 +926,28 @@ export async function mysqlListNews(): Promise<NewsItem[]> {
 }
 
 export async function mysqlSaveNews(news: NewsItem): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  await pool.execute(
-    `INSERT INTO \`news\` (id, title, publish_date, category, image_url, summary, content, featured, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       title = VALUES(title), publish_date = VALUES(publish_date), category = VALUES(category),
-       image_url = VALUES(image_url), summary = VALUES(summary), content = VALUES(content),
-       featured = VALUES(featured), created_at = VALUES(created_at)`,
-    [
-      String(news.id),
-      String(news.title || ''),
-      String(news.date || news.publishDate || ''),
-      String(news.category || ''),
-      String(news.image || news.imageUrl || ''),
-      String(news.summary || ''),
-      String(news.content || ''),
-      news.featured ? 1 : 0,
-      String(news.createdAt || new Date().toISOString()),
-    ]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute(
+      `INSERT INTO \`news\` (id, title, publish_date, category, image_url, summary, content, featured, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         title = VALUES(title), publish_date = VALUES(publish_date), category = VALUES(category),
+         image_url = VALUES(image_url), summary = VALUES(summary), content = VALUES(content),
+         featured = VALUES(featured), created_at = VALUES(created_at)`,
+      [
+        String(news.id),
+        String(news.title || ''),
+        String(news.date || news.publishDate || ''),
+        String(news.category || ''),
+        String(news.image || news.imageUrl || ''),
+        String(news.summary || ''),
+        String(news.content || ''),
+        news.featured ? 1 : 0,
+        String(news.createdAt || new Date().toISOString()),
+      ]
+    );
+  });
 }
 
 export async function mysqlDeleteNews(newsId: string): Promise<void> {
@@ -951,49 +956,28 @@ export async function mysqlDeleteNews(newsId: string): Promise<void> {
   await pool.execute('DELETE FROM `news` WHERE `id` = ?', [newsId]);
 }
 
-let latestBannersColumnsChecked = false;
-
-async function ensureLatestBannersVideoColumns(): Promise<void> {
-  if (latestBannersColumnsChecked) return;
-  const pool = getMysqlPool();
-  try {
-    const [colsVideo] = await pool.query<RowDataPacket[]>("SHOW COLUMNS FROM `latest_banners` LIKE 'video_url'");
-    if (!colsVideo || colsVideo.length === 0) {
-      await pool.query('ALTER TABLE `latest_banners` ADD COLUMN `video_url` TEXT NULL AFTER `image_url`');
-    }
-    const [colsMedia] = await pool.query<RowDataPacket[]>("SHOW COLUMNS FROM `latest_banners` LIKE 'media_type'");
-    if (!colsMedia || colsMedia.length === 0) {
-      await pool.query("ALTER TABLE `latest_banners` ADD COLUMN `media_type` VARCHAR(32) NOT NULL DEFAULT 'image' AFTER `video_url`");
-    }
-    latestBannersColumnsChecked = true;
-  } catch (err) {
-    console.warn('ensureLatestBannersVideoColumns notice:', err);
-  }
-}
-
 export async function mysqlListLatestBanners(): Promise<LatestBannerItem[]> {
-  await ensureMysqlSchema();
-  await ensureLatestBannersVideoColumns();
-  const pool = getMysqlPool();
-  const [rows] = await pool.query<RowDataPacket[]>(
-    "SELECT * FROM `latest_banners` WHERE `id` NOT IN ('banner-1', 'banner-2')"
-  );
-  return rows.map((r) => ({
-    id: String(r.id),
-    title: String(r.title || ''),
-    ...(r.summary ? { summary: String(r.summary) } : {}),
-    imageUrl: String(r.image_url || ''),
-    ...(r.video_url ? { videoUrl: String(r.video_url) } : {}),
-    ...(r.media_type ? { mediaType: r.media_type as 'image' | 'video' } : {}),
-    date: String(r.banner_date || ''),
-    createdAt: String(r.created_at || ''),
-  }));
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT * FROM `latest_banners` WHERE `id` NOT IN ('banner-1', 'banner-2')"
+    );
+    return rows.map((r) => ({
+      id: String(r.id),
+      title: String(r.title || ''),
+      ...(r.summary ? { summary: String(r.summary) } : {}),
+      imageUrl: String(r.image_url || ''),
+      ...(r.video_url ? { videoUrl: String(r.video_url) } : {}),
+      ...(r.media_type ? { mediaType: r.media_type as 'image' | 'video' } : {}),
+      date: String(r.banner_date || ''),
+      createdAt: String(r.created_at || ''),
+    }));
+  });
 }
 
 export async function mysqlSaveLatestBanner(banner: LatestBannerItem): Promise<void> {
-  await ensureMysqlSchema();
-  await ensureLatestBannersVideoColumns();
-  const pool = getMysqlPool();
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
   await pool.execute(
     `INSERT INTO \`latest_banners\` (id, title, summary, image_url, video_url, media_type, banner_date, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1012,6 +996,7 @@ export async function mysqlSaveLatestBanner(banner: LatestBannerItem): Promise<v
       String(banner.createdAt || new Date().toISOString()),
     ]
   );
+  });
 }
 
 export async function mysqlDeleteLatestBanner(bannerId: string): Promise<void> {
@@ -1037,25 +1022,26 @@ export async function mysqlListGovOrders(): Promise<GovOrder[]> {
 }
 
 export async function mysqlSaveGovOrder(order: GovOrder): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  await pool.execute(
-    `INSERT INTO \`gov_orders\` (id, title, order_date, order_type, file_url, drive_url, summary, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       title = VALUES(title), order_date = VALUES(order_date), order_type = VALUES(order_type),
-       file_url = VALUES(file_url), drive_url = VALUES(drive_url), summary = VALUES(summary)`,
-    [
-      String(order.id),
-      String(order.title || ''),
-      String(order.date || ''),
-      String(order.type || 'शासन निर्णय'),
-      String(order.fileUrl || ''),
-      String(order.driveUrl || ''),
-      String(order.summary || ''),
-      String(order.createdAt || new Date().toISOString()),
-    ]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute(
+      `INSERT INTO \`gov_orders\` (id, title, order_date, order_type, file_url, drive_url, summary, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         title = VALUES(title), order_date = VALUES(order_date), order_type = VALUES(order_type),
+         file_url = VALUES(file_url), drive_url = VALUES(drive_url), summary = VALUES(summary)`,
+      [
+        String(order.id),
+        String(order.title || ''),
+        String(order.date || ''),
+        String(order.type || 'शासन निर्णय'),
+        String(order.fileUrl || ''),
+        String(order.driveUrl || ''),
+        String(order.summary || ''),
+        String(order.createdAt || new Date().toISOString()),
+      ]
+    );
+  });
 }
 
 export async function mysqlDeleteGovOrder(id: string): Promise<void> {
@@ -1064,60 +1050,44 @@ export async function mysqlDeleteGovOrder(id: string): Promise<void> {
   await pool.execute('DELETE FROM `gov_orders` WHERE `id` = ?', [id]);
 }
 
-let contactsPhotoColumnChecked = false;
-
-async function ensureContactsPhotoColumn(): Promise<void> {
-  if (contactsPhotoColumnChecked) return;
-  const pool = getMysqlPool();
-  try {
-    const [cols] = await pool.query<RowDataPacket[]>("SHOW COLUMNS FROM `contacts` LIKE 'photo'");
-    if (!cols || cols.length === 0) {
-      await pool.query('ALTER TABLE `contacts` ADD COLUMN `photo` LONGTEXT NULL AFTER `message`');
-    }
-    contactsPhotoColumnChecked = true;
-  } catch (err) {
-    console.warn('ensureContactsPhotoColumn notice:', err);
-  }
-}
-
 export async function mysqlListContacts(): Promise<Record<string, any>[]> {
-  await ensureMysqlSchema();
-  await ensureContactsPhotoColumn();
-  const pool = getMysqlPool();
-  const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `contacts` ORDER BY `created_at` DESC');
-  return rows.map((r) => ({
-    id: String(r.id),
-    name: String(r.name || ''),
-    phone: String(r.phone || ''),
-    email: r.email ? String(r.email) : undefined,
-    district: r.district ? String(r.district) : undefined,
-    subject: r.subject ? String(r.subject) : undefined,
-    message: String(r.message || ''),
-    photo: r.photo ? String(r.photo) : undefined,
-    createdAt: String(r.created_at || ''),
-  }));
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `contacts` ORDER BY `created_at` DESC');
+    return rows.map((r) => ({
+      id: String(r.id),
+      name: String(r.name || ''),
+      phone: String(r.phone || ''),
+      email: r.email ? String(r.email) : undefined,
+      district: r.district ? String(r.district) : undefined,
+      subject: r.subject ? String(r.subject) : undefined,
+      message: String(r.message || ''),
+      photo: r.photo ? String(r.photo) : undefined,
+      createdAt: String(r.created_at || ''),
+    }));
+  });
 }
 
 export async function mysqlSaveContact(contact: Record<string, any>): Promise<void> {
-  await ensureMysqlSchema();
-  await ensureContactsPhotoColumn();
-  const pool = getMysqlPool();
-  await pool.execute(
-    `INSERT INTO \`contacts\` (id, name, phone, email, district, subject, message, photo, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE message = VALUES(message), photo = VALUES(photo)`,
-    [
-      String(contact.id),
-      String(contact.name || ''),
-      String(contact.phone || ''),
-      String(contact.email || ''),
-      String(contact.district || ''),
-      String(contact.subject || ''),
-      String(contact.message || ''),
-      String(contact.photo || ''),
-      String(contact.createdAt || new Date().toISOString()),
-    ]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute(
+      `INSERT INTO \`contacts\` (id, name, phone, email, district, subject, message, photo, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE message = VALUES(message), photo = VALUES(photo)`,
+      [
+        String(contact.id),
+        String(contact.name || ''),
+        String(contact.phone || ''),
+        String(contact.email || ''),
+        String(contact.district || ''),
+        String(contact.subject || ''),
+        String(contact.message || ''),
+        String(contact.photo || ''),
+        String(contact.createdAt || new Date().toISOString()),
+      ]
+    );
+  });
 }
 
 export async function mysqlDeleteContact(id: string): Promise<void> {
@@ -1154,45 +1124,45 @@ export async function mysqlListSubAdmins(): Promise<Record<string, any>[]> {
 }
 
 export async function mysqlSaveSubAdmin(admin: Record<string, any>): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
 
-  const rawIncomingPwd = typeof admin.password === 'string' ? admin.password.trim() : '';
-  const isFirstLogin = Boolean(admin.isFirstLogin);
-  let resolvedPasswordToStore = '';
+    const rawIncomingPwd = typeof admin.password === 'string' ? admin.password.trim() : '';
+    const isFirstLogin = Boolean(admin.isFirstLogin);
+    let resolvedPasswordToStore = '';
 
-  if (rawIncomingPwd) {
-    resolvedPasswordToStore = hashPassword(rawIncomingPwd);
-  } else if (!isFirstLogin) {
-    // Preserve existing stored password when updating sub-admin metadata/permissions from sanitized UI state
-    const [existingRows] = await pool.query<RowDataPacket[]>(
-      'SELECT `password` FROM `sub_admins` WHERE `id` = ? LIMIT 1',
-      [String(admin.id)]
-    );
-    if (existingRows.length && existingRows[0].password) {
-      resolvedPasswordToStore = String(existingRows[0].password);
+    if (rawIncomingPwd) {
+      resolvedPasswordToStore = hashPassword(rawIncomingPwd);
+    } else if (!isFirstLogin) {
+      const [existingRows] = await pool.query<RowDataPacket[]>(
+        'SELECT `password` FROM `sub_admins` WHERE `id` = ? LIMIT 1',
+        [String(admin.id)]
+      );
+      if (existingRows.length && existingRows[0].password) {
+        resolvedPasswordToStore = String(existingRows[0].password);
+      }
     }
-  }
 
-  await pool.execute(
-    `INSERT INTO \`sub_admins\` (id, email, name, password, is_first_login, is_super_admin, permissions_json, created_at, last_login_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       email = VALUES(email), name = VALUES(name), password = VALUES(password),
-       is_first_login = VALUES(is_first_login), is_super_admin = VALUES(is_super_admin),
-       permissions_json = VALUES(permissions_json), last_login_at = VALUES(last_login_at)`,
-    [
-      String(admin.id),
-      String(admin.email || '').trim().toLowerCase(),
-      String(admin.name || ''),
-      resolvedPasswordToStore,
-      isFirstLogin ? 1 : 0,
-      admin.isSuperAdmin ? 1 : 0,
-      JSON.stringify(admin.permissions || {}),
-      String(admin.createdAt || new Date().toISOString()),
-      String(admin.lastLoginAt || ''),
-    ]
-  );
+    await pool.execute(
+      `INSERT INTO \`sub_admins\` (id, email, name, password, is_first_login, is_super_admin, permissions_json, created_at, last_login_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         email = VALUES(email), name = VALUES(name), password = VALUES(password),
+         is_first_login = VALUES(is_first_login), is_super_admin = VALUES(is_super_admin),
+         permissions_json = VALUES(permissions_json), last_login_at = VALUES(last_login_at)`,
+      [
+        String(admin.id),
+        String(admin.email || '').trim().toLowerCase(),
+        String(admin.name || ''),
+        resolvedPasswordToStore,
+        isFirstLogin ? 1 : 0,
+        admin.isSuperAdmin ? 1 : 0,
+        JSON.stringify(admin.permissions || {}),
+        String(admin.createdAt || new Date().toISOString()),
+        String(admin.lastLoginAt || ''),
+      ]
+    );
+  });
 }
 
 export async function mysqlUpdateSubAdminPassword(email: string, newPassword: string): Promise<Record<string, any> | null> {
@@ -1428,38 +1398,39 @@ export async function mysqlListOfficials(): Promise<OfficialMember[]> {
 }
 
 export async function mysqlSaveOfficial(member: OfficialMember): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const nowIso = new Date().toISOString();
-  await pool.execute(
-    `INSERT INTO \`officials\` (
-      id, salutation, first_name, middle_name, last_name, appointed_post, district, taluka,
-      current_cadre, working_place, mobile, photo, appointed_date, order_number, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      salutation = VALUES(salutation), first_name = VALUES(first_name), middle_name = VALUES(middle_name),
-      last_name = VALUES(last_name), appointed_post = VALUES(appointed_post), district = VALUES(district),
-      taluka = VALUES(taluka), current_cadre = VALUES(current_cadre), working_place = VALUES(working_place),
-      mobile = VALUES(mobile), photo = VALUES(photo), appointed_date = VALUES(appointed_date),
-      order_number = VALUES(order_number), updated_at = VALUES(updated_at)`,
-    [
-      String(member.id),
-      String(member.salutation || 'श्री.'),
-      String(member.firstName || ''),
-      String(member.middleName || ''),
-      String(member.lastName || ''),
-      String(member.appointedPost || ''),
-      String(member.district || ''),
-      String(member.taluka || ''),
-      String(member.currentCadre || ''),
-      String(member.workingPlace || ''),
-      toEnglishDigits(String(member.mobile || '')),
-      String(member.photo || ''),
-      String(member.appointedDate || ''),
-      String(member.orderNumber || ''),
-      nowIso,
-    ]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const nowIso = new Date().toISOString();
+    await pool.execute(
+      `INSERT INTO \`officials\` (
+        id, salutation, first_name, middle_name, last_name, appointed_post, district, taluka,
+        current_cadre, working_place, mobile, photo, appointed_date, order_number, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        salutation = VALUES(salutation), first_name = VALUES(first_name), middle_name = VALUES(middle_name),
+        last_name = VALUES(last_name), appointed_post = VALUES(appointed_post), district = VALUES(district),
+        taluka = VALUES(taluka), current_cadre = VALUES(current_cadre), working_place = VALUES(working_place),
+        mobile = VALUES(mobile), photo = VALUES(photo), appointed_date = VALUES(appointed_date),
+        order_number = VALUES(order_number), updated_at = VALUES(updated_at)`,
+      [
+        String(member.id),
+        String(member.salutation || 'श्री.'),
+        String(member.firstName || ''),
+        String(member.middleName || ''),
+        String(member.lastName || ''),
+        String(member.appointedPost || ''),
+        String(member.district || ''),
+        String(member.taluka || ''),
+        String(member.currentCadre || ''),
+        String(member.workingPlace || ''),
+        toEnglishDigits(String(member.mobile || '')),
+        String(member.photo || ''),
+        String(member.appointedDate || ''),
+        String(member.orderNumber || ''),
+        nowIso,
+      ]
+    );
+  });
 }
 
 export async function mysqlDeleteOfficial(id: string): Promise<void> {
@@ -1494,51 +1465,50 @@ export async function mysqlListDistrictPasswordStatuses(): Promise<Record<string
 }
 
 export async function mysqlSetDistrictPassword(district: string, password: string): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const nowIso = new Date().toISOString();
-  const cleanPass = String(password || '').trim();
-  const stored = hashPassword(cleanPass);
-  await pool.execute(
-    `INSERT INTO \`district_passwords\` (district, password, updated_at)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE password = VALUES(password), updated_at = VALUES(updated_at)`,
-    [district, stored, nowIso]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const nowIso = new Date().toISOString();
+    const cleanPass = String(password || '').trim();
+    const stored = hashPassword(cleanPass);
+    await pool.execute(
+      `INSERT INTO \`district_passwords\` (district, password, updated_at)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE password = VALUES(password), updated_at = VALUES(updated_at)`,
+      [district, stored, nowIso]
+    );
+  });
 }
 
 export async function mysqlListAppointedPosts(): Promise<AppointedPostItem[]> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `appointed_posts` ORDER BY `sort_order` ASC');
-  if (!rows.length) return DEFAULT_APPOINTED_POSTS;
-  return rows.map((r) => {
-    const rowLevel = String(r.level || '').trim() as AppointedPostItem['level'];
-    if (r.extra_json) {
-      try {
-        const parsed = JSON.parse(String(r.extra_json)) as AppointedPostItem;
-        if (parsed && parsed.name) {
-          return {
-            ...parsed,
-            level: parsed.level || rowLevel || (parsed.isTaluka ? 'taluka' : 'district'),
-          };
-        }
-      } catch {}
-    }
-    return {
-      name: String(r.title || ''),
-      isTaluka: String(r.level || '') === 'taluka',
-      ...(rowLevel ? { level: rowLevel } : {}),
-    };
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `appointed_posts` ORDER BY `sort_order` ASC');
+    if (!rows.length) return DEFAULT_APPOINTED_POSTS;
+    return rows.map((r) => {
+      const rowLevel = String(r.level || '').trim() as AppointedPostItem['level'];
+      if (r.extra_json) {
+        try {
+          const parsed = JSON.parse(String(r.extra_json)) as AppointedPostItem;
+          if (parsed && parsed.name) {
+            return {
+              ...parsed,
+              level: parsed.level || rowLevel || (parsed.isTaluka ? 'taluka' : 'district'),
+            };
+          }
+        } catch {}
+      }
+      return {
+        name: String(r.title || ''),
+        isTaluka: String(r.level || '') === 'taluka',
+        ...(rowLevel ? { level: rowLevel } : {}),
+      };
+    });
   });
 }
 
 export async function mysqlSetAppointedPosts(posts: AppointedPostItem[]): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
+  const nowIso = new Date().toISOString();
+  await withMysqlTransaction(async (conn) => {
     await conn.execute('DELETE FROM `appointed_posts`');
     for (let i = 0; i < posts.length; i++) {
       const p = posts[i];
@@ -1549,17 +1519,11 @@ export async function mysqlSetAppointedPosts(posts: AppointedPostItem[]): Promis
         level,
       };
       await conn.execute(
-        'INSERT INTO `appointed_posts` (id, sort_order, title, level, extra_json) VALUES (?, ?, ?, ?, ?)',
-        [`post-${i}-${Date.now()}`, i + 1, normalized.name, level, JSON.stringify(normalized)]
+        'INSERT INTO `appointed_posts` (id, sort_order, title, level, extra_json, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [`post-${i}-${Date.now()}`, i + 1, normalized.name, level, JSON.stringify(normalized), nowIso]
       );
     }
-    await conn.commit();
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
+  });
 }
 
 export async function mysqlGetPresidentPassword(): Promise<string> {
@@ -1612,15 +1576,16 @@ export async function mysqlGetSystemSetting<T = any>(key: string): Promise<T | n
 }
 
 export async function mysqlSaveSystemSetting(key: string, value: any): Promise<void> {
-  await ensureMysqlSchema();
-  const pool = getMysqlPool();
-  const nowIso = new Date().toISOString();
-  await pool.execute(
-    `INSERT INTO \`system_settings\` (setting_key, setting_json, updated_at)
-     VALUES (?, ?, ?)
-     ON DUPLICATE KEY UPDATE setting_json = VALUES(setting_json), updated_at = VALUES(updated_at)`,
-    [key, JSON.stringify(value ?? {}), nowIso]
-  );
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const nowIso = new Date().toISOString();
+    await pool.execute(
+      `INSERT INTO \`system_settings\` (setting_key, setting_json, updated_at)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE setting_json = VALUES(setting_json), updated_at = VALUES(updated_at)`,
+      [key, JSON.stringify(value ?? {}), nowIso]
+    );
+  });
 }
 
 export async function mysqlListSystemSettingsMap(): Promise<Record<string, any>> {
