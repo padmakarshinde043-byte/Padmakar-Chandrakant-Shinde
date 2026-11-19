@@ -2845,7 +2845,6 @@ export const AppointmentsTab: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="उदा. विलास"
                     value={formFirstName}
                     onChange={(e) => setFormFirstName(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
@@ -2856,7 +2855,6 @@ export const AppointmentsTab: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="उदा. हनुमंतराव"
                     value={formMiddleName}
                     onChange={(e) => setFormMiddleName(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
@@ -2867,7 +2865,6 @@ export const AppointmentsTab: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="उदा. यादव"
                     value={formLastName}
                     onChange={(e) => setFormLastName(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
@@ -2896,7 +2893,6 @@ export const AppointmentsTab: React.FC = () => {
                   <input
                     type="text"
                     required
-                    placeholder="उदा. केंद्र - गंगापूर"
                     value={formWorkingPlace}
                     onChange={(e) => setFormWorkingPlace(e.target.value)}
                     className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
@@ -2969,7 +2965,6 @@ export const AppointmentsTab: React.FC = () => {
                   type="tel"
                   required
                   pattern="[0-9]{10}"
-                  placeholder="10 अंकी मोबाईल नंबर"
                   value={formMobile}
                   onChange={(e) => setFormMobile(toEnglishDigits(e.target.value))}
                   className="w-full p-2 border border-slate-300 rounded-md font-semibold font-mono focus:outline-none focus:border-[#193568]"

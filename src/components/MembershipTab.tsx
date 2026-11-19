@@ -1002,7 +1002,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="उदा. अमोल राजेश पाटील"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#193568] rounded-md focus:outline-none transition-colors"
                 />
               </div>
@@ -1019,7 +1018,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     const clean = toEnglishDigits(e.target.value).replace(/\D/g, '').slice(0, 10);
                     setPhone(clean);
                   }}
-                  placeholder="10 अंकी मोबाईल नंबर (उदा. 9822123456)"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
               </div>
@@ -1033,7 +1031,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="उदा. amol@gmail.com (सदस्य क्रमांक ई-मेलवर मिळेल)"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
@@ -1095,7 +1092,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     required
                     value={centerName}
                     onChange={(e) => setCenterName(e.target.value)}
-                    placeholder="उदा. कें. शा. उंबर्डा बाजार / केंद्र - मालेगाव"
                     className="w-full p-2.5 bg-white border border-slate-300 focus:border-[#193568] rounded-md focus:outline-none text-sm sm:text-base font-semibold text-slate-900"
                   />
                   <p className="text-xs sm:text-sm text-slate-600">
@@ -1113,7 +1109,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   min="1"
                   value={familyMembers}
                   onChange={(e) => setFamilyMembers(e.target.value)}
-                  placeholder="उदा. 4"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] rounded-md focus:outline-none focus:border-[#193568]"
                 />
               </div>
@@ -1126,7 +1121,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   type="text"
                   value={hobby}
                   onChange={(e) => setHobby(e.target.value)}
-                  placeholder="उदा. वाचन, शैक्षणिक संशोधन, वृक्षारोपण, क्रीडा"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#193568] rounded-md focus:outline-none transition-colors"
                 />
               </div>
@@ -1140,7 +1134,6 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="घर/फ्लॅट क्र., शाळा/कार्यालय, गाव/शहर, तालुका, जिल्हा व पिनकोड"
                   className="w-full p-2.5 bg-white border border-[#c8d2e2] focus:border-[#193568] rounded-md focus:outline-none transition-colors"
                 />
               </div>

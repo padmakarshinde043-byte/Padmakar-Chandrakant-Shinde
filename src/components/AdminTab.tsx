@@ -189,80 +189,80 @@ interface AdminPermissionOption {
 const ADMIN_PERMISSION_OPTIONS: AdminPermissionOption[] = [
   {
     key: 'approveMembers',
-    label: 'सदस्यत्व अर्ज व मंजुरी',
-    description: 'अर्ज तपासणे, पेमेंट खात्री व सदस्य मंजुरी देणे',
+    label: 'Applications & Approval',
+    description: 'Review applications, verify payments, and approve members',
     activeCardClass: 'bg-amber-50/80 border-amber-300 shadow-xs',
     checkboxClass: 'text-[#df6b16] focus:ring-[#df6b16]',
     badgeClass: 'bg-amber-100 text-amber-900',
   },
   {
     key: 'editMembers',
-    label: 'सदस्य एडिट',
-    description: 'मंजूर सदस्यांची माहिती एडिट व डुप्लिकेट साफ करणे',
+    label: 'Edit Members',
+    description: 'Edit approved member details and clean duplicates',
     activeCardClass: 'bg-indigo-50/80 border-indigo-300 shadow-xs',
     checkboxClass: 'text-indigo-600 focus:ring-indigo-500',
     badgeClass: 'bg-indigo-100 text-indigo-900',
   },
   {
     key: 'manageLeadership',
-    label: 'नेतृत्व व पदाधिकारी',
-    description: 'कार्यकारिणी, विभागीय व जिल्हाध्यक्ष माहिती बदलणे',
+    label: 'Leadership',
+    description: 'Manage state, divisional, and district leaders',
     activeCardClass: 'bg-purple-50/80 border-purple-300 shadow-xs',
     checkboxClass: 'text-purple-600 focus:ring-purple-500',
     badgeClass: 'bg-purple-100 text-purple-900',
   },
   {
     key: 'manageNews',
-    label: 'बातम्या',
-    description: 'बातम्या, फोटो व कार्यक्रम वेबसाईटवर टाकणे',
+    label: 'News',
+    description: 'Publish news, photos, and events on the website',
     activeCardClass: 'bg-blue-50/80 border-blue-300 shadow-xs',
     checkboxClass: 'text-blue-600 focus:ring-blue-500',
     badgeClass: 'bg-blue-100 text-blue-900',
   },
   {
     key: 'manageGovOrders',
-    label: 'शासन निर्णय (GR)',
-    description: 'शासन निर्णय, न्यायालयीन आदेश व परिपत्रके टाकणे',
+    label: 'GR & Orders',
+    description: 'Upload GRs, court orders, and circulars',
     activeCardClass: 'bg-teal-50/80 border-teal-300 shadow-xs',
     checkboxClass: 'text-teal-600 focus:ring-teal-500',
     badgeClass: 'bg-teal-100 text-teal-900',
   },
   {
     key: 'manageLatestBanners',
-    label: 'ताज्या घडामोडी बॅनर्स',
-    description: 'होमपेज ताज्या घडामोडी स्लायडर फोटो व बॅनर जोडणे',
+    label: 'Latest Banners',
+    description: 'Manage homepage slider photos and short videos',
     activeCardClass: 'bg-emerald-50/80 border-emerald-300 shadow-xs',
     checkboxClass: 'text-emerald-600 focus:ring-emerald-500',
     badgeClass: 'bg-emerald-100 text-emerald-900',
   },
   {
     key: 'viewIdCardPreview',
-    label: 'आय-कार्ड डिझाईन नमुना',
-    description: 'अधिकृत डिजिटल आय-कार्ड डिझाईन व नमुना PDF तपासणे',
+    label: 'ID Card Design',
+    description: 'Preview digital ID card template and sample PDF',
     activeCardClass: 'bg-sky-50/80 border-sky-300 shadow-xs',
     checkboxClass: 'text-sky-600 focus:ring-sky-500',
     badgeClass: 'bg-sky-100 text-sky-900',
   },
   {
     key: 'manageContactMessages',
-    label: 'प्राप्त संदेश',
-    description: 'संपर्क फॉर्मद्वारे आलेले संदेश पाहणे व हटवणे',
+    label: 'Messages & Mail',
+    description: 'Read, reply to, and manage inquiries and mailbox',
     activeCardClass: 'bg-orange-50/80 border-orange-300 shadow-xs',
     checkboxClass: 'text-orange-600 focus:ring-orange-500',
     badgeClass: 'bg-orange-100 text-orange-900',
   },
   {
     key: 'manageAdmins',
-    label: 'व्यवस्थापक (Admins)',
-    description: 'नवीन सब-ॲडमिन जोडणे व अधिकार कमी-जास्त करणे',
+    label: 'Sub-Admins',
+    description: 'Add sub-admins and manage their permissions',
     activeCardClass: 'bg-rose-50/80 border-rose-300 shadow-xs',
     checkboxClass: 'text-rose-600 focus:ring-rose-500',
     badgeClass: 'bg-rose-100 text-rose-900',
   },
   {
     key: 'manageCloudinary',
-    label: 'क्लाउड स्टोरेज',
-    description: 'फोटो व फाइल मीडिया स्टोरेज सेटिंग्ज',
+    label: 'Cloud Storage',
+    description: 'Configure photo and media storage settings',
     activeCardClass: 'bg-cyan-50/80 border-cyan-300 shadow-xs',
     checkboxClass: 'text-cyan-600 focus:ring-cyan-500',
     badgeClass: 'bg-cyan-100 text-cyan-900',
@@ -412,7 +412,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
 
     if (listToSave.length === 0) {
-      showAdminFeedback('कृपया किमान एक पद यादीत ठेवा.', 'error');
+      showAdminFeedback('Keep at least one post in the list.', 'error');
       return;
     }
 
@@ -420,9 +420,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       await saveAppointedPostsToRtdb(listToSave);
       setHasUnsavedPostChanges(false);
-      showAdminFeedback('बदल यशस्वीरीत्या सेव्ह झाले! नवीन पदे व त्यांचा क्रम जिल्हा पदाधिकारी पानावरील ड्रॉपडाऊनमध्ये त्वरित अपडेट करण्यात आला आहे.', 'success');
+      showAdminFeedback('Posts saved and updated in the District Portal dropdown.', 'success');
     } catch (err: any) {
-      showAdminFeedback(`पदे सेव्ह करताना त्रुटी आली: ${err?.message || 'सर्व्हर त्रुटी'}`, 'error');
+      showAdminFeedback(`Failed to save posts: ${err?.message || 'Server error'}`, 'error');
     } finally {
       setIsSavingPosts(false);
     }
@@ -498,9 +498,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         [distName]: DEFAULT_DISTRICT_PASSWORD,
       }));
       window.dispatchEvent(new Event('mahasangh_district_passwords_updated'));
-      showAdminFeedback(`'${distName}' जिल्ह्याचा पासवर्ड पूर्ववत '${DEFAULT_DISTRICT_PASSWORD}' वर रिसेट करण्यात आला आहे! संबंधित जिल्हाध्यक्ष आता '${DEFAULT_DISTRICT_PASSWORD}' ने लॉगिन करून स्वतःचा नवीन पासवर्ड तयार करू शकतात.`, 'success');
+      showAdminFeedback(`Password for '${distName}' reset to '${DEFAULT_DISTRICT_PASSWORD}'.`, 'success');
     } catch (err: any) {
-      showAdminFeedback(`पासवर्ड रिसेट करताना त्रुटी आली: ${err?.message || ''}`, 'error');
+      showAdminFeedback(`Failed to reset password: ${err?.message || ''}`, 'error');
     } finally {
       setIsResettingDistrictPassword(false);
     }
@@ -542,7 +542,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handleGenerateBatchPrintPdf = async () => {
     setIsGeneratingBatchPrint(true);
-    setBatchPrintProgressMsg('जिल्ह्यातील सदस्यांची माहिती व फोटो लोड करत आहे...');
+    setBatchPrintProgressMsg('Loading district members and photos...');
     try {
       const fullDistrictApps = await fetchApprovedApplicationsWithPhotosByDistricts([batchPrintDistrict]);
       await generateDistrictBatchIdCardsPdf(
@@ -550,9 +550,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         fullDistrictApps,
         (msg) => setBatchPrintProgressMsg(msg)
       );
-      showAdminFeedback(`'${batchPrintDistrict}' जिल्ह्यातील सर्व सदस्यांचे आय-कार्ड पीडीएफ यशस्वीरीत्या डाऊनलोड झाले!`, 'success');
+      showAdminFeedback(`ID Cards PDF downloaded for '${batchPrintDistrict}'.`, 'success');
     } catch (err: any) {
-      showAdminFeedback('आय-कार्ड पीडीएफ करताना त्रुटी आली: ' + (err?.message || ''), 'error');
+      showAdminFeedback('Failed to generate ID Cards PDF: ' + (err?.message || ''), 'error');
     } finally {
       setIsGeneratingBatchPrint(false);
       setBatchPrintProgressMsg('');
@@ -566,12 +566,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handleDownloadPassportPhotosZip = async () => {
     if (passportPhotoDistricts.length === 0) {
-      alert('कृपया किमान एक जिल्हा निवडा.');
+      showAdminFeedback('Please select at least one district.', 'error');
       return;
     }
 
     setIsGeneratingPassportZip(true);
-    setPassportZipProgressMsg('निवडलेल्या जिल्ह्यांमधील फोटो लोड करत आहे...');
+    setPassportZipProgressMsg('Loading photos from selected districts...');
 
     try {
       const approvedWithPhotos = await fetchApprovedApplicationsWithPhotosByDistricts(passportPhotoDistricts);
@@ -580,13 +580,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       );
 
       if (validPhotosList.length === 0) {
-        alert('निवडलेल्या जिल्ह्यांमध्ये एकही फोटो उपलब्ध असलेला मंजूर सदस्य आढळला नाही.');
+        showAdminFeedback('No approved members with photos found in the selected districts.', 'error');
         setIsGeneratingPassportZip(false);
         setPassportZipProgressMsg('');
         return;
       }
 
-      setPassportZipProgressMsg('ZIP फाईल तयार होत आहे...');
+      setPassportZipProgressMsg('Creating ZIP archive...');
       const zip = new JSZip();
       const folder = zip.folder('mahasangh_passport_photos');
       if (!folder) throw new Error('ZIP folder creation failed');
@@ -596,7 +596,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       for (const member of validPhotosList) {
         processedCount++;
         setPassportZipProgressMsg(
-          `फोटो प्रक्रिया करत आहे (${toEnglishDigits(String(processedCount))}/${toEnglishDigits(String(validPhotosList.length))}): ${member.fullName}`
+          `Processing photo (${toEnglishDigits(String(processedCount))}/${toEnglishDigits(String(validPhotosList.length))}): ${member.fullName}`
         );
 
         try {
@@ -645,9 +645,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         }
       }
 
-      setPassportZipProgressMsg('ZIP संकलित (Compressing) होत आहे...');
+      setPassportZipProgressMsg('Compressing ZIP file...');
       const content = await zip.generateAsync({ type: 'blob' }, (metadata) => {
-        setPassportZipProgressMsg(`ZIP फाईल तयार होत आहे: ${toEnglishDigits(Math.round(metadata.percent).toString())}%`);
+        setPassportZipProgressMsg(`Creating ZIP file: ${toEnglishDigits(Math.round(metadata.percent).toString())}%`);
       });
 
       const url = URL.createObjectURL(content);
@@ -659,10 +659,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setPassportZipProgressMsg('ZIP डाऊनलोड यशस्वीरीत्या सुरू झाले!');
+      setPassportZipProgressMsg('ZIP download started.');
       setTimeout(() => setPassportZipProgressMsg(''), 4000);
     } catch (err: any) {
-      alert('ZIP फाईल तयार करताना त्रुटी आली: ' + (err?.message || 'Error'));
+      showAdminFeedback('Failed to create ZIP file: ' + (err?.message || 'Error'), 'error');
     } finally {
       setIsGeneratingPassportZip(false);
     }
@@ -721,9 +721,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
       pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Mahasangh_Appointment_Letter_${Date.now()}.pdf`);
-      showAdminFeedback('नमुना नियुक्ती पत्र PDF यशस्वीरीत्या डाऊनलोड झाले!', 'success');
+      showAdminFeedback('Sample appointment letter PDF downloaded.', 'success');
     } catch (err: any) {
-      showAdminFeedback('PDF डाऊनलोड करताना त्रुटी आली: ' + (err?.message || ''), 'error');
+      showAdminFeedback('Failed to download PDF: ' + (err?.message || ''), 'error');
     } finally {
       setIsDownloadingLetterPdf(false);
     }
@@ -756,8 +756,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setBannerImageUrl(url);
     } catch (err: any) {
       setBannerErrorMsg(
-        'फोटो अपलोड करताना त्रुटी आली: ' +
-          (err?.message || 'कृपया इंटरनेट कनेक्शन किंवा स्टोरेज सेटिंग तपासा.')
+        'Photo upload failed: ' +
+          (err?.message || 'Check your internet connection or storage settings.')
       );
     } finally {
       setIsUploadingBanner(false);
@@ -774,7 +774,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const MAX_VIDEO_BYTES = 3 * 1024 * 1024;
     if (file.size > MAX_VIDEO_BYTES) {
       const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-      setBannerErrorMsg(`व्हिडिओचा आकार ३ MB पेक्षा जास्त आहे (${sizeMb} MB). कृपया ३ MB किंवा त्यापेक्षा लहान आकाराचा शॉर्ट व्हिडिओ निवडा.`);
+      setBannerErrorMsg(`Video exceeds 3 MB limit (${sizeMb} MB). Please choose a smaller video.`);
       e.target.value = '';
       return;
     }
@@ -787,9 +787,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       if (!bannerImageUrl) {
         setBannerImageUrl(url);
       }
-      setBannerSuccessMsg('✓ शॉर्ट व्हिडिओ Cloudinary वर यशस्वीरीत्या अपलोड झाला!');
+      setBannerSuccessMsg('Short video uploaded successfully.');
     } catch (err: any) {
-      setBannerErrorMsg(err?.message || 'व्हिडिओ अपलोड करताना त्रुटी आली.');
+      setBannerErrorMsg(err?.message || 'Video upload failed.');
     } finally {
       setIsUploadingBannerVideo(false);
       e.target.value = '';
@@ -825,22 +825,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setBannerSuccessMsg('');
 
     if (isUploadingBanner || isUploadingBannerVideo) {
-      setBannerErrorMsg('मीडिया अपलोड होत आहे, कृपया काही सेकंद थांबा.');
+      setBannerErrorMsg('Media is still uploading. Please wait.');
       return;
     }
 
     if (!bannerTitle.trim()) {
-      setBannerErrorMsg('कृपया ताज्या घडामोडीचे शीर्षक आवश्यक भरा.');
+      setBannerErrorMsg('Please enter a banner title.');
       return;
     }
 
     if (bannerMediaType === 'video' && !bannerVideoUrl.trim()) {
-      setBannerErrorMsg('कृपया ३ MB मर्यादेतील शॉर्ट व्हिडिओ निवडा किंवा लिंक प्रविष्ट करा.');
+      setBannerErrorMsg('Please upload a short video (max 3 MB) or enter a video URL.');
       return;
     }
 
     if (bannerMediaType === 'image' && !bannerImageUrl.trim()) {
-      setBannerErrorMsg('कृपया ताज्या घडामोडी छायाचित्र निवडा किंवा अपलोड करा.');
+      setBannerErrorMsg('Please upload a banner image or enter an image URL.');
       return;
     }
 
@@ -873,10 +873,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
       setBannerSuccessMsg(
         editingBannerId
-          ? 'ताज्या घडामोडी बॅनरमधील बदल सेव्ह झाले असून मुख्य पानावर अद्ययावत झाले आहेत!'
+          ? 'Banner updated on the homepage.'
           : isVideo
-          ? 'शॉर्ट व्हिडिओ यशस्वीरीत्या सेव्ह झाला असून मुख्य पानावर प्रसिद्ध झाला आहे!'
-          : 'ताज्या घडामोडी व फोटो यशस्वीरीत्या सेव्ह झाले असून मुख्य पानावर प्रसिद्ध झाले आहेत!'
+          ? 'Short video banner published on the homepage.'
+          : 'Banner published on the homepage.'
       );
       setEditingBannerId(null);
       setBannerTitle('');
@@ -887,7 +887,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setBannerDate(new Date().toISOString().split('T')[0]);
     } catch (err: any) {
       setBannerErrorMsg(
-        'माहिती सेव्ह करताना त्रुटी आली: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.')
+        'Failed to save banner: ' + (err?.message || 'Please try again.')
       );
     } finally {
       setIsSavingBanner(false);
@@ -896,9 +896,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handleDeleteBannerWithFeedback = (bannerId: string) => {
     setConfirmDialog({
-      title: 'बॅनर हटवा',
-      message: 'हा ताज्या घडामोडीचा बॅनर कायमचा डिलीट करायचा आहे का?',
-      confirmLabel: 'होय, डिलीट करा',
+      title: 'Delete Banner',
+      message: 'Permanently delete this homepage banner?',
+      confirmLabel: 'Delete',
       isDanger: true,
       onConfirm: async () => {
         setBannerErrorMsg('');
@@ -911,9 +911,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           if (editingBannerId === bannerId) {
             handleCancelEditBanner();
           }
-          setBannerSuccessMsg('ताज्या घडामोडी बॅनर यशस्वीरीत्या हटवण्यात आला!');
+          setBannerSuccessMsg('Banner deleted.');
         } catch (err: any) {
-          setBannerErrorMsg('बॅनर डिलीट करताना त्रुटी आली: ' + (err?.message || 'Error'));
+          setBannerErrorMsg('Failed to delete banner: ' + (err?.message || 'Error'));
         } finally {
           setDeletingBannerId(null);
         }
@@ -928,7 +928,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     try {
       await onRefreshLatestBanners();
     } catch (err: any) {
-      setBannerErrorMsg('बॅनर्स ताजे करताना त्रुटी आली: ' + (err?.message || 'Error'));
+      setBannerErrorMsg('Failed to refresh banners: ' + (err?.message || 'Error'));
     } finally {
       setIsRefreshingBanners(false);
     }
@@ -1097,12 +1097,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
       if (list.length === 0) {
         showAdminFeedback(
-          `Razorpay मधील मागील ${targetDays} दिवसांतील ${res.capturedPaymentsCount} सफल पेमेंट तपासले; परंतु प्रलंबित अर्जांपैकी नवीन न जुळलेले पेमेंट आढळले नाही.`,
+          `Checked ${res.capturedPaymentsCount} captured payments from the last ${targetDays} days. No new unmatched pending payments found.`,
           'success'
         );
       }
     } catch (err: any) {
-      showAdminFeedback(err?.message || 'Razorpay सर्व्हरवरून पेमेंट तपासताना त्रुटी आली.', 'error');
+      showAdminFeedback(err?.message || 'Failed to sync payments from Razorpay.', 'error');
     } finally {
       setIsSyncingRazorpay(false);
     }
@@ -1143,9 +1143,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isResequencing, setIsResequencing] = useState(false);
   const handleResequence = () => {
     setConfirmDialog({
-      title: 'सदस्य क्रमांक पुनर्रचना',
-      message: 'तुम्हाला नक्की सर्व मंजूर सदस्यांचे क्रमांक मंजुरीच्या क्रमानुसार 1 पासून सलग रांगेत लावायचे आहेत का? यामुळे जुने गॅप निघून जातील.',
-      confirmLabel: 'होय, क्रमाने लावा',
+      title: 'Resequence Member Numbers',
+      message: 'Renumber all approved members sequentially starting from 1 by approval order? This removes any number gaps.',
+      confirmLabel: 'Resequence',
       onConfirm: async () => {
         setIsResequencing(true);
         try {
@@ -1153,7 +1153,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           showAdminFeedback(res.message, 'success');
           if (onFetchApplications) await onFetchApplications(true);
         } catch (err) {
-          showAdminFeedback('पुनर्रचना करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+          showAdminFeedback('Resequence failed: ' + (err instanceof Error ? err.message : String(err)), 'error');
         } finally {
           setIsResequencing(false);
         }
@@ -1166,9 +1166,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [activeCircleAction, setActiveCircleAction] = useState<'resequence' | 'reset' | null>(null);
   const handleResetCounter = () => {
     setConfirmDialog({
-      title: 'सदस्य काउंटर रिसेट करा',
-      message: 'सदस्य क्रमांक काउंटर सर्व्हरवरील शेवटच्या खऱ्या क्रमांकावर रिसेट करायचा का? पुढचा नवीन अर्ज मंजूर केल्यावर क्रमांक तिथून पुढे चालू होईल.',
-      confirmLabel: 'होय, रिसेट करा',
+      title: 'Reset Member Counter',
+      message: 'Reset the member number counter to the highest existing number on the server?',
+      confirmLabel: 'Reset',
       onConfirm: async () => {
         setIsResettingCounter(true);
         try {
@@ -1176,7 +1176,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           showAdminFeedback(res.message, 'success');
           if (onFetchApplications) await onFetchApplications(true);
         } catch (err) {
-          showAdminFeedback('काउंटर रिसेट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+          showAdminFeedback('Counter reset failed: ' + (err instanceof Error ? err.message : String(err)), 'error');
         } finally {
           setIsResettingCounter(false);
         }
@@ -1186,9 +1186,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handlePurgeDeletedGhosts = () => {
     setConfirmDialog({
-      title: 'जुना व दुबार डाटा स्वच्छ करा',
-      message: 'पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित अर्जांचा डाटा सिस्टम व कॅशमधून कायमचा काढून टाकायचा का?',
-      confirmLabel: 'होय, स्वच्छ करा',
+      title: 'Clean Rejected & Duplicate Data',
+      message: 'Permanently remove rejected, deleted, incomplete, and duplicate pending records from the database and cache?',
+      confirmLabel: 'Clean Now',
       isDanger: true,
       onConfirm: async () => {
         setIsPurgingGhosts(true);
@@ -1197,7 +1197,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           showAdminFeedback(res.message, 'success');
           if (onFetchApplications) await onFetchApplications(true);
         } catch (err) {
-          showAdminFeedback('जुना डाटा स्वच्छ करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+          showAdminFeedback('Cleanup failed: ' + (err instanceof Error ? err.message : String(err)), 'error');
         } finally {
           setIsPurgingGhosts(false);
         }
@@ -1207,9 +1207,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   const handleDeleteWithFeedback = (app: MembershipApplication) => {
     setConfirmDialog({
-      title: 'अर्ज कायमचा डिलीट करा',
-      message: `${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone}) यांचा हा अर्ज सिस्टममधून कायमचा डिलीट करायचा का? डिलीट केल्यानंतर ते पुन्हा अर्ज भरू शकतील.`,
-      confirmLabel: 'होय, डिलीट करा',
+      title: 'Delete Application',
+      message: `Permanently delete the application for ${app.salutation ? app.salutation + ' ' : ''}${app.fullName} (${app.phone})? They will be able to apply again.`,
+      confirmLabel: 'Delete',
       isDanger: true,
       onConfirm: async () => {
         try {
@@ -1217,9 +1217,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           if (selectedAppForVerification?.id === app.id) {
             setSelectedAppForVerification(null);
           }
-          showAdminFeedback(`${app.fullName} यांचा अर्ज यशस्वीरीत्या डिलीट झाला.`, 'success');
+          showAdminFeedback(`Application for ${app.fullName} deleted.`, 'success');
         } catch (err) {
-          showAdminFeedback('अर्ज डिलीट करताना त्रुटी आली: ' + (err instanceof Error ? err.message : String(err)), 'error');
+          showAdminFeedback('Failed to delete application: ' + (err instanceof Error ? err.message : String(err)), 'error');
         }
       },
     });
@@ -1246,15 +1246,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     setCloudinaryConfig(updated);
     setCloudinaryStatusMsg({
       text: updated.enabled
-        ? '✓ सर्व्हर मिडिया स्टोरेज सेटिंग्ज यशस्वीरीत्या सेव्ह झाली! आता सर्व फोटो थेट क्लाउड सर्व्हरवर सेव्ह होतील.'
-        : 'सर्व्हर मिडिया स्टोरेज सेटिंग्ज जतन करण्यात आली (सध्या पर्याय निष्क्रिय आहे).',
+        ? 'Cloud storage settings saved. Photos will now upload directly to cloud storage.'
+        : 'Cloud storage settings saved (currently disabled).',
       type: 'success'
     });
   };
 
   const handleTestCloudinaryUpload = async () => {
     if (!cloudinaryCloudName.trim() || !cloudinaryPreset.trim()) {
-      setCloudinaryStatusMsg({ text: 'कृपया आधी Cloud Name आणि Unsigned Upload Preset प्रविष्ट करा.', type: 'error' });
+      setCloudinaryStatusMsg({ text: 'Please enter Cloud Name and Unsigned Upload Preset first.', type: 'error' });
       return;
     }
     setIsTestingCloudinary(true);
@@ -1270,7 +1270,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         ctx.fillRect(0, 0, 10, 10);
       }
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
-      if (!blob) throw new Error('चाचणी इमेज तयार करता आली नाही.');
+      if (!blob) throw new Error('Could not create test image.');
       const testFile = new File([blob], 'test_ping.png', { type: 'image/png' });
 
       const result = await uploadToCloudinary(testFile, {
@@ -1280,12 +1280,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       });
 
       setCloudinaryStatusMsg({
-        text: `✓ सर्व्हर फोटो साठवणूक कनेक्शन यशस्वी झाले! चाचणी फोटो अपलोड झाला: ${result.url}`,
+        text: `Connection successful. Test upload URL: ${result.url}`,
         type: 'success'
       });
     } catch (err: any) {
       setCloudinaryStatusMsg({
-        text: 'फोटो सर्व्हर चाचणी अयशस्वी: ' + (err.message || 'कृपया नाव व Preset तपासा'),
+        text: 'Connection test failed: ' + (err.message || 'Check Cloud Name and Preset'),
         type: 'error'
       });
     } finally {
@@ -1368,9 +1368,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         try {
           const { base64 } = await compressImageFile(file, 800, 600, 0.7);
           setNewsImageUrl(base64);
-          setNewsError('सर्व्हर अपलोड त्रुटी (' + (err.message || '') + '), म्हणून स्थानिक कॉम्प्रेस केलेली इमेज वापरली.');
+          setNewsError('Cloud upload failed (' + (err.message || '') + '). Used locally compressed image instead.');
         } catch {
-          setNewsError('फोटो कॉम्प्रेस करताना अडचण आली.');
+          setNewsError('Failed to compress image.');
         } finally {
           setIsCompressingNewsImg(false);
         }
@@ -1401,12 +1401,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         const result = await uploadToCloudinary(file, cloudinaryConfig);
         setGoFileUrl(result.url);
       } catch (err: any) {
-        setGoError('फाइल अपलोड अयशस्वी: ' + (err.message || ''));
+        setGoError('File upload failed: ' + (err.message || ''));
       } finally {
         setIsUploadingGoFile(false);
       }
     } else {
-      setGoError('कृपया Admin पॅनलमध्ये सर्व्हर मिडिया स्टोरेज सेटिंग्ज तपासा.');
+      setGoError('Please configure Cloud Storage settings in the Admin Panel first.');
     }
   };
 
@@ -1491,7 +1491,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     } catch (err: any) {
       console.warn('Could not sync leaders to backend:', err);
       setLeaderFormMsg({
-        text: err?.message || 'डेटा सर्व्हरवर सेव्ह करताना त्रुटी आली. कृपया पुन्हा लॉगिन करून प्रयत्न करा.',
+        text: err?.message || 'Failed to save to server. Please log in again and retry.',
         type: 'error',
       });
       return false;
@@ -1499,7 +1499,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   const activeLeaderSectionLabel =
-    leaderCategory === 'राज्य सल्लागार मंडळ' ? advisorySubTab : leaderCategory;
+    leaderCategory === 'राज्य सल्लागार मंडळ'
+      ? advisorySubTab === 'कायदेविषयक सल्लागार'
+        ? 'Legal Advisors'
+        : 'Mentors'
+      : leaderCategory === 'राज्य कार्यकारिणी'
+      ? 'State Executive'
+      : leaderCategory === 'महिला आघाडी राज्य कार्यकारिणी'
+      ? 'Women Wing'
+      : 'Divisional Coordinators';
 
   const missingVacantLeadersCount = findMissingVacantLeaders(dynamicLeaders).length;
 
@@ -1511,7 +1519,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const ok = await saveLeadersToStorage(merged);
       if (ok) {
         setLeaderFormMsg({
-          text: `✓ ${addedCount} रिकामी पदे (राज्य / महिला आघाडी / विभागीय कार्यकारिणी) यशस्वीरीत्या पुन्हा जोडली गेली आहेत!`,
+          text: `Restored ${addedCount} vacant posts.`,
           type: 'success',
         });
         setTimeout(() => setLeaderFormMsg(null), 5000);
@@ -1733,7 +1741,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const inputPass = password.trim();
 
     if (!inputEmail) {
-      setLoginError('कृपया ई-मेल प्रविष्ट करा.');
+      setLoginError('Please enter your email.');
       return;
     }
 
@@ -1759,7 +1767,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       }
 
       if (!ok || data?.status !== 'success' || !data.user) {
-        setLoginError(data?.message || 'चुकीचा ई-मेल किंवा पासवर्ड. कृपया पुन्हा प्रयत्न करा.');
+        setLoginError(data?.message || 'Invalid email or password.');
         return;
       }
 
@@ -1790,7 +1798,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         }
       }
     } catch (err: any) {
-      setLoginError('लॉगिन करताना त्रुटी आली: ' + (err.message || 'Error'));
+      setLoginError('Login failed: ' + (err.message || 'Error'));
     } finally {
       setIsLoggingIn(false);
     }
@@ -1806,17 +1814,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const confPwd = firstLoginConfirmPassword.trim();
 
     if (!newPwd || !confPwd) {
-      setFirstLoginError('कृपया दोन्ही पासवर्ड रकाने भरा.');
+      setFirstLoginError('Please fill in both password fields.');
       return;
     }
 
     if (newPwd.length < 4) {
-      setFirstLoginError('पासवर्ड किमान 4 अक्षरांचा असावा.');
+      setFirstLoginError('Password must be at least 4 characters.');
       return;
     }
 
     if (newPwd !== confPwd) {
-      setFirstLoginError('दोन्ही पासवर्ड एकमेकांशी जुळत नाहीत.');
+      setFirstLoginError('Passwords do not match.');
       return;
     }
 
@@ -1832,7 +1840,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       });
 
       if (!ok || data?.status !== 'success' || !data.user) {
-        setFirstLoginError(data?.message || 'पासवर्ड सेव्ह करताना त्रुटी आली.');
+        setFirstLoginError(data?.message || 'Failed to save password.');
         return;
       }
 
@@ -1840,7 +1848,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setAuthSessionToken(data.token);
       }
       const user = data.user;
-      setFirstLoginSuccess('आपला पासवर्ड यशस्वीपणे तयार झाला आहे! डॅशबोर्ड उघडत आहे...');
+      setFirstLoginSuccess('Password set. Opening dashboard...');
       setTimeout(() => {
         setIsFirstLoginMode(false);
         setCurrentUser(user);
@@ -1851,7 +1859,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         }
       }, 1000);
     } catch (err: any) {
-      setFirstLoginError('पासवर्ड सेव्ह करताना त्रुटी: ' + (err.message || 'Error'));
+      setFirstLoginError('Failed to save password: ' + (err.message || 'Error'));
     }
   };
 
@@ -1867,17 +1875,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const confP = confirmPassInput.trim();
 
     if (!curr || !newP || !confP) {
-      setChangePassStatus({ text: 'कृपया सर्व रकाने भरा.', type: 'error' });
+      setChangePassStatus({ text: 'Please fill in all fields.', type: 'error' });
       return;
     }
 
     if (newP.length < 4) {
-      setChangePassStatus({ text: 'नवीन पासवर्ड किमान 4 अक्षरांचा असावा.', type: 'error' });
+      setChangePassStatus({ text: 'New password must be at least 4 characters.', type: 'error' });
       return;
     }
 
     if (newP !== confP) {
-      setChangePassStatus({ text: 'नवीन पासवर्ड आणि पुष्टीकरण पासवर्ड जुळत नाहीत.', type: 'error' });
+      setChangePassStatus({ text: 'New password and confirmation do not match.', type: 'error' });
       return;
     }
 
@@ -1887,19 +1895,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         { currentPassword: curr, newPassword: newP }
       );
       if (!ok || data?.status !== 'success') {
-        setChangePassStatus({ text: data?.message || 'सध्याचा चालू पासवर्ड चुकीचा आहे.', type: 'error' });
+        setChangePassStatus({ text: data?.message || 'Current password is incorrect.', type: 'error' });
         return;
       }
 
       setChangePassStatus({
-        text: '✓ पासवर्ड यशस्वीपणे बदलण्यात आला आहे! हा पासवर्ड क्लाउडवर सेव्ह झाला असून आता सर्व मोबाईल व उपकरणांवरून लॉगिन करताना हाच पासवर्ड चालेल.',
+        text: 'Password updated successfully across all devices.',
         type: 'success'
       });
       setCurrentPassInput('');
       setNewPassInput('');
       setConfirmPassInput('');
     } catch (err: any) {
-      setChangePassStatus({ text: 'पासवर्ड बदलताना त्रुटी: ' + err.message, type: 'error' });
+      setChangePassStatus({ text: 'Failed to update password: ' + err.message, type: 'error' });
     }
   };
 
@@ -1910,17 +1918,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
     const targetEmail = newAdminEmail.trim().toLowerCase();
     if (!targetEmail || !targetEmail.includes('@')) {
-      setAdminActionMsg({ text: 'कृपया योग्य ई-मेल आयडी प्रविष्ट करा.', type: 'error' });
+      setAdminActionMsg({ text: 'Please enter a valid email address.', type: 'error' });
       return;
     }
 
     if (targetEmail === DEFAULT_ADMIN_EMAIL.toLowerCase() || adminUsersList.some((u) => u.email.toLowerCase() === targetEmail)) {
-      setAdminActionMsg({ text: 'हा ई-मेल आधीच व्यवस्थापक म्हणून नोंदणीकृत आहे.', type: 'error' });
+      setAdminActionMsg({ text: 'This email is already registered as an admin.', type: 'error' });
       return;
     }
 
     if (!hasAnyAdminPermission(newAdminPermissions)) {
-      setAdminActionMsg({ text: 'कृपया या व्यवस्थापकासाठी किमान एक अधिकार निवडा.', type: 'error' });
+      setAdminActionMsg({ text: 'Select at least one permission.', type: 'error' });
       return;
     }
 
@@ -1945,11 +1953,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         approveMembers: true,
       });
       setAdminActionMsg({
-        text: `व्यवस्थापक (${targetEmail}) यशस्वीपणे जोडला! ते पहिल्या लॉगिन वेळी स्वतःचा पासवर्ड तयार करू शकतील.`,
+        text: `Sub-Admin (${targetEmail}) added. They can set their password on first login.`,
         type: 'success',
       });
     } catch (err: any) {
-      setAdminActionMsg({ text: 'व्यवस्थापक जोडताना त्रुटी आली: ' + (err.message || 'Error'), type: 'error' });
+      setAdminActionMsg({ text: 'Failed to add Sub-Admin: ' + (err.message || 'Error'), type: 'error' });
     } finally {
       setIsSubmittingAdmin(false);
     }
@@ -1966,7 +1974,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleSaveAdminPermissions = async (subAdmin: AdminUser) => {
     setAdminActionMsg(null);
     if (!hasAnyAdminPermission(editingPermissions)) {
-      setAdminActionMsg({ text: 'कृपया या व्यवस्थापकासाठी किमान एक अधिकार निवडा.', type: 'error' });
+      setAdminActionMsg({ text: 'Select at least one permission.', type: 'error' });
       return;
     }
 
@@ -1981,12 +1989,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       setAdminUsersList(updatedList);
       setEditingAdminId(null);
       setAdminActionMsg({
-        text: `✓ ${subAdmin.email} यांचे अधिकार यशस्वीपणे अद्ययावत (Update) करण्यात आले!`,
+        text: `Permissions updated for ${subAdmin.email}.`,
         type: 'success',
       });
     } catch (err: any) {
       setAdminActionMsg({
-        text: 'अधिकार अद्ययावत करताना त्रुटी आली: ' + (err.message || 'Error'),
+        text: 'Failed to update permissions: ' + (err.message || 'Error'),
         type: 'error',
       });
     } finally {
@@ -2003,9 +2011,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       }
       const updated = await fetchAdminUsers();
       setAdminUsersList(updated);
-      setAdminActionMsg({ text: `${targetEmail} यांचे व्यवस्थापक अधिकार काढण्यात आले.`, type: 'success' });
+      setAdminActionMsg({ text: `Removed admin access for ${targetEmail}.`, type: 'success' });
     } catch (err: any) {
-      setAdminActionMsg({ text: 'व्यवस्थापक हटवताना त्रुटी आली.', type: 'error' });
+      setAdminActionMsg({ text: 'Failed to remove Sub-Admin.', type: 'error' });
     }
   };
 
@@ -2016,11 +2024,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       const updated = await fetchAdminUsers();
       setAdminUsersList(updated);
       setAdminActionMsg({
-        text: `✓ ${targetEmail} यांचा पासवर्ड यशस्वीरीत्या रिसेट करण्यात आला! ते आता कोणत्याही मोबाईलवरून लॉगिन करताना नवीन पासवर्ड तयार करू शकतील.`,
+        text: `Password reset for ${targetEmail}. They can set a new password on next login.`,
         type: 'success',
       });
     } catch (err: any) {
-      setAdminActionMsg({ text: 'पासवर्ड रिसेट करताना त्रुटी आली: ' + (err.message || 'Error'), type: 'error' });
+      setAdminActionMsg({ text: 'Failed to reset password: ' + (err.message || 'Error'), type: 'error' });
     }
   };
 
@@ -2052,11 +2060,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           setMailboxError(mb.message);
         }
       } else {
-        setMailboxError('ईमेल सर्व्हरशी संपर्क साधता आला नाही.');
+        setMailboxError('Could not connect to the mail server.');
       }
     } catch (e: any) {
       console.warn('Failed to fetch unified inbox:', e);
-      setMailboxError(e?.message || 'संदेश लोड करताना त्रुटी आली.');
+      setMailboxError(e?.message || 'Failed to load messages.');
     } finally {
       setIsLoadingContacts(false);
     }
@@ -2084,12 +2092,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         body: JSON.stringify({ uid: emailItem.uid, isRead: nextRead, folder: emailItem.folder || 'INBOX' }),
       });
       if (!res.ok) throw new Error('Mark read failed');
-      showAdminFeedback(nextRead ? 'ईमेल वाचलेला म्हणून चिन्हांकित केला.' : 'ईमेल अनरीड केला.', 'success');
+      showAdminFeedback(nextRead ? 'Marked as read.' : 'Marked as unread.', 'success');
     } catch {
       setMailboxEmails((prev) =>
         prev.map((m) => (m.uid === emailItem.uid ? { ...m, isRead: !nextRead } : m))
       );
-      showAdminFeedback('ईमेल स्थिती अपडेट करताना अडचण आली.', 'error');
+      showAdminFeedback('Failed to update email status.', 'error');
     }
   };
 
@@ -2101,9 +2109,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       );
       if (!res.ok) throw new Error('Delete failed');
       setMailboxEmails((prev) => prev.filter((m) => m.uid !== emailItem.uid));
-      showAdminFeedback('ईमेल इनबॉक्समधून हटवण्यात आला.', 'success');
+      showAdminFeedback('Email deleted from inbox.', 'success');
     } catch {
-      showAdminFeedback('ईमेल हटवताना त्रुटी आली.', 'error');
+      showAdminFeedback('Failed to delete email.', 'error');
     }
   };
 
@@ -2119,10 +2127,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       ? /^re:/i.test(rawSubject)
         ? rawSubject
         : `Re: ${rawSubject}`
-      : 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ — संपर्क उत्तर';
+      : 'Mahasangh — Reply';
     const greeting = opts.recipientName
-      ? `सप्रेम नमस्कार ${opts.recipientName} जी,\n\n`
-      : 'सप्रेम नमस्कार,\n\n';
+      ? `Dear ${opts.recipientName},\n\n`
+      : 'Hello,\n\n';
 
     setReplyModal({
       open: true,
@@ -2145,11 +2153,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const text = replyModal.body.trim();
 
     if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
-      setReplyModal((prev) => prev ? { ...prev, error: 'कृपया वैध ईमेल पत्ता (To Email) टाका.' } : prev);
+      setReplyModal((prev) => prev ? { ...prev, error: 'Please enter a valid recipient email.' } : prev);
       return;
     }
     if (!subject || !text) {
-      setReplyModal((prev) => prev ? { ...prev, error: 'कृपया विषय आणि उत्तर मजकूर भरा.' } : prev);
+      setReplyModal((prev) => prev ? { ...prev, error: 'Please enter both subject and message.' } : prev);
       return;
     }
 
@@ -2168,13 +2176,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       });
       const data = await res.json();
       if (!res.ok || data.status === 'error') {
-        throw new Error(data.message || 'ईमेल पाठवता आला नाही.');
+        throw new Error(data.message || 'Failed to send email.');
       }
       setReplyModal(null);
-      showAdminFeedback(`✓ '${to}' यांना ${mailboxAccount} वरून ईमेल यशस्वीपणे पाठवला!`, 'success');
+      showAdminFeedback(`Email sent to '${to}' from ${mailboxAccount}.`, 'success');
     } catch (err: any) {
       setReplyModal((prev) =>
-        prev ? { ...prev, isSending: false, error: err?.message || 'ईमेल पाठवताना त्रुटी आली.' } : prev
+        prev ? { ...prev, isSending: false, error: err?.message || 'Failed to send email.' } : prev
       );
     }
   };
@@ -2207,7 +2215,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleApproveVerified = async () => {
     if (!selectedAppForVerification || isApprovingApp) return;
     if (!paymentConfirmedChecked) {
-      setVerificationErrorMsg('कृपया सदस्यत्व व वर्गणी फी बँक खात्यावर जमा झाल्याची खात्री करणारा टिक बॉक्स निवडा.');
+      setVerificationErrorMsg('Please confirm that the membership fee payment has been received.');
       return;
     }
     setVerificationErrorMsg('');
@@ -2234,12 +2242,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         paymentConfirmed: true
       });
       showAdminFeedback(
-        `${selectedAppForVerification.fullName} यांचा अर्ज मंजूर झाला! क्रमांक: ${resolvedNumber}`,
+        `Approved ${selectedAppForVerification.fullName}. Member No: ${resolvedNumber}`,
         'success'
       );
       setSelectedAppForVerification(null);
     } catch (err: any) {
-      setVerificationErrorMsg('मंजुरी देताना तांत्रिक त्रुटी आली: ' + (err?.message || 'कृपया इंटरनेट तपासून पुन्हा प्रयत्न करा.'));
+      setVerificationErrorMsg('Approval failed: ' + (err?.message || 'Please check your connection and retry.'));
     } finally {
       setIsApprovingApp(false);
     }
@@ -2255,9 +2263,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
 
     const rejectedName = selectedAppForVerification.fullName;
-    onRejectApplication(selectedAppForVerification.id, rejectReason.trim() || 'प्रशासनाकडून नाकारले');
+    onRejectApplication(selectedAppForVerification.id, rejectReason.trim() || 'Rejected by Admin');
     setSelectedAppForVerification(null);
-    showAdminFeedback(`${rejectedName} यांचा अर्ज नाकारण्यात आला.`, 'success');
+    showAdminFeedback(`Application for ${rejectedName} rejected.`, 'success');
   };
 
   // Handle Photo selection for Leader with client-side super-compression (15KB - 25KB)
@@ -2267,7 +2275,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setLeaderFormMsg({ text: 'कृपया वैध फोटो फाईल (JPG किंवा PNG) निवडा.', type: 'error' });
+      setLeaderFormMsg({ text: 'Please select a valid image file (JPG or PNG).', type: 'error' });
       return;
     }
 
@@ -2278,7 +2286,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setLeaderPhoto(result.url);
         setLeaderPhotoUrl(result.url);
         setLeaderPhotoSizeKb(0);
-        setLeaderFormMsg({ text: '✓ फोटो थेट हाय-स्पीड मिडिया सर्व्हरवर सेव्ह झाला!', type: 'success' });
+        setLeaderFormMsg({ text: 'Photo uploaded to cloud storage.', type: 'success' });
       } catch (err: any) {
         console.warn('Cloudinary leader upload error, falling back to local compression:', err);
         try {
@@ -2286,9 +2294,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           setLeaderPhoto(base64);
           setLeaderPhotoSizeKb(sizeKb);
           setLeaderPhotoUrl('');
-          setLeaderFormMsg({ text: 'सर्व्हर त्रुटी, स्थानिक कॉम्प्रेस केलेला फोटो वापरला (' + sizeKb + ' KB).', type: 'error' });
+          setLeaderFormMsg({ text: 'Cloud upload failed. Using compressed image (' + sizeKb + ' KB).', type: 'error' });
         } catch {
-          setLeaderFormMsg({ text: 'फोटो अपलोड करताना अडचण आली.', type: 'error' });
+          setLeaderFormMsg({ text: 'Failed to upload photo.', type: 'error' });
         }
       } finally {
         setIsUploadingLeaderCloudinary(false);
@@ -2301,7 +2309,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setLeaderPhotoSizeKb(sizeKb);
         setLeaderPhotoUrl('');
       } catch (err: any) {
-        setLeaderFormMsg({ text: 'फोटो कॉम्प्रेस करताना अडचण आली: ' + (err.message || ''), type: 'error' });
+        setLeaderFormMsg({ text: 'Failed to compress photo: ' + (err.message || ''), type: 'error' });
       }
     }
   };
@@ -2314,17 +2322,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const isDistrictTab = activeAdminSubTab === 'district_leadership';
 
     if (isDistrictTab && !leaderRegion.trim()) {
-      setLeaderFormMsg({ text: 'कृपया जिल्हा निवडा.', type: 'error' });
+      setLeaderFormMsg({ text: 'Please select a district.', type: 'error' });
       return;
     }
 
     if (isDistrictTab && (!leaderName.trim() || !leaderRole.trim())) {
-      setLeaderFormMsg({ text: 'कृपया नाव आणि पद आवश्यकपणे भरा.', type: 'error' });
+      setLeaderFormMsg({ text: 'Please enter both name and designation.', type: 'error' });
       return;
     }
 
     if (!isDistrictTab && !leaderRole.trim()) {
-      setLeaderFormMsg({ text: 'कृपया पद (Role) आवश्यकपणे भरा.', type: 'error' });
+      setLeaderFormMsg({ text: 'Please enter the designation.', type: 'error' });
       return;
     }
 
@@ -2358,7 +2366,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         });
         savedOk = await saveLeadersToStorage(updated);
         if (savedOk) {
-          setLeaderFormMsg({ text: 'पदाधिकारी माहिती यशस्वीपणे अद्यतनित झाली!', type: 'success' });
+          setLeaderFormMsg({ text: 'Leader updated successfully.', type: 'success' });
         }
       } else if (isDistrictTab) {
         // If a placeholder slot exists for the same district and mode, fill it in place to preserve district row order
@@ -2402,7 +2410,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           savedOk = await saveLeadersToStorage([...dynamicLeaders, newLeader]);
         }
         if (savedOk) {
-          setLeaderFormMsg({ text: `${districtLeaderMode} माहिती यशस्वीपणे जतन झाली!`, type: 'success' });
+          setLeaderFormMsg({ text: 'District leader saved successfully.', type: 'success' });
         }
       } else {
         // Add new state/advisory leader (vacant post allowed with '-' when name is empty)
@@ -2418,7 +2426,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         };
         savedOk = await saveLeadersToStorage([newLeader, ...dynamicLeaders]);
         if (savedOk) {
-          setLeaderFormMsg({ text: 'नवीन पदाधिकारी यशस्वीपणे जोडले गेले!', type: 'success' });
+          setLeaderFormMsg({ text: 'New leader added successfully.', type: 'success' });
         }
       }
     } finally {
@@ -2464,7 +2472,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const filtered = dynamicLeaders.filter((l) => (l.id ? l.id !== leaderId : l.name !== leaderName));
     const ok = await saveLeadersToStorage(filtered);
     if (ok) {
-      setLeaderFormMsg({ text: `'${leaderName || 'पदाधिकारी'}' यांना यादीतून वगळण्यात आले आहे.`, type: 'success' });
+      setLeaderFormMsg({ text: `'${leaderName || 'Leader'}' removed from list.`, type: 'success' });
       setTimeout(() => setLeaderFormMsg(null), 3500);
     }
   };
@@ -2473,7 +2481,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const handleCreateNews = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newsTitle.trim() || !newsSummary.trim() || !newsContent.trim()) {
-      setNewsError('कृपया बातमीचे शीर्षक, सारांश आणि सविस्तर मजकूर भरा.');
+      setNewsError('Please enter title, summary, and full content.');
       return;
     }
     setNewsError('');
@@ -2561,23 +2569,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         setGoDate(new Date().toISOString().split('T')[0]);
         setTimeout(() => setGoCreatedSuccess(false), 4000);
     } catch (err: any) {
-        setGoError('शासन निर्णय सेव्ह करताना त्रुटी: ' + err.message);
+        setGoError('Failed to save GR: ' + err.message);
     }
   };
 
   const handleDeleteGovOrder = (id: string) => {
     setConfirmDialog({
-      title: 'शासन निर्णय हटवा',
-      message: 'हा शासन निर्णय / परिपत्रक कायमचे हटवायचे आहे का?',
-      confirmLabel: 'होय, हटवा',
+      title: 'Delete GR / Order',
+      message: 'Permanently delete this GR / Circular / Order?',
+      confirmLabel: 'Delete',
       isDanger: true,
       onConfirm: async () => {
         try {
           await deleteGovOrderFromFirestore(id);
           setGovOrders(prev => prev.filter(go => go.id !== id));
-          showAdminFeedback('शासन निर्णय यशस्वीरीत्या हटवला गेला.', 'success');
+          showAdminFeedback('GR / Order deleted.', 'success');
         } catch (err: any) {
-          showAdminFeedback('हटवताना त्रुटी: ' + err.message, 'error');
+          showAdminFeedback('Delete failed: ' + err.message, 'error');
         }
       },
     });
@@ -2610,17 +2618,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
   // Delete News with fallback for corrupt/missing titles
   const handleDeleteNewsItem = (item: NewsItem) => {
-    const displayTitle = item.title || (item as any).headline || 'ही बातमी';
+    const displayTitle = item.title || (item as any).headline || 'this post';
     setConfirmDialog({
-      title: 'बातमी / परिपत्रक हटवा',
-      message: `आपण खात्रीने '${displayTitle}' ही बातमी / परिपत्रक / फोटो हटवू इच्छिता?`,
-      confirmLabel: 'होय, हटवा',
+      title: 'Delete News',
+      message: `Permanently delete '${displayTitle}'?`,
+      confirmLabel: 'Delete',
       isDanger: true,
       onConfirm: () => {
         if (onDeleteNews) {
           onDeleteNews(item.id);
         }
-        showAdminFeedback('बातमी यशस्वीरीत्या हटवण्यात आली.', 'success');
+        showAdminFeedback('News post deleted.', 'success');
       },
     });
   };
@@ -2628,7 +2636,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Live Preview Handlers
   const handleOpenLivePreview = () => {
     if (!newsTitle.trim()) {
-      setNewsError('प्रिव्ह्यू पाहण्यासाठी किमान बातमीचे शीर्षक भरा.');
+      setNewsError('Enter at least a title to preview.');
       return;
     }
     setNewsError('');
@@ -2694,30 +2702,30 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   }> = [
     {
       key: 'applications',
-      label: `सदस्यत्व अर्ज (${toEnglishDigits(totalCount)})`,
-      shortLabel: 'अर्ज',
+      label: `Applications (${toEnglishDigits(totalCount)})`,
+      shortLabel: 'Apps',
       icon: <Users className="w-4 h-4 shrink-0" />,
       badge: pendingCount > 0 ? pendingCount : undefined,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.approveMembers),
     },
     {
       key: 'edit_members',
-      label: 'सदस्य एडिट व दुरुस्ती',
-      shortLabel: 'एडिट',
+      label: 'Edit Members',
+      shortLabel: 'Edit',
       icon: <Edit3 className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.editMembers),
     },
     {
       key: 'leadership',
-      label: 'राज्य पदाधिकारी',
-      shortLabel: 'राज्य पदे',
+      label: 'State Leaders',
+      shortLabel: 'State',
       icon: <Award className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership),
     },
     {
       key: 'district_leadership',
-      label: 'जिल्हा कार्यकारिणी',
-      shortLabel: 'जिल्हा पदे',
+      label: 'District Leaders',
+      shortLabel: 'District',
       icon: <Users className="w-4 h-4 shrink-0 text-amber-600" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership),
     },
@@ -2730,86 +2738,86 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     },
     {
       key: 'whatsapp_broadcast',
-      label: 'व्हॉट्सॲप संदेश (API)',
+      label: 'WhatsApp',
       shortLabel: 'WhatsApp',
       icon: <Smartphone className="w-4 h-4 shrink-0 text-emerald-600" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
       key: 'backup_restore',
-      label: 'बॅकअप व रिस्टोअर',
-      shortLabel: 'बॅकअप',
+      label: 'Backup & Restore',
+      shortLabel: 'Backup',
       icon: <Database className="w-4 h-4 shrink-0 text-[#193568]" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
       key: 'add_news',
-      label: 'बातम्या व परिपत्रके',
-      shortLabel: 'बातम्या',
+      label: 'News',
+      shortLabel: 'News',
       icon: <FileText className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageNews),
     },
     {
       key: 'gov_order',
-      label: 'शासन निर्णय (GR)',
+      label: 'GR & Orders',
       shortLabel: 'GR',
       icon: <FileText className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageGovOrders),
     },
     {
       key: 'latest_banners',
-      label: 'ताज्या घडामोडी बॅनर्स',
-      shortLabel: 'बॅनर्स',
+      label: 'Banners',
+      shortLabel: 'Banners',
       icon: <ImageIcon className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners),
     },
     {
       key: 'print_id_cards',
-      label: 'नवीन आयकार्ड प्रिंट करा',
-      shortLabel: 'प्रिंट आयकार्ड',
+      label: 'Print ID Cards',
+      shortLabel: 'Print ID',
       icon: <Award className="w-4 h-4 shrink-0 text-amber-600" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
       key: 'passport_photo',
-      label: 'पासपोर्ट फोटो ZIP',
-      shortLabel: 'फोटो ZIP',
+      label: 'Photo ZIP',
+      shortLabel: 'Photos',
       icon: <ImageIcon className="w-4 h-4 shrink-0 text-amber-500" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
       key: 'id_card_preview',
-      label: 'आय-कार्ड डिझाईन नमुना',
-      shortLabel: 'आय-कार्ड',
+      label: 'ID Card Design',
+      shortLabel: 'ID Card',
       icon: <Award className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview),
     },
     {
       key: 'contact_messages',
-      label: `प्राप्त संदेश (${toEnglishDigits(contactMessages.length + mailboxEmails.length)})`,
-      shortLabel: 'संदेश',
+      label: `Messages (${toEnglishDigits(contactMessages.length + mailboxEmails.length)})`,
+      shortLabel: 'Inbox',
       icon: <MessageSquare className="w-4 h-4 shrink-0" />,
       badge: contactMessages.length + mailboxEmails.length > 0 ? contactMessages.length + mailboxEmails.length : undefined,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages),
     },
     {
       key: 'manage_admins',
-      label: 'व्यवस्थापक (Admins)',
-      shortLabel: 'ॲडमिन',
+      label: 'Sub-Admins',
+      shortLabel: 'Admins',
       icon: <Shield className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageAdmins),
     },
     {
       key: 'cloudinary',
-      label: 'क्लाउड स्टोरेज',
-      shortLabel: 'स्टोरेज',
+      label: 'Cloud Storage',
+      shortLabel: 'Storage',
       icon: <Cloud className="w-4 h-4 shrink-0" />,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary),
     },
     {
       key: 'password',
-      label: 'पासवर्ड बदला',
-      shortLabel: 'पासवर्ड',
+      label: 'Password',
+      shortLabel: 'Password',
       icon: <KeyRound className="w-4 h-4 shrink-0" />,
       allowed: true,
     },
@@ -2836,15 +2844,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <img
               src="/logo.png"
-              alt="महासंघ अधिकृत मानचिन्ह"
+              alt="Mahasangh Official Logo"
               className="w-9 h-9 sm:w-11 sm:h-11 rounded-full ring-2 ring-[#efb24b] bg-white object-contain shrink-0"
             />
             <div className="min-w-0">
               <p className="text-[10px] sm:text-[11px] font-bold text-[#efb24b] tracking-wide truncate leading-tight">
-                महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+                Maharashtra State Federation
               </p>
-              <h1 className="font-serifDevanagari text-sm sm:text-lg font-bold text-white truncate leading-tight">
-                अधिकृत प्रशासन कक्ष (Admin Panel)
+              <h1 className="text-sm sm:text-lg font-bold text-white truncate leading-tight">
+                Admin Panel
               </h1>
             </div>
           </div>
@@ -2855,11 +2863,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 type="button"
                 onClick={onExitAdmin}
                 className="min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="मुख्य वेबसाईटवर परत जा"
+                title="Back to Website"
               >
                 <ArrowLeft className="w-4 h-4 text-[#efb24b]" />
-                <span className="hidden sm:inline">मुख्य वेबसाईटवर जा</span>
-                <span className="sm:hidden">वेबसाईट</span>
+                <span className="hidden sm:inline">Website</span>
+                <span className="sm:hidden">Site</span>
               </button>
             )}
 
@@ -2874,11 +2882,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   setIsMobileMenuOpen(false);
                 }}
                 className="min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                title="प्रशासन कक्षातून बाहेर पडा"
+                title="Sign out of Admin Panel"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">बाहेर पडा (Logout)</span>
-                <span className="sm:hidden">बाहेर</span>
+                <span className="hidden sm:inline">Logout</span>
+                <span className="sm:hidden">Exit</span>
               </button>
             )}
           </div>
@@ -2896,14 +2904,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="w-14 h-14 bg-[#fff5e8] border border-[#efb24b]/60 rounded-full flex items-center justify-center text-[#df6b16] mb-4 mx-auto">
                     <UserPlus className="w-7 h-7" />
                   </div>
-                  <h2 className="font-serifDevanagari text-xl font-bold text-center text-[#0b1e36] mb-1">
-                    नवीन पासवर्ड तयार करा
+                  <h2 className="text-xl font-bold text-center text-[#0b1e36] mb-1">
+                    Set Password
                   </h2>
                   <p className="text-xs text-center text-[#607184] mb-3">
-                    आपले ॲडमिन पॅनलमध्ये स्वागत आहे! आपण प्रथमच लॉगिन करत आहात.
+                    Welcome to the Admin Panel. Create your password for first-time login.
                   </p>
                   <div className="bg-[#fbf8f2] border border-[#e7ded1] p-3 rounded-xl text-center text-xs mb-4">
-                    ई-मेल: <strong className="text-[#0b1e36] font-mono">{firstLoginEmail}</strong>
+                    Email: <strong className="text-[#0b1e36] font-mono">{firstLoginEmail}</strong>
                   </div>
 
                   {firstLoginError && (
@@ -2923,28 +2931,28 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <form onSubmit={handleFirstLoginSubmit} className="space-y-4">
                     <div>
                       <label className="font-bold text-xs text-[#102a43] block mb-1.5">
-                        नवीन पासवर्ड तयार करा <span className="text-rose-600">*</span>
+                        New Password <span className="text-rose-600">*</span>
                       </label>
                       <input
                         type="password"
                         required
                         value={firstLoginNewPassword}
                         onChange={(e) => setFirstLoginNewPassword(e.target.value)}
-                        placeholder="किमान 4 अक्षरी गुप्त पासवर्ड"
+                        placeholder="Minimum 4 characters"
                         className="w-full px-3.5 py-3 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
                       />
                     </div>
 
                     <div>
                       <label className="font-bold text-xs text-[#102a43] block mb-1.5">
-                        पासवर्ड पुन्हा प्रविष्ट करा (Confirm Password) <span className="text-rose-600">*</span>
+                        Confirm Password <span className="text-rose-600">*</span>
                       </label>
                       <input
                         type="password"
                         required
                         value={firstLoginConfirmPassword}
                         onChange={(e) => setFirstLoginConfirmPassword(e.target.value)}
-                        placeholder="तोच पासवर्ड पुन्हा टाका"
+                        placeholder="Re-enter password"
                         className="w-full px-3.5 py-3 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
                       />
                     </div>
@@ -2955,13 +2963,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         onClick={() => setIsFirstLoginMode(false)}
                         className="flex-1 min-h-[46px] bg-slate-100 hover:bg-slate-200 text-[#102a43] font-bold py-2.5 rounded-xl text-sm cursor-pointer"
                       >
-                        रद्द करा
+                        Cancel
                       </button>
                       <button
                         type="submit"
                         className="flex-1 min-h-[46px] bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 rounded-xl text-sm shadow-sm cursor-pointer"
                       >
-                        पासवर्ड सेव्ह करा
+                        Save Password
                       </button>
                     </div>
                   </form>
@@ -2971,15 +2979,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="w-16 h-16 rounded-full ring-2 ring-[#efb24b] bg-[#fbf8f2] p-1 mx-auto mb-4 shadow-sm flex items-center justify-center">
                     <img
                       src="/logo.png"
-                      alt="महासंघ मानचिन्ह"
+                      alt="Mahasangh Logo"
                       className="w-full h-full object-contain rounded-full"
                     />
                   </div>
-                  <h2 className="font-serifDevanagari text-2xl font-bold text-center text-[#0b1e36] mb-1">
-                    प्रशासन लॉगिन
+                  <h2 className="text-2xl font-bold text-center text-[#0b1e36] mb-1">
+                    Admin Login
                   </h2>
                   <p className="text-xs sm:text-sm text-center text-[#607184] mb-6">
-                    केवळ अधिकृत व्यवस्थापकांसाठी राखीव पोर्टल
+                    Authorized Administrators Only
                   </p>
 
                   {loginError && (
@@ -2992,34 +3000,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div>
                       <label className="font-bold text-xs sm:text-sm text-[#102a43] block mb-1.5">
-                        ई-मेल (Admin Email)
+                        Email
                       </label>
                       <input
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="आपला ॲडमिन ई-मेल प्रविष्ट करा"
+                        placeholder="Enter admin email"
                         className="w-full px-3.5 py-3 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
                       />
                     </div>
 
                     <div>
                       <label className="font-bold text-xs sm:text-sm text-[#102a43] block mb-1.5">
-                        पासवर्ड (Password)
+                        Password
                       </label>
                       <div className="relative">
                         <input
                           type={showPassword ? 'text' : 'password'}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="पासवर्ड प्रविष्ट करा"
+                          placeholder="Enter password"
                           className="w-full px-3.5 py-3 pr-12 text-base sm:text-sm bg-[#fbf8f2] border border-[#e7ded1] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#df6b16]"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          aria-label="पासवर्ड पहा किंवा लपवा"
+                          aria-label="Toggle password visibility"
                           className="absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-[#607184] hover:text-[#0b1e36] focus:outline-none cursor-pointer"
                         >
                           {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -3035,12 +3043,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       {isLoggingIn ? (
                         <>
                           <RefreshCw className="w-5 h-5 animate-spin" />
-                          <span>लॉगिन पडताळणी होत आहे...</span>
+                          <span>Signing in...</span>
                         </>
                       ) : (
                         <>
                           <Lock className="w-4 h-4 text-[#efb24b]" />
-                          <span>Login करा</span>
+                          <span>Sign In</span>
                         </>
                       )}
                     </button>
@@ -3051,7 +3059,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       type="button"
                       onClick={() => {
                         if (!email.trim()) {
-                          setLoginError('कृपया आधी आपला अधिकृत ई-मेल प्रविष्ट करा.');
+                          setLoginError('Please enter your authorized email first.');
                           return;
                         }
                         setIsFirstLoginMode(true);
@@ -3062,7 +3070,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="min-h-[44px] px-3 text-sm text-[#df6b16] hover:text-[#0b1e36] font-bold flex items-center justify-center gap-2 mx-auto transition-colors cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
-                      नवीन ॲडमिन? पासवर्ड तयार करा
+                      New Sub-Admin? Set Password
                     </button>
                   </div>
                 </div>
@@ -3078,7 +3086,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div className="flex items-center gap-2 text-xs font-bold text-[#efb24b]">
                   <Shield className="w-4 h-4 shrink-0" />
                   <span className="truncate">
-                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक' : currentUser?.name || 'सह-व्यवस्थापक'}
+                    {currentUser?.isSuperAdmin ? 'Super Admin' : currentUser?.name || 'Sub-Admin'}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 font-mono truncate mt-0.5">
@@ -3086,7 +3094,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </p>
               </div>
 
-              <nav className="space-y-1" aria-label="प्रशासन विभाग">
+              <nav className="space-y-1" aria-label="Admin Navigation">
                 {permittedNavItems.map((item) => {
                   const isActive = activeAdminSubTab === item.key;
                   return (
@@ -3127,10 +3135,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               <div className="lg:hidden bg-white border border-[#e7ded1] rounded-2xl px-3.5 py-2.5 shadow-2xs flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-[#df6b16]">
-                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक' : currentUser?.name || 'सह-व्यवस्थापक'}
+                    {currentUser?.isSuperAdmin ? 'Super Admin' : currentUser?.name || 'Sub-Admin'}
                   </p>
-                  <p className="font-serifDevanagari font-bold text-sm text-[#0b1e36] truncate">
-                    {permittedNavItems.find((i) => i.key === activeAdminSubTab)?.label || 'प्रशासन'}
+                  <p className="font-bold text-sm text-[#0b1e36] truncate">
+                    {permittedNavItems.find((i) => i.key === activeAdminSubTab)?.label || 'Admin'}
                   </p>
                 </div>
                 <button
@@ -3139,7 +3147,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   className="min-h-[42px] px-3 py-2 rounded-xl bg-[#0b1e36] text-white text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <Menu className="w-4 h-4 text-[#efb24b]" />
-                  <span>मेनू</span>
+                  <span>Menu</span>
                 </button>
               </div>
 
@@ -3164,7 +3172,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     type="button"
                     onClick={() => setAdminFeedbackBanner(null)}
                     className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-black/5 shrink-0 cursor-pointer"
-                    aria-label="बंद करा"
+                    aria-label="Close"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -3176,11 +3184,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               <div className="bg-white p-4 sm:p-6 rounded-2xl border border-[#e7ded1] shadow-xs space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e7ded1] pb-4">
                   <div>
-                    <h3 className="font-serifDevanagari text-lg font-bold text-[#0b1e36]">
-                      सदस्यत्व अर्ज तपासणी व मंजुरी
+                    <h3 className="text-lg font-bold text-[#0b1e36]">
+                      Membership Applications
                     </h3>
                     <p className="text-xs text-[#607184] mt-0.5">
-                      येथे प्राप्त झालेले सर्व अर्ज तपासा, बँक पेमेंट पडताळा व अधिकृत सदस्य क्रमांक द्या.
+                      Review applications, verify payments, and issue member numbers.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -3199,13 +3207,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             }}
                             disabled={isResequencing}
                             className="min-w-[40px] min-h-[40px] rounded-xl bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-2.5"
-                            title="सर्व क्रमांक क्रमाने लावा"
+                            title="Resequence all member numbers"
                           >
-                            {isResequencing ? '...' : 'क्रमाने लावा'}
+                            {isResequencing ? '...' : 'Resequence'}
                           </button>
                           {activeCircleAction === 'resequence' && (
                             <div className="absolute left-0 sm:left-auto sm:right-0 top-11 z-30 bg-[#0b1e36] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2 border border-[#efb24b]">
-                              <span>पुनर्रचना करायची? (पुन्हा टॅप करा)</span>
+                              <span>Confirm resequence? Tap again</span>
                               <button
                                 type="button"
                                 onClick={() => setActiveCircleAction(null)}
@@ -3230,13 +3238,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             }}
                             disabled={isResettingCounter}
                             className="min-w-[40px] min-h-[40px] rounded-xl bg-[#193568] hover:bg-[#0b1e36] text-white flex items-center justify-center text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-2.5"
-                            title="काउंट शेवटच्या क्रमांकावर सेट करा"
+                            title="Reset counter to highest number"
                           >
-                            {isResettingCounter ? '...' : 'काउंटर रिसेट'}
+                            {isResettingCounter ? '...' : 'Reset Counter'}
                           </button>
                           {activeCircleAction === 'reset' && (
                             <div className="absolute left-0 sm:left-auto sm:right-0 top-11 z-30 bg-[#0b1e36] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2 border border-[#efb24b]">
-                              <span>शेवटच्या क्रमांकावर सेट करा? (पुन्हा टॅप करा)</span>
+                              <span>Reset counter? Tap again</span>
                               <button
                                 type="button"
                                 onClick={() => setActiveCircleAction(null)}
@@ -3253,10 +3261,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           onClick={handlePurgeDeletedGhosts}
                           disabled={isPurgingGhosts}
                           className="min-h-[40px] bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-                          title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित रेकॉर्ड सिस्टममधून स्वच्छ करा"
+                          title="Clean rejected, deleted, and duplicate pending records"
                         >
                           <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
-                          <span>{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुना डाटा स्वच्छ करा'}</span>
+                          <span>{isPurgingGhosts ? 'Cleaning...' : 'Clean Data'}</span>
                         </button>
                       </>
                     )}
@@ -3269,7 +3277,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         className="min-h-[40px] bg-[#fbf8f2] hover:bg-[#f2eadf] text-[#0b1e36] border border-[#e7ded1] text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 text-[#df6b16] ${isLoadingApps ? 'animate-spin' : ''}`} />
-                        <span>{isLoadingApps ? 'लोड होत आहे...' : 'ताजे करा'}</span>
+                        <span>{isLoadingApps ? 'Loading...' : 'Refresh'}</span>
                       </button>
                     )}
                   </div>
@@ -3278,19 +3286,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {/* Quick Stats Grid inside Applications Sub-Tab */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                   <div className="bg-[#fbf8f2] p-3.5 rounded-xl border border-[#e7ded1]">
-                    <span className="text-[#607184] text-xs font-bold block">एकूण अर्ज</span>
+                    <span className="text-[#607184] text-xs font-bold block">Total</span>
                     <span className="text-2xl font-black text-[#0b1e36] tabular-nums">{toEnglishDigits(totalCount)}</span>
                   </div>
                   <div className="bg-emerald-50/70 p-3.5 rounded-xl border border-emerald-200">
-                    <span className="text-emerald-800 text-xs font-bold block">मंजूर अर्ज</span>
+                    <span className="text-emerald-800 text-xs font-bold block">Approved</span>
                     <span className="text-2xl font-black text-emerald-700 tabular-nums">{toEnglishDigits(approvedCount)}</span>
                   </div>
                   <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200">
-                    <span className="text-amber-800 text-xs font-bold block">प्रलंबित अर्ज</span>
+                    <span className="text-amber-800 text-xs font-bold block">Pending</span>
                     <span className="text-2xl font-black text-amber-700 tabular-nums">{toEnglishDigits(pendingCount)}</span>
                   </div>
                   <div className="bg-rose-50/70 p-3.5 rounded-xl border border-rose-200">
-                    <span className="text-rose-800 text-xs font-bold block">नाकारलेले अर्ज</span>
+                    <span className="text-rose-800 text-xs font-bold block">Rejected</span>
                     <span className="text-2xl font-black text-rose-700 tabular-nums">{toEnglishDigits(rejectedCount)}</span>
                   </div>
                 </div>
@@ -3312,10 +3320,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             : 'text-[#607184] hover:text-[#0b1e36]'
                         }`}
                       >
-                        {st === 'all' && `सर्व (${toEnglishDigits(totalCount)})`}
-                        {st === 'pending' && `प्रलंबित (${toEnglishDigits(pendingCount)})`}
-                        {st === 'approved' && `मंजूर (${toEnglishDigits(approvedCount)})`}
-                        {st === 'rejected' && `नाकारलेले (${toEnglishDigits(rejectedCount)})`}
+                        {st === 'all' && `All (${toEnglishDigits(totalCount)})`}
+                        {st === 'pending' && `Pending (${toEnglishDigits(pendingCount)})`}
+                        {st === 'approved' && `Approved (${toEnglishDigits(approvedCount)})`}
+                        {st === 'rejected' && `Rejected (${toEnglishDigits(rejectedCount)})`}
                       </button>
                     ))}
                   </div>
@@ -3325,7 +3333,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <Search className="w-4 h-4 text-[#607184] absolute left-3 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
-                        placeholder="नाव, अर्ज क्र., मोबाईल किंवा जिल्हा..."
+                        placeholder="Name, App No., mobile, or district..."
                         value={searchQuery}
                         onChange={(e) => {
                           setSearchQuery(e.target.value);
@@ -3357,25 +3365,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               : `अधिकृत_सदस्य_यादी_${filterStatus}_${dateSlug}.xlsx`,
                         });
                         showAdminFeedback(
-                          `एक्सेल यादी (${toEnglishDigits(filteredApps.length)} सदस्य - लिंग रकान्यासह) यशस्वीरीत्या डाऊनलोड झाली!`,
+                          `Excel list (${toEnglishDigits(filteredApps.length)} members) downloaded.`,
                           'success'
                         );
                       }}
                       className="min-h-[44px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
-                      title="सर्व सदस्य माहिती मूळ एक्सेल (.XLSX) फॉरमॅटमध्ये डाऊनलोड करा"
+                      title="Download member list as Excel (.xlsx)"
                     >
                       <Download className="w-4 h-4" />
-                      <span>XLSX डाऊनलोड</span>
+                      <span>Export XLSX</span>
                     </button>
                     <button
                       type="button"
                       disabled={isSyncingRazorpay}
                       onClick={() => handleSyncRazorpayLivePayments()}
                       className="min-h-[44px] bg-[#df6b16] hover:bg-[#c55b0d] disabled:opacity-60 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
-                      title="एक्सेल डाउनलोड न करता थेट Razorpay खात्यावरून पेमेंट आलेले प्रलंबित अर्ज तपासा व मंजूर करा"
+                      title="Sync and match pending applications directly from Razorpay"
                     >
                       <RefreshCw className={`w-4 h-4 ${isSyncingRazorpay ? 'animate-spin' : ''}`} />
-                      <span>{isSyncingRazorpay ? 'Razorpay तपासत आहे...' : 'Razorpay थेट सिंक'}</span>
+                      <span>{isSyncingRazorpay ? 'Syncing...' : 'Razorpay Sync'}</span>
                     </button>
                     <button
                       type="button"
@@ -3424,19 +3432,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             setRazorpaySyncMeta({ source: 'excel' });
                             setShowRazorpayMatchModal(true);
                             if (matched.length === 0) {
-                              showAdminFeedback('एक्सेल फाईलमध्ये कोणत्याही प्रलंबित अर्जाशी जुळणारे सफल पेमेंट आढळले नाही.', 'error');
+                              showAdminFeedback('No matching captured payments found for pending applications.', 'error');
                             }
                           } catch (err: any) {
-                            showAdminFeedback('एक्सेल वाचताना त्रुटी: ' + err.message, 'error');
+                            showAdminFeedback('Failed to read Excel file: ' + err.message, 'error');
                           }
                         };
                         fileInput.click();
                       }}
                       className="min-h-[44px] bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
-                      title="Razorpay पेमेंट रिपोर्ट (Excel) अपलोड करून प्रलंबित अर्ज स्वयंचलित मंजूर करा"
+                      title="Upload Razorpay Excel report to auto-approve matching pending applications"
                     >
                       <Upload className="w-4 h-4 text-[#efb24b]" />
-                      <span>Excel ऑटो-मंजूर</span>
+                      <span>Excel Auto-Approve</span>
                     </button>
                   </div>
                 </div>
@@ -3445,7 +3453,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div className="md:hidden space-y-3">
                   {filteredApps.length === 0 ? (
                     <div className="py-10 text-center text-sm text-[#607184] bg-[#fbf8f2] rounded-xl border border-dashed border-[#e7ded1]">
-                      कोणताही अर्ज सापडला नाही.
+                      No applications found.
                     </div>
                   ) : (
                     visibleFilteredApps.map((app) => (
@@ -3482,15 +3490,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </button>
                               {app.status === 'approved' ? (
                                 <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
-                                  मंजूर
+                                  Approved
                                 </span>
                               ) : app.status === 'rejected' ? (
                                 <span className="inline-flex items-center bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
-                                  नाकारले
+                                  Rejected
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[11px] font-bold shrink-0">
-                                  प्रलंबित
+                                  Pending
                                 </span>
                               )}
                             </div>
@@ -3501,11 +3509,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </p>
                               <p>
                                 {normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')} • <strong className="text-[#102a43]">{app.district}</strong>
-                                {app.taluka ? ` · ता. ${app.taluka}` : ''}
+                                {app.taluka ? ` · Tal. ${app.taluka}` : ''}
                               </p>
                               {app.centerName && (
                                 <p className="text-[11px] text-[#102a43] font-medium">
-                                  केंद्र: {app.centerName}
+                                  Center: {app.centerName}
                                 </p>
                               )}
                               <p className="font-mono text-[#df6b16] font-bold">{app.phone}</p>
@@ -3523,7 +3531,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <Check className="w-4 h-4" />
-                                <span>मंजूर</span>
+                                <span>Approve</span>
                               </button>
                               <button
                                 type="button"
@@ -3531,7 +3539,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 className="min-h-[44px] bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <X className="w-4 h-4" />
-                                <span>नाकारा</span>
+                                <span>Reject</span>
                               </button>
                               <button
                                 type="button"
@@ -3539,7 +3547,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 className="min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
-                                <span>डिलीट</span>
+                                <span>Delete</span>
                               </button>
                             </div>
                           ) : (
@@ -3550,7 +3558,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 className="min-h-[44px] bg-[#0b1e36] hover:bg-[#193568] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <Eye className="w-4 h-4 text-[#efb24b]" />
-                                <span>आय-कार्ड</span>
+                                <span>ID Card</span>
                               </button>
                               <button
                                 type="button"
@@ -3566,7 +3574,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 className="min-h-[44px] bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1 cursor-pointer"
                               >
                                 <Trash2 className="w-4 h-4" />
-                                <span>डिलीट</span>
+                                <span>Delete</span>
                               </button>
                             </div>
                           )}
@@ -3581,20 +3589,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <table className="w-full text-left text-xs">
                     <thead className="bg-[#fbf8f2] border-b border-[#e7ded1] text-[#0b1e36] font-bold uppercase tracking-wider text-[11px]">
                       <tr>
-                        <th className="py-3 px-4">फोटो</th>
-                        <th className="py-3 px-4">अर्ज क्र. / तारीख</th>
-                        <th className="py-3 px-4">अर्जदाराचे नाव (क्लिक करा)</th>
-                        <th className="py-3 px-4">पद व जिल्हा</th>
-                        <th className="py-3 px-4">मोबाईल</th>
-                        <th className="py-3 px-4">स्थिती</th>
-                        <th className="py-3 px-4 text-center">कृती (Action)</th>
+                        <th className="py-3 px-4">Photo</th>
+                        <th className="py-3 px-4">App No. / Date</th>
+                        <th className="py-3 px-4">Applicant</th>
+                        <th className="py-3 px-4">Cadre & District</th>
+                        <th className="py-3 px-4">Mobile</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e7ded1]/70">
                       {filteredApps.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-8 text-center text-[#607184]">
-                            कोणताही अर्ज सापडला नाही.
+                            No applications found.
                           </td>
                         </tr>
                       ) : (
@@ -3633,7 +3641,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 type="button"
                                 onClick={() => handleOpenVerification(app)}
                                 className="text-left hover:text-[#df6b16] hover:underline cursor-pointer"
-                                title="तपशीलवार पडताळणी उघडा"
+                                title="Open verification details"
                               >
                                 {app.fullName}
                                 {app.isOfficial && (
@@ -3646,11 +3654,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <td className="py-3 px-4 text-[#102a43]">
                               {normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')}
                               <span className="block text-[11px] text-[#607184] font-semibold">
-                                {app.district}{app.taluka ? ` (ता. ${app.taluka})` : ''}
+                                {app.district}{app.taluka ? ` (Tal. ${app.taluka})` : ''}
                               </span>
                               {app.centerName && (
                                 <span className="block text-[11px] text-[#102a43] font-medium mt-0.5">
-                                  केंद्र: {app.centerName}
+                                  Center: {app.centerName}
                                 </span>
                               )}
                             </td>
@@ -3661,15 +3669,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               {app.status === 'approved' ? (
                                 <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
                                   <Award className="w-3 h-3 text-emerald-600" />
-                                  मंजूर
+                                  Approved
                                 </span>
                               ) : app.status === 'rejected' ? (
                                 <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
-                                  नाकारले
+                                  Rejected
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full text-[11px] font-bold">
-                                  प्रलंबित
+                                  Pending
                                 </span>
                               )}
                             </td>
@@ -3681,21 +3689,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     onClick={() => handleOpenVerification(app)}
                                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                                   >
-                                    मंजूर करा
+                                    Approve
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleOpenVerification(app, true)}
                                     className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                                   >
-                                    नाकारा
+                                    Reject
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteWithFeedback(app)}
                                     className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
                                   >
-                                    डिलीट
+                                    Delete
                                   </button>
                                 </div>
                               ) : (
@@ -3704,16 +3712,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     type="button"
                                     onClick={() => setCertModalApp(app)}
                                     className="bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
-                                    title="आय-कार्ड पहा"
+                                    title="View ID Card"
                                   >
                                     <Eye className="w-3.5 h-3.5 text-[#efb24b]" />
-                                    आय-कार्ड पहा
+                                    ID Card
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => generateMembershipIdCardPdf(app)}
                                     className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
-                                    title="आय-कार्ड PDF डाऊनलोड करा"
+                                    title="Download ID Card PDF"
                                   >
                                     <Download className="w-3.5 h-3.5" />
                                     PDF
@@ -3722,7 +3730,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     type="button"
                                     onClick={() => handleDeleteWithFeedback(app)}
                                     className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors shadow-xs cursor-pointer"
-                                    title="हा अर्ज कायमचा डिलीट करा"
+                                    title="Delete application"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -3740,8 +3748,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {filteredApps.length > 0 && (
                   <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-[#607184]">
                     <span>
-                      एकूण <strong className="text-[#0b1e36] tabular-nums">{toEnglishDigits(filteredApps.length)}</strong> पैकी{' '}
-                      <strong className="text-[#0b1e36] tabular-nums">{toEnglishDigits(visibleFilteredApps.length)}</strong> नोंदी दाखवल्या आहेत
+                      Showing <strong className="text-[#0b1e36] tabular-nums">{toEnglishDigits(visibleFilteredApps.length)}</strong> of{' '}
+                      <strong className="text-[#0b1e36] tabular-nums">{toEnglishDigits(filteredApps.length)}</strong> applications
                     </span>
                     {visibleFilteredApps.length < filteredApps.length && (
                       <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -3750,14 +3758,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           onClick={() => setAppsVisibleCount((prev) => prev + 50)}
                           className="flex-1 sm:flex-none min-h-[42px] px-4 py-2 bg-[#0b1e36] hover:bg-[#193568] text-white font-bold rounded-xl cursor-pointer"
                         >
-                          आणखी ५० अर्ज पहा
+                          Load 50 More
                         </button>
                         <button
                           type="button"
                           onClick={() => setAppsVisibleCount(filteredApps.length)}
                           className="min-h-[42px] px-4 py-2 bg-[#fbf8f2] hover:bg-[#f0e9de] text-[#0b1e36] border border-[#e7ded1] font-bold rounded-xl cursor-pointer"
                         >
-                          सर्व दाखवा
+                          Show All
                         </button>
                       </div>
                     )}
@@ -3785,18 +3793,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {activeAdminSubTab === 'leadership' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
                 <div>
-                  <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
-                    राज्य पदाधिकारी संपादन (State Leadership Management)
+                  <h3 className="text-lg font-bold text-[#17366d]">
+                    State Leaders
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    येथून आपण राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी, विभागीय समन्वयक आणि राज्य सल्लागार मंडळ (कायदेविषयक सल्लागार व मार्गदर्शक) यांचे फोटो, नाव आणि पद बदलू किंवा नव्याने जोडू शकता. जिल्हा पदाधिकाऱ्यांसाठी शेजारील &quot;जिल्हा कार्यकारिणी&quot; टॅब वापरा.
+                    Manage State Executive, Women Wing, Divisional Coordinators, and Advisory Board members.
                   </p>
                 </div>
 
                 {/* Dropdown with 4 State Categories */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                   <label className="font-bold text-xs text-[#09243f] shrink-0">
-                    श्रेणी निवडा:
+                    Category:
                   </label>
                   <select
                     value={leaderCategory}
@@ -3806,13 +3814,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     }}
                     className="p-2.5 bg-white border border-[#c8d2e2] text-xs font-bold text-[#193568] rounded-lg focus:outline-none focus:border-[#df6b16] w-full sm:w-72"
                   >
-                    <option value="राज्य कार्यकारिणी">1. राज्य कार्यकारिणी</option>
-                    <option value="महिला आघाडी राज्य कार्यकारिणी">2. महिला आघाडी राज्य कार्यकारिणी</option>
-                    <option value="विभागीय समन्वयक">3. विभागीय समन्वयक</option>
-                    <option value="राज्य सल्लागार मंडळ">4. राज्य सल्लागार मंडळ (सल्लागार व मार्गदर्शक)</option>
+                    <option value="राज्य कार्यकारिणी">1. State Executive</option>
+                    <option value="महिला आघाडी राज्य कार्यकारिणी">2. Women Wing</option>
+                    <option value="विभागीय समन्वयक">3. Divisional Coordinators</option>
+                    <option value="राज्य सल्लागार मंडळ">4. Advisory Board</option>
                   </select>
                   <span className="text-xs text-slate-500 font-medium">
-                    या विभागात एकूण: <strong>{categoryLeaders.length}</strong> पदाधिकारी
+                    Total: <strong>{categoryLeaders.length}</strong> leaders
                   </span>
                 </div>
 
@@ -3820,10 +3828,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="text-xs text-amber-950">
                       <strong className="block text-sm font-bold text-[#17366d]">
-                        मूळ रिकामी पदे पुन्हा जोडण्यासाठी उपलब्ध ({missingVacantLeadersCount} पदे)
+                        Vacant Posts Available ({missingVacantLeadersCount})
                       </strong>
                       <span className="text-amber-900">
-                        राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी व विभागीय कार्यकारिणीतील गहाळ झालेली रिकामी पदे एका क्लिकवर पुन्हा जोडा (कोणतेही विद्यमान नाव/फोटो बदलणार नाहीत).
+                        Restore missing default vacant slots without affecting existing leaders.
                       </span>
                     </div>
                     <button
@@ -3833,7 +3841,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="px-4 py-2.5 bg-[#17366d] hover:bg-[#10274e] text-white font-bold text-xs rounded-xl shadow-xs shrink-0 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                     >
                       <RotateCcw className="w-3.5 h-3.5 text-[#efb24b]" />
-                      <span>रिकामी पदे पुन्हा जोडा ({missingVacantLeadersCount})</span>
+                      <span>Restore Vacant Posts ({missingVacantLeadersCount})</span>
                     </button>
                   </div>
                 )}
@@ -3841,7 +3849,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {leaderCategory === 'राज्य सल्लागार मंडळ' && (
                   <div className="bg-[#f8f9fc] p-3.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="text-xs font-semibold text-[#17366d]">
-                      राज्य सल्लागार मंडळ उप-विभाग निवडा:
+                      Advisory Sub-Section:
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -3856,7 +3864,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                         }`}
                       >
-                        १. कायदेविषयक सल्लागार
+                        1. Legal Advisors
                       </button>
                       <button
                         type="button"
@@ -3870,7 +3878,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                         }`}
                       >
-                        २. मार्गदर्शक
+                        2. Mentors
                       </button>
                     </div>
                   </div>
@@ -3882,21 +3890,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-[#df6b16] animate-pulse shrink-0"></span>
-                        <h4 className="font-serifDevanagari font-bold text-sm text-[#193568]">
-                          पदाधिकाऱ्यांचा क्रम ठरवा (नाव निवडून बाणाने वर-खाली करा)
+                        <h4 className="font-bold text-sm text-[#193568]">
+                          Reorder Leaders
                         </h4>
                       </div>
                       <p className="text-xs text-slate-700 mt-1">
                         {selectedLeader ? (
                           <span className="inline-flex items-center gap-1.5 flex-wrap">
-                            <span>निवडलेले नाव:</span>
+                            <span>Selected:</span>
                             <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-400 font-bold text-[#193568] shadow-2xs">
-                              #{selectedLeaderIndex + 1} {isPlaceholderDistrictName(selectedLeader.name) ? 'नाव भरायचे आहे (पद रिक्त)' : selectedLeader.name} ({selectedLeader.role})
+                              #{selectedLeaderIndex + 1} {isPlaceholderDistrictName(selectedLeader.name) ? 'Vacant Post' : selectedLeader.name} ({selectedLeader.role})
                             </span>
                           </span>
                         ) : (
                           <span className="text-slate-500">
-                            खालील यादीतून ज्या पदाधिकाऱ्याचे स्थान बदलायचे आहे, त्या नावावर क्लिक करा.
+                            Select a leader below to move them up or down.
                           </span>
                         )}
                       </p>
@@ -3909,20 +3917,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         disabled={!selectedLeader || selectedLeaderIndex <= 0}
                         onClick={() => handleMoveLeaderUp()}
                         className="flex-1 md:flex-none px-5 py-3 bg-[#17366d] hover:bg-[#12284c] text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-[#17366d]"
-                        title="निवडलेले नाव वर सरकवा"
+                        title="Move selected leader up"
                       >
                         <ArrowUp className="w-4 h-4 text-[#efb24b]" />
-                        <span>▲ वर हलवा</span>
+                        <span>Move Up</span>
                       </button>
                       <button
                         type="button"
                         disabled={!selectedLeader || selectedLeaderIndex === -1 || selectedLeaderIndex >= categoryLeaders.length - 1}
                         onClick={() => handleMoveLeaderDown()}
                         className="flex-1 md:flex-none px-5 py-3 bg-[#df6b16] hover:bg-[#b8540c] text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer border border-[#df6b16]"
-                        title="निवडलेले नाव खाली सरकवा"
+                        title="Move selected leader down"
                       >
                         <ArrowDown className="w-4 h-4 text-white" />
-                        <span>▼ खाली हलवा</span>
+                        <span>Move Down</span>
                       </button>
                     </div>
                   </div>
@@ -3932,16 +3940,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider">
-                      विद्यमान पदाधिकारी ({activeLeaderSectionLabel}) — एकूण: {categoryLeaders.length}
+                      Current Leaders ({activeLeaderSectionLabel}) — {categoryLeaders.length}
                     </h4>
                     <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-                      💡 नावावर क्लिक करून निवडा किंवा बाजूच्या बाणांवर क्लिक करा
+                      Click a row to select or use the arrow buttons
                     </span>
                   </div>
 
                   {categoryLeaders.length === 0 ? (
                     <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500 text-xs">
-                      या श्रेणीत अद्याप कोणतेही पदाधिकारी जोडलेले नाहीत. खालील फॉर्मद्वारे नवीन पदाधिकारी जोडा.
+                      No leaders added in this category yet. Use the form below to add one.
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -3968,7 +3976,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     ? 'bg-[#df6b16] text-white shadow-2xs'
                                     : 'bg-slate-100 text-slate-700 border border-slate-200'
                                 }`}
-                                title={`स्थान: #${index + 1}`}
+                                title={`Position #${index + 1}`}
                               >
                                 {index + 1}
                               </span>
@@ -3989,23 +3997,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               {/* Details */}
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                  <h5 className={`font-serifDevanagari font-bold text-xs sm:text-sm truncate ${
+                                  <h5 className={`font-bold text-xs sm:text-sm truncate ${
                                     isVacantSlot
                                       ? 'text-amber-800 italic'
                                       : isSelected
                                         ? 'text-[#193568]'
                                         : 'text-slate-900'
                                   }`}>
-                                    {isVacantSlot ? 'नाव भरायचे आहे (पद रिक्त)' : ldr.name}
+                                    {isVacantSlot ? 'Vacant Post' : ldr.name}
                                   </h5>
                                   {isVacantSlot && (
                                     <span className="bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                                      रिक्त
+                                      Vacant
                                     </span>
                                   )}
                                   {isSelected && (
                                     <span className="bg-[#df6b16] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                                      निवडलेले
+                                      Selected
                                     </span>
                                   )}
                                 </div>
@@ -4027,7 +4035,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     handleMoveLeaderUp(ldr.id || ldr.name);
                                   }}
                                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#17366d] hover:text-white text-slate-700 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-700 transition-colors shadow-2xs text-xs font-bold border border-slate-200 cursor-pointer"
-                                  title="वर हलवा (Move Up)"
+                                  title="Move Up"
                                 >
                                   <ChevronUp className="w-4 h-4" />
                                 </button>
@@ -4039,7 +4047,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     handleMoveLeaderDown(ldr.id || ldr.name);
                                   }}
                                   className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#df6b16] hover:text-white text-slate-700 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-700 transition-colors shadow-2xs text-xs font-bold border border-slate-200 cursor-pointer"
-                                  title="खाली हलवा (Move Down)"
+                                  title="Move Down"
                                 >
                                   <ChevronDown className="w-4 h-4" />
                                 </button>
@@ -4053,7 +4061,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   handleEditLeader(ldr);
                                 }}
                                 className="p-2 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors cursor-pointer"
-                                title="दुरुस्त करा (Edit)"
+                                title="Edit"
                               >
                                 <Edit3 className="w-4 h-4" />
                               </button>
@@ -4064,7 +4072,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   handleDeleteLeader(ldr.id, ldr.name);
                                 }}
                                 className="p-2 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
-                                title="वगळा (Delete)"
+                                title="Delete"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -4078,11 +4086,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                 {/* Form to Add / Edit Leader (Photo < 200KB) */}
                 <div className="bg-[#fbfbfd] p-5 rounded-xl border border-slate-200">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-1">
-                    {editingLeaderId ? 'पदाधिकारी माहिती दुरुस्त करा (Edit Leader)' : `नवीन पदाधिकारी जोडा (${activeLeaderSectionLabel})`}
+                  <h4 className="text-base font-bold text-[#17366d] mb-1">
+                    {editingLeaderId ? 'Edit Leader' : `Add Leader (${activeLeaderSectionLabel})`}
                   </h4>
                   <p className="text-[11px] text-slate-500 mb-4">
-                    नाव, पद, जिल्हा व 200KB आकारातील पासपोर्ट फोटो निवडून सेव्ह करा.
+                    Enter name, designation, region, and photo (max 200 KB).
                   </p>
 
                   {leaderFormMsg && (
@@ -4097,66 +4105,66 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          पदाधिकाऱ्याचे नाव <span className="text-[10px] font-normal text-slate-500">(रिक्त पदासाठी मोकळे सोडा)</span>
+                          Full Name <span className="text-[10px] font-normal text-slate-500">(blank for vacant)</span>
                         </label>
                         <input
                           type="text"
                           value={leaderName}
                           onChange={(e) => setLeaderName(e.target.value)}
-                          placeholder="उदा. श्री. रमेश देशमुख (किंवा रिकामे ठेवा)"
+                          placeholder="Full name (or leave blank)"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          पद (Role) <span className="text-rose-600">*</span>
+                          Designation <span className="text-rose-600">*</span>
                         </label>
                         <input
                           type="text"
                           required
                           value={leaderRole}
                           onChange={(e) => setLeaderRole(e.target.value)}
-                          placeholder="उदा. जिल्हाध्यक्ष / उपाध्यक्ष"
+                          placeholder="e.g. Vice President"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          जिल्हा / कार्यक्षेत्र
+                          District / Region
                         </label>
                         <input
                           type="text"
                           value={leaderRegion}
                           onChange={(e) => setLeaderRegion(e.target.value)}
-                          placeholder="उदा. नाशिक / पुणे विभाग"
+                          placeholder="e.g. Nashik / Pune Division"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          मोबाईल नंबर
+                          Mobile
                         </label>
                         <input
                           type="text"
                           value={leaderPhone}
                           onChange={(e) => setLeaderPhone(e.target.value)}
-                          placeholder="10 अंकी मोबाईल"
+                          placeholder="10-digit mobile"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          शैक्षणिक पात्रता / संवर्ग
+                          Qualification / Cadre
                         </label>
                         <input
                           type="text"
                           value={leaderEducation}
                           onChange={(e) => setLeaderEducation(e.target.value)}
-                          placeholder="उदा. M.A., B.Ed., केंद्रप्रमुख"
+                          placeholder="e.g. M.A., B.Ed."
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
@@ -4165,12 +4173,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="font-bold text-slate-700 text-xs">
-                            पासपोर्ट फोटो
+                            Photo
                           </label>
                           {cloudinaryConfig.enabled && (
                             <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              क्लाउड स्टोरेज सक्रिय
+                              Cloud Active
                             </span>
                           )}
                         </div>
@@ -4187,14 +4195,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           {isUploadingLeaderCloudinary && (
                             <div className="text-[11px] text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
                               <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
-                              <span>फोटो अपलोड होत आहे...</span>
+                              <span>Uploading photo...</span>
                             </div>
                           )}
                           {leaderPhoto && !isUploadingLeaderCloudinary && (
                             <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded">
-                              <img src={leaderPhoto} alt="प्रीव्ह्यू" className="w-8 h-8 rounded object-cover" />
+                              <img src={leaderPhoto} alt="Preview" className="w-8 h-8 rounded object-cover" />
                               <span className="text-[10px] text-slate-600 truncate flex-1 font-mono">
-                                {leaderPhoto.startsWith('http') ? 'फोटो यशस्वीरीत्या अपलोड झाला' : 'फोटो निवडला आहे'}
+                                {leaderPhoto.startsWith('http') ? 'Photo uploaded' : 'Photo selected'}
                               </span>
                               <button
                                 type="button"
@@ -4205,7 +4213,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 }}
                                 className="text-[10px] text-rose-600 font-bold"
                               >
-                                काढा
+                                Remove
                               </button>
                             </div>
                           )}
@@ -4213,7 +4221,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                         <div className="mt-2">
                           <label className="text-[10px] font-bold text-slate-500 block mb-0.5">
-                            किंवा थेट फोटो लिंक टाका (URL):
+                            Or Image URL:
                           </label>
                           <input
                             type="url"
@@ -4226,7 +4234,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 setLeaderPhotoSizeKb(0);
                               }
                             }}
-                            placeholder="https://... (इमेज URL / डायरेक्ट सर्व्हर फोटो लिंक)"
+                            placeholder="https://..."
                             className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] focus:outline-none focus:border-[#df6b16]"
                           />
                         </div>
@@ -4242,10 +4250,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         {isSavingLeader ? (
                           <>
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>सेव्ह होत आहे...</span>
+                            <span>Saving...</span>
                           </>
                         ) : (
-                          <span>{editingLeaderId ? 'बदल सेव्ह करा' : 'पदाधिकारी जोडा'}</span>
+                          <span>{editingLeaderId ? 'Save Changes' : 'Add Leader'}</span>
                         )}
                       </button>
                       {editingLeaderId && (
@@ -4262,7 +4270,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           }}
                           className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-lg text-xs"
                         >
-                          रद्द करा
+                          Cancel
                         </button>
                       )}
                     </div>
@@ -4276,20 +4284,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
-                    <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d]">
-                      जिल्हा कार्यकारिणी व्यवस्थापन (District Leadership)
+                    <h3 className="text-lg font-bold text-[#17366d]">
+                      District Leaders
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      येथून सर्व ३४ जिल्ह्यांचे <strong>जिल्हा अध्यक्ष</strong> व <strong>जिल्हा सरचिटणीस</strong> यांचे नाव, पद, फोटो व क्रम थेट अद्यतनित करता येतात.
+                      Manage <strong>District Presidents</strong> and <strong>District Secretaries</strong> across all 34 districts.
                     </p>
                   </div>
 
                   <div className="flex items-center gap-2 text-xs font-bold">
                     <span className="bg-sky-50 text-sky-900 border border-sky-200 px-3 py-1.5 rounded-lg">
-                      अध्यक्ष: {dynamicLeaders.filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district') && !isPlaceholderDistrictName(l.name)).length}
+                      Presidents: {dynamicLeaders.filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district') && !isPlaceholderDistrictName(l.name)).length}
                     </span>
                     <span className="bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-lg">
-                      सरचिटणीस: {dynamicLeaders.filter((l) => l && l.category === 'जिल्हा सरचिटणीस' && !isPlaceholderDistrictName(l.name)).length}
+                      Secretaries: {dynamicLeaders.filter((l) => l && l.category === 'जिल्हा सरचिटणीस' && !isPlaceholderDistrictName(l.name)).length}
                     </span>
                   </div>
                 </div>
@@ -4316,7 +4324,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      १. जिल्हा अध्यक्ष ({dynamicLeaders.filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district')).length})
+                      1. District Presidents ({dynamicLeaders.filter((l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district')).length})
                     </button>
                     <button
                       type="button"
@@ -4337,7 +4345,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      २. जिल्हा सरचिटणीस ({dynamicLeaders.filter((l) => l && l.category === 'जिल्हा सरचिटणीस').length})
+                      2. District Secretaries ({dynamicLeaders.filter((l) => l && l.category === 'जिल्हा सरचिटणीस').length})
                     </button>
                   </div>
 
@@ -4347,7 +4355,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       type="text"
                       value={districtLeaderSearch}
                       onChange={(e) => setDistrictLeaderSearch(e.target.value)}
-                      placeholder="जिल्हा किंवा नाव शोधा..."
+                      placeholder="Search district or name..."
                       className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
@@ -4364,11 +4372,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     (d) => !filledDistrictKeys.has(normalizeDistrictAlias(d))
                   );
                   if (missingDistricts.length === 0) return null;
+                  const modeLabelEn = districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'District President' : 'District Secretary';
                   return (
                     <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 space-y-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="text-xs font-bold text-[#17366d]">
-                          अद्याप {districtLeaderMode} नोंद नसलेले जिल्हे ({missingDistricts.length}) — थेट जोडण्यासाठी जिल्ह्यावर क्लिक करा:
+                          Districts without {modeLabelEn} ({missingDistricts.length}) — click to add:
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
@@ -4404,19 +4413,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div className="bg-gradient-to-r from-sky-50/90 via-amber-50/70 to-sky-50/90 border border-sky-200 rounded-2xl p-4 shadow-sm">
                   <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <h4 className="font-serifDevanagari font-bold text-sm text-[#193568]">
-                        जिल्ह्यांचा क्रम ठरवा ({districtLeaderMode})
+                      <h4 className="font-bold text-sm text-[#193568]">
+                        Reorder Districts ({districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'Presidents' : 'Secretaries'})
                       </h4>
                       <p className="text-xs text-slate-700 mt-1">
                         {selectedDistrictLeader ? (
                           <span className="inline-flex items-center gap-1.5 flex-wrap">
-                            <span>निवडलेला जिल्हा:</span>
+                            <span>Selected:</span>
                             <span className="bg-white px-2.5 py-1 rounded-lg border border-amber-400 font-bold text-[#193568]">
-                              #{selectedDistrictLeaderIndex + 1} {selectedDistrictLeader.region} — {isPlaceholderDistrictName(selectedDistrictLeader.name) ? 'नाव भरायचे आहे' : selectedDistrictLeader.name}
+                              #{selectedDistrictLeaderIndex + 1} {selectedDistrictLeader.region} — {isPlaceholderDistrictName(selectedDistrictLeader.name) ? 'Vacant' : selectedDistrictLeader.name}
                             </span>
                           </span>
                         ) : (
-                          <span className="text-slate-500">यादीतून जिल्हा निवडून वर-खाली क्रम बदला.</span>
+                          <span className="text-slate-500">Select a district to move up or down.</span>
                         )}
                       </p>
                     </div>
@@ -4429,7 +4438,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         className="flex-1 md:flex-none px-4 py-2.5 bg-[#17366d] hover:bg-[#12284c] text-white font-bold text-xs rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <ArrowUp className="w-4 h-4 text-[#efb24b]" />
-                        <span>▲ वर हलवा</span>
+                        <span>Move Up</span>
                       </button>
                       <button
                         type="button"
@@ -4438,7 +4447,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         className="flex-1 md:flex-none px-4 py-2.5 bg-[#df6b16] hover:bg-[#b8540c] text-white font-bold text-xs rounded-xl shadow-sm disabled:opacity-35 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                       >
                         <ArrowDown className="w-4 h-4 text-white" />
-                        <span>▼ खाली हलवा</span>
+                        <span>Move Down</span>
                       </button>
                     </div>
                   </div>
@@ -4448,8 +4457,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {filteredDistrictModeLeaders.length === 0 ? (
                   <div className="bg-slate-50 border border-dashed border-slate-300 rounded-xl p-8 text-center text-slate-500 text-xs">
                     {districtLeaderSearch.trim()
-                      ? `'${districtLeaderSearch}' साठी कोणताही पदाधिकारी सापडला नाही.`
-                      : `अद्याप ${districtLeaderMode} जोडलेले नाहीत. वरील जिल्ह्यावर क्लिक करून किंवा खालील फॉर्ममधून जोडा.`}
+                      ? `No leader found for '${districtLeaderSearch}'.`
+                      : 'No district leaders added yet. Click a district above or use the form below.'}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -4495,16 +4504,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[11px] font-extrabold text-[#17366d] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded">
-                                  {ldr.region || 'जिल्हा'}
+                                  {ldr.region || 'District'}
                                 </span>
                                 {isBlank && (
                                   <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
-                                    नाव भरायचे आहे
+                                    Vacant
                                   </span>
                                 )}
                               </div>
-                              <h5 className="font-serifDevanagari font-bold text-xs sm:text-sm text-slate-900 truncate mt-1">
-                                {isBlank ? 'पदाधिकारी नाव अद्यतनित करा' : ldr.name}
+                              <h5 className="font-bold text-xs sm:text-sm text-slate-900 truncate mt-1">
+                                {isBlank ? 'Update Leader Name' : ldr.name}
                               </h5>
                               <span className="text-[11px] text-[#df6b16] font-semibold block truncate">
                                 {ldr.role || districtLeaderMode}
@@ -4523,7 +4532,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   handleMoveDistrictLeaderUp(ldrKey);
                                 }}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#17366d] hover:text-white text-slate-700 disabled:opacity-30 border border-slate-200 cursor-pointer"
-                                title="वर हलवा"
+                                title="Move Up"
                               >
                                 <ChevronUp className="w-4 h-4" />
                               </button>
@@ -4535,7 +4544,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   handleMoveDistrictLeaderDown(ldrKey);
                                 }}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-white hover:bg-[#df6b16] hover:text-white text-slate-700 disabled:opacity-30 border border-slate-200 cursor-pointer"
-                                title="खाली हलवा"
+                                title="Move Down"
                               >
                                 <ChevronDown className="w-4 h-4" />
                               </button>
@@ -4548,7 +4557,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 handleEditLeader(ldr);
                               }}
                               className="p-2 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors cursor-pointer"
-                              title="दुरुस्त करा (Edit)"
+                              title="Edit"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
@@ -4559,7 +4568,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 handleDeleteLeader(ldr.id, ldr.name);
                               }}
                               className="p-2 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors cursor-pointer"
-                              title="वगळा (Delete)"
+                              title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -4572,13 +4581,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                 {/* Form to Add / Edit District Officer */}
                 <div ref={districtLeaderFormRef} className="bg-[#fbfbfd] p-5 rounded-xl border border-slate-200">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-1">
+                  <h4 className="text-base font-bold text-[#17366d] mb-1">
                     {editingLeaderId
-                      ? `माहिती दुरुस्त करा (${districtLeaderMode})`
-                      : `नवीन ${districtLeaderMode} जोडा`}
+                      ? `Edit ${districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'District President' : 'District Secretary'}`
+                      : `Add ${districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'District President' : 'District Secretary'}`}
                   </h4>
                   <p className="text-[11px] text-slate-500 mb-4">
-                    जिल्हा निवडा, नाव व पासपोर्ट फोटो अपलोड करून सेव्ह करा. बदल लगेच &quot;जिल्हा पदाधिकारी&quot; पानावर दिसतील.
+                    Select district, enter details, and upload photo. Changes update live on the District Portal.
                   </p>
 
                   {leaderFormMsg && (
@@ -4593,7 +4602,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          जिल्हा निवडा <span className="text-rose-600">*</span>
+                          District <span className="text-rose-600">*</span>
                         </label>
                         <select
                           required
@@ -4601,7 +4610,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           onChange={(e) => setLeaderRegion(e.target.value)}
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         >
-                          <option value="">-- जिल्हा निवडा --</option>
+                          <option value="">-- Select District --</option>
                           {MAHARASHTRA_DISTRICTS.map((dist) => (
                             <option key={dist} value={dist}>{dist}</option>
                           ))}
@@ -4613,54 +4622,54 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          पदाधिकाऱ्याचे नाव <span className="text-rose-600">*</span>
+                          Full Name <span className="text-rose-600">*</span>
                         </label>
                         <input
                           type="text"
                           required
                           value={leaderName}
                           onChange={(e) => setLeaderName(e.target.value)}
-                          placeholder="उदा. श्री. अनंत नारायण सानप"
+                          placeholder="Full name"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          पद (Role) <span className="text-rose-600">*</span>
+                          Designation <span className="text-rose-600">*</span>
                         </label>
                         <input
                           type="text"
                           required
                           value={leaderRole || (districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'जिल्हाध्यक्ष' : 'जिल्हा सरचिटणीस')}
                           onChange={(e) => setLeaderRole(e.target.value)}
-                          placeholder={districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'जिल्हाध्यक्ष' : 'जिल्हा सरचिटणीस'}
+                          placeholder={districtLeaderMode === 'जिल्हा अध्यक्ष' ? 'District President' : 'District Secretary'}
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          मोबाईल नंबर
+                          Mobile
                         </label>
                         <input
                           type="text"
                           value={leaderPhone}
                           onChange={(e) => setLeaderPhone(e.target.value)}
-                          placeholder="10 अंकी मोबाईल"
+                          placeholder="10-digit mobile"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          शैक्षणिक पात्रता / संवर्ग
+                          Qualification / Cadre
                         </label>
                         <input
                           type="text"
                           value={leaderEducation}
                           onChange={(e) => setLeaderEducation(e.target.value)}
-                          placeholder="उदा. M.A., B.Ed., केंद्रप्रमुख"
+                          placeholder="e.g. M.A., B.Ed."
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
@@ -4668,11 +4677,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label className="font-bold text-slate-700 text-xs">
-                            पासपोर्ट फोटो
+                            Photo
                           </label>
                           {cloudinaryConfig.enabled && (
                             <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              क्लाउड सक्रिय
+                              Cloud Active
                             </span>
                           )}
                         </div>
@@ -4688,14 +4697,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           {isUploadingLeaderCloudinary && (
                             <div className="text-[11px] text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
                               <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
-                              <span>फोटो अपलोड होत आहे...</span>
+                              <span>Uploading photo...</span>
                             </div>
                           )}
                           {leaderPhoto && !isUploadingLeaderCloudinary && (
                             <div className="flex items-center gap-2 p-1.5 bg-slate-50 border border-slate-200 rounded">
-                              <img src={leaderPhoto} alt="प्रीव्ह्यू" className="w-8 h-8 rounded object-cover" />
+                              <img src={leaderPhoto} alt="Preview" className="w-8 h-8 rounded object-cover" />
                               <span className="text-[10px] text-slate-600 truncate flex-1 font-mono">
-                                फोटो निवडला आहे
+                                Photo selected
                               </span>
                               <button
                                 type="button"
@@ -4706,7 +4715,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 }}
                                 className="text-[10px] text-rose-600 font-bold cursor-pointer"
                               >
-                                काढा
+                                Remove
                               </button>
                             </div>
                           )}
@@ -4721,7 +4730,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 setLeaderPhotoSizeKb(0);
                               }
                             }}
-                            placeholder="किंवा फोटो लिंक (URL) टाका..."
+                            placeholder="Or image URL..."
                             className="w-full p-2 bg-white border border-slate-300 rounded-lg text-[11px] focus:outline-none focus:border-[#df6b16]"
                           />
                         </div>
@@ -4737,10 +4746,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         {isSavingLeader ? (
                           <>
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            <span>सेव्ह होत आहे...</span>
+                            <span>Saving...</span>
                           </>
                         ) : (
-                          <span>{editingLeaderId ? 'बदल सेव्ह करा' : `${districtLeaderMode} सेव्ह करा`}</span>
+                          <span>{editingLeaderId ? 'Save Changes' : 'Save Leader'}</span>
                         )}
                       </button>
                       {editingLeaderId && (
@@ -4758,7 +4767,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           }}
                           className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-2.5 rounded-lg text-xs cursor-pointer"
                         >
-                          रद्द करा
+                          Cancel
                         </button>
                       )}
                     </div>
@@ -4771,12 +4780,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {activeAdminSubTab === 'master_studio' && currentUser?.isSuperAdmin && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
-                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2 mb-1">
+                  <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2 mb-1">
                     <Award className="w-5 h-5 text-amber-500" />
-                    महासंघ मास्टर स्टुडिओ (Master Studio)
+                    Master Studio
                   </h3>
                   <p className="text-xs text-slate-500 mb-6">
-                    येथून आपण बहाल करावयाची पदे, जिल्हा पासवर्ड रिसेट आणि नियुक्ती पत्र डिझाईन व्यवस्थापित करू शकता.
+                    Manage official posts, portal passwords, and appointment letter templates.
                   </p>
 
                   <div className="space-y-8">
@@ -4784,15 +4793,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
-                          <h4 className="font-serifDevanagari font-bold text-base text-[#17366d]">
-                            1. बहाल करावयाची पदे व्यवस्थापन (Post Management)
+                          <h4 className="font-bold text-base text-[#17366d]">
+                            1. Post Management
                           </h4>
                           <span className="text-[11px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                            एकूण पदे: {postsList.length}
+                            Total: {postsList.length}
                           </span>
                           {hasUnsavedPostChanges && (
                             <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                              बदल सेव करणे बाकी
+                              Unsaved changes
                             </span>
                           )}
                         </div>
@@ -4806,24 +4815,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white ring-2 ring-emerald-300'
                                 : 'bg-[#17366d] hover:bg-[#0f2752] text-white'
                             } disabled:opacity-60`}
-                            title="सर्व केलेले बदल डेटाबेसमध्ये सेव करून जिल्हा पदाधिकारी ड्रॉपडाऊनमध्ये त्वरित अपडेट करा"
+                            title="Save changes to database and sync with District Portal"
                           >
                             {isSavingPosts ? (
                               <>
                                 <RefreshCw className="w-4 h-4 animate-spin" />
-                                सेव होत आहे...
+                                Saving...
                               </>
                             ) : (
                               <>
                                 <CheckCircle2 className="w-4 h-4" />
-                                बदल सेव करा
+                                Save Changes
                               </>
                             )}
                           </button>
                         </div>
                       </div>
                       <p className="text-xs text-slate-600 mb-4">
-                        येथून आपण सर्व अधिकृत पदे तयार करू शकता, त्यांचे नाव संपादित (Edit) करू शकता, क्रम बदलू शकता (▲/▼) किंवा वगळू शकता. बदल केल्यानंतर वरती असलेल्या <strong>'बदल सेव करा'</strong> बटनावर क्लिक करताच ते डेटाबेसमध्ये सेव होऊन जिल्हा पदाधिकारी पानावर जिल्हाध्यक्ष लॉगिनमधील ड्रॉपडाऊनमध्ये त्वरित अपडेट होतात.
+                        Add, edit, reorder, or remove official posts. Click <strong>Save Changes</strong> to publish updates to the District Portal.
                       </p>
                       
                       <form onSubmit={(e) => {
@@ -4839,39 +4848,39 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         ];
                         setPostsList(updatedPosts);
                         setHasUnsavedPostChanges(true);
-                        showAdminFeedback(`पद '${nameInput}' यादीत जोडले आहे. जिल्हा पदाधिकारी पानावर लागू करण्यासाठी 'बदल सेव करा' क्लिक करा.`, 'success');
+                        showAdminFeedback(`Added '${nameInput}'. Click Save Changes to apply.`, 'success');
                         form.reset();
                       }} className="flex flex-col sm:flex-row gap-3 items-end">
                         <div className="flex-1 w-full">
-                          <label className="font-bold text-slate-700 text-xs block mb-1">नवीन पदाचे नाव:</label>
+                          <label className="font-bold text-slate-700 text-xs block mb-1">Post Name:</label>
                           <input
                             type="text"
                             name="newPostName"
                             required
-                            placeholder="उदा. जिल्हा सहसंघटक"
+                            placeholder="Enter post title"
                             className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs"
                           />
                         </div>
                         <div className="w-full sm:w-48">
-                          <label className="font-bold text-slate-700 text-xs block mb-1">पदाचा स्तर:</label>
+                          <label className="font-bold text-slate-700 text-xs block mb-1">Level:</label>
                           <select name="newPostLevel" className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800">
-                            <option value="district">जिल्हास्तर (District)</option>
-                            <option value="taluka">तालुकास्तर (Taluka)</option>
-                            <option value="state">राज्यस्तर (State)</option>
-                            <option value="division">विभागस्तर (Division)</option>
-                            <option value="mahila">महिला आघाडी (Mahila)</option>
+                            <option value="district">District</option>
+                            <option value="taluka">Taluka</option>
+                            <option value="state">State</option>
+                            <option value="division">Division</option>
+                            <option value="mahila">Women Wing</option>
                           </select>
                         </div>
                         <button type="submit" className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] text-white font-bold px-5 py-2.5 rounded-lg text-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0">
                           <PlusCircle className="w-4 h-4" />
-                          पद जोडा
+                          Add Post
                         </button>
                       </form>
 
                       <div className="mt-5 space-y-2">
                         <div className="flex items-center justify-between">
-                          <h5 className="font-bold text-xs text-slate-700">विद्यमान पदे (एकूण: {postsList.length}):</h5>
-                          {isLoadingPosts && <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> लोड होत आहे...</span>}
+                          <h5 className="font-bold text-xs text-slate-700">Posts ({postsList.length}):</h5>
+                          {isLoadingPosts && <span className="text-[11px] text-blue-600 font-semibold flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" /> Loading...</span>}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-1">
                           {postsList.map((p, idx) => {
@@ -4881,7 +4890,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               return (
                                 <div key={idx} className="p-3 bg-amber-50/90 border-2 border-amber-400 rounded-xl space-y-2 text-xs col-span-1 sm:col-span-2 shadow-sm">
                                   <div className="flex items-center justify-between">
-                                    <span className="font-bold text-amber-900">पद #{idx + 1} संपादन (Edit):</span>
+                                    <span className="font-bold text-amber-900">Edit Post #{idx + 1}:</span>
                                   </div>
                                   <div className="flex flex-col sm:flex-row gap-2 items-center">
                                     <input
@@ -4889,7 +4898,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       value={editingPostName}
                                       onChange={(e) => setEditingPostName(e.target.value)}
                                       className="flex-1 w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
-                                      placeholder="पदाचे नाव"
+                                      placeholder="Post name"
                                       autoFocus
                                     />
                                     <select
@@ -4897,11 +4906,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       onChange={(e) => setEditingPostLevel(e.target.value)}
                                       className="w-full sm:w-44 p-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800"
                                     >
-                                      <option value="district">जिल्हास्तर (District)</option>
-                                      <option value="taluka">तालुकास्तर (Taluka)</option>
-                                      <option value="state">राज्यस्तर (State)</option>
-                                      <option value="division">विभागस्तर (Division)</option>
-                                      <option value="mahila">महिला आघाडी (Mahila)</option>
+                                      <option value="district">District</option>
+                                      <option value="taluka">Taluka</option>
+                                      <option value="state">State</option>
+                                      <option value="division">Division</option>
+                                      <option value="mahila">Women Wing</option>
                                     </select>
                                     <div className="flex items-center gap-1.5 w-full sm:w-auto justify-end shrink-0">
                                       <button
@@ -4918,22 +4927,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                           setPostsList(arr);
                                           setEditingPostIndex(null);
                                           setHasUnsavedPostChanges(true);
-                                          showAdminFeedback(`पद '${editingPostName.trim()}' अद्ययावत केले. कायमस्वरूपी सेव करण्यासाठी 'बदल सेव करा' क्लिक करा.`, 'success');
+                                          showAdminFeedback(`Updated '${editingPostName.trim()}'. Click Save Changes to persist.`, 'success');
                                         }}
                                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg flex items-center gap-1 cursor-pointer"
-                                        title="बदल तात्पुरते लागू करा"
+                                        title="Apply change"
                                       >
                                         <Check className="w-3.5 h-3.5" />
-                                        जतन
+                                        Apply
                                       </button>
                                       <button
                                         type="button"
                                         onClick={() => setEditingPostIndex(null)}
                                         className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-lg flex items-center gap-1 cursor-pointer"
-                                        title="रद्द करा"
+                                        title="Cancel"
                                       >
                                         <X className="w-3.5 h-3.5" />
-                                        रद्द
+                                        Cancel
                                       </button>
                                     </div>
                                   </div>
@@ -4953,20 +4962,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <div className="flex items-center gap-1 shrink-0">
                                   <button
                                     type="button"
-                                    aria-label={`${p.name} संपादन करा`}
+                                    aria-label={`Edit ${p.name}`}
                                     onClick={() => {
                                       setEditingPostIndex(idx);
                                       setEditingPostName(p.name);
                                       setEditingPostLevel(getPostLevel(p.name, p.level, p.isTaluka));
                                     }}
                                     className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md cursor-pointer transition-colors"
-                                    title="पद संपादन करा (Edit Name/Level)"
+                                    title="Edit Name / Level"
                                   >
                                     <Edit3 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     type="button"
-                                    aria-label={`${p.name} वर सरकवा`}
+                                    aria-label={`Move ${p.name} up`}
                                     disabled={idx === 0}
                                     onClick={() => {
                                       const arr = [...postsList];
@@ -4977,13 +4986,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       setHasUnsavedPostChanges(true);
                                     }}
                                     className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold transition-colors"
-                                    title="वर सरकवा"
+                                    title="Move Up"
                                   >
                                     ▲
                                   </button>
                                   <button
                                     type="button"
-                                    aria-label={`${p.name} खाली सरकवा`}
+                                    aria-label={`Move ${p.name} down`}
                                     disabled={idx === postsList.length - 1}
                                     onClick={() => {
                                       const arr = [...postsList];
@@ -4994,25 +5003,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       setHasUnsavedPostChanges(true);
                                     }}
                                     className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 disabled:opacity-30 cursor-pointer text-xs font-bold transition-colors"
-                                    title="खाली सरकवा"
+                                    title="Move Down"
                                   >
                                     ▼
                                   </button>
                                   <button
                                     type="button"
-                                    aria-label={`${p.name} वगळा`}
+                                    aria-label={`Delete ${p.name}`}
                                     onClick={() => {
                                       if (postsList.length <= 1) {
-                                        showAdminFeedback('यादीत किमान एक पद असणे आवश्यक आहे.', 'error');
+                                        showAdminFeedback('At least one post is required.', 'error');
                                         return;
                                       }
                                       const arr = postsList.filter((_, i) => i !== idx);
                                       setPostsList(arr);
                                       setHasUnsavedPostChanges(true);
-                                      showAdminFeedback(`पद '${p.name}' यादीतून काढले आहे. सेव करण्यासाठी 'बदल सेव करा' क्लिक करा.`, 'success');
+                                      showAdminFeedback(`Removed '${p.name}'. Click Save Changes to persist.`, 'success');
                                     }}
                                     className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md cursor-pointer transition-colors"
-                                    title="वगळा (Delete)"
+                                    title="Delete"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -5027,23 +5036,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {/* Part 2: District Password Reset */}
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
                       <div>
-                        <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] flex items-center gap-2">
+                        <h4 className="font-bold text-base text-[#17366d] flex items-center gap-2">
                           <KeyRound className="w-4 h-4 text-amber-600" />
-                          2. जिल्हा पासवर्ड रिसेट (District Password Reset - Default AD2026)
+                          2. District Password Reset (Default: AD2026)
                         </h4>
                         <p className="text-xs text-slate-600 mt-1">
-                          जिल्ह्याचा पासवर्ड रिसेट केल्यास तो पूर्ववत <strong>'{DEFAULT_DISTRICT_PASSWORD}'</strong> होतो. त्यानंतर संबंधित जिल्हाध्यक्ष पहिल्यांदा <strong>'{DEFAULT_DISTRICT_PASSWORD}'</strong> टाकून लॉगिन करतील, तेव्हा त्यांना स्वतःचा नवीन पासवर्ड तयार करण्याचा स्क्रीन आपोआप उघडेल आणि त्यानंतर ते त्याच नवीन पासवर्डने लॉगिन करू शकतील.
+                          Resetting restores the default password <strong>'{DEFAULT_DISTRICT_PASSWORD}'</strong>. On next login, the District President sets a new password.
                         </p>
                       </div>
 
                       {/* Quick Reset Box */}
                       <div className="p-4 bg-white border border-slate-300 rounded-xl space-y-3 shadow-2xs">
                         <div className="text-xs font-bold text-slate-800">
-                          ⚡ तत्काळ जिल्हा पासवर्ड पूर्ववत 'AD2026' करा:
+                          Quick Reset to AD2026:
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                           <div className="sm:col-span-1">
-                            <label className="font-bold text-slate-700 text-xs block mb-1">जिल्हा निवडा:</label>
+                            <label className="font-bold text-slate-700 text-xs block mb-1">District:</label>
                             <select
                               value={selectedDistrictForReset}
                               onChange={(e) => setSelectedDistrictForReset(e.target.value)}
@@ -5063,7 +5072,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             >
                               <RotateCcw className={`w-3.5 h-3.5 ${isResettingDistrictPassword ? 'animate-spin' : ''}`} />
                               <span>
-                                {isResettingDistrictPassword ? 'रिसेट होत आहे...' : `'${selectedDistrictForReset}' चा पासवर्ड पुन्हा AD2026 करा`}
+                                {isResettingDistrictPassword ? 'Resetting...' : `Reset '${selectedDistrictForReset}' to AD2026`}
                               </span>
                             </button>
                           </div>
@@ -5075,7 +5084,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           const dist = selectedDistrictForReset;
                           const pwd = customResetPassword.trim();
                           if (!dist || !pwd || pwd.length < 4) {
-                            showAdminFeedback('कृपया किमान ४ अक्षरी पासवर्ड प्रविष्ट करा.', 'error');
+                            showAdminFeedback('Password must be at least 4 characters.', 'error');
                             return;
                           }
                           setIsResettingDistrictPassword(true);
@@ -5083,23 +5092,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             await updateDistrictPasswordInRtdb(dist, pwd);
                             setDistrictPasswords((prev) => ({ ...prev, [dist]: pwd }));
                             window.dispatchEvent(new Event('mahasangh_district_passwords_updated'));
-                            showAdminFeedback(`'${dist}' जिल्ह्यासाठी नवीन पासवर्ड यशस्वीरीत्या सेव्ह झाला!`, 'success');
+                            showAdminFeedback(`New password saved for '${dist}'.`, 'success');
                             setCustomResetPassword('');
                           } catch (err: any) {
-                            showAdminFeedback('त्रुटी: ' + err.message, 'error');
+                            showAdminFeedback('Error: ' + err.message, 'error');
                           } finally {
                             setIsResettingDistrictPassword(false);
                           }
                         }} className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row gap-2 items-end">
                           <div className="flex-1 w-full">
                             <label className="text-[11px] text-slate-600 block mb-1">
-                              किंवा थेट कोणताही नवीन पासवर्ड सेट करा (Optional Override):
+                              Or set a custom password (Optional):
                             </label>
                             <input
                               type="text"
                               value={customResetPassword}
                               onChange={(e) => setCustomResetPassword(e.target.value)}
-                              placeholder={`'${selectedDistrictForReset}' साठी नवीन पासवर्ड (किमान ४ अक्षरे)`}
+                              placeholder={`Custom password for '${selectedDistrictForReset}' (min 4 chars)`}
                               className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono"
                             />
                           </div>
@@ -5108,7 +5117,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             disabled={isResettingDistrictPassword || !customResetPassword.trim()}
                             className="bg-slate-800 hover:bg-slate-900 disabled:opacity-40 text-white font-bold px-4 py-2 rounded-lg text-xs cursor-pointer"
                           >
-                            थेट सेव्ह करा
+                            Save Password
                           </button>
                         </form>
                       </div>
@@ -5117,12 +5126,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h5 className="font-bold text-xs text-slate-800">
-                            📋 सर्व ३६ जिल्हे व पासवर्ड स्थिती:
+                            All 36 Districts — Password Status:
                           </h5>
                           <div className="flex items-center gap-2">
                             <input
                               type="text"
-                              placeholder="🔍 जिल्हा शोधा..."
+                              placeholder="Search district..."
                               value={districtSearchFilter}
                               onChange={(e) => setDistrictSearchFilter(e.target.value)}
                               className="p-1.5 bg-white border border-slate-300 rounded-lg text-xs w-36 sm:w-48"
@@ -5132,7 +5141,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               onClick={() => loadAllDistrictPasswords(true)}
                               disabled={isLoadingDistrictPasswords}
                               className="p-1.5 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-slate-700 text-xs flex items-center gap-1 cursor-pointer"
-                              title="पासवर्ड स्थिती ताजी करा"
+                              title="Refresh status"
                             >
                               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDistrictPasswords ? 'animate-spin' : ''}`} />
                             </button>
@@ -5161,11 +5170,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     <div className="mt-0.5">
                                       {isDefault ? (
                                         <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                          🟡 डिफॉल्ट (AD2026)
+                                          Default (AD2026)
                                         </span>
                                       ) : (
                                         <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                          🟢 नवीन पासवर्ड सक्रिय
+                                          Custom Active
                                         </span>
                                       )}
                                     </div>
@@ -5175,10 +5184,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     disabled={isResettingDistrictPassword}
                                     onClick={() => handleResetDistrictToAD2026(dist)}
                                     className="shrink-0 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-md font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
-                                    title="पासवर्ड पुन्हा AD2026 करा"
+                                    title="Reset password to AD2026"
                                   >
                                     <RotateCcw className="w-3 h-3 text-rose-600" />
-                                    <span>AD2026 करा</span>
+                                    <span>Reset</span>
                                   </button>
                                 </div>
                               );
@@ -5187,22 +5196,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       </div>
                     </div>
 
-                    {/* Part 3: State President Password Reset (राज्याध्यक्ष पासवर्ड रिसेट - Default RK2026) */}
+                    {/* Part 3: State President Password Reset */}
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
                       <div>
-                        <h4 className="font-serifDevanagari font-bold text-base text-[#17366d] flex items-center gap-2">
+                        <h4 className="font-bold text-base text-[#17366d] flex items-center gap-2">
                           <Award className="w-4 h-4 text-amber-600" />
-                          राज्याध्यक्ष पासवर्ड रिसेट (State President Password Reset - Default RK2026)
+                          State President Password Reset (Default: RK2026)
                         </h4>
                         <p className="text-xs text-slate-600 mt-1">
-                          संस्थापक राज्याध्यक्षांचा पासवर्ड रिसेट केल्यास तो पुन्हा <strong>'RK2026'</strong> होईल. त्यानंतर राज्याध्यक्ष 'RK2026' टाकून लॉगिन करतील तेव्हा त्यांना नवीन पासवर्ड सेट करण्याचा स्क्रीन मिळेल.
+                          Resets the State President login password back to <strong>'RK2026'</strong>.
                         </p>
                       </div>
 
                       <div className="p-4 bg-white border border-slate-300 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
                         <div>
                           <span className="text-xs font-bold text-slate-800">
-                            ⚡ राज्याध्यक्ष पासवर्ड पूर्ववत 'RK2026' करा:
+                            Reset State President password to 'RK2026':
                           </span>
                         </div>
                         <button
@@ -5212,9 +5221,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             setIsResettingPresidentPassword(true);
                             try {
                               await updatePresidentPasswordInFirebase('RK2026');
-                              showAdminFeedback('राज्याध्यक्ष पासवर्ड यशस्वीपणे "RK2026" करण्यात आला आहे!', 'success');
+                              showAdminFeedback('State President password reset to "RK2026".', 'success');
                             } catch (err: any) {
-                              showAdminFeedback('त्रुटी: ' + (err.message || 'रिसेट करता आला नाही'), 'error');
+                              showAdminFeedback('Error: ' + (err.message || 'Reset failed'), 'error');
                             } finally {
                               setIsResettingPresidentPassword(false);
                             }
@@ -5222,7 +5231,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold px-5 py-2.5 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors shrink-0"
                         >
                           <RotateCcw className={`w-3.5 h-3.5 ${isResettingPresidentPassword ? 'animate-spin' : ''}`} />
-                          <span>{isResettingPresidentPassword ? 'रिसेट होत आहे...' : 'राज्याध्यक्ष पासवर्ड RK2026 करा'}</span>
+                          <span>{isResettingPresidentPassword ? 'Resetting...' : 'Reset to RK2026'}</span>
                         </button>
                       </div>
                     </div>
@@ -5231,12 +5240,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="bg-white p-5 sm:p-6 rounded-xl border border-amber-300 shadow-sm space-y-4">
                       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200">
                         <div>
-                          <h4 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#17366d] flex items-center gap-2">
+                          <h4 className="font-bold text-base sm:text-lg text-[#17366d] flex items-center gap-2">
                             <Award className="w-5 h-5 text-amber-600" />
-                            3. नियुक्ती पत्र डिझाईन व कस्टमायझेशन (Appointment Letter Studio)
+                            3. Appointment Letter Studio
                           </h4>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            येथून आपण नियुक्ती पत्राचे घटक, पार्श्वभूमी, स्वाक्षऱ्या, मजकूर आणि फॉन्ट आकार थेट कस्टमाइझ करू शकता.
+                            Customize letter elements, background, signatures, text, and font size.
                           </p>
                         </div>
                         <button
@@ -5246,7 +5255,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
                         >
                           <Download className="w-4 h-4" />
-                          <span>{isDownloadingLetterPdf ? 'PDF तयार होत आहे...' : 'नमुना पत्र PDF डाऊनलोड'}</span>
+                          <span>{isDownloadingLetterPdf ? 'Generating PDF...' : 'Download Sample PDF'}</span>
                         </button>
                       </div>
 
@@ -5257,48 +5266,48 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           <div className="space-y-2">
                             <h5 className="font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
                               <Eye className="w-3.5 h-3.5 text-[#17366d]" />
-                              <span>घटक दाखवा / लपवा (Element Visibility)</span>
+                              <span>Element Visibility</span>
                             </h5>
                             <div className="grid grid-cols-2 gap-2">
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showLetterHeader} onChange={(e) => setShowLetterHeader(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>हेडर बॅनर (Header)</span>
+                                <span>Header Banner</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showOutward} onChange={(e) => setShowOutward(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>पत्र क्रमांक व दिनांक</span>
+                                <span>Outward No. & Date</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showTitle} onChange={(e) => setShowTitle(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>पत्र शीर्षक (Title)</span>
+                                <span>Letter Title</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showRecipient} onChange={(e) => setShowRecipient(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>प्रति / व्यक्ती माहिती</span>
+                                <span>Recipient Block</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showSubject} onChange={(e) => setShowSubject(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>विषय पट्टी (Subject)</span>
+                                <span>Subject Line</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showBody} onChange={(e) => setShowBody(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>मुख्य परिच्छेद (१ व २)</span>
+                                <span>Main Body (1 & 2)</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showCallout} onChange={(e) => setShowCallout(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>पद सन्मान बॅनर</span>
+                                <span>Post Callout Banner</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showPara3} onChange={(e) => setShowPara3(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>परिच्छेद ३ (शुभेच्छा)</span>
+                                <span>Closing Paragraph</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showSign1} onChange={(e) => setShowSign1(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>स्वाक्षरी १ (सरचिटणीस)</span>
+                                <span>Signature 1 (Secretary)</span>
                               </label>
                               <label className="flex items-center gap-1.5 p-2 bg-white rounded border border-slate-200 cursor-pointer font-medium text-slate-700">
                                 <input type="checkbox" checked={showSign2} onChange={(e) => setShowSign2(e.target.checked)} className="rounded text-[#df6b16]" />
-                                <span>स्वाक्षरी २ (राज्याध्यक्ष)</span>
+                                <span>Signature 2 (President)</span>
                               </label>
                             </div>
                           </div>
@@ -5307,15 +5316,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           <div className="space-y-2 pt-2 border-t border-slate-200">
                             <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
                               <ImageIcon className="w-3.5 h-3.5 text-[#17366d]" />
-                              <span>पार्श्वभूमी व लोगो (Background & Images)</span>
+                              <span>Background & Images</span>
                             </h5>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[11px] font-bold text-slate-600 block mb-1">A4 पार्श्वभूमी इमेज:</label>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">A4 Background:</label>
                                 <input type="file" accept="image/*" onChange={handleBgUpload} className="w-full p-1.5 bg-white border border-slate-300 rounded text-[11px]" />
                               </div>
                               <div>
-                                <label className="text-[11px] font-bold text-slate-600 block mb-1">इतर सानुकूल इमेज:</label>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Custom Image:</label>
                                 <input type="file" accept="image/*" onChange={handleCustomImgUpload} className="w-full p-1.5 bg-white border border-slate-300 rounded text-[11px]" />
                               </div>
                             </div>
@@ -5323,47 +5332,47 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                           {/* 3. Signature Customization */}
                           <div className="space-y-2 pt-2 border-t border-slate-200">
-                            <h5 className="font-bold text-slate-800">✍️ स्वाक्षरी व पदनाम संपादन</h5>
+                            <h5 className="font-bold text-slate-800">Signatures & Designations</h5>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी १ नाव:</label>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Signature 1 Name:</label>
                                 <input type="text" value={letterSign1Name} onChange={(e) => setLetterSign1Name(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                               </div>
                               <div>
-                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी २ नाव:</label>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Signature 2 Name:</label>
                                 <input type="text" value={letterSign2Name} onChange={(e) => setLetterSign2Name(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                               </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               <div>
-                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी १ पद:</label>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Signature 1 Role:</label>
                                 <textarea rows={2} value={letterSign1Role} onChange={(e) => setLetterSign1Role(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                               </div>
                               <div>
-                                <label className="text-[11px] font-bold text-slate-600 block mb-1">स्वाक्षरी २ पद:</label>
+                                <label className="text-[11px] font-bold text-slate-600 block mb-1">Signature 2 Role:</label>
                                 <textarea rows={2} value={letterSign2Role} onChange={(e) => setLetterSign2Role(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                               </div>
                             </div>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-600 block mb-1">राज्याध्यक्ष स्वाक्षरी शिक्का (PNG):</label>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">President Signature Stamp (PNG):</label>
                               <input type="file" accept="image/*" onChange={handleSignImgUpload} className="w-full p-1.5 bg-white border border-slate-300 rounded text-[11px]" />
                             </div>
                           </div>
 
                           {/* 4. Typography & Spacing */}
                           <div className="space-y-2 pt-2 border-t border-slate-200">
-                            <h5 className="font-bold text-slate-800">🔤 फॉन्ट आकार व अंतर</h5>
+                            <h5 className="font-bold text-slate-800">Typography & Spacing</h5>
                             <div className="grid grid-cols-3 gap-2">
                               <div>
-                                <label className="text-[10px] font-bold text-slate-600 block">फॉन्ट साईज ({letterFontSize}px)</label>
+                                <label className="text-[10px] font-bold text-slate-600 block">Font Size ({letterFontSize}px)</label>
                                 <input type="range" min="12" max="20" value={letterFontSize} onChange={(e) => setLetterFontSize(Number(e.target.value))} className="w-full accent-[#df6b16]" />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-600 block">लाईन हाईट ({letterLineHeight})</label>
+                                <label className="text-[10px] font-bold text-slate-600 block">Line Height ({letterLineHeight})</label>
                                 <input type="range" min="1.3" max="2.0" step="0.05" value={letterLineHeight} onChange={(e) => setLetterLineHeight(Number(e.target.value))} className="w-full accent-[#df6b16]" />
                               </div>
                               <div>
-                                <label className="text-[10px] font-bold text-slate-600 block">मजकूर रंग</label>
+                                <label className="text-[10px] font-bold text-slate-600 block">Text Color</label>
                                 <input type="color" value={letterTextColor} onChange={(e) => setLetterTextColor(e.target.value)} className="w-full h-7 rounded border border-slate-300 cursor-pointer p-0.5 bg-white" />
                               </div>
                             </div>
@@ -5371,21 +5380,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                           {/* 5. Letter Text Editing */}
                           <div className="space-y-2 pt-2 border-t border-slate-200">
-                            <h5 className="font-bold text-slate-800">📝 पत्र मजकूर संपादन</h5>
+                            <h5 className="font-bold text-slate-800">Letter Content</h5>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-600 block mb-1">विषय ओळ:</label>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">Subject:</label>
                               <input type="text" value={letterSubjectText} onChange={(e) => setLetterSubjectText(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs font-bold" />
                             </div>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-600 block mb-1">परिच्छेद १:</label>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">Paragraph 1:</label>
                               <textarea rows={3} value={letterPara1Text} onChange={(e) => setLetterPara1Text(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                             </div>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-600 block mb-1">परिच्छेद २:</label>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">Paragraph 2:</label>
                               <textarea rows={3} value={letterPara2Text} onChange={(e) => setLetterPara2Text(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                             </div>
                             <div>
-                              <label className="text-[11px] font-bold text-slate-600 block mb-1">परिच्छेद ३ (शुभेच्छा):</label>
+                              <label className="text-[11px] font-bold text-slate-600 block mb-1">Paragraph 3 (Closing):</label>
                               <textarea rows={3} value={letterPara3Text} onChange={(e) => setLetterPara3Text(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded text-xs" />
                             </div>
                           </div>
@@ -5394,7 +5403,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         {/* Right: Live A4 Preview Canvas */}
                         <div className="bg-slate-200 p-3 rounded-xl flex flex-col items-center overflow-x-auto">
                           <div className="text-[11px] font-bold text-slate-600 mb-2">
-                            👁️ लाईव्ह नियुक्ती पत्र प्रिव्ह्यू (A4 Canvas Preview)
+                            Live A4 Preview
                           </div>
                           
                           <div
@@ -5553,7 +5562,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <PlusCircle className="w-4 h-4" />
-                      <span>{editingNewsItem ? '✏️ बातमी संपादन करा' : '📰 सविस्तर बातमी / शासन निर्णय'}</span>
+                      <span>{editingNewsItem ? 'Edit News' : 'Add News / GR'}</span>
                     </button>
 
                     <button
@@ -5569,7 +5578,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <List className="w-4 h-4" />
-                      <span>📋 सर्व बातम्या ({newsList.length})</span>
+                      <span>All News ({newsList.length})</span>
                     </button>
                   </div>
 
@@ -5585,7 +5594,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }}
                       className="text-xs text-rose-600 font-semibold hover:underline"
                     >
-                      संपादन रद्द करा
+                      Cancel Edit
                     </button>
                   )}
                 </div>
@@ -5595,8 +5604,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                     <span className="font-semibold">
                       {editingNewsItem
-                        ? 'बातमीमधील बदल यशस्वीपणे सेव्ह झाले असून वेबसाईटवर अद्ययावत झाले आहेत!'
-                        : 'बातमी / परिपत्रक / फोटो यशस्वीपणे वेबसाईटवर प्रसिद्ध करण्यात आला आहे!'}
+                        ? 'Changes saved and updated on the website.'
+                        : 'Published successfully on the website.'}
                     </span>
                   </div>
                 )}
@@ -5613,12 +5622,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-5 border-b border-slate-100 gap-2">
                       <div>
-                        <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                        <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                           <PlusCircle className="w-5 h-5 text-[#df6b16]" />
-                          {editingNewsItem ? 'बातमी / परिपत्रक संपादित करा (Edit News/GR)' : 'नवीन बातमी किंवा अधिकृत परिपत्रक प्रसिद्ध करा'}
+                          {editingNewsItem ? 'Edit News / Circular' : 'Publish News / Circular'}
                         </h3>
                         <p className="text-xs text-slate-500 mt-1">
-                          बातमीचा तपशील, संबंधित छायाचित्र व मजकूर भरा. हे मुख्य वेबसाईटवर लगेच प्रसिद्ध होईल.
+                          Add headline, image, and content to publish directly to the website.
                         </p>
                       </div>
 
@@ -5628,7 +5637,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           onClick={handleCancelEditNews}
                           className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition-colors self-start"
                         >
-                          ✕ संपादन रद्द करा
+                          Cancel Edit
                         </button>
                       )}
                     </div>
@@ -5636,7 +5645,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {editingNewsItem && (
                       <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-center justify-between">
                         <div>
-                          <strong>संपादित करत आहात:</strong> {editingNewsItem.title}
+                          <strong>Editing:</strong> {editingNewsItem.title}
                           <span className="ml-2 text-[11px] text-amber-700">({editingNewsItem.date})</span>
                         </div>
                       </div>
@@ -5645,12 +5654,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <form onSubmit={handleCreateNews} className="space-y-4 text-xs">
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          बातमी / परिपत्रकाचे शीर्षक <span className="text-rose-600">*</span>
+                          Title <span className="text-rose-600">*</span>
                         </label>
                         <input
                           type="text"
                           required
-                          placeholder="उदा. केंद्रप्रमुख पदोन्नती बाबत राज्यस्तरीय बैठक संपन्न..."
+                          placeholder="Enter news or circular title"
                           value={newsTitle}
                           onChange={(e) => setNewsTitle(e.target.value)}
                           className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] text-sm"
@@ -5661,7 +5670,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <div>
                           <label className="font-bold text-slate-700 block mb-1 flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5 text-[#df6b16]" />
-                            <span>प्रसिद्धी दिनांक (Publication Date)</span> <span className="text-rose-600">*</span>
+                            <span>Publish Date</span> <span className="text-rose-600">*</span>
                           </label>
                           <input
                             type="date"
@@ -5674,27 +5683,27 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            श्रेणी (Category) <span className="text-rose-600">*</span>
+                            Category <span className="text-rose-600">*</span>
                           </label>
                           <select
                             value={newsCategory}
                             onChange={(e) => setNewsCategory(e.target.value)}
                             className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                           >
-                            <option value="अधिकृत घोषणा">अधिकृत घोषणा</option>
-                            <option value="अधिकृत वृत्त">अधिकृत वृत्त</option>
-                            <option value="संघटना वृत्त">संघटना वृत्त</option>
-                            <option value="अभिनंदन">अभिनंदन</option>
-                            <option value="शासन निर्णय (GR)">शासन निर्णय (GR)</option>
-                            <option value="बैठक अहवाल">बैठक अहवाल</option>
-                            <option value="जिल्हा वृत्त">जिल्हा वृत्त</option>
-                            <option value="अधिकृत छायाचित्र / परिपत्रक">अधिकृत छायाचित्र / परिपत्रक</option>
+                            <option value="अधिकृत घोषणा">Official Announcement</option>
+                            <option value="अधिकृत वृत्त">Official News</option>
+                            <option value="संघटना वृत्त">Union News</option>
+                            <option value="अभिनंदन">Congratulations</option>
+                            <option value="शासन निर्णय (GR)">Gov Resolution (GR)</option>
+                            <option value="बैठक अहवाल">Meeting Report</option>
+                            <option value="जिल्हा वृत्त">District News</option>
+                            <option value="अधिकृत छायाचित्र / परिपत्रक">Photo / Circular</option>
                           </select>
                         </div>
 
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            फोटो अपलोड (Direct Server Upload)
+                            Photo Upload
                           </label>
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
@@ -5702,10 +5711,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <Upload className="w-3.5 h-3.5 text-[#df6b16]" />
                                 <span>
                                   {isUploadingNewsCloudinary
-                                    ? 'सर्व्हरवर फोटो अपलोड होत आहे...'
+                                    ? 'Uploading...'
                                     : isCompressingNewsImg
-                                    ? 'प्रक्रिया सुरू आहे...'
-                                    : 'फोटो निवडा (Upload Photo)'}
+                                    ? 'Processing...'
+                                    : 'Upload Photo'}
                                 </span>
                                 <input
                                   type="file"
@@ -5722,7 +5731,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   onClick={() => setNewsImageUrl('')}
                                   className="text-xs text-rose-600 hover:underline font-semibold"
                                 >
-                                  फोटो हटवा
+                                  Remove
                                 </button>
                               )}
                             </div>
@@ -5741,7 +5750,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           <div className="min-w-0 flex-1">
                             <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              फोटो यशस्वीरीत्या जोडला गेला आहे
+                              Photo attached
                             </span>
                             <p className="text-[10px] text-slate-500 truncate mt-0.5 font-mono">
                               {newsImageUrl}
@@ -5752,12 +5761,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          थोडक्यात सारांश <span className="text-rose-600">*</span>
+                          Summary <span className="text-rose-600">*</span>
                         </label>
                         <textarea
                           required
                           rows={2}
-                          placeholder="बातमीचा 2-3 ओळींत महत्त्वाचा सारांश..."
+                          placeholder="Short 2-3 line summary"
                           value={newsSummary}
                           onChange={(e) => setNewsSummary(e.target.value)}
                           className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
@@ -5766,12 +5775,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          सविस्तर मजकूर <span className="text-rose-600">*</span>
+                          Content <span className="text-rose-600">*</span>
                         </label>
                         <textarea
                           required
                           rows={6}
-                          placeholder="बातमीची संपूर्ण माहिती किंवा परिपत्रकाचा संपूर्ण तपशील..."
+                          placeholder="Full article or circular details"
                           value={newsContent}
                           onChange={(e) => setNewsContent(e.target.value)}
                           className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
@@ -5785,7 +5794,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-5 rounded-lg text-xs flex items-center gap-1.5 transition-colors shadow-xs"
                         >
                           <Eye className="w-4 h-4 text-emerald-400" />
-                          <span>प्रिव्ह्यू पहा (Live Preview)</span>
+                          <span>Live Preview</span>
                         </button>
 
                         <button
@@ -5793,7 +5802,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           className="bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 px-6 rounded-lg text-xs transition-colors shadow-xs flex items-center gap-1.5"
                         >
                           <Check className="w-4 h-4" />
-                          <span>{editingNewsItem ? 'बदल सेव्ह करा (Update)' : 'वेबसाईटवर प्रसिद्ध करा (Publish)'}</span>
+                          <span>{editingNewsItem ? 'Update' : 'Publish'}</span>
                         </button>
 
                         {editingNewsItem && (
@@ -5802,7 +5811,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             onClick={handleCancelEditNews}
                             className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-2.5 px-4 rounded-lg text-xs"
                           >
-                            रद्द करा
+                            Cancel
                           </button>
                         )}
                       </div>
@@ -5815,12 +5824,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-3">
                       <div>
-                        <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                        <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                           <FileText className="w-5 h-5 text-[#df6b16]" />
-                          सर्व प्रसिद्ध बातम्या, शासन निर्णय व फोटो ({newsList.length})
+                          Published News & Circulars ({newsList.length})
                         </h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          वेबसाईटवर प्रसिद्ध असलेल्या सर्व नोंदी पाहण्यासाठी, संपादित करण्यासाठी किंवा हटवण्यासाठी ही यादी वापरा.
+                          View, edit, or delete published entries.
                         </p>
                       </div>
 
@@ -5829,7 +5838,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
                         <input
                           type="text"
-                          placeholder="शीर्षक किंवा श्रेणी शोधा..."
+                          placeholder="Search title or category..."
                           value={newsSearchQuery}
                           onChange={(e) => setNewsSearchQuery(e.target.value)}
                           className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#df6b16]"
@@ -5839,7 +5848,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                     {newsList.length === 0 ? (
                       <div className="text-center py-12 text-slate-500 text-xs">
-                        वेबसाईटवर अद्याप कोणतीही बातमी उपलब्ध नाही.
+                        No news published yet.
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5884,7 +5893,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       </span>
                                       {isPhotoOnly && (
                                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                                          📷 केवळ फोटो
+                                          Photo Only
                                         </span>
                                       )}
                                     </div>
@@ -5908,7 +5917,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded border border-slate-300 flex items-center gap-1 transition-colors"
                                   >
                                     <Eye className="w-3.5 h-3.5 text-blue-600" />
-                                    <span>प्रिव्ह्यू</span>
+                                    <span>Preview</span>
                                   </button>
 
                                   <button
@@ -5917,7 +5926,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     className="px-2.5 py-1 bg-white hover:bg-amber-50 text-amber-800 font-semibold rounded border border-amber-300 flex items-center gap-1 transition-colors"
                                   >
                                     <Edit3 className="w-3.5 h-3.5 text-amber-600" />
-                                    <span>संपादित करा</span>
+                                    <span>Edit</span>
                                   </button>
 
                                   <button
@@ -5926,7 +5935,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     className="px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-700 font-semibold rounded border border-rose-300 flex items-center gap-1 transition-colors"
                                   >
                                     <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                    <span>हटवा</span>
+                                    <span>Delete</span>
                                   </button>
                                 </div>
                               </div>
@@ -5946,7 +5955,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <div className="flex items-center gap-2">
                           <Eye className="w-4 h-4 text-[#df6b16]" />
                           <span className="font-bold text-xs sm:text-sm text-[#09243f]">
-                            थेट प्रिव्ह्यू (Live Preview) — मुख्य वेबसाईटवर असे दिसेल
+                            Live Preview
                           </span>
                         </div>
                         <button
@@ -5970,7 +5979,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             />
                             <div className="p-2 bg-slate-900/90 text-center">
                               <span className="text-[11px] text-slate-300">
-                                📷 मुख्य वेबसाईटवर फोटो असा वर दिसेल
+                                Website Header Image Preview
                               </span>
                             </div>
                           </div>
@@ -5981,11 +5990,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             {previewNewsItem.category}
                           </span>
                           <span className="text-xs text-slate-500">
-                            दिनांक: {previewNewsItem.date}
+                            Date: {previewNewsItem.date}
                           </span>
                         </div>
 
-                        <h2 className="font-serifDevanagari text-lg sm:text-2xl font-bold text-[#09243f] leading-snug">
+                        <h2 className="text-lg sm:text-2xl font-bold text-[#09243f] leading-snug">
                           {previewNewsItem.title}
                         </h2>
 
@@ -6001,7 +6010,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           </div>
                         ) : (
                           <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-600">
-                            💡 ही केवळ फोटो पोस्ट आहे. वेबसाईटवर युझरला <strong>'📷 फोटो पहा'</strong> हे बटण दिसेल व त्यावर क्लिक केल्यावर हा फोटो संपूर्ण मोठा दिसेल.
+                            Photo-only post. Visitors can click to view the full-size image.
                           </div>
                         )}
                       </div>
@@ -6013,7 +6022,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           onClick={() => setPreviewNewsItem(null)}
                           className="bg-[#17366d] hover:bg-[#09243f] text-white font-bold px-5 py-2 rounded-lg text-xs transition-colors"
                         >
-                          प्रिव्ह्यू बंद करा
+                          Close
                         </button>
                       </div>
                     </div>
@@ -6022,14 +6031,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab: Latest Banners Management (ताज्या घडामोडी बॅनर्स) */}
+            {/* Sub-tab: Latest Banners Management */}
             {activeAdminSubTab === 'latest_banners' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLatestBanners) && (
               <div className="space-y-6">
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                    <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                       <ImageIcon className="w-5 h-5 text-[#df6b16]" />
-                      {editingBannerId ? 'ताज्या घडामोडी बॅनर संपादन करा (Edit)' : 'ताज्या घडामोडी नवीन बॅनर्स / फोटो जोडा'}
+                      {editingBannerId ? 'Edit Banner' : 'Add Banner / Highlight'}
                     </h3>
                     {editingBannerId && (
                       <button
@@ -6037,12 +6046,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         onClick={handleCancelEditBanner}
                         className="text-xs font-bold text-rose-600 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200"
                       >
-                        संपादन रद्द करा
+                        Cancel Edit
                       </button>
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mb-5">
-                    येथे जोडलेला फोटो व बातमी मुख्य पानावरील 'ताज्या घडामोडी' विभागात सर्वात समोर दिसते.
+                    Featured banners and short videos appear at the top of the home page.
                   </p>
 
                   {bannerSuccessMsg && (
@@ -6062,7 +6071,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {/* Media Type Switcher: Photo vs Short Video */}
                     <div>
                       <label className="font-bold text-slate-700 block mb-1">
-                        माध्यम प्रकार (Media Type) निवडा:
+                        Media Type
                       </label>
                       <div className="flex gap-2 p-1 bg-slate-100 rounded-lg max-w-sm">
                         <button
@@ -6075,7 +6084,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           }`}
                         >
                           <ImageIcon className="w-3.5 h-3.5" />
-                          <span>📸 छायाचित्र (Photo)</span>
+                          <span>Photo</span>
                         </button>
                         <button
                           type="button"
@@ -6087,19 +6096,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           }`}
                         >
                           <Video className="w-3.5 h-3.5 text-rose-600" />
-                          <span>🎥 शॉर्ट व्हिडिओ (Max 3 MB)</span>
+                          <span>Short Video (Max 3 MB)</span>
                         </button>
                       </div>
                     </div>
 
                     <div>
                       <label className="font-bold text-slate-700 block mb-1">
-                        बॅनर / बातमी शीर्षक (Title) <span className="text-rose-600">*</span>
+                        Title <span className="text-rose-600">*</span>
                       </label>
                       <input
                         type="text"
                         required
-                        placeholder="उदा. वर्धा जिल्हा कार्यकारिणीची घोषणा व सत्कार समारंभ"
+                        placeholder="Enter banner title"
                         value={bannerTitle}
                         onChange={(e) => setBannerTitle(e.target.value)}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
@@ -6108,7 +6117,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1">दिनांक (Date)</label>
+                        <label className="font-bold text-slate-700 block mb-1">Date</label>
                         <input
                           type="date"
                           value={bannerDate}
@@ -6120,20 +6129,20 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       {bannerMediaType === 'image' ? (
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            छायाचित्र (Upload / URL) <span className="text-rose-600">*</span>
+                            Image (Upload / URL) <span className="text-rose-600">*</span>
                           </label>
                           <div className="flex gap-2 items-center">
                             <input
                               type="text"
                               required
-                              placeholder="https://... किंवा फाइल निवडा"
+                              placeholder="https://... or upload file"
                               value={bannerImageUrl}
                               onChange={(e) => setBannerImageUrl(e.target.value)}
                               className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
                             />
                             <label className={`shrink-0 bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBanner ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
                               <Upload className="w-4 h-4" />
-                              <span>{isUploadingBanner ? 'अपलोड होत आहे...' : 'फाइल निवडा'}</span>
+                              <span>{isUploadingBanner ? 'Uploading...' : 'Upload'}</span>
                               <input
                                 type="file"
                                 accept="image/*"
@@ -6148,17 +6157,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <div>
                           <div className="flex items-center justify-between mb-1">
                             <label className="font-bold text-slate-700 block">
-                              शॉर्ट व्हिडिओ <span className="text-rose-600">*</span>
+                              Short Video <span className="text-rose-600">*</span>
                             </label>
                             <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                              मर्यादा: कमाल ३ MB
+                              Max 3 MB
                             </span>
                           </div>
                           <div className="flex gap-2 items-center">
                             <input
                               type="text"
                               required
-                              placeholder="https://... किंवा फाइल निवडा"
+                              placeholder="https://... or upload video"
                               value={bannerVideoUrl}
                               onChange={(e) => {
                                 setBannerVideoUrl(e.target.value);
@@ -6168,7 +6177,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             />
                             <label className={`shrink-0 bg-rose-700 hover:bg-rose-800 text-white px-3.5 py-2.5 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors ${isUploadingBannerVideo ? 'opacity-60 cursor-wait' : 'cursor-pointer'}`}>
                               <Upload className="w-4 h-4" />
-                              <span>{isUploadingBannerVideo ? 'व्हिडिओ अपलोड...' : 'व्हिडिओ निवडा (Max 3MB)'}</span>
+                              <span>{isUploadingBannerVideo ? 'Uploading...' : 'Upload Video'}</span>
                               <input
                                 type="file"
                                 accept="video/mp4,video/webm,video/*"
@@ -6187,7 +6196,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <img src={bannerImageUrl} alt="Preview" className="w-20 h-16 object-contain rounded bg-white border border-slate-300" />
                         <div className="min-w-0 flex-1">
                           <span className="text-xs text-emerald-700 font-bold block">
-                            ✓ छायाचित्र यशस्वीरीत्या जोडले गेले आहे.
+                            Image attached
                           </span>
                         </div>
                       </div>
@@ -6198,10 +6207,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-emerald-400 font-bold flex items-center gap-1.5">
                             <CheckCircle2 className="w-4 h-4" />
-                            ✓ शॉर्ट व्हिडिओ यशस्वीरीत्या जोडला गेला आहे (Cloudinary CDN)
+                            Video uploaded (Cloudinary CDN)
                           </span>
                           <span className="text-[11px] text-slate-400">
-                            मुख्य पानावर इनलाईन प्ले होईल
+                            Plays inline on home page
                           </span>
                         </div>
                         <video
@@ -6215,10 +6224,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     )}
 
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">थोडक्यात सारांश (Summary / Description)</label>
+                      <label className="font-bold text-slate-700 block mb-1">Summary</label>
                       <textarea
                         rows={3}
-                        placeholder="ताज्या घडामोडीबाबत थोडक्यात माहिती किंवा बातमीचा सारांश..."
+                        placeholder="Short banner description..."
                         value={bannerSummary}
                         onChange={(e) => setBannerSummary(e.target.value)}
                         className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:border-[#17366d]"
@@ -6234,12 +6243,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         <PlusCircle className="w-4 h-4 text-amber-400" />
                         <span>
                           {isSavingBanner
-                            ? 'सेव्ह होत आहे...'
+                            ? 'Saving...'
                             : editingBannerId
-                            ? 'बदल सेव्ह करा'
+                            ? 'Save Changes'
                             : bannerMediaType === 'video'
-                            ? 'शॉर्ट व्हिडिओ प्रसिद्ध करा'
-                            : 'ताज्या घडामोडी बॅनर प्रसिद्ध करा'}
+                            ? 'Publish Video'
+                            : 'Publish Banner'}
                         </span>
                       </button>
                       {editingBannerId && (
@@ -6248,7 +6257,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           onClick={handleCancelEditBanner}
                           className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-4 py-3 rounded-xl text-xs transition-colors"
                         >
-                          रद्द करा
+                          Cancel
                         </button>
                       )}
                     </div>
@@ -6258,8 +6267,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {/* Existing Banners List */}
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <h4 className="font-serifDevanagari text-base font-bold text-[#17366d]">
-                      प्रसिद्ध केलेले सर्व ताज्या घडामोडी बॅनर्स ({latestBanners.length})
+                    <h4 className="text-base font-bold text-[#17366d]">
+                      Published Banners ({latestBanners.length})
                     </h4>
                     {onRefreshLatestBanners && (
                       <button
@@ -6269,14 +6278,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingBanners ? 'animate-spin' : ''}`} />
-                        <span>{isRefreshingBanners ? 'ताजे होत आहे...' : 'ताजे करा'}</span>
+                        <span>{isRefreshingBanners ? 'Refreshing...' : 'Refresh'}</span>
                       </button>
                     )}
                   </div>
 
                   {latestBanners.length === 0 ? (
                     <div className="text-slate-500 text-xs p-6 bg-slate-50 rounded-xl text-center">
-                      सध्या कोणतेही ताज्या घडामोडी बॅनर्स नाहीत. वर दिलेल्या फॉर्ममधून नवीन फोटो व बातमी जोडा.
+                      No banners published yet.
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -6286,7 +6295,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             {banner.mediaType === 'video' || banner.videoUrl ? (
                               <div className="w-16 h-12 bg-slate-900 rounded flex flex-col items-center justify-center text-rose-400 shrink-0 border border-slate-700">
                                 <Video className="w-5 h-5 text-rose-400" />
-                                <span className="text-[9px] font-bold text-white mt-0.5">व्हिडिओ</span>
+                                <span className="text-[9px] font-bold text-white mt-0.5">Video</span>
                               </div>
                             ) : banner.imageUrl ? (
                               <img src={banner.imageUrl} alt="" className="w-16 h-12 object-contain rounded bg-white border border-slate-200 shrink-0" />
@@ -6298,11 +6307,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
-                                  दिनांक: {banner.date}
+                                  Date: {banner.date}
                                 </span>
                                 {(banner.mediaType === 'video' || banner.videoUrl) && (
                                   <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded">
-                                    🎥 ३ MB व्हिडिओ
+                                    Video
                                   </span>
                                 )}
                               </div>
@@ -6316,7 +6325,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               type="button"
                               onClick={() => handleStartEditBanner(banner)}
                               className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors cursor-pointer"
-                              title="बॅनर संपादन करा"
+                              title="Edit Banner"
                             >
                               <Edit3 className="w-4 h-4" />
                             </button>
@@ -6325,7 +6334,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               disabled={deletingBannerId === banner.id}
                               onClick={() => handleDeleteBannerWithFeedback(banner.id)}
                               className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
-                              title="बॅनर डिलीट करा"
+                              title="Delete Banner"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -6338,25 +6347,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab: Print ID Cards Batch (नवीन आयकार्ड प्रिंट करा - Super Admin Only) */}
+            {/* Sub-tab: Print ID Cards Batch (Super Admin Only) */}
             {activeAdminSubTab === 'print_id_cards' && currentUser?.isSuperAdmin && (
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="bg-white p-6 sm:p-8 rounded-2xl border border-amber-300 shadow-md space-y-5">
                   <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                     <div>
-                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                      <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                         <Award className="w-5 h-5 text-amber-600" />
-                        नवीन आयकार्ड प्रिंट करा (District Batch Print — Super Admin)
+                        Batch Print ID Cards
                       </h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        येथून कोणत्याही जिल्ह्याची निवड करून त्या संपूर्ण जिल्ह्यातील सर्व मंजूर सदस्यांचे नवीन आय-कार्ड्स एकाच मेगा PDF मध्ये लँडस्केप (Landscape) मांडणीत फुल साईज व उच्च प्रिंट क्वालिटीमध्ये डाऊनलोड करू शकता.
+                        Select a district to download high-resolution print-ready ID cards for all approved members in one PDF.
                       </p>
                     </div>
                   </div>
 
                   <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
                     <div>
-                      <label className="font-bold text-slate-700 text-xs block mb-1.5">जिल्हा निवडा (Select District):</label>
+                      <label className="font-bold text-slate-700 text-xs block mb-1.5">Select District</label>
                       <select
                         value={batchPrintDistrict}
                         onChange={(e) => setBatchPrintDistrict(e.target.value)}
@@ -6366,7 +6375,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           const count = applications.filter((m) => m.status === 'approved' && m.district === d).length;
                           return (
                             <option key={d} value={d}>
-                              {d} ({count} मंजूर सदस्य)
+                              {d} ({count} Approved)
                             </option>
                           );
                         })}
@@ -6375,9 +6384,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                     <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex flex-col sm:flex-row items-center justify-between gap-3">
                       <div>
-                        <strong>निवडलेला जिल्हा:</strong> {batchPrintDistrict} <br />
+                        <strong>District:</strong> {batchPrintDistrict} <br />
                         <span className="text-slate-600">
-                          मंजूर सदस्य संख्या:{' '}
+                          Approved Members:{' '}
                           <span className="font-bold text-[#0b1e33]">
                             {applications.filter((m) => m.status === 'approved' && m.district === batchPrintDistrict).length}
                           </span>
@@ -6391,7 +6400,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       >
                         <Download className="w-4 h-4" />
                         <span>
-                          {isGeneratingBatchPrint ? batchPrintProgressMsg || 'PDF तयार होत आहे...' : `📥 ${batchPrintDistrict} सर्व आय-कार्ड्स डाऊनलोड करा`}
+                          {isGeneratingBatchPrint ? batchPrintProgressMsg || 'Generating PDF...' : `Download ${batchPrintDistrict} PDF`}
                         </span>
                       </button>
                     </div>
@@ -6399,7 +6408,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     {isGeneratingBatchPrint && (
                       <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl text-xs text-sky-900 flex items-center gap-2 animate-pulse">
                         <RefreshCw className="w-4 h-4 animate-spin text-sky-600 shrink-0" />
-                        <span>{batchPrintProgressMsg || 'कृपया प्रतीक्षा करा, सर्व सदस्यांचे हाई-डिफ़िंक्शन आय-कार्ड्स एकत्र केले जात आहेत...'}</span>
+                        <span>{batchPrintProgressMsg || 'Generating high-resolution ID cards...'}</span>
                       </div>
                     )}
                   </div>
@@ -6407,18 +6416,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab: Passport Photos ZIP Download (सुपर ॲडमिन पॅनल - पासपोर्ट फोटो ZIP) */}
+            {/* Sub-tab: Passport Photos ZIP Download (Super Admin Only) */}
             {activeAdminSubTab === 'passport_photo' && currentUser?.isSuperAdmin && (
               <div className="space-y-6 max-w-4xl mx-auto">
                 <div className="bg-white p-6 sm:p-8 rounded-2xl border border-amber-300 shadow-md space-y-5">
                   <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                     <div>
-                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                      <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                         <ImageIcon className="w-5 h-5 text-amber-600" />
-                        <span>सभासद पासपोर्ट फोटो ZIP डाऊनलोड कक्ष (फक्त JPEG / JPG फॉर्मेट)</span>
+                        <span>Passport Photo ZIP Export</span>
                       </h3>
                       <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                        येथून हव्या त्या जिल्ह्यांची निवड (Tick) करून सर्व मंजूर सदस्यांचे पासपोर्ट फोटो एकाच ZIP फोल्डरमध्ये केवळ <strong className="text-amber-700">.jpg / .jpeg</strong> फॉरमॅटमध्ये झटपट डाऊनलोड करू शकता.
+                        Select districts to download approved member photos in <strong className="text-amber-700">.jpg</strong> format inside a ZIP file.
                       </p>
                     </div>
                   </div>
@@ -6426,7 +6435,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   {/* Select All / Deselect All Controls */}
                   <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div className="text-xs sm:text-sm font-bold text-slate-700">
-                      निवडलेले जिल्हे: <span className="text-[#17366d] font-mono">{passportPhotoDistricts.length}</span> / {MAHARASHTRA_DISTRICTS.length}
+                      Selected Districts: <span className="text-[#17366d] font-mono">{passportPhotoDistricts.length}</span> / {MAHARASHTRA_DISTRICTS.length}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -6434,14 +6443,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         onClick={() => setPassportPhotoDistricts([...MAHARASHTRA_DISTRICTS])}
                         className="px-3 py-1.5 bg-[#17366d] hover:bg-[#11254a] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer"
                       >
-                        सर्व जिल्हे निवडा
+                        Select All
                       </button>
                       <button
                         type="button"
                         onClick={() => setPassportPhotoDistricts([])}
                         className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-bold rounded-lg transition-colors cursor-pointer"
                       >
-                        सर्व रद्द करा
+                        Clear All
                       </button>
                     </div>
                   </div>
@@ -6479,7 +6488,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <span className="truncate">{dist}</span>
                           </div>
                           <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
-                            {toEnglishDigits(String(photoCount))} फोटो
+                            {toEnglishDigits(String(photoCount))}
                           </span>
                         </label>
                       );
@@ -6490,9 +6499,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <div className="p-5 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
-                        <strong className="text-amber-900 text-sm sm:text-base block">ZIP डाऊनलोड माहिती:</strong>
+                        <strong className="text-amber-900 text-sm sm:text-base block">ZIP Export Summary</strong>
                         <span className="text-xs sm:text-sm text-slate-700">
-                          निवडलेल्या जिल्ह्यांमधील एकूण उपलब्ध फोटो असलेले मंजूर सदस्य:{' '}
+                          Approved members with photos:{' '}
                           <strong className="font-mono text-[#17366d] text-base">
                             {toEnglishDigits(
                               String(
@@ -6515,7 +6524,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         className="bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-50 text-white font-bold px-6 py-3 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer shrink-0"
                       >
                         <Download className={`w-5 h-5 ${isGeneratingPassportZip ? 'animate-spin' : ''}`} />
-                        <span>{isGeneratingPassportZip ? 'ZIP तयार होत आहे...' : 'पासपोर्ट फोटो ZIP डाऊनलोड करा (.jpg)'}</span>
+                        <span>{isGeneratingPassportZip ? 'Creating ZIP...' : 'Download Photo ZIP (.jpg)'}</span>
                       </button>
                     </div>
 
@@ -6529,18 +6538,18 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               </div>
             )}
 
-            {/* Sub-tab: ID Card Sample Preview (आय-कार्ड डिझाईन नमुना) */}
+            {/* Sub-tab: ID Card Sample Preview */}
             {activeAdminSubTab === 'id_card_preview' && (currentUser?.isSuperAdmin || currentUser?.permissions.viewIdCardPreview) && (
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-md space-y-4">
                   <div className="flex items-center justify-between pb-4 border-b border-slate-200">
                     <div>
-                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                      <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                         <Award className="w-5 h-5 text-[#df6b16]" />
-                        नवीन आय-कार्ड डिझाईन नमुना व प्रिंट क्वालिटी तपासणी
+                        ID Card Design & Print Quality Preview
                       </h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        सदस्य नोंदणी आणि 'अर्जाची स्थिती पहा' मधून सर्व नवीन व मागील सदस्यांसाठी हेच अधिकृत सरळ गोल्डन-निळे, शार्प व प्रिंट-रेडी (1016 DPI Ultra-HD, 2–3 MB) नवीन आय-कार्ड डिझाईन सक्रिय करण्यात आले आहे.
+                        Official active CR80 print-ready membership ID card template (1016 DPI).
                       </p>
                     </div>
                   </div>
@@ -6564,7 +6573,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   {/* Live Print Test Action Bar */}
                   <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4">
                     <p className="text-xs text-emerald-950 font-medium">
-                      ✓ हे नवीन डिझाईन आता संपूर्ण वेबसाईटवर (नवीन नोंदणी, ई-मेल आणि अर्जाची स्थिती पहा) सक्रिय आहे. कलर प्रिंटची स्पष्टता तपासण्यासाठी खालील बटनावरून नमुना PDF डाऊनलोड करा:
+                      Active across registration, email, and status portal. Download a sample PDF to verify print clarity.
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
@@ -6595,7 +6604,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         className="bg-[#0b1e33] hover:bg-[#1e3a8a] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
                       >
                         <Download className="w-4 h-4" />
-                        <span>नमुना प्रिंट-रेडी PDF डाऊनलोड करा</span>
+                        <span>Download Sample PDF</span>
                       </button>
                     </div>
                   </div>
@@ -6608,13 +6617,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {activeAdminSubTab === 'gov_order' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageGovOrders) && (
               <div className="space-y-6">
               <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-3xl">
-                <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] mb-5">
-                  शासन निर्णय अपलोड (Upload Gov Order)
+                <h3 className="text-lg sm:text-xl font-bold text-[#17366d] mb-5">
+                  Upload GR / Order
                 </h3>
                 {goCreatedSuccess && (
                   <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 shadow-xs">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <span className="font-semibold">शासन निर्णय यशस्वीपणे प्रसिद्ध करण्यात आला आहे!</span>
+                    <span className="font-semibold">GR / Order published successfully.</span>
                   </div>
                 )}
                 {goError && (
@@ -6625,39 +6634,39 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 )}
                 <form onSubmit={handleCreateGovOrder} className="space-y-4 text-xs">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">शीर्षक</label>
+                    <label className="font-bold text-slate-700 block mb-1">Title</label>
                     <input type="text" value={goTitle} onChange={e => setGoTitle(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">प्रकार</label>
+                    <label className="font-bold text-slate-700 block mb-1">Type</label>
                     <select value={goType} onChange={e => setGoType(e.target.value as any)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]">
-                       <option value="शासन निर्णय">शासन निर्णय</option>
-                       <option value="न्यायालयीन आदेश">न्यायालयीन आदेश</option>
-                       <option value="परिपत्रक">परिपत्रक</option>
+                       <option value="शासन निर्णय">Government Resolution (GR)</option>
+                       <option value="न्यायालयीन आदेश">Court Order</option>
+                       <option value="परिपत्रक">Circular</option>
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">प्रसिद्धी दिनांक</label>
+                    <label className="font-bold text-slate-700 block mb-1">Publish Date</label>
                     <input type="date" value={goDate} onChange={e => setGoDate(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">फाइल निवडा (Upload File - Image Only)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Upload File (Image Only)</label>
                     <input type="file" onChange={handleGoFileUpload} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" />
-                    {goFileUrl && <div className="text-emerald-700 font-bold mt-2">✓ फाइल सज्ज आहे!</div>}
+                    {goFileUrl && <div className="text-emerald-700 font-bold mt-2">File ready</div>}
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Google Drive लिंक (PDF साठी)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Google Drive Link (PDF)</label>
                     <input type="url" value={goDriveUrl} onChange={e => setGoDriveUrl(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#10b981]" placeholder="https://drive.google.com/..." />
                   </div>
                   <button type="submit" disabled={isUploadingGoFile} className="bg-[#10b981] text-white font-bold py-2.5 px-6 rounded-lg text-xs disabled:opacity-50">
-                    {isUploadingGoFile ? 'अपलोड होत आहे...' : 'प्रसिद्ध करा'}
+                    {isUploadingGoFile ? 'Uploading...' : 'Publish'}
                   </button>
                 </form>
               </div>
 
               <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
-                <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d] mb-4">
-                  शासन निर्णय सूची
+                <h3 className="text-lg font-bold text-[#17366d] mb-4">
+                  Published GR & Orders
                 </h3>
                 <div className="space-y-3">
                   {govOrders.map(go => (
@@ -6666,7 +6675,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               <div className="font-bold text-[#17366d]">{go.title}</div>
                               <div className="text-xs text-slate-500">{go.type} · {go.date}</div>
                           </div>
-                          <button onClick={() => handleDeleteGovOrder(go.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded">
+                          <button onClick={() => handleDeleteGovOrder(go.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded" title="Delete">
                               <Trash2 className="w-4 h-4" />
                           </button>
                       </div>
@@ -6682,12 +6691,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-100 gap-2">
                     <div>
-                      <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                      <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                         <Shield className="w-5 h-5 text-[#df6b16]" />
-                        व्यवस्थापक प्रशासन (Manage Admins & Roles)
+                        Sub-Admins & Permissions
                       </h3>
                       <p className="text-xs text-slate-500 mt-1">
-                        ॲडमिन पॅनेलमधील सर्व सब-मेनू व सुविधांचे अधिकार आवश्यकतेनुसार वेगवेगळ्या व्यक्तींना द्या किंवा नंतर कमी-जास्त करा.
+                        Assign or update module access permissions for sub-administrators.
                       </p>
                     </div>
                   </div>
@@ -6713,33 +6722,33 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <form onSubmit={handleAddAdminUser} className="space-y-4 max-w-5xl bg-slate-50/70 p-5 rounded-xl border border-slate-200 text-xs">
                     <h4 className="font-bold text-[#09243f] text-sm flex items-center gap-1.5 border-b border-slate-200 pb-2">
                       <UserPlus className="w-4 h-4 text-[#df6b16]" />
-                      नवीन व्यवस्थापक जोडा (Add New Sub-Admin)
+                      Add Sub-Admin
                     </h4>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          व्यवस्थापक ई-मेल आयडी (User Email ID) <span className="text-rose-600">*</span>
+                          Email ID <span className="text-rose-600">*</span>
                         </label>
                         <input
                           type="email"
                           required
                           value={newAdminEmail}
                           onChange={(e) => setNewAdminEmail(e.target.value)}
-                          placeholder="उदा. admin.nashik@gmail.com"
+                          placeholder="e.g. admin.nashik@gmail.com"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
 
                       <div>
                         <label className="font-bold text-slate-700 block mb-1">
-                          नाव किंवा पद (Name / Designation)
+                          Name / Role
                         </label>
                         <input
                           type="text"
                           value={newAdminName}
                           onChange={(e) => setNewAdminName(e.target.value)}
-                          placeholder="उदा. श्री. सुरेश शिंदे (जिल्हाध्यक्ष)"
+                          placeholder="e.g. Suresh Shinde (District President)"
                           className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                         />
                       </div>
@@ -6749,7 +6758,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="pt-2">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
                         <label className="font-bold text-slate-800 block">
-                          या ॲडमिनला द्यावयाचे अधिकार निवडा (सर्व {toEnglishDigits(ADMIN_PERMISSION_OPTIONS.length)} सुविधा): <span className="text-rose-600">*</span>
+                          Permissions ({toEnglishDigits(ADMIN_PERMISSION_OPTIONS.length)} modules): <span className="text-rose-600">*</span>
                         </label>
                         <div className="flex items-center gap-2">
                           <button
@@ -6757,14 +6766,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             onClick={() => setNewAdminPermissions({ ...ALL_ADMIN_PERMISSIONS_TRUE })}
                             className="text-[11px] font-bold text-[#17366d] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded transition-colors"
                           >
-                            सर्व निवडा
+                            Select All
                           </button>
                           <button
                             type="button"
                             onClick={() => setNewAdminPermissions({ ...ALL_ADMIN_PERMISSIONS_FALSE })}
                             className="text-[11px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded transition-colors"
                           >
-                            सर्व काढा
+                            Clear All
                           </button>
                         </div>
                       </div>
@@ -6807,7 +6816,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
 
                     <div className="bg-[#fff9f2] border border-[#f5d5b7] p-3 rounded-lg text-[11px] text-[#703b11] leading-relaxed">
-                      💡 <strong>पासवर्ड सुविधा:</strong> नवीन ॲडमिनसाठी आपल्याला पासवर्ड सेट करण्याची आवश्यकता नाही. ते स्वतः पहिल्या लॉगिन वेळी आपला गुप्त पासवर्ड तयार करतील.
+                      <strong>Note:</strong> No initial password required. Sub-admins create their own password on first login.
                     </div>
 
                     <button
@@ -6816,35 +6825,35 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="bg-[#df6b16] hover:bg-[#c85c0e] disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-lg text-xs shadow-xs transition-colors flex items-center gap-1.5"
                     >
                       <UserPlus className="w-4 h-4" />
-                      {isSubmittingAdmin ? 'जोडत आहे...' : 'नवीन व्यवस्थापक जोडा (Add Admin)'}
+                      {isSubmittingAdmin ? 'Adding...' : 'Add Sub-Admin'}
                     </button>
                   </form>
                 </div>
 
                 {/* Sub-Admins List Table */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#17366d] mb-4 pb-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                    <span>सक्रिय व्यवस्थापक व अधिकार यादी ({toEnglishDigits(adminUsersList.length)})</span>
+                  <h4 className="text-base font-bold text-[#17366d] mb-4 pb-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <span>Active Sub-Admins ({toEnglishDigits(adminUsersList.length)})</span>
                     <span className="text-[11px] font-sans font-normal text-slate-500">
-                      मुख्य प्रशासक: {DEFAULT_ADMIN_EMAIL} (सर्व अधिकार)
+                      Super Admin: {DEFAULT_ADMIN_EMAIL} (Full Access)
                     </span>
                   </h4>
 
                   {adminUsersList.length === 0 ? (
                     <div className="text-center py-8 text-slate-400 text-xs">
                       <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                      सध्या कोणताही अतिरिक्त व्यवस्थापक जोडलेला नाही. वर दिलेल्या फॉर्मद्वारे आपण नवीन ॲडमिन जोडू शकता.
+                      No sub-admins added yet.
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
                         <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
                           <tr>
-                            <th className="p-3 w-12 text-center">अ.क्र.</th>
-                            <th className="p-3">व्यवस्थापक ई-मेल व नाव</th>
-                            <th className="p-3">दिलेले अधिकार (Permissions)</th>
-                            <th className="p-3">स्थिती</th>
-                            <th className="p-3 text-center">कृती (अधिकार बदला / हटवा)</th>
+                            <th className="p-3 w-12 text-center">#</th>
+                            <th className="p-3">Email & Name</th>
+                            <th className="p-3">Permissions</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3 text-center">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -6881,19 +6890,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                           </span>
                                         ))
                                       ) : (
-                                        <span className="text-slate-400 text-[10px]">कोणतेही अधिकार नाहीत</span>
+                                        <span className="text-slate-400 text-[10px]">No permissions</span>
                                       )}
                                     </div>
                                   </td>
                                   <td className="p-3">
                                     {subAdmin.isFirstLogin || (!subAdmin.hasPassword && !subAdmin.password) ? (
                                       <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-bold">
-                                        पहिले लॉगिन प्रलंबित
+                                        Pending Setup
                                       </span>
                                     ) : (
                                       <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded text-[10px] font-bold">
                                         <Check className="w-3 h-3 text-emerald-600" />
-                                        पासवर्ड सक्रिय
+                                        Active
                                       </span>
                                     )}
                                   </td>
@@ -6905,7 +6914,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                         className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-2.5 py-1 rounded text-[11px] font-bold inline-flex items-center gap-1 transition-colors"
                                       >
                                         <X className="w-3.5 h-3.5" />
-                                        बंद करा
+                                        Close
                                       </button>
                                     ) : (
                                       <div className="inline-flex items-center gap-1">
@@ -6913,16 +6922,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                           type="button"
                                           onClick={() => handleStartEditPermissions(subAdmin)}
                                           className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded text-[11px] font-bold transition-colors inline-flex items-center gap-1"
-                                          title="दिलेले अधिकार कमी-जास्त करा (Edit Permissions)"
+                                          title="Edit Permissions"
                                         >
                                           <Edit3 className="w-3.5 h-3.5" />
-                                          <span>अधिकार बदला</span>
+                                          <span>Edit Access</span>
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => handleResetSubAdmin(subAdmin.id, subAdmin.email)}
                                           className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-1.5 rounded transition-colors inline-flex items-center"
-                                          title="पासवर्ड रिसेट करा (पुन्हा नवीन पासवर्ड सेट करू द्या)"
+                                          title="Reset Password"
                                         >
                                           <RotateCcw className="w-4 h-4" />
                                         </button>
@@ -6930,7 +6939,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                           type="button"
                                           onClick={() => handleDeleteAdmin(subAdmin.id, subAdmin.email)}
                                           className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 p-1.5 rounded transition-colors inline-flex items-center"
-                                          title="व्यवस्थापक अधिकार काढून टाका"
+                                          title="Remove Sub-Admin"
                                         >
                                           <Trash2 className="w-4 h-4" />
                                         </button>
@@ -6945,10 +6954,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                                           <div>
                                             <h5 className="font-bold text-[#17366d] text-xs sm:text-sm">
-                                              {subAdmin.email} यांचे अधिकार कमी-जास्त करा (Edit Permissions)
+                                              Edit Permissions — {subAdmin.email}
                                             </h5>
                                             <p className="text-[11px] text-slate-500">
-                                              खालील यादीतून हवे ते अधिकार निवडा किंवा काढा आणि 'अधिकार सेव्ह करा' वर क्लिक करा.
+                                              Toggle allowed modules and click Save Permissions.
                                             </p>
                                           </div>
                                           <div className="flex items-center gap-2">
@@ -6957,14 +6966,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                               onClick={() => setEditingPermissions({ ...ALL_ADMIN_PERMISSIONS_TRUE })}
                                               className="text-[11px] font-bold text-[#17366d] bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1 rounded transition-colors"
                                             >
-                                              सर्व निवडा
+                                              Select All
                                             </button>
                                             <button
                                               type="button"
                                               onClick={() => setEditingPermissions({ ...ALL_ADMIN_PERMISSIONS_FALSE })}
                                               className="text-[11px] font-bold text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2.5 py-1 rounded transition-colors"
                                             >
-                                              सर्व काढा
+                                              Clear All
                                             </button>
                                           </div>
                                         </div>
@@ -7011,7 +7020,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                             onClick={() => setEditingAdminId(null)}
                                             className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 border border-slate-200 transition-colors"
                                           >
-                                            रद्द करा
+                                            Cancel
                                           </button>
                                           <button
                                             type="button"
@@ -7020,7 +7029,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                             className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 shadow-xs transition-colors"
                                           >
                                             <Check className="w-4 h-4" />
-                                            <span>{isUpdatingAdminPerms ? 'सेव्ह होत आहे...' : 'अधिकार सेव्ह करा'}</span>
+                                            <span>{isUpdatingAdminPerms ? 'Saving...' : 'Save Permissions'}</span>
                                           </button>
                                         </div>
                                       </div>
@@ -7041,12 +7050,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {/* Sub-tab 4: Change Password Management */}
             {activeAdminSubTab === 'password' && (
               <div className="bg-white p-6 sm:p-8 rounded-xl border border-slate-200 shadow-xs max-w-md">
-                <h3 className="font-serifDevanagari text-lg font-bold text-[#17366d] mb-2 pb-2 border-b border-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-[#17366d] mb-2 pb-2 border-b border-slate-100 flex items-center gap-2">
                   <KeyRound className="w-5 h-5 text-[#df6b16]" />
-                  ॲडमिन पासवर्ड बदला (Change Password)
+                  Change Password
                 </h3>
                 <p className="text-xs text-slate-500 mb-5">
-                  येथून आपण आपला ॲडमिन पासवर्ड कधीही बदलू शकता.
+                  Update your admin account password anytime.
                 </p>
 
                 {changePassStatus && (
@@ -7069,42 +7078,42 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <form onSubmit={handleChangePasswordInside} className="space-y-4 text-xs">
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      सध्याचा चालू पासवर्ड (Current Password)
+                      Current Password
                     </label>
                     <input
                       type="password"
                       required
                       value={currentPassInput}
                       onChange={(e) => setCurrentPassInput(e.target.value)}
-                      placeholder="सध्याचा पासवर्ड प्रविष्ट करा"
+                      placeholder="Enter current password"
                       className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
 
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      नवीन पासवर्ड (New Password)
+                      New Password
                     </label>
                     <input
                       type="password"
                       required
                       value={newPassInput}
                       onChange={(e) => setNewPassInput(e.target.value)}
-                      placeholder="किमान 4 अक्षरी नवीन पासवर्ड"
+                      placeholder="Min 4 characters"
                       className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
 
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      नवीन पासवर्ड पुन्हा प्रविष्ट करा (Confirm New Password)
+                      Confirm New Password
                     </label>
                     <input
                       type="password"
                       required
                       value={confirmPassInput}
                       onChange={(e) => setConfirmPassInput(e.target.value)}
-                      placeholder="नवीन पासवर्ड पुन्हा टाका"
+                      placeholder="Re-enter new password"
                       className="w-full p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
@@ -7113,7 +7122,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     type="submit"
                     className="w-full bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2.5 rounded-lg text-sm transition-colors shadow-sm"
                   >
-                    नवीन पासवर्ड सुरक्षित सेव्ह करा
+                    Save Password
                   </button>
                 </form>
               </div>
@@ -7125,12 +7134,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {/* Header & Actions Bar */}
                 <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-bold text-[#17366d] flex items-center gap-2">
                       <Inbox className="w-5 h-5 text-[#df6b16] shrink-0" />
-                      <span>एकत्रित प्राप्त संदेश व ईमेल बॉक्स ({mailboxAccount})</span>
+                      <span>Messages & Mailbox ({mailboxAccount})</span>
                     </h3>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      <strong>{mailboxAccount}</strong> वर येणारे सर्व थेट ईमेल तसेच वेबसाईटवरील संपर्क फॉर्मवरून आलेले संदेश येथे एकत्र दिसतात व येथूनच उत्तर पाठवता येते.
+                      Direct emails to <strong>{mailboxAccount}</strong> and website contact inquiries in one inbox.
                     </p>
                   </div>
 
@@ -7142,13 +7151,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           to: '',
                           recipientName: '',
                           subject: '',
-                          contextLabel: 'नवीन ईमेल संदेश',
+                          contextLabel: 'Compose Email',
                         })
                       }
                       className="bg-[#193568] hover:bg-[#11254a] text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5 text-[#efb24b]" />
-                      <span>नवीन ईमेल पाठवा</span>
+                      <span>Compose</span>
                     </button>
 
                     <button
@@ -7161,7 +7170,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <Smartphone className="w-3.5 h-3.5 text-[#df6b16]" />
-                      <span>मोबाईल सेटअप माहिती</span>
+                      <span>Mobile Setup</span>
                     </button>
 
                     <button
@@ -7169,14 +7178,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       onClick={loadContactMessages}
                       disabled={isLoadingContacts}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="ईमेल व संपर्क संदेश रिफ्रेश करा"
+                      title="Refresh Inbox"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isLoadingContacts ? 'animate-spin text-[#df6b16]' : ''}`} />
-                      <span>रिफ्रेश करा</span>
+                      <span>Refresh</span>
                     </button>
 
                     <span className="bg-amber-100 text-[#9a460b] font-bold text-xs px-3 py-1.5 rounded-lg border border-amber-300 font-mono">
-                      एकूण: {toEnglishDigits(contactMessages.length + mailboxEmails.length)}
+                      Total: {toEnglishDigits(contactMessages.length + mailboxEmails.length)}
                     </span>
                   </div>
                 </div>
@@ -7185,9 +7194,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 {showMobileMailGuide && (
                   <div className="bg-[#f8fafc] border border-slate-300 rounded-xl p-4 sm:p-5 text-xs space-y-3">
                     <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
-                      <h4 className="font-serifDevanagari text-sm sm:text-base font-bold text-[#193568] flex items-center gap-2">
+                      <h4 className="text-sm sm:text-base font-bold text-[#193568] flex items-center gap-2">
                         <Smartphone className="w-4 h-4 text-[#df6b16]" />
-                        मोबाईलवर (Gmail / Outlook अ‍ॅप) {mailboxAccount} जोडण्याची माहिती
+                        Mobile Mail Setup ({mailboxAccount})
                       </h4>
                       <button
                         type="button"
@@ -7200,32 +7209,32 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-slate-700">
                       <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
                         <div className="font-bold text-[#193568]">Incoming Server (IMAP)</div>
-                        <div>Server / Host: <code className="font-mono font-bold text-slate-900">mail.mahasangh.in</code></div>
+                        <div>Host: <code className="font-mono font-bold text-slate-900">mail.mahasangh.in</code></div>
                         <div>Port & Security: <code className="font-mono font-bold text-slate-900">993 (SSL/TLS)</code></div>
                         <div>Username: <code className="font-mono font-bold text-slate-900">{mailboxAccount}</code></div>
                       </div>
                       <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1">
                         <div className="font-bold text-[#193568]">Outgoing Server (SMTP)</div>
-                        <div>Server / Host: <code className="font-mono font-bold text-slate-900">mail.mahasangh.in</code></div>
+                        <div>Host: <code className="font-mono font-bold text-slate-900">mail.mahasangh.in</code></div>
                         <div>Port & Security: <code className="font-mono font-bold text-slate-900">465 (SSL/TLS)</code></div>
                         <div>Webmail: <code className="font-mono text-slate-800">panel.hostkarle.in/roundcube</code></div>
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Gmail अ‍ॅपमध्ये: प्रोफाइल फोटो → Add another account → Other → {mailboxAccount} → Personal (IMAP) निवडून वरील IMAP व SMTP सर्व्हर तपशील आणि आपला मेल पासवर्ड प्रविष्ट करा.
+                      In Gmail app: Profile icon → Add another account → Other → {mailboxAccount} → Personal (IMAP), then enter the IMAP/SMTP details above with your mail password.
                     </p>
                   </div>
                 )}
 
                 {mailboxError && (
                   <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-xl p-3 text-xs font-medium flex items-center justify-between gap-2">
-                    <span>ईमेल सर्व्हर सूचना: {mailboxError} (संपर्क फॉर्मवरील संदेश खाली उपलब्ध आहेत)</span>
+                    <span>Mail server notice: {mailboxError} (Website contact messages are still shown below)</span>
                     <button
                       type="button"
                       onClick={loadContactMessages}
                       className="text-xs font-bold underline shrink-0 cursor-pointer"
                     >
-                      पुन्हा प्रयत्न करा
+                      Retry
                     </button>
                   </div>
                 )}
@@ -7242,7 +7251,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      सर्व एकत्र ({toEnglishDigits(contactMessages.length + mailboxEmails.length)})
+                      All ({toEnglishDigits(contactMessages.length + mailboxEmails.length)})
                     </button>
                     <button
                       type="button"
@@ -7254,7 +7263,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <Mail className="w-3.5 h-3.5" />
-                      <span>ईमेल इनबॉक्स ({toEnglishDigits(mailboxEmails.length)})</span>
+                      <span>Emails ({toEnglishDigits(mailboxEmails.length)})</span>
                     </button>
                     <button
                       type="button"
@@ -7266,7 +7275,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }`}
                     >
                       <Globe className="w-3.5 h-3.5" />
-                      <span>वेबसाईट संपर्क फॉर्म ({toEnglishDigits(contactMessages.length)})</span>
+                      <span>Contact Form ({toEnglishDigits(contactMessages.length)})</span>
                     </button>
                   </div>
 
@@ -7277,7 +7286,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         type="text"
                         value={contactSearchQuery}
                         onChange={(e) => setContactSearchQuery(e.target.value)}
-                        placeholder="नाव, ईमेल, मोबाईल, विषय किंवा संदेशात शोधा..."
+                        placeholder="Search name, email, phone, subject, or message..."
                         className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16]"
                       />
                     </div>
@@ -7287,7 +7296,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       onChange={(e) => setContactDistrictFilter(e.target.value)}
                       className="p-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-[#df6b16] bg-white min-w-[160px]"
                     >
-                      <option value="">सर्व 34 जिल्हे (संपर्क फॉर्म)</option>
+                      <option value="">All Districts</option>
                       {MAHARASHTRA_DISTRICTS.map((d) => (
                         <option key={d} value={d}>
                           {d}
@@ -7353,7 +7362,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     return (
                       <div className="bg-white p-10 text-center rounded-xl border border-slate-200 text-slate-500 text-sm flex flex-col items-center gap-2">
                         <RefreshCw className="w-6 h-6 animate-spin text-[#df6b16]" />
-                        <span>ईमेल व संपर्क संदेश लोड होत आहेत...</span>
+                        <span>Loading messages...</span>
                       </div>
                     );
                   }
@@ -7362,9 +7371,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     return (
                       <div className="bg-white p-12 text-center rounded-xl border border-dashed border-slate-300 text-slate-400 space-y-2">
                         <Inbox className="w-12 h-12 mx-auto text-slate-300" />
-                        <p className="text-sm font-semibold text-slate-600">कोणतेही संदेश किंवा ईमेल आढळले नाहीत.</p>
+                        <p className="text-sm font-semibold text-slate-600">No messages found.</p>
                         <p className="text-xs text-slate-400">
-                          {mailboxAccount} वर आलेले ईमेल व वेबसाईट संपर्क फॉर्मवरील संदेश येथे एकत्र दिसतील.
+                          Emails to {mailboxAccount} and website inquiries will appear here.
                         </p>
                       </div>
                     );
@@ -7393,21 +7402,21 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                         {em.fromName}
                                       </h4>
                                       <span className="bg-blue-50 text-[#193568] font-bold px-2 py-0.5 rounded text-[10px] border border-blue-200">
-                                        ईमेल ({mailboxAccount})
+                                        Email ({mailboxAccount})
                                       </span>
                                       {em.isRead ? (
                                         <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">
-                                          वाचलेला
+                                          Read
                                         </span>
                                       ) : (
                                         <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300">
-                                          नवीन ईमेल
+                                          Unread
                                         </span>
                                       )}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
                                       {em.fromEmail && <span className="font-mono text-slate-700">{em.fromEmail}</span>}
-                                      <span>· दिनांक: {formatDateWithEnglishDigits(em.date)}</span>
+                                      <span>· {formatDateWithEnglishDigits(em.date)}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -7423,7 +7432,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     }`}
                                   >
                                     <Check className="w-3.5 h-3.5" />
-                                    <span>{em.isRead ? 'अनरीड करा' : 'वाचले करा'}</span>
+                                    <span>{em.isRead ? 'Mark Unread' : 'Mark Read'}</span>
                                   </button>
                                   <button
                                     type="button"
@@ -7431,22 +7440,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-rose-200 cursor-pointer"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
-                                    <span>हटवा</span>
+                                    <span>Delete</span>
                                   </button>
                                 </div>
                               </div>
 
                               <div className="space-y-1.5 text-xs">
                                 <p className="font-bold text-[#17366d]">
-                                  विषय: <span className="font-semibold text-slate-800">{em.subject}</span>
+                                  Subject: <span className="font-semibold text-slate-800">{em.subject}</span>
                                 </p>
                                 <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-slate-800 leading-relaxed whitespace-pre-wrap font-normal max-h-60 overflow-y-auto">
-                                  {em.textBody || em.snippet || '(मजकूर उपलब्ध नाही)'}
+                                  {em.textBody || em.snippet || '(No content)'}
                                 </div>
                                 {em.hasAttachments && em.attachmentNames.length > 0 && (
                                   <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600 pt-1">
                                     <Paperclip className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>सोबत फायली: {em.attachmentNames.join(', ')}</span>
+                                    <span>Attachments: {em.attachmentNames.join(', ')}</span>
                                   </div>
                                 )}
                               </div>
@@ -7461,13 +7470,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                         recipientName: em.fromName,
                                         subject: em.subject,
                                         replyToMessageId: em.messageId,
-                                        contextLabel: `ईमेलला उत्तर (${em.fromEmail})`,
+                                        contextLabel: `Reply to ${em.fromEmail}`,
                                       })
                                     }
                                     className="inline-flex items-center gap-1.5 bg-[#193568] hover:bg-[#11254a] text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                                   >
                                     <Reply className="w-3.5 h-3.5 text-[#efb24b]" />
-                                    <span>उत्तर पाठवा ({mailboxAccount} वरून)</span>
+                                    <span>Reply</span>
                                   </button>
                                 )}
                               </div>
@@ -7485,7 +7494,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                               <div className="flex items-center gap-2.5">
                                 <div className="w-9 h-9 rounded-full bg-amber-500/10 text-amber-800 font-bold flex items-center justify-center shrink-0 border border-amber-300">
-                                  {msg.name?.charAt(0) || '👤'}
+                                  {msg.name?.charAt(0) || 'U'}
                                 </div>
                                 <div>
                                   <div className="flex flex-wrap items-center gap-2">
@@ -7493,15 +7502,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       {msg.name}
                                     </h4>
                                     <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">
-                                      वेबसाईट संपर्क फॉर्म
+                                      Contact Form
                                     </span>
                                     {msg.isRead ? (
                                       <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[10px] border border-slate-200">
-                                        वाचलेला
+                                        Read
                                       </span>
                                     ) : (
                                       <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300">
-                                        नवीन संदेश
+                                        New
                                       </span>
                                     )}
                                   </div>
@@ -7512,7 +7521,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                       </span>
                                     )}
                                     <span>
-                                      दिनांक: {formatDateWithEnglishDigits(msg.createdAt)}
+                                      {formatDateWithEnglishDigits(msg.createdAt)}
                                     </span>
                                   </div>
                                 </div>
@@ -7526,26 +7535,26 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     setContactMessages((prev) =>
                                       prev.map((m) => (m.id === msg.id ? { ...m, isRead: nextRead } : m))
                                     );
-                                    showAdminFeedback(nextRead ? 'संदेश वाचलेला म्हणून चिन्हांकित केला.' : 'संदेश अनरीड केला.', 'success');
+                                    showAdminFeedback(nextRead ? 'Marked as read.' : 'Marked as unread.', 'success');
                                   }}
                                   className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border cursor-pointer ${
                                     msg.isRead
                                       ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                                       : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
                                   }`}
-                                  title="वाचले / न वाचले म्हणून चिन्हांकित करा"
+                                  title="Toggle Read Status"
                                 >
                                   <Check className="w-3.5 h-3.5" />
-                                  <span>{msg.isRead ? 'अनरीड करा' : 'वाचले करा'}</span>
+                                  <span>{msg.isRead ? 'Mark Unread' : 'Mark Read'}</span>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteContactMessage(msg.id)}
                                   className="text-rose-600 hover:text-rose-800 hover:bg-rose-50 text-xs font-semibold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border border-rose-200 cursor-pointer"
-                                  title="हा संदेश काढून टाका"
+                                  title="Delete Message"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
-                                  <span>हटवा</span>
+                                  <span>Delete</span>
                                 </button>
                               </div>
                             </div>
@@ -7554,7 +7563,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <div className="space-y-1.5 text-xs">
                               {msg.subject && (
                                 <p className="font-bold text-[#17366d]">
-                                  विषय: <span className="font-semibold text-slate-800">{msg.subject}</span>
+                                  Subject: <span className="font-semibold text-slate-800">{msg.subject}</span>
                                 </p>
                               )}
                               <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
@@ -7565,11 +7574,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 <div className="mt-2 p-2.5 bg-amber-50/60 border border-amber-200 rounded-lg flex flex-wrap items-center gap-3">
                                   <img
                                     src={msg.photo}
-                                    alt={`${msg.name} संलग्न फोटो`}
+                                    alt={`${msg.name} attachment`}
                                     onClick={() =>
                                       setContactPhotoModal({
                                         src: msg.photo || '',
-                                        title: `${msg.name} — संलग्न फोटो`,
+                                        title: `${msg.name} — Attachment`,
                                       })
                                     }
                                     className="w-16 h-16 rounded-lg object-cover border border-amber-300 bg-white cursor-pointer hover:opacity-90 transition-opacity shrink-0"
@@ -7577,7 +7586,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   <div className="min-w-0 flex-1 space-y-1">
                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#17366d]">
                                       <Paperclip className="w-3.5 h-3.5 text-[#df6b16]" />
-                                      <span>संलग्न फोटो (Attachment)</span>
+                                      <span>Attachment</span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <button
@@ -7585,13 +7594,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                         onClick={() =>
                                           setContactPhotoModal({
                                             src: msg.photo || '',
-                                            title: `${msg.name} — संलग्न फोटो`,
+                                            title: `${msg.name} — Attachment`,
                                           })
                                         }
                                         className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-[#17366d] border border-slate-300 px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer"
                                       >
                                         <Eye className="w-3 h-3" />
-                                        <span>पूर्ण फोटो पहा</span>
+                                        <span>View</span>
                                       </button>
                                       <a
                                         href={msg.photo}
@@ -7599,7 +7608,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                         className="inline-flex items-center gap-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 px-2.5 py-1 rounded text-[11px] font-bold"
                                       >
                                         <Download className="w-3 h-3" />
-                                        <span>डाऊनलोड करा</span>
+                                        <span>Download</span>
                                       </a>
                                     </div>
                                   </div>
@@ -7616,14 +7625,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     handleOpenReplyModal({
                                       to: msg.email || '',
                                       recipientName: msg.name,
-                                      subject: msg.subject || 'आपल्या संपर्क संदेशाचे उत्तर',
-                                      contextLabel: `संपर्क फॉर्म संदेशास उत्तर (${msg.email})`,
+                                      subject: msg.subject || 'Re: Your Inquiry',
+                                      contextLabel: `Reply to ${msg.email}`,
                                     })
                                   }
                                   className="inline-flex items-center gap-1.5 bg-[#193568] hover:bg-[#11254a] text-white font-bold px-3.5 py-1.5 rounded-lg transition-colors cursor-pointer"
                                 >
                                   <Reply className="w-3.5 h-3.5 text-[#efb24b]" />
-                                  <span>ईमेलने उत्तर पाठवा ({msg.email})</span>
+                                  <span>Email Reply</span>
                                 </button>
                               )}
 
@@ -7632,7 +7641,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors"
                               >
                                 <PhoneCall className="w-3.5 h-3.5" />
-                                <span>कॉल करा ({msg.phone})</span>
+                                <span>Call ({msg.phone})</span>
                               </a>
 
                               {cleanPhone && (
@@ -7643,7 +7652,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                   className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors"
                                 >
                                   <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>WhatsApp संदेश पाठवा</span>
+                                  <span>WhatsApp</span>
                                 </a>
                               )}
                             </div>
@@ -7661,15 +7670,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b]">
                         <div className="flex items-center gap-2 min-w-0">
                           <Send className="w-4 h-4 text-[#efb24b] shrink-0" />
-                          <h4 className="font-serifDevanagari text-base font-bold truncate">
-                            {replyModal.contextLabel || 'ईमेल उत्तर पाठवा'}
+                          <h4 className="text-base font-bold truncate">
+                            {replyModal.contextLabel || 'Send Email Reply'}
                           </h4>
                         </div>
                         <button
                           type="button"
                           onClick={() => setReplyModal(null)}
                           className="text-slate-300 hover:text-white p-1 cursor-pointer"
-                          aria-label="बंद करा"
+                          aria-label="Close"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -7677,7 +7686,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                       <form onSubmit={handleSendMailboxReply} className="p-5 space-y-3.5">
                         <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 flex items-center justify-between">
-                          <span>प्रेषक (From):</span>
+                          <span>From:</span>
                           <strong className="font-mono text-[#193568]">{mailboxAccount}</strong>
                         </div>
 
@@ -7689,7 +7698,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            प्राप्तकर्ता ईमेल (To) *
+                            To *
                           </label>
                           <input
                             type="email"
@@ -7705,7 +7714,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            विषय (Subject) *
+                            Subject *
                           </label>
                           <input
                             type="text"
@@ -7714,14 +7723,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             onChange={(e) =>
                               setReplyModal((prev) => prev ? { ...prev, subject: e.target.value } : prev)
                             }
-                            placeholder="ईमेलचा विषय"
+                            placeholder="Email subject"
                             className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#193568]"
                           />
                         </div>
 
                         <div>
                           <label className="font-bold text-slate-700 block mb-1">
-                            उत्तर / संदेश (Message) *
+                            Message *
                           </label>
                           <textarea
                             required
@@ -7730,7 +7739,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             onChange={(e) =>
                               setReplyModal((prev) => prev ? { ...prev, body: e.target.value } : prev)
                             }
-                            placeholder="येथे आपले सविस्तर उत्तर टाईप करा..."
+                            placeholder="Write your reply here..."
                             className="w-full p-2.5 bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#193568] leading-relaxed"
                           />
                         </div>
@@ -7741,7 +7750,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             onClick={() => setReplyModal(null)}
                             className="px-4 py-2 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
                           >
-                            रद्द करा
+                            Cancel
                           </button>
                           <button
                             type="submit"
@@ -7751,12 +7760,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             {replyModal.isSending ? (
                               <>
                                 <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#efb24b]" />
-                                <span>पाठवत आहे...</span>
+                                <span>Sending...</span>
                               </>
                             ) : (
                               <>
                                 <Send className="w-3.5 h-3.5 text-[#efb24b]" />
-                                <span>{mailboxAccount} वरून पाठवा</span>
+                                <span>Send</span>
                               </>
                             )}
                           </button>
@@ -7779,7 +7788,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <div className="bg-[#193568] text-white px-5 py-3 flex items-center justify-between gap-2 border-b-2 border-[#efb24b]">
                         <div className="flex items-center gap-2 min-w-0">
                           <ImageIcon className="w-4 h-4 text-[#efb24b] shrink-0" />
-                          <h4 className="font-serifDevanagari text-sm sm:text-base font-bold truncate">
+                          <h4 className="text-sm sm:text-base font-bold truncate">
                             {contactPhotoModal.title}
                           </h4>
                         </div>
@@ -7787,7 +7796,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           type="button"
                           onClick={() => setContactPhotoModal(null)}
                           className="p-1 rounded-full hover:bg-white/15 text-slate-200 hover:text-white cursor-pointer"
-                          aria-label="बंद करा"
+                          aria-label="Close"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -7806,14 +7815,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold inline-flex items-center gap-1.5"
                         >
                           <Download className="w-3.5 h-3.5" />
-                          <span>डाऊनलोड करा</span>
+                          <span>Download</span>
                         </a>
                         <button
                           type="button"
                           onClick={() => setContactPhotoModal(null)}
                           className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-bold cursor-pointer"
                         >
-                          बंद करा
+                          Close
                         </button>
                       </div>
                     </div>
@@ -7828,15 +7837,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <h3 className="font-serifDevanagari text-base font-bold text-[#17366d]">
-                      क्लाउड स्टोरेज व्यवस्थापन
+                    <h3 className="text-base font-bold text-[#17366d]">
+                      Cloud Storage Settings
                     </h3>
                   </div>
                   <button
                     type="button"
                     onClick={() => setActiveAdminSubTab(currentUser?.isSuperAdmin ? 'applications' : getFirstAllowedAdminTab(currentUser?.permissions || ALL_ADMIN_PERMISSIONS_FALSE))}
                     className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                    title="बंद करा"
+                    title="Close"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -7898,7 +7907,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="w-4 h-4 text-[#df6b16] rounded border-slate-300"
                     />
                     <label htmlFor="cldEnabled" className="font-medium text-slate-700 cursor-pointer">
-                      क्लाउड अपलोड सक्रिय ठेवा
+                      Enable cloud uploads
                     </label>
                   </div>
 
@@ -7907,7 +7916,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       type="submit"
                       className="flex-1 bg-[#df6b16] hover:bg-[#c85c0e] text-white font-bold py-2 rounded-lg transition-colors shadow-2xs"
                     >
-                      जतन करा
+                      Save
                     </button>
                     <button
                       type="button"
@@ -7916,7 +7925,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 rounded-lg transition-colors flex items-center gap-1.5"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isTestingCloudinary ? 'animate-spin' : ''}`} />
-                      <span>{isTestingCloudinary ? 'चाचणी...' : 'चाचणी'}</span>
+                      <span>{isTestingCloudinary ? 'Testing...' : 'Test'}</span>
                     </button>
                   </div>
                 </form>
@@ -7961,7 +7970,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       {/* ============================================================== */}
       {isLoggedIn && (
         <nav
-          aria-label="मोबाईल प्रशासन नेव्हिगेशन"
+          aria-label="Mobile Admin Navigation"
           className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-[58px] bg-[#0b1e36]/95 backdrop-blur-md border-t border-[#efb24b]/70 text-white shadow-[0_-4px_20px_rgba(11,30,54,0.28)]"
         >
           <div className="h-full max-w-lg mx-auto grid grid-flow-col auto-cols-fr items-stretch">
@@ -8004,7 +8013,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               }`}
             >
               <Menu className="w-4 h-4" />
-              <span>सर्व मेनू</span>
+              <span>Menu</span>
             </button>
           </div>
         </nav>
@@ -8027,12 +8036,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               <div className="flex items-center gap-3 min-w-0">
                 <img
                   src="/logo.png"
-                  alt="महासंघ मानचिन्ह"
+                  alt="Federation Logo"
                   className="w-10 h-10 rounded-full ring-2 ring-[#efb24b] bg-white object-contain shrink-0"
                 />
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-[#efb24b] truncate">
-                    {currentUser?.isSuperAdmin ? 'मुख्य प्रशासक (Super Admin)' : currentUser?.name || 'सह-व्यवस्थापक'}
+                    {currentUser?.isSuperAdmin ? 'Super Admin' : currentUser?.name || 'Sub-Admin'}
                   </p>
                   <p className="text-[11px] text-slate-300 font-mono truncate">
                     {currentUser?.email}
@@ -8043,7 +8052,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 type="button"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white shrink-0 cursor-pointer"
-                aria-label="मेनू बंद करा"
+                aria-label="Close Menu"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -8052,7 +8061,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {/* Menu Grid */}
             <div className="p-4 overflow-y-auto space-y-2">
               <p className="text-[11px] font-bold uppercase tracking-wider text-[#607184] px-1">
-                प्रशासन विभाग निवडा
+                Admin Modules
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {permittedNavItems.map((item) => {
@@ -8101,7 +8110,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     className="min-h-[48px] bg-white border border-[#e7ded1] text-[#0b1e36] font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <ArrowLeft className="w-4 h-4 text-[#df6b16]" />
-                    <span>मुख्य वेबसाईट</span>
+                    <span>Website</span>
                   </button>
                 )}
                 <button
@@ -8116,7 +8125,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   className="min-h-[48px] bg-rose-600 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>बाहेर पडा (Logout)</span>
+                  <span>Logout</span>
                 </button>
               </div>
             </div>
@@ -8137,7 +8146,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#0b1e36] text-white px-5 py-4 flex items-center justify-between gap-2">
-              <h3 className="font-serifDevanagari text-base font-bold text-white">
+              <h3 className="text-base font-bold text-white">
                 {confirmDialog.title}
               </h3>
               <button
@@ -8145,7 +8154,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 disabled={isConfirmExecuting}
                 onClick={() => setConfirmDialog(null)}
                 className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white cursor-pointer"
-                aria-label="बंद करा"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -8163,7 +8172,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   onClick={() => setConfirmDialog(null)}
                   className="flex-1 min-h-[46px] bg-slate-100 hover:bg-slate-200 text-[#102a43] font-bold rounded-xl text-sm cursor-pointer"
                 >
-                  रद्द करा
+                  Cancel
                 </button>
                 <button
                   type="button"
@@ -8183,7 +8192,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       : 'bg-[#0b1e36] hover:bg-[#193568]'
                   }`}
                 >
-                  {isConfirmExecuting ? 'प्रक्रिया सुरू...' : confirmDialog.confirmLabel}
+                  {isConfirmExecuting ? 'Processing...' : confirmDialog.confirmLabel}
                 </button>
               </div>
             </div>
@@ -8207,17 +8216,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             <div className="bg-[#0b1e36] text-white px-5 py-4 flex items-center justify-between gap-2 shrink-0">
               <div>
                 <span className="text-[11px] font-bold uppercase text-[#efb24b] block">
-                  अर्ज पडताळणी कक्ष
+                  Verification
                 </span>
-                <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white">
-                  सदस्यत्व अर्जदार सविस्तर माहिती
+                <h3 className="text-base sm:text-lg font-bold text-white">
+                  Application Details
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedAppForVerification(null)}
                 className="w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer shrink-0"
-                aria-label="बंद करा"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -8239,7 +8248,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     ) : (
                       <div className="text-center text-[#607184] p-2">
                         <ImageIcon className="w-8 h-8 mx-auto opacity-50" />
-                        <span className="text-[9px]">फोटो नाही</span>
+                        <span className="text-[9px]">No Photo</span>
                       </div>
                     )}
                   </div>
@@ -8250,29 +8259,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full inline-flex items-center justify-center gap-1 bg-[#193568] hover:bg-[#11254a] text-white font-bold text-[10px] px-2 py-1.5 rounded-lg transition-colors shadow-2xs cursor-pointer"
-                      title="फोटो राईट क्लिक किंवा डाऊनलोड करा"
+                      title="Download Photo"
                     >
                       <Download className="w-3 h-3" />
-                      <span>फोटो डाऊनलोड करा</span>
+                      <span>Download Photo</span>
                     </a>
                   )}
                 </div>
 
                 <div className="space-y-1 min-w-0 flex-1">
-                  <h4 className="font-serifDevanagari text-base font-bold text-[#0b1e36]">
+                  <h4 className="text-base font-bold text-[#0b1e36]">
                     {selectedAppForVerification.salutation} {selectedAppForVerification.fullName}
                   </h4>
                   <p className="text-[#607184]">
-                    अर्ज क्र.: <strong className="font-mono text-[#0b1e36]">{selectedAppForVerification.applicationNumber}</strong>
+                    App No.: <strong className="font-mono text-[#0b1e36]">{selectedAppForVerification.applicationNumber}</strong>
                   </p>
                   <p className="text-[#607184]">
-                    दिनांक: {formatDateWithEnglishDigits(selectedAppForVerification.createdAt)}
+                    Date: {formatDateWithEnglishDigits(selectedAppForVerification.createdAt)}
                   </p>
                   <p className="text-[#607184]">
-                    मोबाईल: <strong className="font-mono text-[#df6b16]">{selectedAppForVerification.phone}</strong>
+                    Mobile: <strong className="font-mono text-[#df6b16]">{selectedAppForVerification.phone}</strong>
                   </p>
                   <p className="text-[#607184] truncate">
-                    ई-मेल: {selectedAppForVerification.email}
+                    Email: {selectedAppForVerification.email}
                   </p>
                 </div>
               </div>
@@ -8280,34 +8289,34 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               {/* Geographical & Organizational Details */}
               <div className="grid grid-cols-2 gap-3 bg-white p-3.5 border border-[#e7ded1] rounded-2xl">
                 <div>
-                  <span className="text-[#607184] block text-[10px]">जिल्हा / तालुका:</span>
+                  <span className="text-[#607184] block text-[10px]">District / Taluka:</span>
                   <strong className="text-[#0b1e36]">
                     {selectedAppForVerification.district}
-                    {selectedAppForVerification.taluka ? ` (ता. ${selectedAppForVerification.taluka})` : ''}
+                    {selectedAppForVerification.taluka ? ` (${selectedAppForVerification.taluka})` : ''}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-[#607184] block text-[10px]">सध्याचे पद / संवर्ग:</span>
+                  <span className="text-[#607184] block text-[10px]">Designation / Cadre:</span>
                   <strong className="text-[#0b1e36]">{normalizeOfficialCadre(selectedAppForVerification.professional, 'केंद्रप्रमुख')}</strong>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[#607184] block text-[10px]">कार्यरत केंद्राचे नाव:</span>
+                  <span className="text-[#607184] block text-[10px]">Working Center:</span>
                   <strong className="text-[#0b1e36]">{selectedAppForVerification.centerName || '-'}</strong>
                 </div>
                 <div>
-                  <span className="text-[#607184] block text-[10px]">शैक्षणिक पात्रता:</span>
+                  <span className="text-[#607184] block text-[10px]">Education:</span>
                   <span>{selectedAppForVerification.education || '-'}</span>
                 </div>
                 <div>
-                  <span className="text-[#607184] block text-[10px]">व्यावसायिक पात्रता:</span>
+                  <span className="text-[#607184] block text-[10px]">Professional Qualification:</span>
                   <span className="font-semibold text-[#102a43]">{selectedAppForVerification.professionalQualification || '-'}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[#607184] block text-[10px]">कुटुंब सदस्य / छंद:</span>
+                  <span className="text-[#607184] block text-[10px]">Family Members / Hobby:</span>
                   <span>{selectedAppForVerification.familyMembers || '-'} / {selectedAppForVerification.hobby || '-'}</span>
                 </div>
                 <div className="col-span-2">
-                  <span className="text-[#607184] block text-[10px]">पत्ता / कार्यक्षेत्र:</span>
+                  <span className="text-[#607184] block text-[10px]">Address:</span>
                   <span>{selectedAppForVerification.address}</span>
                 </div>
               </div>
@@ -8315,11 +8324,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               {/* If Official Member */}
               {selectedAppForVerification.isOfficial && (
                 <div className="bg-amber-50/70 border border-amber-300 p-3 rounded-xl text-amber-950">
-                  <span className="font-bold block text-xs mb-0.5">संघटनात्मक अधिकृत पदाधिकारी:</span>
+                  <span className="font-bold block text-xs mb-0.5">Official Office Bearer:</span>
                   <p>
-                    पद: <strong>{selectedAppForVerification.officialPost}</strong>
-                    {selectedAppForVerification.officialDistrict && ` | जिल्हा: ${selectedAppForVerification.officialDistrict}`}
-                    {selectedAppForVerification.officialTaluka && ` | तालुका: ${selectedAppForVerification.officialTaluka}`}
+                    Post: <strong>{selectedAppForVerification.officialPost}</strong>
+                    {selectedAppForVerification.officialDistrict && ` | District: ${selectedAppForVerification.officialDistrict}`}
+                    {selectedAppForVerification.officialTaluka && ` | Taluka: ${selectedAppForVerification.officialTaluka}`}
                   </p>
                 </div>
               )}
@@ -8347,10 +8356,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       />
                       <div>
                         <strong className="text-xs text-[#0b1e36] block">
-                          सदस्यत्व फी बँक खात्यावर जमा झाल्याची खात्री केली आहे <span className="text-rose-600">*</span>
+                          Payment receipt verified <span className="text-rose-600">*</span>
                         </strong>
                         <span className="text-[11px] text-[#607184]">
-                          आजीवन सदस्यत्व (₹100) किंवा वार्षिक वर्गणी (₹120) महासंघाच्या खात्यावर जमा झाल्याची पडताळणी झाली आहे.
+                          Confirmed that lifetime fee (₹100) or annual fee (₹120) was received.
                         </span>
                       </div>
                     </label>
@@ -8359,13 +8368,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   {showRejectInput && (
                     <div className="bg-rose-50/70 border border-rose-200 p-3.5 rounded-2xl space-y-2">
                       <label className="font-bold text-xs text-rose-900 block">
-                        अर्ज नाकारण्याचे कारण प्रविष्ट करा:
+                        Rejection Reason:
                       </label>
                       <textarea
                         rows={2}
                         value={rejectReason}
                         onChange={(e) => setRejectReason(e.target.value)}
-                        placeholder="उदा. पेमेंट तपशील अपूर्ण किंवा चुकीचा फोटो..."
+                        placeholder="e.g. Payment incomplete or invalid photo..."
                         className="w-full px-3 py-2.5 text-base sm:text-xs bg-white border border-rose-300 rounded-xl focus:outline-none focus:border-rose-500"
                       />
                     </div>
@@ -8379,7 +8388,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="min-h-[46px] bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm text-xs cursor-pointer"
                     >
                       <Check className="w-4 h-4" />
-                      <span>{isApprovingApp ? 'मंजूर होत आहे...' : 'मंजूर करा'}</span>
+                      <span>{isApprovingApp ? 'Approving...' : 'Approve'}</span>
                     </button>
                     <button
                       type="button"
@@ -8388,14 +8397,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="min-h-[46px] bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 text-xs cursor-pointer"
                     >
                       <X className="w-4 h-4" />
-                      <span>{showRejectInput ? 'नाकारणे निश्चित करा' : 'नाकारा'}</span>
+                      <span>{showRejectInput ? 'Confirm Reject' : 'Reject'}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedAppForVerification(null)}
                       className="min-h-[46px] bg-slate-100 hover:bg-slate-200 text-[#0b1e36] font-bold px-4 py-2.5 rounded-xl text-xs cursor-pointer"
                     >
-                      बंद करा
+                      Close
                     </button>
                   </div>
                 </div>
@@ -8405,10 +8414,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-2xl text-xs space-y-1">
                       <div className="font-bold flex items-center gap-2 text-sm text-emerald-800">
                         <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                        <span>निर्णय अंतिम: हा अर्ज मंजूर झाला आहे!</span>
+                        <span>Application Approved</span>
                       </div>
                       <p className="text-[#102a43]">
-                        सदस्य क्रमांक:{' '}
+                        Member ID:{' '}
                         <strong className="font-mono text-emerald-900 bg-white px-2 py-0.5 rounded border border-emerald-200">
                           {selectedAppForVerification.memberNumber || 'MS-2026-MEMBER'}
                         </strong>
@@ -8418,9 +8427,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     <div className="p-4 bg-rose-50 border border-rose-200 text-rose-950 rounded-2xl text-xs space-y-1">
                       <div className="font-bold flex items-center gap-2 text-sm text-rose-800">
                         <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0" />
-                        <span>निर्णय अंतिम: हा अर्ज नाकारण्यात आला आहे.</span>
+                        <span>Application Rejected</span>
                       </div>
-                      <p className="text-[#607184]">या अर्जावर प्रशासनाकडून अंतिम निर्णय झालेला आहे.</p>
+                      <p className="text-[#607184]">Final decision has been recorded for this application.</p>
                     </div>
                   )}
 
@@ -8431,14 +8440,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="min-h-[46px] bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
-                      <span>अर्ज कायमचा डिलीट करा</span>
+                      <span>Delete Permanently</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setSelectedAppForVerification(null)}
                       className="min-h-[46px] bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-xs cursor-pointer"
                     >
-                      बंद करा
+                      Close
                     </button>
                   </div>
                 </div>
@@ -8463,15 +8472,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#0b1e36] text-white px-5 py-3.5 flex items-center justify-between gap-2 shrink-0">
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 <Award className="w-5 h-5 text-[#efb24b]" />
-                <span>अधिकृत आजीवन सदस्य आय-कार्ड</span>
+                <span>Membership ID Card</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setCertModalApp(null)}
                 className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer shrink-0"
-                aria-label="बंद करा"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -8489,14 +8498,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   className="min-h-[46px] bg-[#0b1e36] hover:bg-[#193568] text-white text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-md cursor-pointer"
                 >
                   <Download className="w-4 h-4 text-[#efb24b]" />
-                  <span>आय-कार्ड PDF डाऊनलोड करा</span>
+                  <span>Download PDF</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setCertModalApp(null)}
                   className="min-h-[46px] bg-slate-200 hover:bg-slate-300 text-[#0b1e36] text-xs sm:text-sm font-bold px-5 py-2.5 rounded-xl cursor-pointer"
                 >
-                  बंद करा
+                  Close
                 </button>
               </div>
             </div>
@@ -8513,9 +8522,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         const allSelected = razorpayMatchedList.length > 0 && selectedItems.length === razorpayMatchedList.length;
         const matchByLabel = (matchBy?: string) => {
           if (matchBy === 'order_id') return 'Order ID';
-          if (matchBy === 'application_id') return 'अर्ज ID';
-          if (matchBy === 'phone') return 'मोबाईल';
-          if (matchBy === 'email') return 'ई-मेल';
+          if (matchBy === 'application_id') return 'App ID';
+          if (matchBy === 'phone') return 'Mobile';
+          if (matchBy === 'email') return 'Email';
           return 'Excel';
         };
 
@@ -8529,12 +8538,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-[#0b1e36] text-white px-5 py-3.5 flex items-center justify-between gap-2 shrink-0">
-              <h3 className="font-serifDevanagari text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                 <span>
                   {razorpaySyncMeta?.source === 'live'
-                    ? `Razorpay थेट पेमेंट जुळणी (${razorpayMatchedList.length} अर्ज सापडले)`
-                    : `Razorpay Excel जुळणी व स्वयंचलित मंजुरी (${razorpayMatchedList.length} अर्ज सापडले)`}
+                    ? `Razorpay Live Sync (${razorpayMatchedList.length} matched)`
+                    : `Razorpay Excel Match (${razorpayMatchedList.length} matched)`}
                 </span>
               </h3>
               <button
@@ -8551,13 +8560,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 <div className="text-xs text-[#607184] leading-relaxed">
                   {razorpaySyncMeta?.source === 'live' ? (
                     <>
-                      Razorpay मधून मागील <strong className="text-[#0b1e36]">{razorpaySyncMeta.daysBack || razorpaySyncDays} दिवसांतील</strong>{' '}
-                      <strong className="text-emerald-700">{razorpaySyncMeta.capturedPaymentsCount ?? 0}</strong> सफल पेमेंट{' '}
-                      आणि <strong className="text-[#0b1e36]">{razorpaySyncMeta.pendingCheckedCount ?? 0}</strong> प्रलंबित अर्ज थेट तपासले.
+                      Checked <strong className="text-emerald-700">{razorpaySyncMeta.capturedPaymentsCount ?? 0}</strong> captured payments from the last{' '}
+                      <strong className="text-[#0b1e36]">{razorpaySyncMeta.daysBack || razorpaySyncDays} days</strong> against{' '}
+                      <strong className="text-[#0b1e36]">{razorpaySyncMeta.pendingCheckedCount ?? 0}</strong> pending applications.
                     </>
                   ) : (
                     <>
-                      खालील प्रलंबित अर्जांचे मोबाईल नंबर किंवा ई-मेल Razorpay पेमेंट रिपोर्टशी यशस्वीरीत्या जुळले आहेत.
+                      Pending applications below matched Razorpay payment records by phone or email.
                     </>
                   )}
                 </div>
@@ -8574,9 +8583,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       disabled={isSyncingRazorpay || isBulkApprovingRazorpay}
                       className="text-xs font-bold bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-[#0b1e36]"
                     >
-                      <option value={7}>मागील ७ दिवस</option>
-                      <option value={30}>मागील ३० दिवस</option>
-                      <option value={90}>मागील ९० दिवस</option>
+                      <option value={7}>Last 7 Days</option>
+                      <option value={30}>Last 30 Days</option>
+                      <option value={90}>Last 90 Days</option>
                     </select>
                     <button
                       type="button"
@@ -8585,7 +8594,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       className="bg-white hover:bg-slate-100 border border-slate-300 text-[#0b1e36] font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     >
                       <RefreshCw className={`w-3.5 h-3.5 text-[#df6b16] ${isSyncingRazorpay ? 'animate-spin' : ''}`} />
-                      <span>पुन्हा तपासा</span>
+                      <span>Re-check</span>
                     </button>
                   </div>
                 )}
@@ -8593,9 +8602,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
 
               {razorpayMatchedList.length === 0 ? (
                 <div className="p-6 text-center text-slate-600 text-xs bg-slate-50 rounded-xl border border-dashed border-slate-200 space-y-1.5">
-                  <div className="font-bold text-[#0b1e36]">प्रलंबित अर्जाशी जुळणारे कोणतेही नवीन सफल पेमेंट आढळले नाही.</div>
+                  <div className="font-bold text-[#0b1e36]">No new captured payments matched pending applications.</div>
                   {razorpaySyncMeta?.source === 'live' && razorpaySyncDays < 90 && (
-                    <div>अधिक जुनी पेमेंट्स तपासण्यासाठी वरील कालावधी "मागील ९० दिवस" वर बदलून पहा.</div>
+                    <div>Try switching the range above to "Last 90 Days".</div>
                   )}
                 </div>
               ) : (
@@ -8612,15 +8621,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               setRazorpayMatchedList((prev) => prev.map((m) => ({ ...m, selected: checked })));
                             }}
                             className="w-4 h-4 accent-[#df6b16] cursor-pointer"
-                            aria-label="सर्व निवडा"
+                            aria-label="Select All"
                           />
                         </th>
-                        <th className="py-2.5 px-2">अ.क्र.</th>
-                        <th className="py-2.5 px-3">नाव व जिल्हा</th>
-                        <th className="py-2.5 px-3">मोबाईल</th>
-                        <th className="py-2.5 px-3">रक्कम व जुळणी</th>
-                        <th className="py-2.5 px-3">Razorpay पेमेंट आयडी</th>
-                        <th className="py-2.5 px-3 text-right">कृती</th>
+                        <th className="py-2.5 px-2">#</th>
+                        <th className="py-2.5 px-3">Name & District</th>
+                        <th className="py-2.5 px-3">Mobile</th>
+                        <th className="py-2.5 px-3">Amount & Match</th>
+                        <th className="py-2.5 px-3">Payment ID</th>
+                        <th className="py-2.5 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#e7ded1]">
@@ -8662,17 +8671,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 try {
                                   const memberNo = await approveSingleRazorpayMatchedItem(item);
                                   setRazorpayMatchedList((prev) => prev.filter((m) => m.app.id !== item.app.id));
-                                  showAdminFeedback(`✓ ${item.app.fullName} यांचा अर्ज मंजूर (क्र.: ${memberNo}).`, 'success');
+                                  showAdminFeedback(`Approved ${item.app.fullName} (ID: ${memberNo}).`, 'success');
                                   if (onFetchApplications) await onFetchApplications(true);
                                 } catch (err: any) {
-                                  showAdminFeedback('मंजूर करताना त्रुटी: ' + (err?.message || 'Error'), 'error');
+                                  showAdminFeedback('Approval error: ' + (err?.message || 'Error'), 'error');
                                 } finally {
                                   setApprovingSingleRazorpayId(null);
                                 }
                               }}
                               className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold px-2.5 py-1.5 rounded-lg text-[11px] cursor-pointer whitespace-nowrap"
                             >
-                              {approvingSingleRazorpayId === item.app.id ? 'मंजूर...' : 'मंजूर करा'}
+                              {approvingSingleRazorpayId === item.app.id ? 'Approving...' : 'Approve'}
                             </button>
                           </td>
                         </tr>
@@ -8700,23 +8709,23 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         } catch (e: any) {
                           console.error('Error auto-approving app:', item.app.id, e);
                           failedErrors.push(
-                            `${item.app.fullName}: ${e?.message || 'सर्व्हर त्रुटी'}`
+                            `${item.app.fullName}: ${e?.message || 'Server error'}`
                           );
                         }
                       }
                       if (successCount === 0 && failedErrors.length > 0) {
                         showAdminFeedback(
-                          `मंजुरी अयशस्वी: ${failedErrors[0]}`,
+                          `Approval failed: ${failedErrors[0]}`,
                           'error'
                         );
                       } else if (failedErrors.length > 0) {
                         showAdminFeedback(
-                          `${successCount} अर्ज मंजूर झाले; ${failedErrors.length} अर्जात त्रुटी: ${failedErrors[0]}`,
+                          `${successCount} approved; ${failedErrors.length} failed: ${failedErrors[0]}`,
                           'error'
                         );
                       } else {
                         showAdminFeedback(
-                          `यशस्वी! एकूण ${successCount} प्रलंबित अर्ज एका क्लिकवर मंजूर करण्यात आले व सदस्य क्रमांक दिले गेले.`,
+                          `${successCount} pending applications approved and assigned Member IDs.`,
                           'success'
                         );
                       }
@@ -8726,7 +8735,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       }
                       if (successCount > 0 && onFetchApplications) await onFetchApplications(true);
                     } catch (err: any) {
-                      showAdminFeedback('त्रुटी: ' + (err?.message || 'Error'), 'error');
+                      showAdminFeedback('Error: ' + (err?.message || 'Error'), 'error');
                     } finally {
                       setIsBulkApprovingRazorpay(false);
                     }
@@ -8736,8 +8745,8 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   <CheckCircle2 className={`w-4 h-4 text-emerald-200 ${isBulkApprovingRazorpay ? 'animate-spin' : ''}`} />
                   <span>
                     {isBulkApprovingRazorpay
-                      ? 'मंजूर करत आहे...'
-                      : `एका क्लिकवर सर्व (${selectedItems.length}) अर्ज मंजूर करा`}
+                      ? 'Approving...'
+                      : `Approve Selected (${selectedItems.length})`}
                   </span>
                 </button>
                 <button
@@ -8745,7 +8754,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   onClick={() => setShowRazorpayMatchModal(false)}
                   className="min-h-[46px] bg-slate-200 hover:bg-slate-300 text-[#0b1e36] font-bold px-5 py-2.5 rounded-xl text-xs cursor-pointer"
                 >
-                  बंद करा
+                  Close
                 </button>
               </div>
             </div>

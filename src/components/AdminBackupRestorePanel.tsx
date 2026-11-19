@@ -120,24 +120,24 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       });
       const json = (await res.json()) as SchemaAuditReportState & { message?: string };
       if (!res.ok) {
-        throw new Error(json?.message || 'डेटाबेस स्कीमा तपासता आली नाही.');
+        throw new Error(json?.message || 'Failed to check database schema.');
       }
       setSchemaReport(json);
       if (repair) {
         if (json.status === 'repaired') {
           setStatusBanner({
             type: 'success',
-            text: `स्कीमा दुरुस्ती पूर्ण! ${toEnglishDigits(String(json.createdTables.length))} नवीन टेबल्स आणि ${toEnglishDigits(String(json.addedColumns.length))} कमी असलेले कॉलम्स यशस्वीरीत्या तयार केले गेले.`,
+            text: `Schema repaired: ${toEnglishDigits(String(json.createdTables.length))} tables and ${toEnglishDigits(String(json.addedColumns.length))} missing columns created.`,
           });
         } else if (json.status === 'partial_error') {
           setStatusBanner({
             type: 'error',
-            text: `काही कॉलम्स दुरुस्त करताना त्रुटी आली: ${json.errors[0] || 'Schema Error'}`,
+            text: `Schema repair error: ${json.errors[0] || 'Schema Error'}`,
           });
         } else {
           setStatusBanner({
             type: 'success',
-            text: `संपूर्ण तपासणी पूर्ण! सर्व ${toEnglishDigits(String(json.tablesChecked))} टेबल्स व ${toEnglishDigits(String(json.totalExpectedColumns))} कॉलम्स MySQL मध्ये व्यवस्थित उपलब्ध आहेत.`,
+            text: `Schema check passed: All ${toEnglishDigits(String(json.tablesChecked))} tables and ${toEnglishDigits(String(json.totalExpectedColumns))} columns are healthy.`,
           });
         }
       }
@@ -145,7 +145,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       if (repair) {
         setStatusBanner({
           type: 'error',
-          text: err?.message || 'डेटाबेस स्कीमा तपासताना त्रुटी आली.',
+          text: err?.message || 'Database schema check failed.',
         });
       }
     } finally {
@@ -162,13 +162,13 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
         cache: 'no-store',
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || 'बॅकअप यादी लोड होऊ शकली नाही.');
+      if (!res.ok) throw new Error(json?.message || 'Failed to load backup list.');
       setSnapshots(Array.isArray(json.snapshots) ? json.snapshots : []);
       if (json.activeBackend) setActiveBackend(json.activeBackend);
     } catch (err: any) {
       setStatusBanner({
         type: 'error',
-        text: err?.message || 'बॅकअप यादी वाचताना अडचण आली.',
+        text: err?.message || 'Error loading backups.',
       });
     } finally {
       setIsLoadingList(false);
@@ -186,7 +186,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       headers: getAuthHeaders(),
     });
     if (!res.ok) {
-      let msg = 'डाऊनलोड अयशस्वी झाले.';
+      let msg = 'Download failed.';
       try {
         const j = await res.json();
         if (j?.message) msg = j.message;
@@ -219,7 +219,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       });
       const json = await res.json();
       if (!res.ok || !json?.snapshot?.fileName) {
-        throw new Error(json?.message || 'संपूर्ण बॅकअप तयार होऊ शकला नाही.');
+        throw new Error(json?.message || 'Backup creation failed.');
       }
 
       const snap = json.snapshot as BackupSnapshotSummary;
@@ -232,12 +232,12 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
 
       setStatusBanner({
         type: 'success',
-        text: `संपूर्ण वेबसाईट व डेटाबेस बॅकअप (${snap.fileName} — ${formatBytes(snap.sizeBytes)}) यशस्वीरीत्या तयार होऊन डाऊनलोड झाला आहे!`,
+        text: `Full backup created & downloaded (${snap.fileName} — ${formatBytes(snap.sizeBytes)}).`,
       });
     } catch (err: any) {
       setStatusBanner({
         type: 'error',
-        text: err?.message || 'बॅकअप तयार करताना त्रुटी आली.',
+        text: err?.message || 'Error creating backup.',
       });
     } finally {
       setIsCreatingBackup(false);
@@ -255,12 +255,12 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       );
       setStatusBanner({
         type: 'success',
-        text: 'सक्रिय डेटाबेसची संपूर्ण .SQL फाइल डाऊनलोड झाली आहे.',
+        text: 'Active database .SQL file downloaded.',
       });
     } catch (err: any) {
       setStatusBanner({
         type: 'error',
-        text: err?.message || 'SQL डाऊनलोड करताना अडचण आली.',
+        text: err?.message || 'SQL download failed.',
       });
     } finally {
       setIsDownloadingSql(false);
@@ -292,7 +292,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
     reader.onerror = () => {
       setStatusBanner({
         type: 'error',
-        text: 'निवडलेली बॅकअप फाइल वाचता आली नाही.',
+        text: 'Failed to read selected backup file.',
       });
     };
     reader.readAsArrayBuffer(file);
@@ -319,7 +319,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       });
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json?.message || 'रिस्टोअर प्रक्रिया अयशस्वी झाली.');
+        throw new Error(json?.message || 'Restore failed.');
       }
 
       // Clear local stale caches so UI displays restored truth immediately
@@ -352,12 +352,12 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       const c = json.counts || {};
       setStatusBanner({
         type: 'success',
-        text: `रिस्टोअर पूर्ण! अर्ज: ${toEnglishDigits(String(c.applications || 0))}, पदाधिकारी: ${toEnglishDigits(String(c.leaders || 0))}, नियुक्त अधिकारी: ${toEnglishDigits(String(c.officials || 0))}, बातम्या: ${toEnglishDigits(String(c.news || 0))}, फाइल्स: ${toEnglishDigits(String(json.restoredPublicFiles || 0))}. (सुरक्षा बॅकअप: ${json.safetySnapshotFileName || 'जतन'})`,
+        text: `Restore complete. Apps: ${toEnglishDigits(String(c.applications || 0))}, Leaders: ${toEnglishDigits(String(c.leaders || 0))}, Officials: ${toEnglishDigits(String(c.officials || 0))}, News: ${toEnglishDigits(String(c.news || 0))}, Files: ${toEnglishDigits(String(json.restoredPublicFiles || 0))}. (Safety snapshot: ${json.safetySnapshotFileName || 'Saved'})`,
       });
     } catch (err: any) {
       setStatusBanner({
         type: 'error',
-        text: err?.message || 'रिस्टोअर करताना त्रुटी आली.',
+        text: err?.message || 'Restore error.',
       });
     } finally {
       setIsRestoring(false);
@@ -373,12 +373,12 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j?.message || 'हटवता आले नाही.');
+        throw new Error(j?.message || 'Delete failed.');
       }
       setPendingDeleteFile(null);
       await fetchSnapshotList();
     } catch (err: any) {
-      setStatusBanner({ type: 'error', text: err?.message || 'फाइल हटवताना अडचण आली.' });
+      setStatusBanner({ type: 'error', text: err?.message || 'Error deleting file.' });
     }
   };
 
@@ -390,17 +390,17 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-[#df6b16] uppercase tracking-wider mb-1">
               <ShieldCheck className="w-4 h-4" />
-              <span>सुपर ॲडमिन डेटा सुरक्षा केंद्र</span>
+              <span>Data Security</span>
             </div>
-            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#193568]">
-              १-क्लिक संपूर्ण वेबसाईट व डेटाबेस बॅकअप / रिस्टोअर
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[#193568]">
+              Backup &amp; Restore
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 mt-1">
-              सर्व सदस्य अर्ज, पदाधिकारी, नियुक्त अधिकारी, बातम्या, शासन निर्णय, सेटिंग्ज आणि वेबसाईट फाइल्स एका क्लिकमध्ये सुरक्षित साठवा किंवा पुन्हा रिस्टोअर करा.
+              Create or restore full database and file backups in one click.
             </p>
           </div>
           <div className="text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3.5 py-2 shrink-0">
-            सक्रिय डेटाबेस: <span className="font-bold text-[#193568]">{activeBackend === 'mysql' ? 'HostKarle MySQL' : 'Preview / Local Mode'}</span>
+            Database: <span className="font-bold text-[#193568]">{activeBackend === 'mysql' ? 'MySQL' : 'Local Mode'}</span>
           </div>
         </div>
 
@@ -430,12 +430,11 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
             <div>
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-[#193568]">
                 <Database className="w-5 h-5 text-[#df6b16]" />
-                <span>१. संपूर्ण बॅकअप घ्या (Full Backup)</span>
+                <span>1. Full Backup</span>
               </div>
               <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                एका क्लिकमध्ये संपूर्ण डेटाबेस आणि वेबसाईट फाइल्स सर्व्हरवर सुरक्षित जतन होतात आणि{' '}
-                <code className="font-mono text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">.mhsbak.gz</code>{' '}
-                फाइल तुमच्या डिव्हाइसवर डाऊनलोड होते.
+                Save database and website files to server and download{' '}
+                <code className="font-mono text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">.mhsbak.gz</code>.
               </p>
             </div>
             <div className="flex flex-wrap gap-2.5">
@@ -443,17 +442,17 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                 type="button"
                 onClick={handleOneClickBackupAndDownload}
                 disabled={isCreatingBackup || isRestoring}
-                className="flex-1 min-w-[210px] bg-[#193568] hover:bg-[#11254a] text-white font-bold text-xs sm:text-sm py-3 px-4 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                className="flex-1 min-w-[200px] bg-[#193568] hover:bg-[#11254a] text-white font-bold text-xs sm:text-sm py-3 px-4 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
               >
                 {isCreatingBackup ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>बॅकअप तयार होत आहे...</span>
+                    <span>Creating Backup...</span>
                   </>
                 ) : (
                   <>
                     <Download className="w-4 h-4 text-[#efb24b]" />
-                    <span>१-क्लिक संपूर्ण बॅकअप घ्या</span>
+                    <span>Create Full Backup</span>
                   </>
                 )}
               </button>
@@ -463,10 +462,10 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                 onClick={handleDownloadActiveSql}
                 disabled={isDownloadingSql || isCreatingBackup}
                 className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs py-3 px-3.5 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-60 cursor-pointer whitespace-nowrap"
-                title="phpMyAdmin साठी थेट SQL फाइल डाऊनलोड करा"
+                title="Download SQL file for phpMyAdmin"
               >
                 <FileCode2 className="w-4 h-4 text-slate-600" />
-                <span>{isDownloadingSql ? 'SQL तयार होत आहे...' : '.SQL फाइल'}</span>
+                <span>{isDownloadingSql ? 'Exporting...' : '.SQL File'}</span>
               </button>
             </div>
           </div>
@@ -476,10 +475,10 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
             <div>
               <div className="flex items-center gap-2 font-bold text-sm sm:text-base text-[#193568]">
                 <RotateCcw className="w-5 h-5 text-emerald-700" />
-                <span>२. बॅकअप फाइलवरून रिस्टोअर (Restore)</span>
+                <span>2. Restore from File</span>
               </div>
               <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                तुमच्या फोन किंवा संगणकावर डाऊनलोड केलेली <code className="font-mono text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">.mhsbak.gz</code> बॅकअप फाइल निवडून सर्व डेटा पुन्हा पूर्ववत करा.
+                Upload a saved <code className="font-mono text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">.mhsbak.gz</code> file to restore data.
               </p>
             </div>
 
@@ -495,10 +494,10 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isRestoring || isCreatingBackup}
-                className="flex-1 min-w-[210px] bg-[#df6b16] hover:bg-[#c55a0d] text-white font-bold text-xs sm:text-sm py-3 px-4 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                className="flex-1 min-w-[200px] bg-[#df6b16] hover:bg-[#c55a0d] text-white font-bold text-xs sm:text-sm py-3 px-4 rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
-                <span>फाइल निवडून १-क्लिक रिस्टोअर करा</span>
+                <span>Upload &amp; Restore</span>
               </button>
             </div>
           </div>
@@ -510,9 +509,9 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
             <div className="flex items-start gap-2.5">
               <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
               <div className="text-xs sm:text-sm text-amber-950">
-                <p className="font-extrabold">रिस्टोअर निश्चित करा (Confirm Restore)</p>
+                <p className="font-extrabold">Confirm Restore</p>
                 <p className="mt-1">
-                  निवडलेला बॅकअप:{' '}
+                  Selected backup:{' '}
                   <strong className="font-mono">
                     {pendingRestoreTarget.mode === 'snapshot'
                       ? pendingRestoreTarget.label
@@ -520,7 +519,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                   </strong>
                 </p>
                 <p className="mt-1 text-amber-900">
-                  टीप: रिस्टोअर सुरू करण्यापूर्वी सर्व्हर सद्यस्थितीचा एक स्वयंचलित <strong>सुरक्षा बॅकअप (Safety Snapshot)</strong> घेईल, जेणेकरून कोणताही डेटा कायमस्वरूपी जाणार नाही.
+                  Note: A <strong>Safety Snapshot</strong> is created automatically before restoring.
                 </p>
               </div>
             </div>
@@ -534,12 +533,12 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                 {isRestoring ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>रिस्टोअर चालू आहे...</span>
+                    <span>Restoring...</span>
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>होय, आत्ताच रिस्टोअर करा</span>
+                    <span>Confirm Restore</span>
                   </>
                 )}
               </button>
@@ -552,7 +551,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                 }}
                 className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-lg cursor-pointer"
               >
-                रद्द करा
+                Cancel
               </button>
             </div>
           </div>
@@ -564,8 +563,8 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
         <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-200 mb-4">
           <div className="flex items-center gap-2">
             <HardDrive className="w-5 h-5 text-[#193568]" />
-            <h3 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#193568]">
-              सर्व्हरवर जतन असलेले बॅकअप्स ({toEnglishDigits(String(snapshots.length))})
+            <h3 className="font-bold text-base sm:text-lg text-[#193568]">
+              Server Backups ({toEnglishDigits(String(snapshots.length))})
             </h3>
           </div>
           <button
@@ -575,24 +574,24 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
             className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingList ? 'animate-spin' : ''}`} />
-            <span>रिफ्रेश</span>
+            <span>Refresh</span>
           </button>
         </div>
 
         {snapshots.length === 0 ? (
           <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-xs sm:text-sm text-slate-500">
-            अद्याप सर्व्हरवर एकही बॅकअप जतन केलेला नाही. वरील <strong>"१-क्लिक संपूर्ण बॅकअप घ्या"</strong> बटनावर क्लिक करून पहिला बॅकअप तयार करा.
+            No backups saved yet. Click <strong>&ldquo;Create Full Backup&rdquo;</strong> above to create one.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
-                  <th className="py-2.5 px-3 font-bold">दिनांक व वेळ</th>
-                  <th className="py-2.5 px-3 font-bold">बॅकअप फाइल</th>
-                  <th className="py-2.5 px-3 font-bold">रेकॉर्ड तपशील</th>
-                  <th className="py-2.5 px-3 font-bold text-right">आकार</th>
-                  <th className="py-2.5 px-3 font-bold text-right">कृती (Actions)</th>
+                  <th className="py-2.5 px-3 font-bold">Date &amp; Time</th>
+                  <th className="py-2.5 px-3 font-bold">File</th>
+                  <th className="py-2.5 px-3 font-bold">Records</th>
+                  <th className="py-2.5 px-3 font-bold text-right">Size</th>
+                  <th className="py-2.5 px-3 font-bold text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -613,14 +612,14 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                           {snap.fileName}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          {snap.sourceBackend === 'mysql' ? 'MySQL' : snap.sourceBackend === 'mock' ? 'Preview' : 'Legacy Archive'} · {toEnglishDigits(String(snap.publicFileCount))} वेबसाईट फाइल्स
+                          {snap.sourceBackend === 'mysql' ? 'MySQL' : snap.sourceBackend === 'mock' ? 'Preview' : 'Legacy Archive'} · {toEnglishDigits(String(snap.publicFileCount))} files
                         </div>
                       </td>
                       <td className="py-3 px-3 text-slate-700 tabular-nums">
-                        अर्ज: <strong>{toEnglishDigits(String(snap.counts?.applications || 0))}</strong> ·
-                        पदाधिकारी: <strong>{toEnglishDigits(String(snap.counts?.leaders || 0))}</strong> ·
-                        नियुक्त: <strong>{toEnglishDigits(String(snap.counts?.officials || 0))}</strong> ·
-                        बातम्या: <strong>{toEnglishDigits(String(snap.counts?.news || 0))}</strong>
+                        Apps: <strong>{toEnglishDigits(String(snap.counts?.applications || 0))}</strong> ·
+                        Leaders: <strong>{toEnglishDigits(String(snap.counts?.leaders || 0))}</strong> ·
+                        Officials: <strong>{toEnglishDigits(String(snap.counts?.officials || 0))}</strong> ·
+                        News: <strong>{toEnglishDigits(String(snap.counts?.news || 0))}</strong>
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-semibold text-slate-700 whitespace-nowrap tabular-nums">
                         {formatBytes(snap.sizeBytes)}
@@ -634,14 +633,14 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                                 `/api/backup/download/${encodeURIComponent(snap.fileName)}`,
                                 snap.fileName
                               ).catch((e) =>
-                                setStatusBanner({ type: 'error', text: e?.message || 'डाऊनलोड त्रुटी' })
+                                setStatusBanner({ type: 'error', text: e?.message || 'Download error' })
                               )
                             }
                             className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-md font-bold inline-flex items-center gap-1 cursor-pointer"
-                            title="डाऊनलोड करा"
+                            title="Download"
                           >
                             <Download className="w-3.5 h-3.5" />
-                            <span>डाऊनलोड</span>
+                            <span>Download</span>
                           </button>
 
                           <button
@@ -655,10 +654,10 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                             }
                             disabled={isRestoring}
                             className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md font-bold inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                            title="हा बॅकअप रिस्टोअर करा"
+                            title="Restore this backup"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
-                            <span>रिस्टोअर</span>
+                            <span>Restore</span>
                           </button>
 
                           {pendingDeleteFile === snap.fileName ? (
@@ -668,14 +667,14 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                                 onClick={() => handleDeleteSnapshot(snap.fileName)}
                                 className="px-2 py-1.5 bg-rose-600 text-white rounded-md font-bold text-[11px] cursor-pointer"
                               >
-                                होय
+                                Yes
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setPendingDeleteFile(null)}
                                 className="px-2 py-1.5 bg-slate-200 text-slate-700 rounded-md font-bold text-[11px] cursor-pointer"
                               >
-                                नाही
+                                No
                               </button>
                             </div>
                           ) : (
@@ -683,7 +682,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
                               type="button"
                               onClick={() => setPendingDeleteFile(snap.fileName)}
                               className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
-                              title="हटवा"
+                              title="Delete"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -705,12 +704,12 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
           <div>
             <div className="flex items-center gap-2">
               <Wrench className="w-5 h-5 text-[#df6b16]" />
-              <h3 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#193568]">
-                MySQL डेटाबेस टेबल्स व कॉलम तपासणी रिपोर्ट (Schema Auto-Heal)
+              <h3 className="font-bold text-base sm:text-lg text-[#193568]">
+                Database Schema Check
               </h3>
             </div>
             <p className="text-xs text-slate-600 mt-1">
-              येथून सर्व १३ डेटाबेस टेबल्स व त्यांतील प्रत्येक कॉलम तपासता येतो; कोणताही कॉलम किंवा टेबल कमी असल्यास एका क्लिकवर सुरक्षितरीत्या तयार केला जातो.
+              Verify all database tables and auto-create missing columns.
             </p>
           </div>
           <button
@@ -720,7 +719,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
             className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isAuditingSchema ? 'animate-spin' : ''}`} />
-            <span>{isAuditingSchema ? 'तपासणी चालू...' : 'सर्व टेबल्स तपासा व दुरुस्त करा'}</span>
+            <span>{isAuditingSchema ? 'Checking...' : 'Check & Repair'}</span>
           </button>
         </div>
 
@@ -728,17 +727,17 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-bold tabular-nums">
-                तपासलेली टेबल्स: {toEnglishDigits(String(schemaReport.tablesChecked))}
+                Tables: {toEnglishDigits(String(schemaReport.tablesChecked))}
               </span>
               <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-800 font-bold tabular-nums">
-                एकूण कॉलम्स: {toEnglishDigits(String(schemaReport.totalExpectedColumns))}
+                Columns: {toEnglishDigits(String(schemaReport.totalExpectedColumns))}
               </span>
               <span className="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold tabular-nums">
-                नवीन जोडलेले कॉलम्स: {toEnglishDigits(String(schemaReport.addedColumns.length))}
+                Added: {toEnglishDigits(String(schemaReport.addedColumns.length))}
               </span>
               {schemaReport.activeBackend === 'mock' && (
                 <span className="px-2.5 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-800 font-semibold">
-                  प्रीव्ह्यू मोड (MySQL सक्रिय नाही)
+                  Preview Mode (MySQL Inactive)
                 </span>
               )}
             </div>
@@ -747,44 +746,44 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
-                    <th className="py-2 px-3 font-bold">टेबलचे नाव</th>
-                    <th className="py-2 px-3 font-bold text-center">कॉलम्स (उपलब्ध / आवश्यक)</th>
-                    <th className="py-2 px-3 font-bold">स्थिती</th>
-                    <th className="py-2 px-3 font-bold">जोडलेले / दुरुस्त तपशील</th>
+                    <th className="py-2 px-3 font-bold">Table</th>
+                    <th className="py-2 px-3 font-bold text-center">Columns</th>
+                    <th className="py-2 px-3 font-bold">Status</th>
+                    <th className="py-2 px-3 font-bold">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {schemaReport.tables.map((t) => (
                     <tr key={t.table} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 font-semibold text-[#193568]">{t.marathiLabel}</td>
+                      <td className="py-2 px-3 font-mono font-semibold text-[#193568]">{t.table}</td>
                       <td className="py-2 px-3 text-center font-mono tabular-nums">
                         {toEnglishDigits(String(t.existingColumnsAfter))} / {toEnglishDigits(String(t.expectedColumns))}
                       </td>
                       <td className="py-2 px-3">
                         {t.status === 'ok' ? (
                           <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> ठीक
+                            <CheckCircle2 className="w-3.5 h-3.5" /> OK
                           </span>
                         ) : t.status === 'created_table' ? (
                           <span className="inline-flex items-center gap-1 text-sky-700 font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> नवीन टेबल तयार
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Created
                           </span>
                         ) : t.status === 'repaired_columns' ? (
                           <span className="inline-flex items-center gap-1 text-amber-700 font-bold">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> कॉलम दुरुस्त
+                            <CheckCircle2 className="w-3.5 h-3.5" /> Repaired
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-rose-700 font-bold">
-                            <AlertCircle className="w-3.5 h-3.5" /> त्रुटी
+                            <AlertCircle className="w-3.5 h-3.5" /> Error
                           </span>
                         )}
                       </td>
                       <td className="py-2 px-3 text-slate-600 font-mono text-[11px]">
                         {t.addedColumns.length > 0
-                          ? `जोडले: ${t.addedColumns.join(', ')}`
+                          ? `Added: ${t.addedColumns.join(', ')}`
                           : t.missingColumnsRemaining.length > 0
-                            ? `कमतरता: ${t.missingColumnsRemaining.join(', ')}`
-                            : t.errorMessage || 'सर्व कॉलम्स उपलब्ध'}
+                            ? `Missing: ${t.missingColumnsRemaining.join(', ')}`
+                            : t.errorMessage || 'All columns present'}
                       </td>
                     </tr>
                   ))}
@@ -793,7 +792,7 @@ export const AdminBackupRestorePanel: React.FC<AdminBackupRestorePanelProps> = (
             </div>
           </div>
         ) : (
-          <div className="text-xs text-slate-500 py-3">डेटाबेस स्कीमा रिपोर्ट लोड होत आहे...</div>
+          <div className="text-xs text-slate-500 py-3">Loading schema report...</div>
         )}
       </div>
     </div>

@@ -371,15 +371,15 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
   }, [applications, dynamicLeaders, officialsList, districtFilter]);
 
   const groupMeta: Array<{ key: GroupKey; label: string; hint: string }> = [
-    { key: 'district_presidents', label: 'जिल्हाध्यक्ष', hint: 'सर्व जिल्ह्यांचे जिल्हाध्यक्ष' },
-    { key: 'district_secretaries', label: 'जिल्हा सरचिटणीस', hint: 'सर्व जिल्ह्यांचे सरचिटणीस' },
-    { key: 'appointed_officials', label: 'नियुक्त पदाधिकारी', hint: 'जिल्हा व तालुका नियुक्त अधिकारी' },
-    { key: 'approved_members', label: 'सर्व मंजूर सदस्य', hint: 'आजीवन सभासद (Approved Members)' },
-    { key: 'all_applicants', label: 'सर्व अर्जदार', hint: 'मंजूर + प्रलंबित सर्व अर्जदार' },
-    { key: 'state_executive', label: 'राज्य कार्यकारिणी', hint: 'राज्यस्तरीय पदाधिकारी' },
-    { key: 'women_wing', label: 'महिला आघाडी राज्य कार्यकारिणी', hint: 'महिला आघाडी नेतृत्व' },
-    { key: 'divisional', label: 'विभागीय कार्यकारिणी', hint: 'सर्व विभागीय समन्वयक व पदाधिकारी' },
-    { key: 'advisory_board', label: 'राज्य सल्लागार मंडळ व मार्गदर्शक', hint: 'कायदेविषयक सल्लागार व मार्गदर्शक' },
+    { key: 'district_presidents', label: 'District Presidents', hint: 'All district presidents' },
+    { key: 'district_secretaries', label: 'District Secretaries', hint: 'All district secretaries' },
+    { key: 'appointed_officials', label: 'Appointed Officials', hint: 'District & taluka officials' },
+    { key: 'approved_members', label: 'Approved Members', hint: 'Verified life members' },
+    { key: 'all_applicants', label: 'All Applicants', hint: 'Approved & pending applicants' },
+    { key: 'state_executive', label: 'State Executive', hint: 'State-level leaders' },
+    { key: 'women_wing', label: 'Women Wing', hint: 'State women wing leaders' },
+    { key: 'divisional', label: 'Divisional Leaders', hint: 'Divisional coordinators & leaders' },
+    { key: 'advisory_board', label: 'Advisory Board', hint: 'Legal advisors & mentors' },
   ];
 
   // Combine selected groups + custom numbers, deduplicated by phone91
@@ -399,10 +399,10 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
         if (norm && !map.has(norm.phone91)) {
           map.set(norm.phone91, {
             ...norm,
-            name: 'इतर संपर्क',
-            role: 'सदस्य',
+            name: 'Custom Contact',
+            role: 'Member',
             district: '',
-            groupLabel: 'कस्टम नंबर',
+            groupLabel: 'Custom',
           });
         }
       }
@@ -439,7 +439,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
     if (!cloudinaryConfig.enabled || !cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
       setBroadcastStatus({
         type: 'error',
-        text: 'WhatsApp वर फोटो पाठवण्यासाठी फोटोची सार्वजनिक https:// लिंक आवश्यक असते. कृपया आधी "क्लाउड स्टोरेज" मध्ये Cloudinary सक्रिय करा किंवा थेट https:// फोटो URL पेस्ट करा.',
+        text: 'Enable Cloud Storage (Cloudinary) first or paste a public https:// photo URL.',
       });
       return;
     }
@@ -450,12 +450,12 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
       setSenderPhoto(result.url);
       setBroadcastStatus({
         type: 'success',
-        text: 'राज्याध्यक्षांचा / कार्यक्रमाचा फोटो क्लाउडवर अपलोड होऊन लिंक जोडली गेली आहे!',
+        text: 'Photo uploaded and linked.',
       });
     } catch (err: any) {
       setBroadcastStatus({
         type: 'error',
-        text: err?.message || 'फोटो अपलोड अयशस्वी झाले.',
+        text: err?.message || 'Photo upload failed.',
       });
     } finally {
       setIsUploadingPhoto(false);
@@ -487,18 +487,18 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
         body: JSON.stringify(payload),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || 'सेटिंग्ज जतन करता आल्या नाहीत.');
+      if (!res.ok) throw new Error(json?.message || 'Failed to save settings.');
       setConfig(json.config);
       setMetaAccessTokenInput('');
       setCustomAuthInput('');
       setConfigStatusMsg({
         type: 'success',
-        text: 'WhatsApp API सेटिंग्ज आणि राज्याध्यक्ष प्रोफाइल सुरक्षितरीत्या जतन झाले आहे!',
+        text: 'WhatsApp API settings saved.',
       });
     } catch (err: any) {
       setConfigStatusMsg({
         type: 'error',
-        text: err?.message || 'सेटिंग्ज जतन करताना त्रुटी आली.',
+        text: err?.message || 'Error saving settings.',
       });
     } finally {
       setIsSavingConfig(false);
@@ -511,7 +511,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
     if (!norm) {
       setBroadcastStatus({
         type: 'error',
-        text: 'चाचणीसाठी कृपया वैध १० अंकी मोबाईल नंबर प्रविष्ट करा.',
+        text: 'Enter a valid 10-digit mobile number.',
       });
       return;
     }
@@ -534,15 +534,15 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || 'चाचणी संदेश अयशस्वी');
+      if (!res.ok) throw new Error(json?.message || 'Test message failed.');
       setBroadcastStatus({
         type: 'success',
-        text: `चाचणी WhatsApp संदेश +${json.phone} वर यशस्वीरीत्या पाठवला गेला!`,
+        text: `Test WhatsApp message sent to +${json.phone}.`,
       });
     } catch (err: any) {
       setBroadcastStatus({
         type: 'error',
-        text: err?.message || 'चाचणी संदेश पाठवताना अडचण आली.',
+        text: err?.message || 'Failed to send test message.',
       });
     } finally {
       setIsSendingTest(false);
@@ -579,19 +579,19 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || 'प्रसारण अयशस्वी झाले.');
+      if (!res.ok) throw new Error(json?.message || 'Broadcast failed.');
 
       setLastResult(json);
       setConfirmBroadcastOpen(false);
       setBroadcastStatus({
         type: json.failedCount > 0 && json.sentCount === 0 ? 'error' : 'success',
-        text: `प्रसारण पूर्ण! एकूण: ${toEnglishDigits(String(json.totalTargeted))}, यशस्वी पाठवले: ${toEnglishDigits(String(json.sentCount))}, अयशस्वी: ${toEnglishDigits(String(json.failedCount))}.`,
+        text: `Broadcast complete. Total: ${toEnglishDigits(String(json.totalTargeted))}, Sent: ${toEnglishDigits(String(json.sentCount))}, Failed: ${toEnglishDigits(String(json.failedCount))}.`,
       });
       loadConfigAndOfficials();
     } catch (err: any) {
       setBroadcastStatus({
         type: 'error',
-        text: err?.message || 'प्रसारण करताना त्रुटी आली.',
+        text: err?.message || 'Broadcast error.',
       });
     } finally {
       setIsBroadcasting(false);
@@ -638,13 +638,13 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
           <div>
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1">
               <Smartphone className="w-4 h-4" />
-              <span>फक्त सुपर ॲडमिन — अधिकृत WhatsApp API प्रसारण कक्ष</span>
+              <span>Super Admin · WhatsApp API</span>
             </div>
-            <h2 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#193568]">
-              व्हॉट्सॲप संदेश प्रसारण (राज्याध्यक्षांच्या नावाने व फोटोसह)
+            <h2 className="text-xl sm:text-2xl font-extrabold text-[#193568]">
+              WhatsApp Broadcast
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 mt-1">
-              वेबसाईटवरील सर्व सदस्य, जिल्हाध्यक्ष, सरचिटणीस व पदाधिकारी यांचे गट निवडून एकदाच अधिकृत API द्वारे फोटोसह संदेश पाठवा.
+              Send WhatsApp messages with photo to selected member and leader groups.
             </p>
           </div>
 
@@ -659,7 +659,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               }`}
             >
               <Send className="w-3.5 h-3.5" />
-              <span>संदेश पाठवा</span>
+              <span>Compose</span>
             </button>
             <button
               type="button"
@@ -671,7 +671,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               }`}
             >
               <Settings className="w-3.5 h-3.5" />
-              <span>API सेटअप</span>
+              <span>API Setup</span>
             </button>
             <button
               type="button"
@@ -683,7 +683,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               }`}
             >
               <History className="w-3.5 h-3.5" />
-              <span>इतिहास ({toEnglishDigits(String(logs.length))})</span>
+              <span>History ({toEnglishDigits(String(logs.length))})</span>
             </button>
           </div>
         </div>
@@ -694,7 +694,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <span>
-                <strong>WhatsApp API अद्याप सक्रिय केलेले नाही:</strong> थेट संदेश पाठवण्यासाठी आधी <strong>"API सेटअप"</strong> मध्ये तुमचा Meta WhatsApp Cloud API किंवा Gateway Token जतन करा.
+                <strong>WhatsApp API Inactive:</strong> Configure Meta Cloud API or Gateway Token in <strong>API Setup</strong> first.
               </span>
             </div>
             <button
@@ -702,7 +702,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               onClick={() => setSubView('setup')}
               className="px-3 py-1.5 bg-[#df6b16] text-white rounded-md font-bold text-xs shrink-0 cursor-pointer"
             >
-              API सेटअप उघडा →
+              Open API Setup →
             </button>
           </div>
         )}
@@ -713,14 +713,14 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
           {/* Left 7 Cols: Sender Photo + Groups + Message */}
           <div className="xl:col-span-7 space-y-5">
-            {/* Step 1: State President Name & Photo */}
+            {/* Step 1: Sender Name & Photo */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-                <h3 className="font-serifDevanagari font-bold text-base text-[#193568]">
-                  १. पाठवणाऱ्याचे नाव व फोटो (राज्याध्यक्ष)
+                <h3 className="font-bold text-base text-[#193568]">
+                  1. Sender Profile
                 </h3>
                 {senderPhoto && (
-                  <span className="text-[11px] font-semibold text-emerald-700">फोटो तयार आहे</span>
+                  <span className="text-[11px] font-semibold text-emerald-700">Photo Ready</span>
                 )}
               </div>
 
@@ -741,7 +741,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 <div className="flex-1 w-full space-y-3 text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">राज्याध्यक्षांचे नाव</label>
+                      <label className="font-bold text-slate-700 block mb-1">Sender Name</label>
                       <input
                         type="text"
                         value={senderName}
@@ -750,7 +750,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       />
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">पदनाम व महासंघ ओळ</label>
+                      <label className="font-bold text-slate-700 block mb-1">Title / Designation</label>
                       <input
                         type="text"
                         value={senderTitle}
@@ -762,14 +762,14 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
 
                   <div>
                     <label className="font-bold text-slate-700 block mb-1">
-                      राज्याध्यक्षांचा फोटो (सार्वजनिक https:// लिंक किंवा अपलोड)
+                      Photo URL (Public https:// link or Upload)
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <input
                         type="url"
                         value={senderPhoto}
                         onChange={(e) => setSenderPhoto(e.target.value)}
-                        placeholder="https://res.cloudinary.com/... किंवा थेट फोटो URL"
+                        placeholder="https://res.cloudinary.com/..."
                         className="flex-1 min-w-[200px] p-2 bg-slate-50 border border-slate-300 rounded-lg text-[11px] focus:bg-white focus:outline-none focus:border-[#df6b16]"
                       />
                       <input
@@ -786,7 +786,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                         className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg font-bold text-[11px] flex items-center gap-1.5 cursor-pointer"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        <span>{isUploadingPhoto ? 'अपलोड...' : 'नवीन फोटो अपलोड'}</span>
+                        <span>{isUploadingPhoto ? 'Uploading...' : 'Upload Photo'}</span>
                       </button>
                     </div>
                   </div>
@@ -799,8 +799,8 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-[#df6b16]" />
-                  <h3 className="font-serifDevanagari font-bold text-base text-[#193568]">
-                    २. वेबसाईटवरील गट निवडा (एकापेक्षा जास्त निवडता येतील)
+                  <h3 className="font-bold text-base text-[#193568]">
+                    2. Select Recipients
                   </h3>
                 </div>
                 <select
@@ -808,10 +808,10 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                   onChange={(e) => setDistrictFilter(e.target.value)}
                   className="p-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-bold text-[#193568]"
                 >
-                  <option value="ALL">सर्व महाराष्ट्र (सर्व जिल्हे)</option>
+                  <option value="ALL">All Districts</option>
                   {MAHARASHTRA_DISTRICTS.map((d) => (
                     <option key={d} value={d}>
-                      फक्त जिल्हा: {d}
+                      District: {d}
                     </option>
                   ))}
                 </select>
@@ -852,24 +852,24 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
 
               <div>
                 <label className="font-bold text-xs text-slate-700 block mb-1">
-                  इतर विशेष मोबाईल नंबर (ऐच्छिक — स्वल्पविराम किंवा नवीन ओळीत टाका)
+                  Extra Numbers (Optional — comma or newline separated)
                 </label>
                 <textarea
                   rows={2}
                   value={customNumbersText}
                   onChange={(e) => setCustomNumbersText(e.target.value)}
-                  placeholder="उदा. 9822000000, 9423000000"
+                  placeholder="e.g. 9822000000, 9423000000"
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:bg-white focus:outline-none focus:border-[#df6b16]"
                 />
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 text-xs">
                 <div className="font-semibold text-slate-700 tabular-nums">
-                  निवडलेले एकूण वैध WhatsApp नंबर:{' '}
+                  Selected Valid Numbers:{' '}
                   <strong className="text-base text-emerald-700">
                     {toEnglishDigits(String(activeRecipients.length))}
                   </strong>
-                  {isLoadingData && <span className="ml-2 text-slate-500">(डेटा लोड होत आहे...)</span>}
+                  {isLoadingData && <span className="ml-2 text-slate-500">(Loading...)</span>}
                 </div>
                 <button
                   type="button"
@@ -877,7 +877,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                   className="text-xs font-bold text-[#193568] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <UserCheck className="w-3.5 h-3.5" />
-                  <span>{showRecipientPreview ? 'यादी लपवा' : 'निवडलेल्या नंबरची यादी पहा'}</span>
+                  <span>{showRecipientPreview ? 'Hide List' : 'View List'}</span>
                 </button>
               </div>
 
@@ -889,7 +889,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       type="text"
                       value={recipientSearch}
                       onChange={(e) => setRecipientSearch(e.target.value)}
-                      placeholder="नाव, जिल्हा किंवा मोबाईल नंबर शोधा..."
+                      placeholder="Search name, district, or mobile..."
                       className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs"
                     />
                   </div>
@@ -927,7 +927,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       );
                     })}
                     {filteredPreviewRecipients.length === 0 && (
-                      <div className="p-4 text-center text-slate-500">कोणतेही वैध नंबर सापडले नाहीत.</div>
+                      <div className="p-4 text-center text-slate-500">No valid numbers found.</div>
                     )}
                   </div>
                 </div>
@@ -937,11 +937,11 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
             {/* Step 3: Message Body */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
-                <h3 className="font-serifDevanagari font-bold text-base text-[#193568]">
-                  ३. संदेशाचा मजकूर लिहा
+                <h3 className="font-bold text-base text-[#193568]">
+                  3. Message
                 </h3>
                 <div className="flex flex-wrap gap-1.5 text-[11px]">
-                  {['{नाव}', '{पद}', '{जिल्हा}'].map((tag) => (
+                  {['{name}', '{role}', '{district}'].map((tag) => (
                     <button
                       key={tag}
                       type="button"
@@ -958,7 +958,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 rows={6}
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
-                placeholder="संदेश येथे लिहा..."
+                placeholder="Write message here..."
                 className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-xs sm:text-sm leading-relaxed focus:bg-white focus:outline-none focus:border-[#df6b16]"
               />
 
@@ -969,7 +969,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                   onChange={(e) => setIncludeSignatureHeader(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 text-[#df6b16]"
                 />
-                <span>संदेशाच्या सुरुवातीस राज्याध्यक्षांचे नाव व शेवटी महासंघाची स्वाक्षरी आपोआप जोडा</span>
+                <span>Include sender header &amp; federation signature</span>
               </label>
             </div>
           </div>
@@ -977,8 +977,8 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
           {/* Right 5 Cols: Authentic WhatsApp Preview + Test + Broadcast */}
           <div className="xl:col-span-5 space-y-5">
             <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
-              <h3 className="font-serifDevanagari font-bold text-base text-[#193568] border-b border-slate-200 pb-2.5">
-                WhatsApp संदेश कसा दिसेल (Live Preview)
+              <h3 className="font-bold text-base text-[#193568] border-b border-slate-200 pb-2.5">
+                Live Preview
               </h3>
 
               {/* WhatsApp Chat Bubble Preview */}
@@ -995,7 +995,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                     </div>
                   ) : (
                     <div className="w-full h-24 bg-slate-100 flex items-center justify-center text-xs text-slate-500">
-                      राज्याध्यक्षांचा फोटो येथे दिसेल
+                      Sender photo preview
                     </div>
                   )}
                   <div className="p-3 text-xs text-slate-900 whitespace-pre-wrap leading-relaxed">
@@ -1024,14 +1024,14 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               {/* Single Test Number Box */}
               <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
                 <label className="text-xs font-bold text-slate-700 block">
-                  आधी स्वतःच्या नंबरवर चाचणी (Test Send) करा
+                  Test Send
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="tel"
                     value={testPhone}
                     onChange={(e) => setTestPhone(e.target.value)}
-                    placeholder="१० अंकी मोबाईल नंबर"
+                    placeholder="10-digit mobile number"
                     className="flex-1 p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono"
                   />
                   <button
@@ -1040,7 +1040,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                     disabled={isSendingTest}
                     className="px-3.5 py-2 bg-[#193568] hover:bg-[#11254a] text-white font-bold text-xs rounded-lg cursor-pointer disabled:opacity-60 whitespace-nowrap"
                   >
-                    {isSendingTest ? 'पाठवत आहे...' : 'चाचणी पाठवा'}
+                    {isSendingTest ? 'Sending...' : 'Send Test'}
                   </button>
                 </div>
               </div>
@@ -1055,13 +1055,13 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 >
                   <Send className="w-4 h-4" />
                   <span>
-                    निवडलेल्या {toEnglishDigits(String(activeRecipients.length))} जणांना WhatsApp संदेश पाठवा
+                    Send to {toEnglishDigits(String(activeRecipients.length))} Recipients
                   </span>
                 </button>
               ) : (
                 <div className="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-3 text-xs">
                   <p className="font-extrabold text-amber-950">
-                    निश्चित करा: तुम्ही एकाच वेळी {toEnglishDigits(String(activeRecipients.length))} WhatsApp नंबरवर राज्याध्यक्षांच्या नावाने व फोटोसह संदेश पाठवत आहात.
+                    Confirm: Send this WhatsApp message to {toEnglishDigits(String(activeRecipients.length))} recipients now?
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -1073,12 +1073,12 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       {isBroadcasting ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>प्रसारण चालू आहे...</span>
+                          <span>Sending...</span>
                         </>
                       ) : (
                         <>
                           <Send className="w-4 h-4" />
-                          <span>होय, आत्ताच पाठवा</span>
+                          <span>Send Now</span>
                         </>
                       )}
                     </button>
@@ -1088,7 +1088,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       onClick={() => setConfirmBroadcastOpen(false)}
                       className="px-4 py-2.5 bg-white border border-slate-300 text-slate-700 font-bold rounded-lg cursor-pointer"
                     >
-                      रद्द करा
+                      Cancel
                     </button>
                   </div>
                 </div>
@@ -1097,27 +1097,27 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               {lastResult && (
                 <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
                   <div className="flex items-center justify-between font-bold text-slate-800">
-                    <span>प्रसारण अहवाल (Campaign Report)</span>
+                    <span>Campaign Report</span>
                     <button
                       type="button"
                       onClick={downloadResultCsv}
                       className="text-[#193568] hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>CSV अहवाल</span>
+                      <span>Export CSV</span>
                     </button>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center tabular-nums">
                     <div className="bg-white p-2 rounded border border-slate-200">
-                      <div className="text-[11px] text-slate-500">एकूण</div>
+                      <div className="text-[11px] text-slate-500">Total</div>
                       <div className="font-extrabold text-slate-900">{toEnglishDigits(String(lastResult.totalTargeted))}</div>
                     </div>
                     <div className="bg-emerald-50 p-2 rounded border border-emerald-200">
-                      <div className="text-[11px] text-emerald-700">यशस्वी</div>
+                      <div className="text-[11px] text-emerald-700">Sent</div>
                       <div className="font-extrabold text-emerald-800">{toEnglishDigits(String(lastResult.sentCount))}</div>
                     </div>
                     <div className="bg-rose-50 p-2 rounded border border-rose-200">
-                      <div className="text-[11px] text-rose-700">अयशस्वी</div>
+                      <div className="text-[11px] text-rose-700">Failed</div>
                       <div className="font-extrabold text-rose-800">{toEnglishDigits(String(lastResult.failedCount))}</div>
                     </div>
                   </div>
@@ -1135,8 +1135,8 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
             onSubmit={handleSaveConfig}
             className="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-4 text-xs"
           >
-            <h3 className="font-serifDevanagari font-bold text-lg text-[#193568] border-b border-slate-200 pb-2.5">
-              WhatsApp API जोडणी सेटिंग्ज
+            <h3 className="font-bold text-lg text-[#193568] border-b border-slate-200 pb-2.5">
+              WhatsApp API Settings
             </h3>
 
             {configStatusMsg && (
@@ -1159,12 +1159,12 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 className="w-4 h-4 text-emerald-600 rounded"
               />
               <span className="font-bold text-slate-900 text-sm">
-                WhatsApp API प्रसारण सक्रिय ठेवा (Enable API)
+                Enable WhatsApp API
               </span>
             </label>
 
             <div>
-              <label className="font-bold text-slate-700 block mb-1.5">API सेवा प्रदाता (Provider)</label>
+              <label className="font-bold text-slate-700 block mb-1.5">API Provider</label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
                   type="button"
@@ -1175,8 +1175,8 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       : 'bg-slate-50 text-slate-700 border-slate-300'
                   }`}
                 >
-                  <div>Meta WhatsApp Cloud API</div>
-                  <div className="text-[11px] font-normal opacity-80 mt-0.5">अधिकृत WhatsApp Business API</div>
+                  <div>Meta Cloud API</div>
+                  <div className="text-[11px] font-normal opacity-80 mt-0.5">Official WhatsApp Business API</div>
                 </button>
                 <button
                   type="button"
@@ -1187,7 +1187,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       : 'bg-slate-50 text-slate-700 border-slate-300'
                   }`}
                 >
-                  <div>Indian Gateway / Custom API</div>
+                  <div>Custom Gateway</div>
                   <div className="text-[11px] font-normal opacity-80 mt-0.5">AiSensy / UltraMsg / WaSender / WATI</div>
                 </button>
               </div>
@@ -1197,12 +1197,12 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               <div className="space-y-3 pt-2 border-t border-slate-200">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Meta Phone Number ID</label>
+                    <label className="font-bold text-slate-700 block mb-1">Phone Number ID</label>
                     <input
                       type="text"
                       value={config.metaPhoneNumberId}
                       onChange={(e) => setConfig({ ...config, metaPhoneNumberId: e.target.value })}
-                      placeholder="उदा. 412345678901234"
+                      placeholder="e.g. 412345678901234"
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono"
                     />
                   </div>
@@ -1221,7 +1221,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="font-bold text-slate-700">
-                      Permanent Access Token {config.hasMetaAccessToken && `(सध्या जतन: ${config.metaAccessTokenPreview})`}
+                      Access Token {config.hasMetaAccessToken && `(Saved: ${config.metaAccessTokenPreview})`}
                     </label>
                     <button
                       type="button"
@@ -1229,21 +1229,21 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       className="text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
                     >
                       {showSecrets ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      <span>{showSecrets ? 'लपवा' : 'दाखवा'}</span>
+                      <span>{showSecrets ? 'Hide' : 'Show'}</span>
                     </button>
                   </div>
                   <input
                     type={showSecrets ? 'text' : 'password'}
                     value={metaAccessTokenInput}
                     onChange={(e) => setMetaAccessTokenInput(e.target.value)}
-                    placeholder={config.hasMetaAccessToken ? 'बदलण्यासाठी नवीन Token टाका (जुना सुरक्षित आहे)' : 'EAAG... Token येथे पेस्ट करा'}
+                    placeholder={config.hasMetaAccessToken ? 'Enter new token to update' : 'Paste EAAG... token'}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">पाठवण्याची पद्धत (Send Mode)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Send Mode</label>
                     <select
                       value={config.metaSendMode}
                       onChange={(e) =>
@@ -1251,8 +1251,8 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       }
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-bold"
                     >
-                      <option value="template">Approved Template (सर्व सदस्यांसाठी)</option>
-                      <option value="image_or_text">Direct Image + Caption (24h Window)</option>
+                      <option value="template">Approved Template</option>
+                      <option value="image_or_text">Direct Image + Caption</option>
                     </select>
                   </div>
                   <div>
@@ -1266,12 +1266,12 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Template Language</label>
+                    <label className="font-bold text-slate-700 block mb-1">Language</label>
                     <input
                       type="text"
                       value={config.metaTemplateLanguage}
                       onChange={(e) => setConfig({ ...config, metaTemplateLanguage: e.target.value })}
-                      placeholder="mr किंवा en_US"
+                      placeholder="mr or en_US"
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono"
                     />
                   </div>
@@ -1280,7 +1280,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
             ) : (
               <div className="space-y-3 pt-2 border-t border-slate-200">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Gateway API Endpoint URL</label>
+                  <label className="font-bold text-slate-700 block mb-1">Endpoint URL</label>
                   <input
                     type="url"
                     value={config.customWebhookUrl}
@@ -1291,7 +1291,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Payload फॉरमॅट</label>
+                    <label className="font-bold text-slate-700 block mb-1">Payload Format</label>
                     <select
                       value={config.customPayloadStyle}
                       onChange={(e) =>
@@ -1302,14 +1302,14 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                       }
                       className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-bold"
                     >
-                      <option value="standard_json">Standard JSON (Webhook / Custom)</option>
-                      <option value="aisensy">AiSensy Campaign API</option>
+                      <option value="standard_json">Standard JSON</option>
+                      <option value="aisensy">AiSensy API</option>
                       <option value="ultramsg">UltraMsg API</option>
                       <option value="wasender">WaSender API</option>
                     </select>
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Auth Header नाव</label>
+                    <label className="font-bold text-slate-700 block mb-1">Auth Header</label>
                     <input
                       type="text"
                       value={config.customAuthHeaderName}
@@ -1321,13 +1321,13 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
-                    API Key / Bearer Token {config.hasCustomAuthHeader && `(जतन: ${config.customAuthHeaderPreview})`}
+                    API Key / Token {config.hasCustomAuthHeader && `(Saved: ${config.customAuthHeaderPreview})`}
                   </label>
                   <input
                     type={showSecrets ? 'text' : 'password'}
                     value={customAuthInput}
                     onChange={(e) => setCustomAuthInput(e.target.value)}
-                    placeholder={config.hasCustomAuthHeader ? 'बदलण्यासाठी नवीन Key टाका' : 'Bearer xxxxx किंवा API Key'}
+                    placeholder={config.hasCustomAuthHeader ? 'Enter new key to update' : 'Bearer token or API key'}
                     className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-lg font-mono"
                   />
                 </div>
@@ -1340,35 +1340,29 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
                 disabled={isSavingConfig}
                 className="w-full sm:w-auto px-6 py-3 bg-[#193568] hover:bg-[#11254a] text-white font-bold rounded-lg shadow-xs cursor-pointer disabled:opacity-60"
               >
-                {isSavingConfig ? 'सेव्ह होत आहे...' : 'API सेटिंग्ज जतन करा'}
+                {isSavingConfig ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
           </form>
 
-          {/* Setup Guide in Marathi */}
+          {/* Setup Guide */}
           <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs space-y-3 text-xs text-slate-700 leading-relaxed">
-            <h3 className="font-serifDevanagari font-bold text-base text-[#193568] border-b border-slate-200 pb-2">
-              WhatsApp API जोडणी मार्गदर्शन (मराठी)
+            <h3 className="font-bold text-base text-[#193568] border-b border-slate-200 pb-2">
+              Quick Setup Guide
             </h3>
             <p>
-              <strong>पर्याय १ — अधिकृत Meta WhatsApp Cloud API:</strong>
+              <strong>Option 1 — Meta Cloud API:</strong>
             </p>
             <ol className="list-decimal pl-4 space-y-1.5">
-              <li>
-                <strong>developers.facebook.com</strong> वर Mahasangh Business App तयार करून WhatsApp उत्पादन जोडा.
-              </li>
-              <li>
-                तेथील <strong>Phone Number ID</strong> व <strong>System User Permanent Token</strong> येथे पेस्ट करा.
-              </li>
-              <li>
-                सर्व सदस्यांना एकाच वेळी संदेश पाठवण्यासाठी Meta मध्ये एक <strong>Marketing / Utility Template</strong> (Header: Image + Body: <code className="font-mono">{'{{1}}'}</code>) मंजूर करून घ्या व त्याचे नाव येथे भरा.
-              </li>
+              <li>Create a Business App on <strong>developers.facebook.com</strong> and add WhatsApp.</li>
+              <li>Paste your <strong>Phone Number ID</strong> and <strong>Permanent Token</strong>.</li>
+              <li>Approve a Template (Header: Image + Body: <code className="font-mono">{'{{1}}'}</code>) and enter its name.</li>
             </ol>
             <p className="pt-2">
-              <strong>पर्याय २ — भारतीय WhatsApp Gateway (AiSensy / WATI / UltraMsg इ.):</strong>
+              <strong>Option 2 — Custom Gateway (AiSensy / WATI / UltraMsg):</strong>
             </p>
             <p>
-              जर तुम्हाला Meta Template शिवाय साधा नंबर लिंक करायचा असेल, तर तुमचा Gateway URL व API Key निवडून येथे सेव्ह करा — सर्व्हर आपोआप राज्याध्यक्षांचा फोटो व संदेश पाठवेल.
+              Enter your Gateway URL, payload format, and API key to send broadcasts directly.
             </p>
           </div>
         </div>
@@ -1378,8 +1372,8 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
       {subView === 'logs' && (
         <div className="bg-white rounded-xl border border-slate-200 p-5 sm:p-6 shadow-xs">
           <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
-            <h3 className="font-serifDevanagari font-bold text-base sm:text-lg text-[#193568]">
-              पूर्वीच्या WhatsApp प्रसारणांचा इतिहास
+            <h3 className="font-bold text-base sm:text-lg text-[#193568]">
+              Broadcast History
             </h3>
             <button
               type="button"
@@ -1387,25 +1381,25 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
               className="text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoadingData ? 'animate-spin' : ''}`} />
-              <span>रिफ्रेश</span>
+              <span>Refresh</span>
             </button>
           </div>
 
           {logs.length === 0 ? (
             <div className="text-center py-10 text-xs sm:text-sm text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-              अद्याप कोणतेही WhatsApp प्रसारण केलेले नाही.
+              No broadcasts sent yet.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-100 text-slate-700 border-b border-slate-200">
-                    <th className="py-2.5 px-3 font-bold">दिनांक</th>
-                    <th className="py-2.5 px-3 font-bold">पाठवणारे (राज्याध्यक्ष)</th>
-                    <th className="py-2.5 px-3 font-bold">संदेश सारांश</th>
-                    <th className="py-2.5 px-3 font-bold text-right">लक्ष्य</th>
-                    <th className="py-2.5 px-3 font-bold text-right">यशस्वी</th>
-                    <th className="py-2.5 px-3 font-bold text-right">अयशस्वी</th>
+                    <th className="py-2.5 px-3 font-bold">Date</th>
+                    <th className="py-2.5 px-3 font-bold">Sender</th>
+                    <th className="py-2.5 px-3 font-bold">Message</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Target</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Sent</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Failed</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">

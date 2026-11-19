@@ -317,7 +317,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setPhotoError('कृपया वैध फोटो फाईल (JPG किंवा PNG) निवडा.');
+      setPhotoError('Please select a valid JPG or PNG image.');
       inputEl.value = '';
       return;
     }
@@ -327,7 +327,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.75);
       setEditingMember((prev) => (prev ? { ...prev, photo: urlOrBase64 } : prev));
     } catch (err: any) {
-      setPhotoError('फोटो प्रोसेस करताना त्रुटी: ' + (err.message || 'Error'));
+      setPhotoError('Photo error: ' + (err.message || 'Error'));
     } finally {
       setIsUploadingPhoto(false);
       inputEl.value = '';
@@ -339,13 +339,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     if (!editingMember) return;
 
     if (!editingMember.fullName.trim()) {
-      setStatusBanner({ text: 'कृपया सदस्याचे संपूर्ण नाव प्रविष्ट करा.', type: 'error' });
+      setStatusBanner({ text: 'Please enter full name.', type: 'error' });
       return;
     }
 
     const cleanPhone = toEnglishDigits(editingMember.phone || '').replace(/\D/g, '').slice(-10);
     if (cleanPhone.length !== 10) {
-      setStatusBanner({ text: 'कृपया 10 अंकी वैध मोबाईल नंबर प्रविष्ट करा.', type: 'error' });
+      setStatusBanner({ text: 'Enter a valid 10-digit mobile number.', type: 'error' });
       return;
     }
 
@@ -388,14 +388,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       }
 
       setStatusBanner({
-        text: `✓ ${updatedRecord.salutation} ${updatedRecord.fullName} यांची माहिती व सदस्य क्रमांक (${updatedRecord.memberNumber || '-'}) यशस्वीरीत्या अपडेट झाले! आता सदस्य 'अर्जाची स्थिती तपासा' मधून नवीन अचूक आय-कार्ड डाऊनलोड करू शकतात.`,
+        text: `Updated ${updatedRecord.salutation} ${updatedRecord.fullName} (Member No: ${updatedRecord.memberNumber || '-'}).`,
         type: 'success',
         member: updatedRecord,
       });
       setEditingMember(null);
     } catch (err: any) {
       setStatusBanner({
-        text: 'माहिती सेव्ह करताना त्रुटी आली: ' + (err.message || 'Error'),
+        text: 'Save failed: ' + (err.message || 'Error'),
         type: 'error',
       });
     } finally {
@@ -409,13 +409,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       setIsDeleting(true);
       await onDeleteApplication(deletingMember.id);
       setStatusBanner({
-        text: `✓ ${deletingMember.salutation} ${deletingMember.fullName} (${deletingMember.memberNumber || deletingMember.applicationNumber}) ही नोंदणी कायमची डिलीट करण्यात आली आहे.`,
+        text: `Deleted ${deletingMember.salutation} ${deletingMember.fullName} (${deletingMember.memberNumber || deletingMember.applicationNumber}).`,
         type: 'success',
       });
       setDeletingMember(null);
     } catch (err: any) {
       setStatusBanner({
-        text: 'नोंदणी डिलीट करताना त्रुटी आली: ' + (err.message || 'Error'),
+        text: 'Delete failed: ' + (err.message || 'Error'),
         type: 'error',
       });
     } finally {
@@ -437,7 +437,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       }
     } catch (err: any) {
       setStatusBanner({
-        text: 'डाटा स्वच्छ करताना त्रुटी आली: ' + (err?.message || 'Error'),
+        text: 'Cleanup failed: ' + (err?.message || 'Error'),
         type: 'error',
       });
     } finally {
@@ -450,14 +450,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
         <div>
-          <p className="text-[11px] font-bold text-[#df6b16] mb-0.5">
-            दुरुस्ती व दुबार नोंदणी नियंत्रण कक्ष
+          <p className="text-[11px] font-bold text-[#df6b16] uppercase tracking-wider mb-0.5">
+            Member Records
           </p>
-          <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-[#0b1e36]">
-            सदस्य एडिट व दुबार नोंदणी दुरुस्ती
+          <h3 className="text-lg sm:text-xl font-bold text-[#0b1e36]">
+            Edit Members &amp; Duplicates
           </h3>
           <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-            सदस्याचे नाव किंवा मोबाईल नंबर शोधून त्यांचा <strong>सदस्य क्रमांक</strong> व संपूर्ण माहिती अद्ययावत करा किंवा दुबार नोंदणी काढा.
+            Search members to update details, fix member numbers, or remove duplicates.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto shrink-0">
@@ -466,10 +466,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             onClick={() => setShowPurgeConfirmModal(true)}
             disabled={isPurgingGhosts}
             className="flex-1 sm:flex-none min-h-[44px] bg-rose-50 hover:bg-rose-100 active:scale-[0.98] text-rose-800 border border-rose-200 text-xs font-bold px-3.5 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
-            title="पूर्वी डिलीट/नाकारलेले व दुबार प्रलंबित घोस्ट रेकॉर्ड सिस्टममधून कायमचे काढून टाका"
+            title="Purge deleted, rejected, and duplicate pending records"
           >
             <Trash2 className={`w-4 h-4 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
-            <span className="whitespace-nowrap">{isPurgingGhosts ? 'स्वच्छता सुरू...' : 'जुने डिलीट स्वच्छ करा'}</span>
+            <span className="whitespace-nowrap">{isPurgingGhosts ? 'Cleaning...' : 'Clean Trash'}</span>
           </button>
 
           {onFetchApplications && (
@@ -480,7 +480,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               className="flex-1 sm:flex-none min-h-[44px] bg-[#0b1e36] hover:bg-[#193568] active:scale-[0.98] text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 text-amber-400 ${isLoadingApps ? 'animate-spin' : ''}`} />
-              <span className="whitespace-nowrap">{isLoadingApps ? 'लोड होत आहे...' : 'यादी ताजी करा'}</span>
+              <span className="whitespace-nowrap">{isLoadingApps ? 'Loading...' : 'Refresh'}</span>
             </button>
           )}
         </div>
@@ -492,7 +492,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
           <div className="flex items-center gap-2 text-xs font-bold text-[#0b1e36]">
             <Link2 className="w-4 h-4 text-[#df6b16] shrink-0" />
             <span>
-              केंद्राचे नाव अद्ययावत करण्यासाठी स्वतंत्र One-Time लिंक (बाकी सदस्य:{' '}
+              One-Time Center Update Link (Pending:{' '}
               <span className="font-mono tabular-nums text-[#df6b16]">
                 {toEnglishDigits(duplicateAnalysis.missingCenterCount)}
               </span>
@@ -500,7 +500,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             </span>
           </div>
           <p className="text-[11px] text-slate-600 leading-relaxed">
-            ही लिंक सदस्यांना शेअर केल्यावर ज्यांचे कार्यरत केंद्र अद्याप भरलेले नाही, फक्त त्यांचीच नावे दिसतील व सबमिट केल्यावर माहिती त्यांच्या नोंदीत आपोआप जोडली जाईल.
+            Share this link with members missing their center name to auto-update their records.
           </p>
           <div className="text-[11px] font-mono text-[#193568] font-semibold truncate select-all">
             {buildCenterUpdateShareUrl()}
@@ -530,12 +530,12 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             {copiedShareMode === 'url' ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-300" />
-                <span>लिंक कॉपी झाली</span>
+                <span>Link Copied</span>
               </>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5" />
-                <span>लिंक कॉपी करा</span>
+                <span>Copy Link</span>
               </>
             )}
           </button>
@@ -562,12 +562,12 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             {copiedShareMode === 'message' ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span>संदेश कॉपी झाला</span>
+                <span>Message Copied</span>
               </>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5 text-[#df6b16]" />
-                <span>WhatsApp संदेश कॉपी</span>
+                <span>Copy WhatsApp Text</span>
               </>
             )}
           </button>
@@ -599,7 +599,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                नवीन आय-कार्ड PDF पहा
+                Download ID PDF
               </button>
             )}
             <button
@@ -619,7 +619,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="सदस्याचे नाव, 10 अंकी मोबाईल नंबर, सदस्य क्र. किंवा अर्ज क्र. शोधा..."
+            placeholder="Search name, mobile, member no., or app no..."
             value={searchQuery}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full min-h-[44px] text-base sm:text-sm pl-10 pr-10 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:border-[#df6b16] font-medium"
@@ -629,7 +629,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               type="button"
               onClick={() => handleSearchChange('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-400 hover:text-slate-700"
-              title="शोध पुसा"
+              title="Clear search"
             >
               <X className="w-4 h-4" />
             </button>
@@ -648,7 +648,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>सर्व नोंदी ({applications.length})</span>
+            <span>All ({applications.length})</span>
           </button>
 
           <button
@@ -661,7 +661,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>दुबार नोंदी ({duplicateAnalysis.duplicateCount})</span>
+            <span>Duplicates ({duplicateAnalysis.duplicateCount})</span>
           </button>
 
           <button
@@ -674,7 +674,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>0001 / त्रुटी ({duplicateAnalysis.issue0001Count})</span>
+            <span>0001 / Issues ({duplicateAnalysis.issue0001Count})</span>
           </button>
 
           <button
@@ -687,7 +687,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             }`}
           >
             <Edit3 className="w-3.5 h-3.5" />
-            <span>आदरार्थी सुटलेले ({duplicateAnalysis.missingSalutationCount})</span>
+            <span>No Title ({duplicateAnalysis.missingSalutationCount})</span>
           </button>
 
           <button
@@ -700,7 +700,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             }`}
           >
             <Building2 className="w-3.5 h-3.5" />
-            <span>केंद्र सुटलेले ({duplicateAnalysis.missingCenterCount})</span>
+            <span>No Center ({duplicateAnalysis.missingCenterCount})</span>
           </button>
 
           <button
@@ -713,7 +713,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             }`}
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>मंजूर ({applications.filter((a) => a.status === 'approved').length})</span>
+            <span>Approved ({applications.filter((a) => a.status === 'approved').length})</span>
           </button>
         </div>
       </div>
@@ -721,12 +721,12 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       {/* Results Count */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 px-1 tabular-nums">
         <span>
-          दाखवले: <strong className="text-[#0b1e36] font-mono">{visibleMembers.length}</strong> / एकूण सापडलेले:{' '}
+          Showing <strong className="text-[#0b1e36] font-mono">{visibleMembers.length}</strong> of{' '}
           <strong className="text-[#0b1e36] font-mono">{filteredMembers.length}</strong>
         </span>
         {quickFilter === 'duplicates' && (
           <span className="text-amber-800 font-semibold">
-            सारखा मोबाईल किंवा नाव असलेले सदस्य येथे एकत्र दिसतात.
+            Records with matching phone or name are grouped together.
           </span>
         )}
       </div>
@@ -735,7 +735,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       <div className="md:hidden space-y-3">
         {visibleMembers.length === 0 ? (
           <div className="py-10 text-center text-slate-500 text-xs bg-[#fbf8f2] rounded-xl border border-[#e7ded1]">
-            शोधलेल्या माहितीनुसार कोणताही सदस्य आढळला नाही.
+            No matching members found.
           </div>
         ) : (
           visibleMembers.map((app) => {
@@ -744,7 +744,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             const dupMemNo = duplicateAnalysis.isDuplicateMemberNo(app);
             const is0001 = Boolean(app.memberNumber && /\/0001$/i.test(app.memberNumber.trim()));
             const statusLabel =
-              app.status === 'approved' ? 'मंजूर' : app.status === 'rejected' ? 'नाकारले' : 'प्रलंबित';
+              app.status === 'approved' ? 'Approved' : app.status === 'rejected' ? 'Rejected' : 'Pending';
             const statusTextColor =
               app.status === 'approved'
                 ? 'text-emerald-700'
@@ -808,26 +808,26 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                                 : 'bg-blue-50 text-blue-800 border border-blue-200'
                             }`}
                           >
-                            {g}
+                            {g === 'स्त्री' ? 'Female' : 'Male'}
                           </span>
                         ) : (
                           <span className="text-[10px] font-bold text-indigo-700">
-                            [आदरार्थी सुटलेले]
+                            [No Title]
                           </span>
                         );
                       })()}
                     </div>
                     {app.centerName && (
                       <div className="text-[11px] text-slate-600 mt-0.5 truncate">
-                        केंद्र: {app.centerName}
+                        Center: {app.centerName}
                       </div>
                     )}
                     {(dupPhone || dupName || dupMemNo || is0001) && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px] font-bold text-rose-700">
-                        {dupPhone && <span>[दुबार मोबाईल]</span>}
-                        {dupName && !dupPhone && <span>[सारखे नाव]</span>}
-                        {dupMemNo && <span>[दुबार सदस्य क्र.]</span>}
-                        {is0001 && <span>[0001 क्रमांक]</span>}
+                        {dupPhone && <span>[Dup Mobile]</span>}
+                        {dupName && !dupPhone && <span>[Same Name]</span>}
+                        {dupMemNo && <span>[Dup Member No]</span>}
+                        {is0001 && <span>[0001 Issue]</span>}
                       </div>
                     )}
                   </div>
@@ -843,7 +843,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     }`}
                   >
                     <Edit3 className="w-4 h-4 text-amber-400" />
-                    <span>एडिट</span>
+                    <span>Edit</span>
                   </button>
 
                   {app.status === 'approved' && (
@@ -853,7 +853,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       className="min-h-[44px] bg-emerald-700 hover:bg-emerald-800 active:scale-[0.98] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>ID कार्ड</span>
+                      <span>ID Card</span>
                     </button>
                   )}
 
@@ -863,7 +863,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     className="min-h-[44px] bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
-                    <span>डिलीट</span>
+                    <span>Delete</span>
                   </button>
                 </div>
               </div>
@@ -877,19 +877,19 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
         <table className="w-full text-left text-xs">
           <thead className="bg-[#fbf8f2] border-b border-[#e7ded1] text-[#0b1e36] font-bold text-[11px]">
             <tr>
-              <th className="py-3 px-3">फोटो</th>
-              <th className="py-3 px-3">सदस्य क्रमांक व अर्ज क्र.</th>
-              <th className="py-3 px-3">संपूर्ण नाव व संवर्ग</th>
-              <th className="py-3 px-3">मोबाईल व जिल्हा/तालुका</th>
-              <th className="py-3 px-3">स्थिती व सूचना</th>
-              <th className="py-3 px-3 text-center">दुरुस्ती / डिलीट</th>
+              <th className="py-3 px-3">Photo</th>
+              <th className="py-3 px-3">Member / App No.</th>
+              <th className="py-3 px-3">Name &amp; Cadre</th>
+              <th className="py-3 px-3">Mobile &amp; Location</th>
+              <th className="py-3 px-3">Status</th>
+              <th className="py-3 px-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {visibleMembers.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-10 text-center text-slate-400">
-                  शोधलेल्या माहितीनुसार कोणताही सदस्य आढळला नाही.
+                  No matching members found.
                 </td>
               </tr>
             ) : (
@@ -936,10 +936,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                           {app.memberNumber}
                         </span>
                       ) : (
-                        <span className="text-slate-400 italic text-[11px]">क्रमांक नाही</span>
+                        <span className="text-slate-400 italic text-[11px]">No number</span>
                       )}
                       <span className="block font-mono text-[11px] text-slate-500 mt-1">
-                        अर्ज: {app.applicationNumber}
+                        App: {app.applicationNumber}
                       </span>
                       <span className="block text-[11px] text-slate-600 mt-0.5">
                         {formatDateWithEnglishDigits(app.createdAt)}
@@ -963,11 +963,11 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                                   : 'bg-blue-50 text-blue-800 border border-blue-200'
                               }`}
                             >
-                              {g}
+                              {g === 'स्त्री' ? 'Female' : 'Male'}
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-indigo-700">
-                              · आदरार्थी सुटलेले
+                              · No Title
                             </span>
                           );
                         })()}
@@ -983,11 +983,11 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       <div className="font-mono font-bold text-[#0b1e36]">{app.phone}</div>
                       <div className="text-[11px] text-slate-600 mt-0.5">
                         {app.district}
-                        {app.taluka ? ` (ता. ${app.taluka})` : ''}
+                        {app.taluka ? ` (${app.taluka})` : ''}
                       </div>
                       {app.centerName && (
                         <div className="text-[10px] text-slate-500 truncate max-w-[180px]">
-                          केंद्र: {app.centerName}
+                          Center: {app.centerName}
                         </div>
                       )}
                     </td>
@@ -995,19 +995,19 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     <td className="py-3 px-3 space-y-1">
                       <div className="text-xs font-bold">
                         {app.status === 'approved' ? (
-                          <span className="text-emerald-700">✓ मंजूर</span>
+                          <span className="text-emerald-700">✓ Approved</span>
                         ) : app.status === 'rejected' ? (
-                          <span className="text-rose-700">✕ नाकारले</span>
+                          <span className="text-rose-700">✕ Rejected</span>
                         ) : (
-                          <span className="text-amber-700">प्रलंबित</span>
+                          <span className="text-amber-700">Pending</span>
                         )}
                       </div>
 
                       <div className="flex flex-wrap gap-1 text-[10px] font-bold">
-                        {dupPhone && <span className="text-amber-800">· दुबार मोबाईल</span>}
-                        {dupName && !dupPhone && <span className="text-orange-800">· सारखे नाव</span>}
-                        {dupMemNo && <span className="text-rose-800">· दुबार सदस्य क्र.</span>}
-                        {is0001 && <span className="text-rose-700">· 0001 क्रमांक</span>}
+                        {dupPhone && <span className="text-amber-800">· Dup Mobile</span>}
+                        {dupName && !dupPhone && <span className="text-orange-800">· Same Name</span>}
+                        {dupMemNo && <span className="text-rose-800">· Dup Member No</span>}
+                        {is0001 && <span className="text-rose-700">· 0001 Issue</span>}
                       </div>
                     </td>
 
@@ -1017,10 +1017,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                           type="button"
                           onClick={() => handleOpenEdit(app)}
                           className="bg-[#0b1e36] hover:bg-[#193568] text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
-                          title="सदस्य क्रमांक व सर्व माहिती एडिट करा"
+                          title="Edit member details"
                         >
                           <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                          <span>एडिट</span>
+                          <span>Edit</span>
                         </button>
 
                         {app.status === 'approved' && (
@@ -1028,7 +1028,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                             type="button"
                             onClick={() => generateMembershipIdCardPdf(app)}
                             className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
-                            title="अद्ययावत आय-कार्ड PDF डाऊनलोड करा"
+                            title="Download ID Card PDF"
                           >
                             <Download className="w-3.5 h-3.5" />
                             <span>ID</span>
@@ -1039,10 +1039,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                           type="button"
                           onClick={() => setDeletingMember(app)}
                           className="bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 font-bold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
-                          title="दुबार / चुकीची नोंदणी डिलीट करा"
+                          title="Delete record"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
-                          <span>डिलीट</span>
+                          <span>Delete</span>
                         </button>
                       </div>
                     </td>
@@ -1062,7 +1062,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             onClick={() => setVisibleCount((prev) => prev + 50)}
             className="w-full sm:w-auto min-h-[44px] bg-[#fbf8f2] hover:bg-amber-50 border border-[#e7ded1] text-[#0b1e36] font-bold px-6 py-2.5 rounded-xl text-xs transition-colors cursor-pointer tabular-nums"
           >
-            आणखी ५० नोंदी पहा ({visibleMembers.length} / {filteredMembers.length})
+            Load 50 More ({visibleMembers.length} / {filteredMembers.length})
           </button>
           {filteredMembers.length - visibleMembers.length > 50 && (
             <button
@@ -1070,7 +1070,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               onClick={() => setVisibleCount(filteredMembers.length)}
               className="w-full sm:w-auto min-h-[44px] bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold px-5 py-2.5 rounded-xl text-xs transition-colors cursor-pointer tabular-nums"
             >
-              सर्व {filteredMembers.length} नोंदी दाखवा
+              Show All {filteredMembers.length}
             </button>
           )}
         </div>
@@ -1086,9 +1086,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             <div className="bg-gradient-to-r from-[#132b52] via-[#193568] to-[#0b1e36] text-white px-5 py-3.5 flex items-center justify-between shrink-0 border-b border-amber-500/60">
               <div>
                 <span className="text-[11px] font-bold text-amber-300 block">
-                  सदस्य संपूर्ण माहिती दुरुस्ती
+                  Edit Member
                 </span>
-                <h4 className="font-serifDevanagari text-base sm:text-lg font-bold text-white">
+                <h4 className="text-base sm:text-lg font-bold text-white">
                   {editingMember.salutation} {editingMember.fullName}
                 </h4>
               </div>
@@ -1107,7 +1107,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               <div className="bg-indigo-50/70 border-2 border-indigo-200 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-indigo-950 text-sm">
-                    १. अधिकृत सदस्य क्रमांक व स्थिती (Member Number & Status)
+                    1. Member Number &amp; Status
                   </span>
                   <span className="font-mono text-[11px] text-slate-500">
                     ID: {editingMember.id}
@@ -1117,7 +1117,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-slate-800 block mb-1">
-                      अधिकृत सदस्य क्रमांक (Member Number)
+                      Member Number
                     </label>
                     <input
                       type="text"
@@ -1128,21 +1128,21 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                           memberNumber: toEnglishDigits(e.target.value).toUpperCase(),
                         })
                       }
-                      placeholder="उदा. MS/2026/NASH/0315"
+                      placeholder="e.g. MS/2026/NASH/0315"
                       className="w-full p-2.5 bg-white border-2 border-indigo-300 rounded-lg font-mono font-black text-sm text-[#17366d] focus:outline-none focus:border-[#df6b16]"
                     />
                   </div>
 
                   <div>
                     <label className="font-bold text-slate-800 block mb-1">
-                      फक्त क्रमांकावरून फॉरमॅट बनवा (मदत)
+                      Format from Sequence No.
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={seqInputForFormat}
                         onChange={(e) => setSeqInputForFormat(e.target.value)}
-                        placeholder="उदा. 315"
+                        placeholder="e.g. 315"
                         className="w-28 p-2.5 bg-white border border-slate-300 rounded-lg font-mono font-bold text-xs focus:outline-none focus:border-indigo-500"
                       />
                       <button
@@ -1151,7 +1151,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                       >
                         <Wand2 className="w-3.5 h-3.5" />
-                        क्रमांक तयार करा
+                        Generate
                       </button>
                     </div>
                   </div>
@@ -1161,18 +1161,18 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                   <div className="p-2.5 bg-rose-50 border border-rose-300 rounded-lg text-rose-800 font-bold flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                     <span>
-                      सावधान: हा सदस्य क्रमांक ({editingMember.memberNumber}) आधीच{' '}
+                      Warning: Member No. ({editingMember.memberNumber}) is already assigned to{' '}
                       <strong>
                         {memberNumberConflict.salutation} {memberNumberConflict.fullName}
                       </strong>{' '}
-                      ({memberNumberConflict.phone}) यांना दिलेला आहे!
+                      ({memberNumberConflict.phone}).
                     </span>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">अर्ज स्थिती (Status)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Status</label>
                     <select
                       value={editingMember.status}
                       onChange={(e) =>
@@ -1183,14 +1183,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       }
                       className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold text-slate-800"
                     >
-                      <option value="approved">✓ मंजूर (Approved)</option>
-                      <option value="pending">⏳ प्रलंबित (Pending)</option>
-                      <option value="rejected">✕ नाकारले (Rejected)</option>
+                      <option value="approved">✓ Approved</option>
+                      <option value="pending">Pending</option>
+                      <option value="rejected">✕ Rejected</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">अर्ज क्रमांक (App No.)</label>
+                    <label className="font-bold text-slate-700 block mb-1">Application No.</label>
                     <input
                       type="text"
                       value={editingMember.applicationNumber || ''}
@@ -1217,7 +1217,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         }
                         className="w-4 h-4 text-emerald-600 rounded"
                       />
-                      <span className="font-bold text-slate-800">पेमेंट प्राप्त (₹220)</span>
+                      <span className="font-bold text-slate-800">Paid (₹220)</span>
                     </label>
                   </div>
                 </div>
@@ -1238,7 +1238,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                   )}
                 </div>
                 <div className="flex-1 space-y-2 text-center sm:text-left">
-                  <div className="font-bold text-slate-800">२. पासपोर्ट फोटो बदला / अपलोड करा</div>
+                  <div className="font-bold text-slate-800">2. Passport Photo</div>
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                     <button
                       type="button"
@@ -1247,7 +1247,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       className="bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
                     >
                       <Upload className="w-3.5 h-3.5 text-[#df6b16]" />
-                      {isUploadingPhoto ? 'अपलोड होत आहे...' : 'नवीन फोटो निवडा'}
+                      {isUploadingPhoto ? 'Uploading...' : 'Upload Photo'}
                     </button>
                     {editingMember.photo && (
                       <button
@@ -1260,7 +1260,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         }}
                         className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-60"
                       >
-                        फोटो काढा
+                        Remove
                       </button>
                     )}
                     <input
@@ -1278,9 +1278,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               {/* Personal & Work Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">आदरार्थी (श्री / सौ / श्रीमती / कुमारी)</label>
+                  <label className="font-bold text-slate-700 block mb-1">Salutation</label>
                   <select
-                    aria-label="आदरार्थी"
+                    aria-label="Salutation"
                     value={normalizeSalutation(editingMember.salutation)}
                     onChange={(e) => {
                       const nextSal = e.target.value;
@@ -1293,19 +1293,19 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     }}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold"
                   >
-                    <option value="">-- निवडा (सुटलेले) --</option>
-                    <option value="श्री">श्री (पुरुष)</option>
-                    <option value="सौ">सौ (स्त्री)</option>
-                    <option value="श्रीमती">श्रीमती (स्त्री)</option>
-                    <option value="कुमारी">कुमारी (स्त्री)</option>
+                    <option value="">-- Select --</option>
+                    <option value="श्री">श्री (Male)</option>
+                    <option value="सौ">सौ (Female)</option>
+                    <option value="श्रीमती">श्रीमती (Female)</option>
+                    <option value="कुमारी">कुमारी (Female)</option>
                     <option value="डॉ">डॉ</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">लिंग (एक्सेल यादीसाठी)</label>
+                  <label className="font-bold text-slate-700 block mb-1">Gender</label>
                   <select
-                    aria-label="लिंग"
+                    aria-label="Gender"
                     disabled={Boolean(deriveGenderFromSalutation(editingMember.salutation))}
                     value={resolveMemberGender(editingMember)}
                     onChange={(e) =>
@@ -1316,15 +1316,15 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     }
                     className="w-full p-2.5 bg-white disabled:bg-slate-100 border border-slate-300 rounded-lg font-bold text-[#0b1e36]"
                   >
-                    <option value="">-- आदरार्थीवरून स्वयंचलित --</option>
-                    <option value="पुरुष">पुरुष</option>
-                    <option value="स्त्री">स्त्री</option>
+                    <option value="">-- Auto --</option>
+                    <option value="पुरुष">Male</option>
+                    <option value="स्त्री">Female</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
-                    संपूर्ण नाव <span className="text-rose-600">*</span>
+                    Full Name <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -1337,7 +1337,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
-                    मोबाईल नंबर (10 अंकी) <span className="text-rose-600">*</span>
+                    Mobile (10 digits) <span className="text-rose-600">*</span>
                   </label>
                   <input
                     type="tel"
@@ -1354,7 +1354,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">ई-मेल पत्ता</label>
+                  <label className="font-bold text-slate-700 block mb-1">Email</label>
                   <input
                     type="email"
                     value={editingMember.email || ''}
@@ -1364,7 +1364,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">जिल्हा</label>
+                  <label className="font-bold text-slate-700 block mb-1">District</label>
                   <select
                     value={editingMember.district || ''}
                     onChange={(e) =>
@@ -1376,7 +1376,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     }
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold"
                   >
-                    <option value="">-- जिल्हा निवडा --</option>
+                    <option value="">-- Select District --</option>
                     {MAHARASHTRA_DISTRICTS.map((d) => (
                       <option key={d} value={d}>
                         {d}
@@ -1389,14 +1389,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">तालुका</label>
+                  <label className="font-bold text-slate-700 block mb-1">Taluka</label>
                   {availableTalukasForEdit.length > 0 ? (
                     <select
                       value={editingMember.taluka || ''}
                       onChange={(e) => setEditingMember({ ...editingMember, taluka: e.target.value })}
                       className="w-full p-2.5 bg-white border border-slate-300 rounded-lg"
                     >
-                      <option value="">-- तालुका निवडा --</option>
+                      <option value="">-- Select Taluka --</option>
                       {availableTalukasForEdit.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -1411,14 +1411,14 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       type="text"
                       value={editingMember.taluka || ''}
                       onChange={(e) => setEditingMember({ ...editingMember, taluka: e.target.value })}
-                      placeholder="तालुका लिहा"
+                      placeholder="Enter taluka"
                       className="w-full p-2.5 bg-white border border-slate-300 rounded-lg"
                     />
                   )}
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">कार्यरत केंद्राचे नाव</label>
+                  <label className="font-bold text-slate-700 block mb-1">Working Center</label>
                   <input
                     type="text"
                     value={editingMember.centerName || ''}
@@ -1428,7 +1428,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">पद / संवर्ग</label>
+                  <label className="font-bold text-slate-700 block mb-1">Cadre / Post</label>
                   <select
                     value={(() => {
                       const norm = normalizeOfficialCadre(editingMember.professional);
@@ -1437,7 +1437,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     onChange={(e) => setEditingMember({ ...editingMember, professional: e.target.value })}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-semibold"
                   >
-                    <option value="">-- संवर्ग निवडा --</option>
+                    <option value="">-- Select Cadre --</option>
                     {OFFICIAL_CADRES.map((c) => (
                       <option key={c} value={c}>
                         {c}
@@ -1447,7 +1447,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">शैक्षणिक पात्रता</label>
+                  <label className="font-bold text-slate-700 block mb-1">Education</label>
                   <input
                     type="text"
                     value={editingMember.education || ''}
@@ -1457,7 +1457,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">व्यावसायिक पात्रता</label>
+                  <label className="font-bold text-slate-700 block mb-1">Qualification</label>
                   <select
                     value={editingMember.professionalQualification || ''}
                     onChange={(e) =>
@@ -1465,7 +1465,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     }
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-lg"
                   >
-                    <option value="">-- निवडा --</option>
+                    <option value="">-- Select --</option>
                     {TEACHER_PROFESSIONAL_QUALIFICATIONS.map((q) => (
                       <option key={q} value={q}>
                         {q}
@@ -1483,7 +1483,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">कुटुंबातील सदस्य</label>
+                  <label className="font-bold text-slate-700 block mb-1">Family Members</label>
                   <input
                     type="text"
                     value={editingMember.familyMembers || ''}
@@ -1493,7 +1493,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="font-bold text-slate-700 block mb-1">छंद / विशेष आवड</label>
+                  <label className="font-bold text-slate-700 block mb-1">Hobbies</label>
                   <input
                     type="text"
                     value={editingMember.hobby || ''}
@@ -1503,7 +1503,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 </div>
 
                 <div className="sm:col-span-3">
-                  <label className="font-bold text-slate-700 block mb-1">पत्ता / कार्यक्षेत्र</label>
+                  <label className="font-bold text-slate-700 block mb-1">Address / Work Area</label>
                   <textarea
                     rows={2}
                     value={editingMember.address || ''}
@@ -1524,13 +1524,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     }
                     className="w-4 h-4 text-[#df6b16] rounded"
                   />
-                  <span>संघटनेचे अधिकृत पदाधिकारी आहेत काय?</span>
+                  <span>Federation Office Bearer</span>
                 </label>
 
                 {editingMember.isOfficial && (
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">संघटनेतील पद</label>
+                      <label className="font-bold text-slate-700 block mb-1">Post</label>
                       <select
                         value={editingMember.officialPost || ''}
                         onChange={(e) =>
@@ -1538,7 +1538,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         }
                         className="w-full p-2 bg-white border border-slate-300 rounded-lg"
                       >
-                        <option value="">-- पद निवडा --</option>
+                        <option value="">-- Select Post --</option>
                         {OFFICIAL_POST_OPTIONS.map((p) => (
                           <option key={p} value={p}>
                             {p}
@@ -1551,7 +1551,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">पदाधिकारी जिल्हा</label>
+                      <label className="font-bold text-slate-700 block mb-1">Official District</label>
                       <input
                         type="text"
                         value={editingMember.officialDistrict || ''}
@@ -1562,7 +1562,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">पदाधिकारी तालुका</label>
+                      <label className="font-bold text-slate-700 block mb-1">Official Taluka</label>
                       <input
                         type="text"
                         value={editingMember.officialTaluka || ''}
@@ -1583,7 +1583,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                   onClick={() => setEditingMember(null)}
                   className="min-h-[44px] px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-xs"
                 >
-                  रद्द करा
+                  Cancel
                 </button>
                 <button
                   type="submit"
@@ -1592,7 +1592,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 >
                   <Check className="w-4 h-4" />
                   <span>
-                    {isUploadingPhoto ? 'फोटो अपलोड होत आहे...' : isSaving ? 'सेव्ह होत आहे...' : 'बदल सेव्ह करा'}
+                    {isUploadingPhoto ? 'Uploading...' : isSaving ? 'Saving...' : 'Save Changes'}
                   </span>
                 </button>
               </div>
@@ -1612,38 +1612,38 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <ShieldAlert className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serifDevanagari text-base font-bold text-rose-900">
-                  सदस्य नोंदणी कायमची डिलीट करायची का?
+                <h4 className="text-base font-bold text-rose-900">
+                  Delete Member Permanently?
                 </h4>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  डिलीट केल्यास ही नोंदणी डेटाबेसमधून कायमची काढली जाईल. कृपया तपशील तपासा:
+                  This record will be permanently deleted from the database.
                 </p>
               </div>
             </div>
 
             <div className="bg-[#fbf8f2] border border-[#e7ded1] rounded-xl p-3.5 text-xs space-y-1.5">
               <div>
-                <span className="text-slate-500">नाव:</span>{' '}
+                <span className="text-slate-500">Name:</span>{' '}
                 <strong className="text-slate-900">
                   {deletingMember.salutation} {deletingMember.fullName}
                 </strong>
               </div>
               <div>
-                <span className="text-slate-500">सदस्य क्रमांक:</span>{' '}
+                <span className="text-slate-500">Member No:</span>{' '}
                 <strong className="font-mono text-[#0b1e36]">
-                  {deletingMember.memberNumber || 'नाही'}
+                  {deletingMember.memberNumber || 'None'}
                 </strong>
               </div>
               <div>
-                <span className="text-slate-500">अर्ज क्रमांक:</span>{' '}
+                <span className="text-slate-500">App No:</span>{' '}
                 <strong className="font-mono">{deletingMember.applicationNumber}</strong>
               </div>
               <div>
-                <span className="text-slate-500">मोबाईल / जिल्हा:</span>{' '}
+                <span className="text-slate-500">Mobile / District:</span>{' '}
                 <strong className="font-mono">{deletingMember.phone}</strong> ({deletingMember.district})
               </div>
               <div>
-                <span className="text-slate-500">नोंदणी तारीख:</span>{' '}
+                <span className="text-slate-500">Date:</span>{' '}
                 <span>{formatDateWithEnglishDigits(deletingMember.createdAt)}</span>
               </div>
             </div>
@@ -1655,7 +1655,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 disabled={isDeleting}
                 className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
               >
-                रद्द करा
+                Cancel
               </button>
               <button
                 type="button"
@@ -1664,7 +1664,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 className="flex-1 sm:flex-none min-h-[44px] px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
-                <span>{isDeleting ? 'डिलीट होत आहे...' : 'होय, कायमचा डिलीट करा'}</span>
+                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
               </button>
             </div>
           </div>
@@ -1682,11 +1682,11 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="font-serifDevanagari text-base font-bold text-[#0b1e36]">
-                  जुने डिलीट व घोस्ट रेकॉर्ड स्वच्छ करायचे का?
+                <h4 className="text-base font-bold text-[#0b1e36]">
+                  Clean Deleted &amp; Ghost Records?
                 </h4>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  पूर्वी डिलीट / नाकारलेले (Rejected), अपूर्ण आणि दुबार प्रलंबित अर्ज डेटाबेसमधून कायमचे काढले जातील. मंजूर सदस्य पूर्णपणे सुरक्षित राहतील.
+                  Removes rejected, incomplete, and duplicate pending records. Approved members remain safe.
                 </p>
               </div>
             </div>
@@ -1696,7 +1696,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 onClick={() => setShowPurgeConfirmModal(false)}
                 className="min-h-[44px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
               >
-                रद्द करा
+                Cancel
               </button>
               <button
                 type="button"
@@ -1704,7 +1704,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 className="flex-1 sm:flex-none min-h-[44px] px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>होय, स्वच्छ करा</span>
+                <span>Clean Now</span>
               </button>
             </div>
           </div>
