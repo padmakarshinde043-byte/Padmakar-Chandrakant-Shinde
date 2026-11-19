@@ -1,7 +1,12 @@
 import XLSX from 'xlsx-js-style';
 import { OfficialMember } from '../data/rkMaharashtraData';
 import { MembershipApplication } from '../data/mahasanghData';
-import { toEnglishDigits } from './formatters';
+import { formatDateWithEnglishDigits, toEnglishDigits } from './formatters';
+import {
+  formatMemberDisplayName,
+  resolveEffectiveSalutation,
+  resolveMemberGender,
+} from './memberGender';
 
 const THIN_BORDER = {
   top: { style: 'thin', color: { rgb: 'D0D5DD' } },
@@ -272,53 +277,179 @@ export function exportTalukaPresidentsExcel(list: Array<{ district: string; talu
   XLSX.writeFile(wb, `महाराष्ट्र_राज्य_सर्व_तालुका_अध्यक्ष_यादी.xlsx`);
 }
 
+export const UNIFIED_MEMBERS_EXCEL_HEADERS = [
+  'अ.क्र.',
+  'सदस्य क्रमांक',
+  'अर्ज क्रमांक',
+  'आदरार्थी',
+  'संपूर्ण नाव',
+  'लिंग',
+  'पद / संवर्ग',
+  'जिल्हा',
+  'तालुका',
+  'कार्यरत केंद्र',
+  'मोबाईल नंबर',
+  'ई-मेल पत्ता',
+  'अर्जाची स्थिती',
+  'नोंदणी दिनांक',
+] as const;
+
+export interface UnifiedMembersExcelOptions {
+  title?: string;
+  fileName?: string;
+  sheetName?: string;
+  filterLabel?: string;
+}
+
+export interface UnifiedMembersExcelData {
+  titleRow: string[];
+  subRow: string[];
+  headerRow: string[];
+  rows: (string | number)[][];
+  stats: {
+    total: number;
+    maleCount: number;
+    femaleCount: number;
+    unspecifiedCount: number;
+  };
+}
+
 /**
- * 4. Registered Members Directory Excel Export
+ * Deterministic sorting shared by both Admin Panel & State President Excel exports
+ * so both exports produce identical row order for the same set of members.
  */
-export function exportRegisteredMembersExcel(list: MembershipApplication[]) {
-  const titleRow = ['महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - नोंदणीकृत सदस्य यादी'];
-  const subRow = [`एकूण नोंदणीकृत सदस्य: ${list.length} | दिनांक: ${new Date().toLocaleDateString('en-IN')}`];
-  const headerRow = ['अ.क्र.', 'सदस्य क्रमांक', 'संपूर्ण नाव', 'सध्याचे पद / संवर्ग', 'तालुका व जिल्हा', 'मोबाईल नंबर'];
-
-  const data: (string | number)[][] = [titleRow, subRow, [], headerRow];
-
-  list.forEach((m, idx) => {
-    const place = m.taluka ? `${m.taluka}, ${m.district}` : m.district || '-';
-    const fullName = `${m.salutation || ''} ${m.fullName || ''}`.trim();
-    data.push([
-      idx + 1,
-      m.memberNumber || '-',
-      fullName,
-      m.professional || '-',
-      place,
-      toEnglishDigits(m.phone || '-')
-    ]);
+export function sortMembersForUnifiedExcel(list: MembershipApplication[]): MembershipApplication[] {
+  return [...(list || [])].sort((a, b) => {
+    const timeDiff = new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+    if (!Number.isNaN(timeDiff) && timeDiff !== 0) return timeDiff;
+    const memCmp = String(a.memberNumber || '').localeCompare(String(b.memberNumber || ''));
+    if (memCmp !== 0) return memCmp;
+    const appCmp = String(a.applicationNumber || '').localeCompare(String(b.applicationNumber || ''));
+    if (appCmp !== 0) return appCmp;
+    return String(a.id || '').localeCompare(String(b.id || ''));
   });
+}
+
+/**
+ * Pure data builder for the Unified Members Excel sheet (used by BOTH Admin Panel and State President Login).
+ */
+export function buildUnifiedMembersExcelData(
+  list: MembershipApplication[],
+  options: UnifiedMembersExcelOptions = {}
+): UnifiedMembersExcelData {
+  const sorted = sortMembersForUnifiedExcel(list);
+  let maleCount = 0;
+  let femaleCount = 0;
+  let unspecifiedCount = 0;
+
+  const rows: (string | number)[][] = sorted.map((m, idx) => {
+    const salutation = resolveEffectiveSalutation(m);
+    const gender = resolveMemberGender(m);
+    if (gender === 'पुरुष') maleCount += 1;
+    else if (gender === 'स्त्री') femaleCount += 1;
+    else unspecifiedCount += 1;
+
+    const fullName = formatMemberDisplayName(salutation, m.fullName);
+    const statusLabel =
+      m.status === 'approved' ? 'मंजूर' : m.status === 'rejected' ? 'नाकारले' : 'प्रलंबित';
+
+    return [
+      idx + 1,
+      toEnglishDigits(m.memberNumber || '-'),
+      toEnglishDigits(m.applicationNumber || '-'),
+      salutation || '-',
+      fullName,
+      gender || '-',
+      m.professional || '-',
+      m.district || '-',
+      m.taluka || '-',
+      m.centerName || '-',
+      toEnglishDigits(m.phone || '-'),
+      m.email || '-',
+      statusLabel,
+      m.createdAt ? formatDateWithEnglishDigits(m.createdAt) : '-',
+    ];
+  });
+
+  const title =
+    options.title || 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - अधिकृत सदस्य यादी';
+  const filterPart = options.filterLabel ? ` (${options.filterLabel})` : '';
+  const summaryParts = [
+    `एकूण सदस्य${filterPart}: ${toEnglishDigits(sorted.length)}`,
+    `पुरुष: ${toEnglishDigits(maleCount)}`,
+    `स्त्री: ${toEnglishDigits(femaleCount)}`,
+  ];
+  if (unspecifiedCount > 0) {
+    summaryParts.push(`अनिर्दिष्ट: ${toEnglishDigits(unspecifiedCount)}`);
+  }
+  summaryParts.push(`दिनांक: ${toEnglishDigits(new Date().toLocaleDateString('en-IN'))}`);
+
+  return {
+    titleRow: [title],
+    subRow: [summaryParts.join(' | ')],
+    headerRow: [...UNIFIED_MEMBERS_EXCEL_HEADERS],
+    rows,
+    stats: {
+      total: sorted.length,
+      maleCount,
+      femaleCount,
+      unspecifiedCount,
+    },
+  };
+}
+
+/**
+ * 4. Unified Members Directory Excel Export
+ * Shared identically by Admin Panel (अर्ज मंजुरी पान) and State President Login (राज्याध्यक्ष लॉगिन).
+ */
+export function exportUnifiedMembersExcel(
+  list: MembershipApplication[],
+  options: UnifiedMembersExcelOptions = {}
+) {
+  const built = buildUnifiedMembersExcelData(list, options);
+  const data: (string | number)[][] = [built.titleRow, built.subRow, [], built.headerRow, ...built.rows];
+  const lastColIdx = built.headerRow.length - 1;
 
   const ws = XLSX.utils.aoa_to_sheet(data);
 
   ws['!cols'] = [
-    { wch: 7 },
-    { wch: 16 },
-    { wch: 26 },
-    { wch: 24 },
-    { wch: 22 },
-    { wch: 15 }
+    { wch: 7 },  // अ.क्र.
+    { wch: 22 }, // सदस्य क्रमांक
+    { wch: 18 }, // अर्ज क्रमांक
+    { wch: 11 }, // आदरार्थी
+    { wch: 30 }, // संपूर्ण नाव
+    { wch: 11 }, // लिंग
+    { wch: 24 }, // पद / संवर्ग
+    { wch: 16 }, // जिल्हा
+    { wch: 16 }, // तालुका
+    { wch: 22 }, // कार्यरत केंद्र
+    { wch: 15 }, // मोबाईल नंबर
+    { wch: 26 }, // ई-मेल पत्ता
+    { wch: 13 }, // अर्जाची स्थिती
+    { wch: 15 }, // नोंदणी दिनांक
   ];
 
-  ws['!rows'] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 6 }, { hpt: 32 }];
+  ws['!rows'] = [{ hpt: 28 }, { hpt: 20 }, { hpt: 6 }, { hpt: 32 }];
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
+    { s: { r: 0, c: 0 }, e: { r: 0, c: lastColIdx } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: lastColIdx } },
   ];
 
-  for (let c = 0; c <= 5; c++) {
+  for (let c = 0; c <= lastColIdx; c++) {
     const r0 = XLSX.utils.encode_cell({ r: 0, c });
     if (!ws[r0]) ws[r0] = { t: 's', v: '' };
     ws[r0].s = {
       font: { name: 'Calibri', sz: 13, bold: true, color: { rgb: 'FFFFFF' } },
       fill: { fgColor: { rgb: '193568' } },
-      alignment: { horizontal: 'center', vertical: 'center' }
+      alignment: { horizontal: 'center', vertical: 'center' },
+    };
+
+    const r1 = XLSX.utils.encode_cell({ r: 1, c });
+    if (!ws[r1]) ws[r1] = { t: 's', v: '' };
+    ws[r1].s = {
+      font: { name: 'Calibri', sz: 10.5, bold: true, color: { rgb: '0F172A' } },
+      fill: { fgColor: { rgb: 'EFF6FF' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
     };
 
     const r3 = XLSX.utils.encode_cell({ r: 3, c });
@@ -327,32 +458,69 @@ export function exportRegisteredMembersExcel(list: MembershipApplication[]) {
         font: { name: 'Calibri', sz: 10.5, bold: true, color: { rgb: 'FFFFFF' } },
         fill: { fgColor: { rgb: '193568' } },
         alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
-        border: THIN_BORDER
+        border: THIN_BORDER,
       };
     }
   }
+
+  const centeredCols = new Set([0, 1, 2, 3, 5, 10, 12, 13]);
 
   for (let r = 4; r < data.length; r++) {
     const isZebra = r % 2 === 1;
     const bg = isZebra ? 'F8FAFC' : 'FFFFFF';
     ws['!rows'].push({ hpt: 22 });
 
-    for (let c = 0; c <= 5; c++) {
+    for (let c = 0; c <= lastColIdx; c++) {
       const ref = XLSX.utils.encode_cell({ r, c });
       if (!ws[ref]) continue;
-      const isCenter = c === 0 || c === 1 || c === 5;
+      const isGenderCol = c === 5;
+      const cellVal = String(ws[ref].v || '');
+      const genderColor =
+        isGenderCol && cellVal === 'स्त्री'
+          ? '9D174D'
+          : isGenderCol && cellVal === 'पुरुष'
+          ? '1E3A8A'
+          : '1E293B';
+
       ws[ref].s = {
-        font: { name: 'Calibri', sz: 10, color: { rgb: '1E293B' }, bold: c === 1 || c === 2 },
+        font: {
+          name: 'Calibri',
+          sz: 10,
+          color: { rgb: genderColor },
+          bold: c === 1 || c === 4 || isGenderCol,
+        },
         fill: { fgColor: { rgb: bg } },
-        alignment: { horizontal: isCenter ? 'center' : 'left', vertical: 'center' },
-        border: THIN_BORDER
+        alignment: { horizontal: centeredCols.has(c) ? 'center' : 'left', vertical: 'center' },
+        border: THIN_BORDER,
       };
     }
   }
 
+  ws['!pageSetup'] = {
+    paperSize: 9, // A4
+    orientation: 'landscape',
+    fitToWidth: 1,
+    fitToHeight: 0,
+  };
+
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'नोंदणीकृत सदस्य');
-  XLSX.writeFile(wb, `अधिकृत_नोंदणीकृत_सदस्य_यादी.xlsx`);
+  const sheetName = options.sheetName || 'नोंदणीकृत सदस्य';
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  const dateSlug = new Date().toISOString().split('T')[0];
+  const fileName = options.fileName || `महाराष्ट्र_राज्य_अधिकृत_सदस्य_यादी_${dateSlug}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+}
+
+/**
+ * Backwards-compatible wrapper used by State President Login — uses the exact same unified format.
+ */
+export function exportRegisteredMembersExcel(list: MembershipApplication[]) {
+  exportUnifiedMembersExcel(list, {
+    title: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - अधिकृत नोंदणीकृत सदस्य यादी',
+    sheetName: 'नोंदणीकृत सदस्य',
+    filterLabel: 'मंजूर',
+    fileName: `अधिकृत_नोंदणीकृत_सदस्य_यादी_${new Date().toISOString().split('T')[0]}.xlsx`,
+  });
 }
 
 /**

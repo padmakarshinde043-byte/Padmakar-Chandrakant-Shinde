@@ -52,6 +52,7 @@ export const MYSQL_SCHEMA_MANIFEST: MysqlTableSpec[] = [
       { name: 'application_number', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
       { name: 'member_number', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
       { name: 'salutation', definition: "VARCHAR(32) NOT NULL DEFAULT ''" },
+      { name: 'gender', definition: "VARCHAR(24) NOT NULL DEFAULT ''" },
       { name: 'full_name', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
       { name: 'phone', definition: "VARCHAR(32) NOT NULL DEFAULT ''" },
       { name: 'email', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },

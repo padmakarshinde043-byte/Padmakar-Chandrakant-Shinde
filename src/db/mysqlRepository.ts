@@ -56,6 +56,7 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
     applicationNumber: String(row.application_number || extra.applicationNumber || ''),
     memberNumber: row.member_number ? String(row.member_number) : extra.memberNumber || '',
     salutation: String(row.salutation || extra.salutation || ''),
+    gender: (String(row.gender || extra.gender || '') as 'पुरुष' | 'स्त्री' | ''),
     fullName: String(row.full_name || extra.fullName || ''),
     phone: String(row.phone || extra.phone || ''),
     email: String(row.email || extra.email || ''),
@@ -128,7 +129,7 @@ export async function mysqlListApplicationsAdminLite(onlyApproved = false): Prom
     const pool = getMysqlPool();
     const whereClause = onlyApproved ? "WHERE `status` = 'approved'" : '';
     const sql = `SELECT
-        \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
+        \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`gender\`, \`full_name\`,
         \`phone\`, \`email\`, \`address\`, \`district\`, \`taluka\`, \`center_name\`,
         \`family_members\`, \`hobby\`, \`education\`, \`professional_qualification\`, \`professional\`,
         \`status\`, \`reject_reason\`,
@@ -212,7 +213,7 @@ export async function mysqlListApprovedDirectory(): Promise<MembershipApplicatio
   return withMysqlSchemaRetry(async () => {
     const pool = getMysqlPool();
     const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
+      `SELECT \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`gender\`, \`full_name\`,
               \`phone\`, \`district\`, \`taluka\`, \`center_name\`, \`professional\`,
               \`is_official\`, \`official_post\`, \`official_district\`, \`official_taluka\`,
               \`status\`, \`approved_at\`, \`created_at\`
@@ -226,6 +227,7 @@ export async function mysqlListApprovedDirectory(): Promise<MembershipApplicatio
       applicationNumber: String(row.application_number || ''),
       memberNumber: row.member_number ? String(row.member_number) : '',
       salutation: String(row.salutation || ''),
+      gender: (String(row.gender || '') as 'पुरुष' | 'स्त्री' | ''),
       fullName: String(row.full_name || ''),
       phone: String(row.phone || ''),
       email: '',
@@ -286,17 +288,18 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
 
     await pool.execute(
     `INSERT INTO \`applications\` (
-      id, application_number, member_number, salutation, full_name, phone, email, address,
+      id, application_number, member_number, salutation, gender, full_name, phone, email, address,
       district, taluka, center_name, family_members, hobby, education, professional_qualification,
       professional, status, reject_reason, photo, payment_ref, payment_confirmed,
       razorpay_payment_id, razorpay_order_id, is_official, official_post, official_district,
       official_taluka, approved_by, id_card_email_sent, id_card_email_sent_at,
       welcome_email_sent, welcome_email_sent_at, created_at, approved_at, rejected_at, updated_at, extra_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       application_number = VALUES(application_number),
       member_number = VALUES(member_number),
       salutation = VALUES(salutation),
+      gender = VALUES(gender),
       full_name = VALUES(full_name),
       phone = VALUES(phone),
       email = VALUES(email),
@@ -334,6 +337,7 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
       String(app.applicationNumber || ''),
       String(app.memberNumber || ''),
       String(app.salutation || ''),
+      String(app.gender || ''),
       String(app.fullName || ''),
       String(app.phone || ''),
       String(app.email || ''),

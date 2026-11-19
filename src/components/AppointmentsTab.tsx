@@ -48,6 +48,8 @@ import {
 } from '../utils/officialsCache';
 import {
   authApiRequest,
+  getAuthHeaders,
+  isSqlBackendActive,
   setAuthSessionToken,
   clearAuthSessionToken,
 } from '../api/sqlBridge';
@@ -336,6 +338,21 @@ export const AppointmentsTab: React.FC = () => {
         .catch(() => {});
     }
   }, [activeSubTab, showStatusMatrixModal, registeredApplications.length]);
+
+  // Keep registeredApplications synchronized immediately when Admin Panel edits any member
+  useEffect(() => {
+    const handleAppsUpdated = () => {
+      fetchApprovedMembersCached(true)
+        .then((appsData) => {
+          if (Array.isArray(appsData)) {
+            setRegisteredApplications(appsData);
+          }
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('mahasangh_apps_updated', handleAppsUpdated);
+    return () => window.removeEventListener('mahasangh_apps_updated', handleAppsUpdated);
+  }, []);
 
   const loadData = async (force: boolean) => {
     setIsRefreshing(true);
@@ -916,21 +933,66 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // Fresh SQL Data Synchronizer for Exports & Matrix (Direct from HostKarle MySQL)
+  // Fresh SQL Data Synchronizer for Exports & Matrix (Direct from HostKarle MySQL or synced local cache)
   const ensureFreshSqlData = async (): Promise<{
     freshOfficials: OfficialMember[];
     freshApps: MembershipApplication[];
   }> => {
     try {
-      const [officialsRes, appsRes] = await Promise.all([
-        fetch(`/api/db/rk/officials?_t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' }
-        }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        fetch(`/api/db/applications?status=approved&summary=1&_t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache' }
-        }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      const sqlActive = await isSqlBackendActive();
+      const authHeaders = getAuthHeaders();
+      const noCacheHeaders: Record<string, string> = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      };
+
+      const fetchFreshApprovedApps = async (): Promise<MembershipApplication[] | null> => {
+        if (!sqlActive) {
+          const localApproved = await fetchApprovedMembersCached(true);
+          return Array.isArray(localApproved) ? localApproved : null;
+        }
+        // When State President / Admin is logged in, fetch full lite approved list (includes email, centerName, salutation, gender)
+        if (authHeaders.Authorization) {
+          const authRes = await fetch(
+            `/api/db/applications?status=approved&lite=1&refresh=1&_t=${Date.now()}`,
+            {
+              cache: 'no-store',
+              headers: { ...noCacheHeaders, ...authHeaders },
+            }
+          )
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null);
+          if (Array.isArray(authRes?.items)) {
+            return authRes.items;
+          }
+        }
+        // Fallback to approved summary directory
+        const summaryRes = await fetch(
+          `/api/db/applications?status=approved&summary=1&refresh=1&_t=${Date.now()}`,
+          {
+            cache: 'no-store',
+            headers: noCacheHeaders,
+          }
+        )
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        if (Array.isArray(summaryRes?.items)) {
+          return summaryRes.items;
+        }
+        const fallback = await fetchApprovedMembersCached(true);
+        return Array.isArray(fallback) ? fallback : null;
+      };
+
+      const [officialsRes, freshAppsResult] = await Promise.all([
+        sqlActive
+          ? fetch(`/api/db/rk/officials?_t=${Date.now()}`, {
+              cache: 'no-store',
+              headers: noCacheHeaders,
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null)
+          : Promise.resolve(null),
+        fetchFreshApprovedApps(),
       ]);
 
       let updatedOfficials = officials;
@@ -956,8 +1018,8 @@ export const AppointmentsTab: React.FC = () => {
       }
 
       let updatedApps = registeredApplications;
-      if (Array.isArray(appsRes?.items)) {
-        updatedApps = appsRes.items;
+      if (Array.isArray(freshAppsResult)) {
+        updatedApps = freshAppsResult;
         setRegisteredApplications(updatedApps);
       }
 

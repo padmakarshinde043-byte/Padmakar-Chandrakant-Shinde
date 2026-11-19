@@ -1925,7 +1925,14 @@ app.get('/api/db/applications', async (req, res) => {
 
     if (!(onlyApproved && isSummary)) {
       const session = extractRequestSession(req);
-      if (!session || (session.role !== 'super_admin' && session.role !== 'sub_admin')) {
+      const isStatePresidentApprovedRead =
+        Boolean(session && session.role === 'state_president' && onlyApproved && !withPhotos);
+      if (
+        !session ||
+        (!isStatePresidentApprovedRead &&
+          session.role !== 'super_admin' &&
+          session.role !== 'sub_admin')
+      ) {
         return res.status(401).json({
           status: 'error',
           message: 'प्रवेश नाकारला: अर्जांची संपूर्ण यादी पाहण्यासाठी कृपया आधी ॲडमिन लॉगिन करा.',

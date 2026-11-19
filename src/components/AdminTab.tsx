@@ -57,6 +57,7 @@ import {
   fetchApprovedApplicationsWithPhotosByDistricts
 } from '../firebase';
 import { generateMembershipIdCardPdf, generateDistrictBatchIdCardsPdf } from '../services/rkPdfGenerator';
+import { exportUnifiedMembersExcel } from '../utils/excelExporter';
 import { compressImageFile } from '../utils/imageCompressor';
 import {
   saveDynamicLeadersToFirebase,
@@ -3334,43 +3335,30 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </div>
                     <button
                       type="button"
-                      onClick={async () => {
-                        const XLSX = await import('xlsx');
-                        const excelData = filteredApps.map((a, idx) => ({
-                          'अनुक्रमांक': idx + 1,
-                          'सदस्य क्रमांक': a.memberNumber || '-',
-                          'अर्ज क्रमांक': a.applicationNumber || '-',
-                          'पूर्ण नाव': a.fullName || '-',
-                          'पद / संवर्ग': a.professional || '-',
-                          'जिल्हा': a.district || '-',
-                          'तालुका': a.taluka || '-',
-                          'कार्यरत केंद्र': a.centerName || '-',
-                          'मोबाईल नंबर': a.phone || '-',
-                          'ई-मेल पत्ता': a.email || '-',
-                          'अर्जाची स्थिती': a.status === 'approved' ? 'मंजूर' : a.status === 'rejected' ? 'नाकारले' : 'प्रलंबित',
-                          'नोंदणी दिनांक': formatDateWithEnglishDigits(a.createdAt || '')
-                        }));
-
-                        const worksheet = XLSX.utils.json_to_sheet(excelData);
-                        worksheet['!cols'] = [
-                          { wch: 10 },
-                          { wch: 22 },
-                          { wch: 18 },
-                          { wch: 32 },
-                          { wch: 22 },
-                          { wch: 16 },
-                          { wch: 16 },
-                          { wch: 22 },
-                          { wch: 16 },
-                          { wch: 26 },
-                          { wch: 14 },
-                          { wch: 16 },
-                        ];
-
-                        const workbook = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(workbook, worksheet, 'सदस्य माहिती');
-                        const fileName = `mahasangh_members_${filterStatus}_${new Date().toISOString().split('T')[0]}.xlsx`;
-                        XLSX.writeFile(workbook, fileName);
+                      onClick={() => {
+                        const filterLabelMap: Record<string, string> = {
+                          all: 'सर्व',
+                          approved: 'मंजूर',
+                          pending: 'प्रलंबित',
+                          rejected: 'नाकारले',
+                        };
+                        const dateSlug = new Date().toISOString().split('T')[0];
+                        exportUnifiedMembersExcel(filteredApps, {
+                          title:
+                            filterStatus === 'approved'
+                              ? 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - अधिकृत नोंदणीकृत सदस्य यादी'
+                              : 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - अधिकृत सदस्य यादी',
+                          sheetName: 'नोंदणीकृत सदस्य',
+                          filterLabel: filterLabelMap[filterStatus] || 'सर्व',
+                          fileName:
+                            filterStatus === 'approved'
+                              ? `अधिकृत_नोंदणीकृत_सदस्य_यादी_${dateSlug}.xlsx`
+                              : `अधिकृत_सदस्य_यादी_${filterStatus}_${dateSlug}.xlsx`,
+                        });
+                        showAdminFeedback(
+                          `एक्सेल यादी (${toEnglishDigits(filteredApps.length)} सदस्य - लिंग रकान्यासह) यशस्वीरीत्या डाऊनलोड झाली!`,
+                          'success'
+                        );
                       }}
                       className="min-h-[44px] bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 cursor-pointer"
                       title="सर्व सदस्य माहिती मूळ एक्सेल (.XLSX) फॉरमॅटमध्ये डाऊनलोड करा"

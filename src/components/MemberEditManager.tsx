@@ -29,6 +29,13 @@ import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary
 import { generateMembershipIdCardPdf } from '../services/rkPdfGenerator';
 import { syncMemberCounter, purgeDeletedAndGhostApplicationsInFirestore, fetchApplicationPhotosBatch, fetchSingleApplicationForAdmin } from '../firebase';
 import { parseMemberNumberSeq } from '../utils/memberNumberAllocator';
+import {
+  deriveGenderFromSalutation,
+  formatMemberDisplayName,
+  isMissingSalutationOrGender,
+  normalizeSalutation,
+  resolveMemberGender,
+} from '../utils/memberGender';
 
 interface MemberEditManagerProps {
   applications: MembershipApplication[];
@@ -64,7 +71,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   isLoadingApps,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'duplicates' | 'issue_0001' | 'approved'>('all');
+  const [quickFilter, setQuickFilter] = useState<
+    'all' | 'duplicates' | 'issue_0001' | 'missing_salutation' | 'approved'
+  >('all');
 
   // Edit Modal State
   const [editingMember, setEditingMember] = useState<MembershipApplication | null>(null);
@@ -132,6 +141,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     ).length;
 
     const issue0001Count = applications.filter((a) => is0001Issue(a)).length;
+    const missingSalutationCount = applications.filter((a) => isMissingSalutationOrGender(a)).length;
 
     return {
       phoneCounts,
@@ -143,6 +153,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       is0001Issue,
       duplicateCount,
       issue0001Count,
+      missingSalutationCount,
     };
   }, [applications]);
 
@@ -162,6 +173,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
         }
       } else if (quickFilter === 'issue_0001') {
         if (!duplicateAnalysis.is0001Issue(app)) return false;
+      } else if (quickFilter === 'missing_salutation') {
+        if (!isMissingSalutationOrGender(app)) return false;
       } else if (quickFilter === 'approved') {
         if (app.status !== 'approved') return false;
       }
@@ -196,7 +209,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     setVisibleCount(50);
   };
 
-  const handleQuickFilterChange = (next: 'all' | 'duplicates' | 'issue_0001' | 'approved') => {
+  const handleQuickFilterChange = (
+    next: 'all' | 'duplicates' | 'issue_0001' | 'missing_salutation' | 'approved'
+  ) => {
     setQuickFilter(next);
     setVisibleCount(50);
   };
@@ -256,7 +271,16 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       const full = await fetchSingleApplicationForAdmin(member.id);
       if (full) target = full;
     }
-    setEditingMember({ ...target });
+    const normalizedSal = normalizeSalutation(target.salutation);
+    const resolvedGender = resolveMemberGender({
+      ...target,
+      salutation: normalizedSal,
+    });
+    setEditingMember({
+      ...target,
+      salutation: normalizedSal,
+      gender: resolvedGender,
+    });
     const parsedSeq = parseMemberNumberSeq(target.memberNumber);
     setSeqInputForFormat(parsedSeq > 0 ? String(parsedSeq) : '');
   };
@@ -308,8 +332,15 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       return;
     }
 
+    const normalizedSal = normalizeSalutation(editingMember.salutation);
+    const resolvedGender = resolveMemberGender({
+      ...editingMember,
+      salutation: normalizedSal,
+    });
     const updatedRecord: MembershipApplication = {
       ...editingMember,
+      salutation: normalizedSal,
+      gender: resolvedGender,
       fullName: editingMember.fullName.trim(),
       phone: cleanPhone,
       email: (editingMember.email || `${cleanPhone}@mahasangh.in`).trim().toLowerCase(),
@@ -542,6 +573,19 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
           <button
             type="button"
+            onClick={() => handleQuickFilterChange('missing_salutation')}
+            className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
+              quickFilter === 'missing_salutation'
+                ? 'bg-indigo-700 text-white shadow-xs'
+                : 'bg-white text-indigo-800 border border-indigo-200 hover:bg-indigo-50'
+            }`}
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+            <span>आदरार्थी सुटलेले ({duplicateAnalysis.missingSalutationCount})</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => handleQuickFilterChange('approved')}
             className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
               quickFilter === 'approved'
@@ -623,7 +667,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       </span>
                     </div>
                     <h4 className="font-bold text-slate-900 text-sm leading-snug mt-0.5 truncate">
-                      {app.salutation} {app.fullName}
+                      {formatMemberDisplayName(app.salutation, app.fullName)}
                     </h4>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600 mt-1 tabular-nums">
                       <span className="font-mono font-bold text-[#0b1e36]">{app.phone}</span>
@@ -635,6 +679,24 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                           <span>{app.taluka}</span>
                         </>
                       )}
+                      {(() => {
+                        const g = resolveMemberGender(app);
+                        return g ? (
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              g === 'स्त्री'
+                                ? 'bg-pink-50 text-pink-800 border border-pink-200'
+                                : 'bg-blue-50 text-blue-800 border border-blue-200'
+                            }`}
+                          >
+                            {g}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-indigo-700">
+                            [आदरार्थी सुटलेले]
+                          </span>
+                        );
+                      })()}
                     </div>
                     {(dupPhone || dupName || dupMemNo || is0001) && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px] font-bold text-rose-700">
@@ -763,12 +825,30 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
                     <td className="py-3 px-3">
                       <div className="font-bold text-slate-900 text-xs sm:text-sm">
-                        {app.salutation} {app.fullName}
+                        {formatMemberDisplayName(app.salutation, app.fullName)}
                       </div>
-                      <div className="text-[11px] text-slate-600 mt-0.5">
-                        {app.professional || 'केंद्रप्रमुख'}
+                      <div className="text-[11px] text-slate-600 mt-0.5 flex flex-wrap items-center gap-1.5">
+                        <span>{app.professional || 'केंद्रप्रमुख'}</span>
+                        {(() => {
+                          const g = resolveMemberGender(app);
+                          return g ? (
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                g === 'स्त्री'
+                                  ? 'bg-pink-50 text-pink-800 border border-pink-200'
+                                  : 'bg-blue-50 text-blue-800 border border-blue-200'
+                              }`}
+                            >
+                              {g}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-indigo-700">
+                              · आदरार्थी सुटलेले
+                            </span>
+                          );
+                        })()}
                         {app.isOfficial && app.officialPost && (
-                          <span className="ml-1.5 text-[#df6b16] font-bold">
+                          <span className="text-[#df6b16] font-bold">
                             · {app.officialPost}
                           </span>
                         )}
@@ -1074,20 +1154,51 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               {/* Personal & Work Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">आदरार्थी</label>
+                  <label className="font-bold text-slate-700 block mb-1">आदरार्थी (श्री / सौ / श्रीमती / कुमारी)</label>
                   <select
-                    value={editingMember.salutation || 'श्री'}
-                    onChange={(e) => setEditingMember({ ...editingMember, salutation: e.target.value })}
-                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg"
+                    aria-label="आदरार्थी"
+                    value={normalizeSalutation(editingMember.salutation)}
+                    onChange={(e) => {
+                      const nextSal = e.target.value;
+                      const derived = deriveGenderFromSalutation(nextSal);
+                      setEditingMember({
+                        ...editingMember,
+                        salutation: nextSal,
+                        gender: derived || editingMember.gender || '',
+                      });
+                    }}
+                    className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-bold"
                   >
-                    <option value="श्री">श्री</option>
-                    <option value="सौ">सौ</option>
-                    <option value="श्रीमती">श्रीमती</option>
+                    <option value="">-- निवडा (सुटलेले) --</option>
+                    <option value="श्री">श्री (पुरुष)</option>
+                    <option value="सौ">सौ (स्त्री)</option>
+                    <option value="श्रीमती">श्रीमती (स्त्री)</option>
+                    <option value="कुमारी">कुमारी (स्त्री)</option>
                     <option value="डॉ">डॉ</option>
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">लिंग (एक्सेल यादीसाठी)</label>
+                  <select
+                    aria-label="लिंग"
+                    disabled={Boolean(deriveGenderFromSalutation(editingMember.salutation))}
+                    value={resolveMemberGender(editingMember)}
+                    onChange={(e) =>
+                      setEditingMember({
+                        ...editingMember,
+                        gender: e.target.value as 'पुरुष' | 'स्त्री' | '',
+                      })
+                    }
+                    className="w-full p-2.5 bg-white disabled:bg-slate-100 border border-slate-300 rounded-lg font-bold text-[#0b1e36]"
+                  >
+                    <option value="">-- आदरार्थीवरून स्वयंचलित --</option>
+                    <option value="पुरुष">पुरुष</option>
+                    <option value="स्त्री">स्त्री</option>
+                  </select>
+                </div>
+
+                <div>
                   <label className="font-bold text-slate-700 block mb-1">
                     संपूर्ण नाव <span className="text-rose-600">*</span>
                   </label>

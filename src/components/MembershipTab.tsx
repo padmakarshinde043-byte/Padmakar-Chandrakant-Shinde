@@ -29,6 +29,7 @@ import {
 } from '../utils/applicationCleanup';
 import { initiateRazorpayPayment } from '../utils/razorpay';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
+import { deriveGenderFromSalutation } from '../utils/memberGender';
 
 interface MembershipTabProps {
   onAddApplication: (
@@ -394,6 +395,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         id: `app-${Date.now()}`,
         applicationNumber: `MS-2026-${randomSuffix}`,
         salutation,
+        gender: deriveGenderFromSalutation(salutation),
         fullName: normalizedName,
         phone: cleanPhone,
         email: cleanEmail,
@@ -976,6 +978,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   <option value="श्री">श्री</option>
                   <option value="सौ">सौ</option>
                   <option value="श्रीमती">श्रीमती</option>
+                  <option value="कुमारी">कुमारी</option>
                   <option value="डॉ">डॉ</option>
                 </select>
               </div>

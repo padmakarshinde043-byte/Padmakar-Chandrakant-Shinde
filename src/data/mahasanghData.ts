@@ -29,6 +29,7 @@ export interface MembershipApplication {
   id: string;
   applicationNumber: string;
   salutation: string;
+  gender?: 'पुरुष' | 'स्त्री' | '';
   fullName: string;
   phone: string;
   email: string;
