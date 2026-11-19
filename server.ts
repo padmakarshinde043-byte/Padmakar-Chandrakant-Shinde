@@ -13,7 +13,7 @@ import path from 'path';
 import dns from 'dns/promises';
 import { isPrivateOrReservedIpAddress, isSafeExternalImageProxyUrl } from './src/utils/pdfImageSafety';
 type Firestore = any;
-import { formatSequentialMemberNumber } from './src/data/mahasanghData';
+import { formatSequentialMemberNumber, normalizeOfficialCadre } from './src/data/mahasanghData';
 import {
   DEFAULT_COUNTER_BASELINE,
   computeNextSafeSeq,
@@ -27,6 +27,8 @@ import {
   mysqlGetApplicationPhotosByIds,
   mysqlListApprovedApplicationsWithPhotosByDistricts,
   mysqlListApprovedDirectory,
+  mysqlListMissingCenterApplications,
+  mysqlSubmitOneTimeCenterUpdate,
   mysqlCountApprovedMembers,
   mysqlGetApplicationById,
   mysqlUpsertApplication,
@@ -430,7 +432,7 @@ function buildMembershipEmailHtml(params: {
             ${params.professional ? `
             <tr style="border-bottom: 1px dashed #e2e8f0;">
               <td style="padding: 7px 0; color: #475569;"><strong>पद / संवर्ग:</strong></td>
-              <td style="padding: 7px 0; color: #0f172a;">${escapeEmailHtml(params.professional)}</td>
+              <td style="padding: 7px 0; color: #0f172a;">${escapeEmailHtml(normalizeOfficialCadre(params.professional))}</td>
             </tr>` : ''}
             ${params.district ? `
             <tr style="border-bottom: 1px dashed #e2e8f0;">
@@ -1541,7 +1543,7 @@ app.post(['/api/email/send-approval-email', '/api/email/send-id-card'], async (r
         memberNumber: memberNumber || '',
         applicationNumber: applicationNumber || '',
         district: district || '',
-        professional: professional || '',
+        professional: normalizeOfficialCadre(professional || ''),
         email: toEmail || '',
         status: 'approved',
         paymentConfirmed: true,
@@ -1912,6 +1914,53 @@ app.get('/api/db/applications/approved-count', async (req, res) => {
     res.json({ count });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+// Standalone One-Time Center Update: list ONLY members whose centerName is still blank
+app.get('/api/db/applications/missing-center', async (req, res) => {
+  try {
+    if (!isMysqlActive()) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ status: 'success', mysqlActive: false, items: [] });
+    }
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const items = await getCachedOrFetch('apps:missing-center', bypass, () =>
+      mysqlListMissingCenterApplications()
+    );
+    sendFreshJson(req, res, { status: 'success', mysqlActive: true, items });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+// Standalone One-Time Center Update: atomically save centerName strictly once when blank
+app.post('/api/db/applications/submit-center-update', appSubmitLimiter, async (req, res) => {
+  try {
+    const { id, centerName, taluka } = req.body || {};
+    if (!isMysqlActive()) {
+      return res.json({ status: 'fallback_local', mysqlActive: false });
+    }
+    const updated = await mysqlSubmitOneTimeCenterUpdate({
+      id: String(id || ''),
+      centerName: String(centerName || ''),
+      taluka: taluka ? String(taluka) : undefined,
+    });
+    invalidateReadCache('apps:');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ status: 'success', updated });
+  } catch (err: any) {
+    const code = err?.code;
+    if (code === 'ALREADY_UPDATED') {
+      return res.status(409).json({ status: 'already_updated', message: err.message });
+    }
+    if (code === 'NOT_FOUND') {
+      return res.status(404).json({ status: 'not_found', message: err.message });
+    }
+    if (code === 'BAD_REQUEST' || code === 'INVALID_STATUS') {
+      return res.status(400).json({ status: 'error', message: err.message });
+    }
+    return res.status(500).json({ status: 'error', message: err?.message || 'Error' });
   }
 });
 

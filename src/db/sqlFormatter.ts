@@ -3,6 +3,8 @@
  * Decoupled from Node/Database drivers so it can be unit-tested cleanly via node:test.
  */
 
+import { normalizeOfficialCadre } from '../data/mahasanghData';
+
 export interface MigrationDataset {
   applications: Record<string, any>[];
   news: Record<string, any>[];
@@ -178,7 +180,7 @@ export function generateFullSqlDump(
           String(app.hobby || ''),
           String(app.education || ''),
           String(app.professionalQualification || ''),
-          String(app.professional || ''),
+          normalizeOfficialCadre(String(app.professional || '')),
           app.status === 'approved' || app.status === 'rejected' ? app.status : 'pending',
           String(app.rejectReason || ''),
           String(app.photo || ''),
@@ -396,7 +398,7 @@ export function generateFullSqlDump(
           String(off.appointedPost || ''),
           String(off.district || ''),
           String(off.taluka || ''),
-          String(off.currentCadre || ''),
+          normalizeOfficialCadre(String(off.currentCadre || '')),
           String(off.workingPlace || ''),
           String(off.mobile || ''),
           String(off.photo || ''),

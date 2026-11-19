@@ -9,6 +9,7 @@ import {
   MembershipApplication,
   OFFICIAL_CADRES,
   TEACHER_PROFESSIONAL_QUALIFICATIONS,
+  normalizeOfficialCadre,
 } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { fetchOfficials } from '../services/rkFirebaseService';
@@ -258,11 +259,12 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       const combinedName = [matched.firstName, matched.middleName, matched.lastName].filter(Boolean).join(' ');
       setFullName(combinedName);
       if (matched.mobile) setPhone(matched.mobile);
+      const normalizedCadre = normalizeOfficialCadre(matched.currentCadre);
       if (
-        matched.currentCadre &&
-        (OFFICIAL_CADRES as readonly string[]).includes(matched.currentCadre)
+        normalizedCadre &&
+        (OFFICIAL_CADRES as readonly string[]).includes(normalizedCadre)
       ) {
-        setProfessional(matched.currentCadre);
+        setProfessional(normalizedCadre);
       } else {
         setProfessional('');
       }
@@ -407,7 +409,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         hobby: hobby.trim(),
         education,
         professionalQualification,
-        professional,
+        professional: normalizeOfficialCadre(professional),
         status: 'pending',
         createdAt: new Date().toISOString(),
         photo: photoDataUrl,
@@ -761,7 +763,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     </span>
                     <span className="text-sm text-slate-600">
                       जिल्हा: <strong>{searchResult.district}</strong>
-                      {searchResult.professional && ` · संवर्ग: ${searchResult.professional}`}
+                      {searchResult.professional && ` · संवर्ग: ${normalizeOfficialCadre(searchResult.professional)}`}
                     </span>
                   </div>
                 </div>

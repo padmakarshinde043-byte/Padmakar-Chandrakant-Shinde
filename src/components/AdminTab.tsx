@@ -23,7 +23,8 @@ import {
   isValidLeaderRecord,
   isAdvisoryBoardLeader,
   isLegalAdvisorLeader,
-  isMargdarshakLeader
+  isMargdarshakLeader,
+  normalizeOfficialCadre
 } from '../data/mahasanghData';
 import {
   filterValidDynamicLeaders,
@@ -1062,7 +1063,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             email: a.email,
             district: a.district,
             taluka: a.taluka,
-            professional: a.professional,
+            professional: normalizeOfficialCadre(a.professional),
             status: a.status,
             razorpayOrderId: a.razorpayOrderId,
             razorpayPaymentId: a.razorpayPaymentId,
@@ -3499,7 +3500,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                 {app.memberNumber || app.applicationNumber} • {formatDateWithEnglishDigits(app.createdAt)}
                               </p>
                               <p>
-                                {app.professional || 'केंद्रप्रमुख'} • <strong className="text-[#102a43]">{app.district}</strong>
+                                {normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')} • <strong className="text-[#102a43]">{app.district}</strong>
                               </p>
                               <p className="font-mono text-[#df6b16] font-bold">{app.phone}</p>
                             </div>
@@ -3637,7 +3638,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </button>
                             </td>
                             <td className="py-3 px-4 text-[#102a43]">
-                              {app.professional || 'केंद्रप्रमुख / अधिकारी'}
+                              {normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')}
                               <span className="block text-[11px] text-[#607184] font-semibold">
                                 {app.district}
                               </span>
@@ -8273,7 +8274,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </div>
                 <div>
                   <span className="text-[#607184] block text-[10px]">सध्याचे पद / संवर्ग:</span>
-                  <strong className="text-[#0b1e36]">{selectedAppForVerification.professional || 'केंद्रप्रमुख'}</strong>
+                  <strong className="text-[#0b1e36]">{normalizeOfficialCadre(selectedAppForVerification.professional, 'केंद्रप्रमुख')}</strong>
                 </div>
                 <div>
                   <span className="text-[#607184] block text-[10px]">शैक्षणिक पात्रता:</span>

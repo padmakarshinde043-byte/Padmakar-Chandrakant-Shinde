@@ -33,7 +33,12 @@ async function loadPdfEngines() {
   ]);
   return { jsPDF, html2canvas };
 }
-import { MembershipApplication, formatSequentialMemberNumber } from '../data/mahasanghData';
+import {
+  MembershipApplication,
+  formatSequentialMemberNumber,
+  normalizeOfficialCadre,
+  normalizeCadreInText,
+} from '../data/mahasanghData';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { resolveImageUrlForPdf } from '../utils/cloudinary';
 import {
@@ -454,7 +459,7 @@ function getDisplayPost(m: OfficialMember): string {
 }
 
 function getWorkingPlaceDisplay(m: OfficialMember): { cadre: string; details: string } {
-  const cadre = m.currentCadre || 'केंद्रप्रमुख';
+  const cadre = normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख');
   const wPlace = m.workingPlace || '';
   return { cadre, details: wPlace };
 }
@@ -873,7 +878,7 @@ async function buildMembershipIdCardPdfDocument(
   const salutation = (app.salutation || '').trim();
   const rawFullName = (app.fullName || '').trim();
   const displayName = `${salutation ? salutation + ' ' : ''}${rawFullName}`.trim() || 'सदस्य';
-  const cadre = (app.professional || 'केंद्रप्रमुख / विस्तार अधिकारी').trim();
+  const cadre = normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख / शिक्षण विस्तार अधिकारी');
   const district = (app.district || '').trim();
   const taluka = (app.taluka || '').trim();
   const areaText = `${district}${taluka ? ` (ता. ${taluka})` : ''}` || '-';
@@ -1104,7 +1109,7 @@ export async function generateDistrictBatchIdCardsPdf(
     wrapper.style.zIndex = '999999';
 
     const memberNo = app.memberNumber || `MRK-${2026}-${1000 + i}`;
-    const cadre = app.professional || 'केंद्रप्रमुख / विस्तार अधिकारी';
+    const cadre = normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख / शिक्षण विस्तार अधिकारी');
     const talukaStr = app.taluka ? `ता. ${app.taluka}` : '';
     const distStr = app.district ? `जि. ${app.district}` : '';
     const areaText = [talukaStr, distStr].filter(Boolean).join(', ');
@@ -1306,7 +1311,7 @@ export async function generateDistrictPresidentsPdf(
     { text: String(idx + 1), bold: true },
     { text: item.district, bold: true },
     { text: item.name, bold: true },
-    { text: item.cadre },
+    { text: normalizeCadreInText(item.cadre, '-') },
     { text: item.post, bold: true },
     { text: toEnglishDigits(item.mobile), bold: true },
   ]);
@@ -1350,7 +1355,7 @@ export async function generateTalukaPresidentsPdf(
     { text: String(idx + 1), bold: true },
     { text: `${item.district}${item.taluka ? ` (${item.taluka})` : ''}`, bold: true },
     { text: item.name, bold: true },
-    { text: item.cadre },
+    { text: normalizeCadreInText(item.cadre, '-') },
     { text: item.post, bold: true },
     { text: toEnglishDigits(item.mobile), bold: true },
   ]);
@@ -1389,7 +1394,7 @@ export async function generateRegisteredMembersPdf(
       { text: String(idx + 1), bold: true },
       { text: m.memberNumber || '-', bold: true },
       { text: `${m.salutation || ''} ${m.fullName || ''}`.trim(), bold: true },
-      { text: m.professional || '-' },
+      { text: normalizeOfficialCadre(m.professional, '-') },
       { text: place },
       { text: toEnglishDigits(m.phone), bold: true },
     ];

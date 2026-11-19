@@ -1,6 +1,10 @@
 import XLSX from 'xlsx-js-style';
 import { OfficialMember } from '../data/rkMaharashtraData';
-import { MembershipApplication } from '../data/mahasanghData';
+import {
+  MembershipApplication,
+  normalizeOfficialCadre,
+  normalizeCadreInText,
+} from '../data/mahasanghData';
 import { formatDateWithEnglishDigits, toEnglishDigits } from './formatters';
 import {
   formatMemberDisplayName,
@@ -37,7 +41,7 @@ export function exportDistrictExecutiveExcel(districtName: string, officials: Of
     data.push([
       idx + 1,
       fullName,
-      m.currentCadre || '-',
+      normalizeOfficialCadre(m.currentCadre, '-'),
       m.appointedPost || '-',
       toEnglishDigits(m.mobile || '-'),
       m.taluka || '-'
@@ -130,7 +134,7 @@ export function exportDistrictPresidentsExcel(list: Array<{ district: string; na
       idx + 1,
       item.district,
       item.name,
-      item.cadre,
+      normalizeCadreInText(item.cadre, '-'),
       item.post,
       toEnglishDigits(item.mobile)
     ]);
@@ -211,7 +215,7 @@ export function exportTalukaPresidentsExcel(list: Array<{ district: string; talu
       idx + 1,
       `${item.district}${item.taluka ? ` (${item.taluka})` : ''}`,
       item.name,
-      item.cadre,
+      normalizeCadreInText(item.cadre, '-'),
       item.post,
       toEnglishDigits(item.mobile)
     ]);
@@ -360,7 +364,7 @@ export function buildUnifiedMembersExcelData(
       salutation || '-',
       fullName,
       gender || '-',
-      m.professional || '-',
+      normalizeOfficialCadre(m.professional, '-'),
       m.district || '-',
       m.taluka || '-',
       m.centerName || '-',
@@ -541,7 +545,7 @@ export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
       m.district || '-',
       m.taluka || '-',
       m.appointedPost || '-',
-      m.currentCadre || '-',
+      normalizeOfficialCadre(m.currentCadre, '-'),
       toEnglishDigits(m.mobile || '-')
     ]);
   });
@@ -611,7 +615,7 @@ export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
  * 6. 34 Districts Organizational Status Matrix Excel Export (A4 Landscape, Centered Numbers, Left Names)
  * - Row horizontal sum in 2 distinct parts:
  *     Part A: राज्य प्रतिनिधी + विभागीय प्रतिनिधी + जिल्हा पदाधिकारी + तालुका पदाधिकारी = एकूण पदाधिकारी
- *     Part B: शिक्षण विस्तार अधिकारी (जेष्ठ + कनिष्ठ + पंचायत एकत्रित) + केंद्रप्रमुख = एकूण सदस्य
+ *     Part B: शिक्षण विस्तार अधिकारी + केंद्रप्रमुख = एकूण सदस्य
  *     Grand Total: सदस्य संख्येएवढीच एकूण बेरीज
  * - Column vertical sums for ALL columns at the bottom (उभी बेरीज)
  * - Numbers centered horizontally & vertically; District names left-aligned
@@ -660,7 +664,7 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     const talukaOff = Number(st.talukaOfficial || 0);
     const offTot = st.officialsTotal ?? (stateRep + divRep + distOff + talukaOff);
 
-    // 2. Part B (सदस्य बेरीज): सर्व प्रकारचे शिक्षण विस्तार अधिकारी एकत्र + केंद्रप्रमुख
+    // 2. Part B (सदस्य बेरीज): शिक्षण विस्तार अधिकारी + केंद्रप्रमुख
     const ext = Number(st.extOfficerCount || 0);
     const hm = Number(st.headmasterCount ?? st.members ?? 0);
     const memTot = st.membersTotal ?? (ext + hm);
@@ -721,7 +725,7 @@ export function exportOrganizationStatusExcel(stats: Array<any>) {
     { wch: 14 },  // 4: जिल्हा पदाधिकारी
     { wch: 14 },  // 5: तालुका पदाधिकारी
     { wch: 14 },  // 6: एकूण पदाधिकारी (Part A)
-    { wch: 17 },  // 7: शिक्षण विस्तार अधिकारी (जेष्ठ + कनिष्ठ + पंचायत एकत्रित)
+    { wch: 17 },  // 7: शिक्षण विस्तार अधिकारी
     { wch: 13 },  // 8: केंद्रप्रमुख
     { wch: 14 },  // 9: एकूण सदस्य (Part B)
     { wch: 14 }   // 10: एकूण बेरीज (Grand Total)

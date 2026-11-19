@@ -15,6 +15,9 @@ import {
   Users,
   Check,
   Sparkles,
+  Building2,
+  Link2,
+  Copy,
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -22,6 +25,7 @@ import {
   OFFICIAL_CADRES,
   TEACHER_PROFESSIONAL_QUALIFICATIONS,
   formatSequentialMemberNumber,
+  normalizeOfficialCadre,
 } from '../data/mahasanghData';
 import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { formatDateWithEnglishDigits, toEnglishDigits, formatTimeOnly } from '../utils/formatters';
@@ -36,6 +40,11 @@ import {
   normalizeSalutation,
   resolveMemberGender,
 } from '../utils/memberGender';
+import {
+  isMissingCenterName,
+  buildCenterUpdateShareUrl,
+  buildCenterUpdateShareMessage,
+} from '../utils/centerUpdateHelper';
 
 interface MemberEditManagerProps {
   applications: MembershipApplication[];
@@ -72,8 +81,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [quickFilter, setQuickFilter] = useState<
-    'all' | 'duplicates' | 'issue_0001' | 'missing_salutation' | 'approved'
+    'all' | 'duplicates' | 'issue_0001' | 'missing_salutation' | 'missing_center' | 'approved'
   >('all');
+  const [copiedShareMode, setCopiedShareMode] = useState<'url' | 'message' | null>(null);
 
   // Edit Modal State
   const [editingMember, setEditingMember] = useState<MembershipApplication | null>(null);
@@ -142,6 +152,9 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
     const issue0001Count = applications.filter((a) => is0001Issue(a)).length;
     const missingSalutationCount = applications.filter((a) => isMissingSalutationOrGender(a)).length;
+    const missingCenterCount = applications.filter(
+      (a) => a.status !== 'rejected' && isMissingCenterName(a.centerName)
+    ).length;
 
     return {
       phoneCounts,
@@ -154,6 +167,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       duplicateCount,
       issue0001Count,
       missingSalutationCount,
+      missingCenterCount,
     };
   }, [applications]);
 
@@ -175,6 +189,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
         if (!duplicateAnalysis.is0001Issue(app)) return false;
       } else if (quickFilter === 'missing_salutation') {
         if (!isMissingSalutationOrGender(app)) return false;
+      } else if (quickFilter === 'missing_center') {
+        if (app.status === 'rejected' || !isMissingCenterName(app.centerName)) return false;
       } else if (quickFilter === 'approved') {
         if (app.status !== 'approved') return false;
       }
@@ -210,7 +226,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   };
 
   const handleQuickFilterChange = (
-    next: 'all' | 'duplicates' | 'issue_0001' | 'missing_salutation' | 'approved'
+    next: 'all' | 'duplicates' | 'issue_0001' | 'missing_salutation' | 'missing_center' | 'approved'
   ) => {
     setQuickFilter(next);
     setVisibleCount(50);
@@ -280,6 +296,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       ...target,
       salutation: normalizedSal,
       gender: resolvedGender,
+      professional: normalizeOfficialCadre(target.professional),
     });
     const parsedSeq = parseMemberNumberSeq(target.memberNumber);
     setSeqInputForFormat(parsedSeq > 0 ? String(parsedSeq) : '');
@@ -351,6 +368,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       familyMembers: toEnglishDigits((editingMember.familyMembers || '').trim()),
       hobby: (editingMember.hobby || '').trim(),
       education: (editingMember.education || '').trim(),
+      professional: normalizeOfficialCadre(editingMember.professional),
       approvedAt:
         editingMember.status === 'approved'
           ? editingMember.approvedAt || new Date().toISOString()
@@ -468,6 +486,94 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
         </div>
       </div>
 
+      {/* Shareable Standalone One-Time Center Update Link Box */}
+      <div className="bg-[#fbf8f2] border border-[#e7ded1] rounded-xl p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 allow-copy">
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-2 text-xs font-bold text-[#0b1e36]">
+            <Link2 className="w-4 h-4 text-[#df6b16] shrink-0" />
+            <span>
+              केंद्राचे नाव अद्ययावत करण्यासाठी स्वतंत्र One-Time लिंक (बाकी सदस्य:{' '}
+              <span className="font-mono tabular-nums text-[#df6b16]">
+                {toEnglishDigits(duplicateAnalysis.missingCenterCount)}
+              </span>
+              )
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            ही लिंक सदस्यांना शेअर केल्यावर ज्यांचे कार्यरत केंद्र अद्याप भरलेले नाही, फक्त त्यांचीच नावे दिसतील व सबमिट केल्यावर माहिती त्यांच्या नोंदीत आपोआप जोडली जाईल.
+          </p>
+          <div className="text-[11px] font-mono text-[#193568] font-semibold truncate select-all">
+            {buildCenterUpdateShareUrl()}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={async () => {
+              const url = buildCenterUpdateShareUrl();
+              try {
+                await navigator.clipboard.writeText(url);
+              } catch {
+                const ta = document.createElement('textarea');
+                ta.value = url;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+              }
+              setCopiedShareMode('url');
+              setTimeout(() => setCopiedShareMode(null), 2500);
+            }}
+            className="min-h-[40px] bg-[#193568] hover:bg-[#0b1e36] text-white text-xs font-bold px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
+          >
+            {copiedShareMode === 'url' ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-300" />
+                <span>लिंक कॉपी झाली</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>लिंक कॉपी करा</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={async () => {
+              const msg = buildCenterUpdateShareMessage();
+              try {
+                await navigator.clipboard.writeText(msg);
+              } catch {
+                const ta = document.createElement('textarea');
+                ta.value = msg;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+              }
+              setCopiedShareMode('message');
+              setTimeout(() => setCopiedShareMode(null), 2500);
+            }}
+            className="min-h-[40px] bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs font-bold px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
+          >
+            {copiedShareMode === 'message' ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>संदेश कॉपी झाला</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 text-[#df6b16]" />
+                <span>WhatsApp संदेश कॉपी</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Feedback Banner */}
       {statusBanner && (
         <div
@@ -582,6 +688,19 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
           >
             <Edit3 className="w-3.5 h-3.5" />
             <span>आदरार्थी सुटलेले ({duplicateAnalysis.missingSalutationCount})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleQuickFilterChange('missing_center')}
+            className={`min-h-[40px] px-3.5 py-2 rounded-xl font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 tabular-nums ${
+              quickFilter === 'missing_center'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'bg-white text-teal-800 border border-teal-200 hover:bg-teal-50'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>केंद्र सुटलेले ({duplicateAnalysis.missingCenterCount})</span>
           </button>
 
           <button
@@ -828,7 +947,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         {formatMemberDisplayName(app.salutation, app.fullName)}
                       </div>
                       <div className="text-[11px] text-slate-600 mt-0.5 flex flex-wrap items-center gap-1.5">
-                        <span>{app.professional || 'केंद्रप्रमुख'}</span>
+                        <span>{normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')}</span>
                         {(() => {
                           const g = resolveMemberGender(app);
                           return g ? (
@@ -1306,12 +1425,10 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">पद / संवर्ग</label>
                   <select
-                    value={
-                      editingMember.professional &&
-                      (OFFICIAL_CADRES as readonly string[]).includes(editingMember.professional)
-                        ? editingMember.professional
-                        : ''
-                    }
+                    value={(() => {
+                      const norm = normalizeOfficialCadre(editingMember.professional);
+                      return norm && (OFFICIAL_CADRES as readonly string[]).includes(norm) ? norm : '';
+                    })()}
                     onChange={(e) => setEditingMember({ ...editingMember, professional: e.target.value })}
                     className="w-full p-2.5 bg-white border border-slate-300 rounded-lg font-semibold"
                   >

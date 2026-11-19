@@ -14,6 +14,7 @@ const loadContactTab = () => import('./components/ContactTab');
 const loadAdminTab = () => import('./components/AdminTab');
 const loadAppointmentsTab = () => import('./components/AppointmentsTab');
 const loadPrivacyPolicyTab = () => import('./components/PrivacyPolicyTab');
+const loadCenterUpdatePage = () => import('./components/CenterUpdatePage');
 
 const AboutTab = lazy(() => loadAboutTab().then((m) => ({ default: m.AboutTab })));
 const LeadershipTab = lazy(() => loadLeadershipTab().then((m) => ({ default: m.LeadershipTab })));
@@ -25,6 +26,7 @@ const ContactTab = lazy(() => loadContactTab().then((m) => ({ default: m.Contact
 const AdminTab = lazy(() => loadAdminTab().then((m) => ({ default: m.AdminTab })));
 const AppointmentsTab = lazy(() => loadAppointmentsTab().then((m) => ({ default: m.AppointmentsTab })));
 const PrivacyPolicyTab = lazy(() => loadPrivacyPolicyTab().then((m) => ({ default: m.PrivacyPolicyTab })));
+const CenterUpdatePage = lazy(() => loadCenterUpdatePage().then((m) => ({ default: m.CenterUpdatePage })));
 
 const prefetchTabChunk = (tabId: string) => {
   switch (tabId) {
@@ -121,10 +123,30 @@ function isPathAdminRoute(): boolean {
   return path === '/admin' || hash === '#admin' || hash === '#/admin';
 }
 
+function isPathCenterUpdateRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  return (
+    path === '/center-update' ||
+    path === '/kendra-update' ||
+    hash === '#center-update' ||
+    hash === '#/center-update' ||
+    hash === '#kendra-update' ||
+    hash === '#/kendra-update'
+  );
+}
+
+function resolveInitialTab(): string {
+  if (isPathAdminRoute()) return 'admin';
+  if (isPathCenterUpdateRoute()) return 'center_update';
+  return 'home';
+}
+
 export function App() {
-  const [currentTab, setCurrentTab] = useState<string>(() => (isPathAdminRoute() ? 'admin' : 'home'));
+  const [currentTab, setCurrentTab] = useState<string>(() => resolveInitialTab());
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => ({
-    [isPathAdminRoute() ? 'admin' : 'home']: true,
+    [resolveInitialTab()]: true,
   }));
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
@@ -212,12 +234,14 @@ export function App() {
     });
   };
 
-  // Listen to browser URL changes (e.g. /admin or #admin)
+  // Listen to browser URL changes (e.g. /admin, /center-update)
   useEffect(() => {
     const handleLocationChange = () => {
       if (isPathAdminRoute()) {
         setCurrentTab('admin');
-      } else if (currentTab === 'admin') {
+      } else if (isPathCenterUpdateRoute()) {
+        setCurrentTab('center_update');
+      } else if (currentTab === 'admin' || currentTab === 'center_update') {
         setCurrentTab('home');
       }
     };
@@ -282,10 +306,10 @@ export function App() {
     };
   }, []);
 
-  // On initial mount (and when switching from /admin to public site): load cached data cleanly without blocking UI
+  // On initial mount (and when switching from /admin or /center-update to public site): load cached data cleanly without blocking UI
   const hasLoadedPublicStartupRef = React.useRef(false);
   useEffect(() => {
-    if (currentTab === 'admin' || hasLoadedPublicStartupRef.current) return;
+    if (currentTab === 'admin' || currentTab === 'center_update' || hasLoadedPublicStartupRef.current) return;
     hasLoadedPublicStartupRef.current = true;
 
     testConnectionOncePerSession().catch(() => {});
@@ -378,12 +402,17 @@ export function App() {
     }
   }, [currentTab]);
 
-  // Exit Admin to Main Public Website
+  // Exit Admin or standalone Center Update page to Main Public Website
   const handleExitAdmin = () => {
     setCurrentTab('home');
-    if (window.location.pathname.toLowerCase() === '/admin') {
+    const pathLower = window.location.pathname.toLowerCase();
+    if (pathLower === '/admin' || pathLower === '/center-update' || pathLower === '/kendra-update') {
       window.history.pushState(null, '', '/');
-    } else if (window.location.hash.toLowerCase().includes('admin')) {
+    } else if (
+      window.location.hash.toLowerCase().includes('admin') ||
+      window.location.hash.toLowerCase().includes('center-update') ||
+      window.location.hash.toLowerCase().includes('kendra-update')
+    ) {
       window.history.pushState(null, '', window.location.pathname);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -666,6 +695,18 @@ export function App() {
     setCurrentTab('news');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // =========================================================================
+  // Standalone One-Time Working Center Update View (/center-update)
+  // Clean shareable link for members missing their working center name
+  // =========================================================================
+  if (currentTab === 'center_update') {
+    return (
+      <Suspense fallback={<TabLoadingFallback />}>
+        <CenterUpdatePage onGoHome={handleExitAdmin} />
+      </Suspense>
+    );
+  }
 
   // =========================================================================
   // Standalone Administration View (mahasangh.in/admin or #admin)

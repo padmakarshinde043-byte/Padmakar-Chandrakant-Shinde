@@ -61,13 +61,50 @@ export interface MembershipApplication {
   welcomeEmailSent?: boolean;
 }
 
-// अधिकृत पद / संवर्ग (केवळ ४ अधिकृत पर्याय)
+// अधिकृत पद / संवर्ग (केवळ २ अधिकृत पर्याय)
 export const OFFICIAL_CADRES = [
   "केंद्रप्रमुख",
-  "शिक्षण विस्तार अधिकारी जेष्ठ",
-  "शिक्षण विस्तार अधिकारी कनिष्ठ",
-  "शिक्षण विस्तार अधिकारी पंचायत"
+  "शिक्षण विस्तार अधिकारी"
 ] as const;
+
+export type OfficialCadre = (typeof OFFICIAL_CADRES)[number];
+
+/**
+ * जुन्या नोंदींमधील 'शिक्षण विस्तार अधिकारी जेष्ठ / कनिष्ठ / पंचायत' यांसारख्या उपप्रकारांना
+ * अधिकृत २ संवर्गांपैकी 'शिक्षण विस्तार अधिकारी' किंवा 'केंद्रप्रमुख' मध्ये एकसमान रूपांतरित करते.
+ */
+export function normalizeOfficialCadre(raw?: string | null, fallback = ''): string {
+  const cleaned = String(raw || '')
+    .replace(/[⭐*★]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return fallback;
+  const hasKendra = cleaned.includes('केंद्रप्रमुख');
+  const hasVistar = cleaned.includes('शिक्षण विस्तार अधिकारी') || cleaned.includes('विस्तार अधिकारी');
+  if (hasVistar && !hasKendra) {
+    return 'शिक्षण विस्तार अधिकारी';
+  }
+  if (hasKendra && !hasVistar) {
+    return 'केंद्रप्रमुख';
+  }
+  return cleaned;
+}
+
+/**
+ * कार्यक्षेत्रासह एकत्रित मजकुरातील (उदा. "शिक्षण विस्तार अधिकारी जेष्ठ, पंचायत समिती नाशिक")
+ * जुने उपप्रकार काढून फक्त 'शिक्षण विस्तार अधिकारी' ठेवते.
+ */
+export function normalizeCadreInText(raw?: string | null, fallback = ''): string {
+  const cleaned = String(raw || '')
+    .replace(/[⭐*★]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return fallback;
+  return cleaned.replace(
+    /शिक्षण\s+विस्तार\s+अधिकारी\s*(?:\(\s*)?(?:जेष्ठ|ज्येष्ठ|कनिष्ठ|पंचायत)(?:\s*\))?/g,
+    'शिक्षण विस्तार अधिकारी'
+  );
+}
 
 // शिक्षक पदाला लागू असणाऱ्या सर्व व्यावसायिक पात्रता (Professional Qualifications)
 export const TEACHER_PROFESSIONAL_QUALIFICATIONS = [

@@ -20,6 +20,7 @@ import {
   MembershipApplication,
   Leader,
   MAHARASHTRA_DISTRICTS,
+  normalizeOfficialCadre,
 } from '../data/mahasanghData';
 import { OfficialMember } from '../data/rkMaharashtraData';
 import { fetchOfficials } from '../services/rkFirebaseService';
@@ -243,7 +244,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
       return {
         ...norm,
         name: `${a.salutation ? a.salutation + ' ' : ''}${a.fullName || ''}`.trim() || 'सदस्य',
-        role: a.professional || 'सदस्य',
+        role: normalizeOfficialCadre(a.professional, 'सदस्य'),
         district: a.district || '',
         groupLabel: label,
       };

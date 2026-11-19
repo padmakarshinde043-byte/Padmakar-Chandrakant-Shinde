@@ -7,6 +7,7 @@ import {
   GovOrder,
   Leader,
   formatSequentialMemberNumber,
+  normalizeOfficialCadre,
 } from '../data/mahasanghData';
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD } from '../data/rkMaharashtraData';
 import { hashPassword, verifyPassword } from '../utils/serverAuth';
@@ -24,6 +25,12 @@ import {
   pickActiveDuplicateMatch,
   classifyGhostApplicationsToPurge,
 } from '../utils/applicationCleanup';
+import {
+  MissingCenterMember,
+  filterMissingCenterMembers,
+  isMissingCenterName,
+  normalizeTalukaValue,
+} from '../utils/centerUpdateHelper';
 import { toEnglishDigits } from '../utils/formatters';
 import { computeNextVisitorStats } from '../utils/visitorCounter';
 
@@ -68,7 +75,7 @@ function mapAppRow(row: RowDataPacket): MembershipApplication & Record<string, a
     hobby: String(row.hobby || extra.hobby || ''),
     education: String(row.education || extra.education || ''),
     professionalQualification: String(row.professional_qualification || extra.professionalQualification || ''),
-    professional: String(row.professional || extra.professional || ''),
+    professional: normalizeOfficialCadre(String(row.professional || extra.professional || '')),
     status: (row.status as 'pending' | 'approved' | 'rejected') || 'pending',
     rejectReason: row.reject_reason ? String(row.reject_reason) : extra.rejectReason || undefined,
     photo: resolvedPhoto,
@@ -236,7 +243,7 @@ export async function mysqlListApprovedDirectory(): Promise<MembershipApplicatio
       taluka: String(row.taluka || ''),
       centerName: String(row.center_name || ''),
       education: '',
-      professional: String(row.professional || ''),
+      professional: normalizeOfficialCadre(String(row.professional || '')),
       status: (row.status as 'pending' | 'approved' | 'rejected') || 'approved',
       isOfficial: Boolean(row.is_official),
       officialPost: row.official_post ? String(row.official_post) : '',
@@ -252,6 +259,130 @@ export async function mysqlListApprovedDirectory(): Promise<MembershipApplicatio
     );
     return list;
   });
+}
+
+/**
+ * Lightweight list of active (non-rejected) members whose working center name (`center_name`)
+ * is currently empty — used by the standalone One-Time Center Update link (/center-update).
+ */
+export async function mysqlListMissingCenterApplications(): Promise<MissingCenterMember[]> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT \`id\`, \`application_number\`, \`member_number\`, \`salutation\`, \`full_name\`,
+              \`district\`, \`taluka\`, \`center_name\`, \`professional\`, \`status\`,
+              \`official_district\`, \`official_taluka\`
+       FROM \`applications\`
+       WHERE \`status\` != 'rejected'
+         AND (\`center_name\` IS NULL OR TRIM(\`center_name\`) IN ('', '-', '--', '—', 'नाही', 'NA', 'N/A', 'na', 'n/a'))`
+    );
+    return filterMissingCenterMembers(rows as Array<Record<string, any>>);
+  });
+}
+
+/**
+ * Atomically sets `center_name` (and `taluka` only if previously blank) for a single member
+ * strictly ONE TIME (only while their `center_name` is still missing).
+ */
+export async function mysqlSubmitOneTimeCenterUpdate(params: {
+  id: string;
+  centerName: string;
+  taluka?: string;
+}): Promise<{
+  id: string;
+  memberNumber: string;
+  applicationNumber: string;
+  salutation: string;
+  fullName: string;
+  district: string;
+  taluka: string;
+  centerName: string;
+  professional: string;
+}> {
+  const targetId = String(params.id || '').trim();
+  const cleanCenter = String(params.centerName || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+  const incomingTaluka = normalizeTalukaValue(params.taluka);
+
+  if (!targetId) {
+    const err = new Error('सदस्य ओळख उपलब्ध नाही.') as Error & { code?: string };
+    err.code = 'BAD_REQUEST';
+    throw err;
+  }
+  if (cleanCenter.length < 2 || isMissingCenterName(cleanCenter)) {
+    const err = new Error('कृपया कार्यरत केंद्राचे वैध नाव प्रविष्ट करा.') as Error & { code?: string };
+    err.code = 'BAD_REQUEST';
+    throw err;
+  }
+
+  return withMysqlSchemaRetry(async () =>
+    withMysqlTransaction(async (conn: PoolConnection) => {
+      const [rows] = await conn.query<RowDataPacket[]>(
+        'SELECT * FROM `applications` WHERE `id` = ? FOR UPDATE',
+        [targetId]
+      );
+      if (!rows || rows.length === 0) {
+        const err = new Error('सदस्याची नोंद सापडली नाही.') as Error & { code?: string };
+        err.code = 'NOT_FOUND';
+        throw err;
+      }
+
+      const row = rows[0];
+      if (String(row.status || '').toLowerCase() === 'rejected') {
+        const err = new Error('नाकारलेल्या अर्जासाठी केंद्र अपडेट करता येत नाही.') as Error & {
+          code?: string;
+        };
+        err.code = 'INVALID_STATUS';
+        throw err;
+      }
+
+      if (!isMissingCenterName(String(row.center_name || ''))) {
+        const err = new Error(
+          'या सदस्याचे कार्यरत केंद्र आधीच नोंदवले गेले आहे (One-Time अपडेट पूर्ण झाले आहे).'
+        ) as Error & { code?: string };
+        err.code = 'ALREADY_UPDATED';
+        throw err;
+      }
+
+      const existingTaluka = normalizeTalukaValue(String(row.taluka || ''));
+      const finalTaluka = existingTaluka || incomingTaluka;
+      const nowIso = new Date().toISOString();
+
+      let updatedExtraJson = row.extra_json ? String(row.extra_json) : '';
+      if (updatedExtraJson) {
+        try {
+          const parsed = JSON.parse(updatedExtraJson);
+          if (parsed && typeof parsed === 'object') {
+            parsed.centerName = cleanCenter;
+            if (finalTaluka) parsed.taluka = finalTaluka;
+            parsed.updatedAt = nowIso;
+            updatedExtraJson = JSON.stringify(parsed);
+          }
+        } catch {
+          // keep original extra_json if unparseable
+        }
+      }
+
+      await conn.execute(
+        'UPDATE `applications` SET `center_name` = ?, `taluka` = ?, `updated_at` = ?, `extra_json` = ? WHERE `id` = ?',
+        [cleanCenter, finalTaluka, nowIso, updatedExtraJson, targetId]
+      );
+
+      return {
+        id: targetId,
+        memberNumber: String(row.member_number || ''),
+        applicationNumber: String(row.application_number || ''),
+        salutation: String(row.salutation || ''),
+        fullName: String(row.full_name || ''),
+        district: String(row.district || ''),
+        taluka: finalTaluka,
+        centerName: cleanCenter,
+        professional: normalizeOfficialCadre(String(row.professional || ''), 'केंद्रप्रमुख'),
+      };
+    })
+  );
 }
 
 export async function mysqlCountApprovedMembers(): Promise<number> {
@@ -349,7 +480,7 @@ export async function mysqlUpsertApplication(app: Record<string, any>): Promise<
       String(app.hobby || ''),
       String(app.education || ''),
       String(app.professionalQualification || ''),
-      String(app.professional || ''),
+      normalizeOfficialCadre(String(app.professional || '')),
       app.status === 'approved' || app.status === 'rejected' ? app.status : 'pending',
       String(app.rejectReason || ''),
       String(app.photo || ''),
@@ -1511,7 +1642,7 @@ export async function mysqlListOfficials(): Promise<OfficialMember[]> {
     appointedPost: String(r.appointed_post || ''),
     district: String(r.district || ''),
     taluka: String(r.taluka || ''),
-    currentCadre: String(r.current_cadre || ''),
+    currentCadre: normalizeOfficialCadre(String(r.current_cadre || '')),
     workingPlace: String(r.working_place || ''),
     mobile: toEnglishDigits(String(r.mobile || '')),
     updatedAt: String(r.updated_at || ''),
@@ -1545,7 +1676,7 @@ export async function mysqlSaveOfficial(member: OfficialMember): Promise<void> {
         String(member.appointedPost || ''),
         String(member.district || ''),
         String(member.taluka || ''),
-        String(member.currentCadre || ''),
+        normalizeOfficialCadre(String(member.currentCadre || '')),
         String(member.workingPlace || ''),
         toEnglishDigits(String(member.mobile || '')),
         String(member.photo || ''),

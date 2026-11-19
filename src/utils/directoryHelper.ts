@@ -1,4 +1,8 @@
-import { MembershipApplication, formatSequentialMemberNumber } from '../data/mahasanghData';
+import {
+  MembershipApplication,
+  formatSequentialMemberNumber,
+  normalizeOfficialCadre,
+} from '../data/mahasanghData';
 import { parseMemberNumberSeq } from './memberNumberAllocator';
 
 export interface RegisteredMemberItem {
@@ -70,7 +74,7 @@ export function buildRegisteredMemberItems(
     const designation =
       app.isOfficial && app.officialPost
         ? app.officialPost.replace(/[⭐*★]/g, '').trim()
-        : (app.professional || 'केंद्रप्रमुख').replace(/[⭐*★]/g, '').trim();
+        : normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख');
 
     const talukaName = app.taluka || app.officialTaluka || '-';
 

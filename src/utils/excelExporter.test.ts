@@ -16,7 +16,12 @@ import {
   resolveMemberGender,
 } from './memberGender';
 import { MAHARASHTRA_34_DISTRICTS } from '../data/rkMaharashtraData';
-import type { MembershipApplication } from '../data/mahasanghData';
+import {
+  OFFICIAL_CADRES,
+  normalizeOfficialCadre,
+  normalizeCadreInText,
+  type MembershipApplication,
+} from '../data/mahasanghData';
 
 after(() => {
   const dateSlug = new Date().toISOString().split('T')[0];
@@ -158,4 +163,35 @@ test('Unified Excel builder produces identical 14-column headers, gender column,
 
   assert.doesNotThrow(() => exportUnifiedMembersExcel(updatedMembers));
   assert.doesNotThrow(() => exportRegisteredMembersExcel(updatedMembers));
+});
+
+test('OFFICIAL_CADRES has strictly 2 options and normalizes legacy extension officer sub-cadres across Excel exports', () => {
+  assert.deepEqual([...OFFICIAL_CADRES], ['केंद्रप्रमुख', 'शिक्षण विस्तार अधिकारी']);
+
+  assert.equal(normalizeOfficialCadre('केंद्रप्रमुख'), 'केंद्रप्रमुख');
+  assert.equal(normalizeOfficialCadre('शिक्षण विस्तार अधिकारी'), 'शिक्षण विस्तार अधिकारी');
+  assert.equal(normalizeOfficialCadre('शिक्षण विस्तार अधिकारी जेष्ठ'), 'शिक्षण विस्तार अधिकारी');
+  assert.equal(normalizeOfficialCadre('शिक्षण विस्तार अधिकारी कनिष्ठ'), 'शिक्षण विस्तार अधिकारी');
+  assert.equal(normalizeOfficialCadre('शिक्षण विस्तार अधिकारी पंचायत'), 'शिक्षण विस्तार अधिकारी');
+  assert.equal(
+    normalizeCadreInText('शिक्षण विस्तार अधिकारी जेष्ठ, पंचायत समिती नाशिक'),
+    'शिक्षण विस्तार अधिकारी, पंचायत समिती नाशिक'
+  );
+  assert.equal(
+    normalizeCadreInText('शिक्षण विस्तार अधिकारी पंचायत, जि. पुणे'),
+    'शिक्षण विस्तार अधिकारी, जि. पुणे'
+  );
+
+  const legacyMembers: MembershipApplication[] = [
+    makeApp({ id: 'c1', professional: 'केंद्रप्रमुख', createdAt: '2026-04-15T10:00:00.000Z' }),
+    makeApp({ id: 'c2', professional: 'शिक्षण विस्तार अधिकारी जेष्ठ', createdAt: '2026-04-14T10:00:00.000Z' }),
+    makeApp({ id: 'c3', professional: 'शिक्षण विस्तार अधिकारी कनिष्ठ', createdAt: '2026-04-13T10:00:00.000Z' }),
+    makeApp({ id: 'c4', professional: 'शिक्षण विस्तार अधिकारी पंचायत', createdAt: '2026-04-12T10:00:00.000Z' }),
+  ];
+
+  const built = buildUnifiedMembersExcelData(legacyMembers);
+  assert.equal(built.rows[0][6], 'केंद्रप्रमुख');
+  assert.equal(built.rows[1][6], 'शिक्षण विस्तार अधिकारी');
+  assert.equal(built.rows[2][6], 'शिक्षण विस्तार अधिकारी');
+  assert.equal(built.rows[3][6], 'शिक्षण विस्तार अधिकारी');
 });

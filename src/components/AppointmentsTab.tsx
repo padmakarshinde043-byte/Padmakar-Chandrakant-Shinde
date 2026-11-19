@@ -33,7 +33,7 @@ import {
   exportOrganizationStatusExcel
 } from '../utils/excelExporter';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
-import { ORG_DETAILS, MembershipApplication, OFFICIAL_CADRES } from '../data/mahasanghData';
+import { ORG_DETAILS, MembershipApplication, OFFICIAL_CADRES, normalizeOfficialCadre } from '../data/mahasanghData';
 import { fetchApprovedMembersCached } from '../firebase';
 import {
   CACHE_KEY_POSTS,
@@ -802,8 +802,9 @@ export const AppointmentsTab: React.FC = () => {
     setFormPost(m.appointedPost || '');
     setFormDistrict(m.district);
     setFormTaluka(m.taluka || '');
-    if ((OFFICIAL_CADRES as readonly string[]).includes(m.currentCadre)) {
-      setFormCadre(m.currentCadre);
+    const normalizedCadre = normalizeOfficialCadre(m.currentCadre);
+    if ((OFFICIAL_CADRES as readonly string[]).includes(normalizedCadre)) {
+      setFormCadre(normalizedCadre);
       setCustomCadreInput('');
     } else {
       setFormCadre('केंद्रप्रमुख');
@@ -831,7 +832,7 @@ export const AppointmentsTab: React.FC = () => {
       return;
     }
 
-    const finalCadre = formCadre;
+    const finalCadre = normalizeOfficialCadre(formCadre, 'केंद्रप्रमुख');
     // CRITICAL: Only taluka-level posts have an appointed taluka! State, Division, and District posts MUST have an empty taluka!
     const finalTaluka = isPostNeedsTaluka ? formTaluka.trim() : '';
 
@@ -1006,7 +1007,7 @@ export const AppointmentsTab: React.FC = () => {
           appointedPost: item.appointedPost || item.appointed_post || '',
           district: item.district || '',
           taluka: item.taluka || '',
-          currentCadre: item.currentCadre || item.current_cadre || '',
+          currentCadre: normalizeOfficialCadre(item.currentCadre || item.current_cadre || ''),
           workingPlace: item.workingPlace || item.working_place || '',
           mobile: toEnglishDigits(item.mobile || ''),
           updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
@@ -1066,8 +1067,8 @@ export const AppointmentsTab: React.FC = () => {
       let headmasterCount = 0;
 
       distApprovedApps.forEach((a) => {
-        const prof = (a.professional || '').trim();
-        if (prof.includes('शिक्षण विस्तार अधिकारी') || prof.includes('विस्तार अधिकारी')) {
+        const prof = normalizeOfficialCadre(a.professional);
+        if (prof === 'शिक्षण विस्तार अधिकारी') {
           extOfficerCount++;
         } else {
           headmasterCount++;
@@ -1169,7 +1170,7 @@ export const AppointmentsTab: React.FC = () => {
         .map((m) => ({
           district: m.district,
           name: `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim(),
-          cadre: [m.currentCadre || 'केंद्रप्रमुख', m.workingPlace].filter(Boolean).join(', '),
+          cadre: [normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख'), m.workingPlace].filter(Boolean).join(', '),
           post: m.appointedPost,
           mobile: m.mobile || '-'
         }));
@@ -1190,7 +1191,7 @@ export const AppointmentsTab: React.FC = () => {
           district: m.district,
           taluka: m.taluka || '',
           name: `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim(),
-          cadre: [m.currentCadre || 'केंद्रप्रमुख', m.workingPlace].filter(Boolean).join(', '),
+          cadre: [normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख'), m.workingPlace].filter(Boolean).join(', '),
           post: m.appointedPost,
           mobile: m.mobile || '-'
         }));
@@ -1416,7 +1417,7 @@ export const AppointmentsTab: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
                   {searchedOfficials.map((m, idx) => {
                     const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
-                    const cadre = m.currentCadre || 'केंद्रप्रमुख';
+                    const cadre = normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख');
                     const details = m.workingPlace || '';
                     const tint = OFFICER_CAPSULE_TINTS[idx % OFFICER_CAPSULE_TINTS.length];
                     const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim();
@@ -1550,7 +1551,7 @@ export const AppointmentsTab: React.FC = () => {
                 ) : (
                   districtOfficials.map((m, idx) => {
                     const displayPost = formatAppointedPostWithTaluka(m.appointedPost, m.taluka);
-                    const cadre = m.currentCadre || 'केंद्रप्रमुख';
+                    const cadre = normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख');
                     const details = m.workingPlace || '';
 
                     return (
@@ -1636,7 +1637,7 @@ export const AppointmentsTab: React.FC = () => {
                               </div>
                             </td>
                             <td className="py-3 px-4 text-slate-600 border-r border-slate-200">
-                              <strong className="text-slate-800 block text-sm font-semibold">{m.currentCadre}</strong>
+                              <strong className="text-slate-800 block text-sm font-semibold">{normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख')}</strong>
                               <span className="text-xs sm:text-sm text-slate-500">{m.workingPlace}</span>
                             </td>
                             <td className="py-3 px-4 font-semibold text-slate-700 font-mono tabular-nums border-r border-slate-200">
@@ -2414,7 +2415,7 @@ export const AppointmentsTab: React.FC = () => {
                     {selectedOfficialForLetter.lastName}
                   </h2>
                   <p className="text-xs text-slate-600 mt-0.5">
-                    ({selectedOfficialForLetter.currentCadre}
+                    ({normalizeOfficialCadre(selectedOfficialForLetter.currentCadre, 'केंद्रप्रमुख')}
                     {selectedOfficialForLetter.workingPlace ? `, ${selectedOfficialForLetter.workingPlace}` : ''},
                     जिल्हा - {selectedOfficialForLetter.district})
                   </p>

@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { MembershipApplication, formatSequentialMemberNumber } from '../data/mahasanghData';
+import {
+  MembershipApplication,
+  formatSequentialMemberNumber,
+  normalizeOfficialCadre,
+} from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { getSharpLogoDataUrl } from '../services/rkPdfGenerator';
 
@@ -38,7 +42,7 @@ export const MembershipIdCardPreview: React.FC<MembershipIdCardPreviewProps> = (
   }
 
   const displayName = `${app.salutation ? app.salutation + ' ' : ''}${app.fullName || ''}`.trim();
-  const cadre = app.professional || 'केंद्रप्रमुख / विस्तार अधिकारी';
+  const cadre = normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख / शिक्षण विस्तार अधिकारी');
   const areaText = `${app.district || ''}${app.taluka ? ` (ता. ${app.taluka})` : ''}`;
   const phoneText = toEnglishDigits(app.phone || '');
   const photoSrc = app.photo || photoFallbackUrl;

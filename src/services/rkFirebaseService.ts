@@ -7,7 +7,7 @@
  */
 
 import { OfficialMember, AppointedPostItem, DEFAULT_APPOINTED_POSTS, SUPER_ADMIN_PASSWORD } from '../data/rkMaharashtraData';
-import { Leader, DEFAULT_AUTHORITATIVE_LEADERS } from '../data/mahasanghData';
+import { Leader, DEFAULT_AUTHORITATIVE_LEADERS, normalizeOfficialCadre } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { isSqlBackendActive, sqlApiRequest, getAuthHeaders } from '../api/sqlBridge';
 
@@ -104,7 +104,7 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
             appointedPost: item.appointedPost || item.appointed_post || '',
             district: item.district || '',
             taluka: item.taluka || '',
-            currentCadre: item.currentCadre || item.current_cadre || '',
+            currentCadre: normalizeOfficialCadre(item.currentCadre || item.current_cadre || ''),
             workingPlace: item.workingPlace || item.working_place || '',
             mobile: toEnglishDigits(item.mobile || ''),
             updatedAt: item.updatedAt || item.updated_at || new Date().toISOString(),
