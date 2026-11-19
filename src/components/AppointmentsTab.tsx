@@ -23,7 +23,15 @@ import {
   fetchDistrictPasswords, updateDistrictPasswordInRtdb, fetchAppointedPosts,
   fetchPresidentPasswordFromFirebase, updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
-import { generateSingleLetterPdf, generateDistrictExecutivePdf } from '../services/rkPdfGenerator';
+import {
+  generateSingleLetterPdf,
+  generateDistrictExecutivePdf,
+  generateOrganizationStatusOfficePdf,
+  generateDistrictPresidentsOfficePdf,
+  generateTalukaPresidentsOfficePdf,
+  generateRegisteredMembersOfficePdf,
+  generateStatewideRegistryOfficePdf,
+} from '../services/rkPdfGenerator';
 import {
   exportDistrictExecutiveExcel,
   exportDistrictPresidentsExcel,
@@ -185,6 +193,7 @@ export const AppointmentsTab: React.FC = () => {
   const [isGeneratingLetterPdf, setIsGeneratingLetterPdf] = useState<boolean>(false);
   const [isGeneratingDirPdf, setIsGeneratingDirPdf] = useState<boolean>(false);
   const [isGeneratingRegistryPdf, setIsGeneratingRegistryPdf] = useState<boolean>(false);
+  const [activePdfKey, setActivePdfKey] = useState<string | null>(null);
   const [pdfProgressStatus, setPdfProgressStatus] = useState<string>('');
 
   // Status Matrix & Registered Members Modal states (Points 8, 9, 10)
@@ -1138,10 +1147,11 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
-  // Official A4 Print-Ready PDF Export: District Executive List (Pulls fresh SQL data, <= 500 KB)
+  // Official A4 Print-Ready PDF Export 1: District Executive List (Pulls fresh SQL data, <= 500 KB)
   const handleDownloadDistrictExecutivePdf = async () => {
-    if (isGeneratingDirPdf) return;
+    if (isGeneratingDirPdf || activePdfKey) return;
     setIsGeneratingDirPdf(true);
+    setActivePdfKey('district_exec');
     setPdfProgressStatus('ताजी जिल्हा कार्यकारिणी माहिती लोड होत आहे...');
     try {
       const { freshOfficials } = await ensureFreshSqlData();
@@ -1163,6 +1173,7 @@ export const AppointmentsTab: React.FC = () => {
       showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
     } finally {
       setIsGeneratingDirPdf(false);
+      setActivePdfKey(null);
       setPdfProgressStatus('');
     }
   };
@@ -1178,6 +1189,36 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
+  // Official A4 Print-Ready PDF Export 6: Statewide Master Registry (<= 1 MB)
+  const handleDownloadStatewideRegistryPdf = async () => {
+    if (isGeneratingDirPdf || activePdfKey) return;
+    setIsGeneratingDirPdf(true);
+    setActivePdfKey('registry');
+    setPdfProgressStatus('राज्यस्तरीय नियुक्ती नोंदवही लोड होत आहे...');
+    try {
+      const { freshOfficials } = await ensureFreshSqlData();
+      if (freshOfficials.length === 0) {
+        showToast('राज्यस्तरीय नियुक्ती नोंदवहीत कोणतीही नोंद उपलब्ध नाही.', 'error');
+        return;
+      }
+      const result = await generateStatewideRegistryOfficePdf(freshOfficials, (status) => {
+        setPdfProgressStatus(status);
+      });
+      if (result) {
+        showToast(
+          `राज्यस्तरीय नियुक्ती नोंदवही PDF डाऊनलोड झाली! (${toEnglishDigits(result.pageCount)} पाने · ${toEnglishDigits(result.sizeKb)} KB)`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
+    } finally {
+      setIsGeneratingDirPdf(false);
+      setActivePdfKey(null);
+      setPdfProgressStatus('');
+    }
+  };
+
   // Excel Export 3: Organization Status Matrix (Pulls fresh SQL data)
   const handleDownloadStatusMatrixExcel = async () => {
     try {
@@ -1187,6 +1228,33 @@ export const AppointmentsTab: React.FC = () => {
       showToast('संघटकीय सद्यस्थिती अहवाल एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
       showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
+    }
+  };
+
+  // Official A4 Landscape Print-Ready PDF Export 2: Organization Status Matrix (34 Districts, <= 1 MB)
+  const handleDownloadStatusMatrixPdf = async () => {
+    if (isGeneratingDirPdf || activePdfKey) return;
+    setIsGeneratingDirPdf(true);
+    setActivePdfKey('status');
+    setPdfProgressStatus('३४ जिल्ह्यांचा संघटना सद्यस्थिती तक्ता लोड होत आहे...');
+    try {
+      const { freshOfficials, freshApps } = await ensureFreshSqlData();
+      const freshStats = computeMatrixForData(freshOfficials, freshApps);
+      const result = await generateOrganizationStatusOfficePdf(freshStats, (status) => {
+        setPdfProgressStatus(status);
+      });
+      if (result) {
+        showToast(
+          `संघटना सद्यस्थिती (३४ जिल्हे) PDF डाऊनलोड झाली! (${toEnglishDigits(result.pageCount)} पाने · ${toEnglishDigits(result.sizeKb)} KB)`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
+    } finally {
+      setIsGeneratingDirPdf(false);
+      setActivePdfKey(null);
+      setPdfProgressStatus('');
     }
   };
 
@@ -1207,6 +1275,45 @@ export const AppointmentsTab: React.FC = () => {
       showToast('सर्व जिल्हाध्यक्ष यादी एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
       showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
+    }
+  };
+
+  // Official A4 Print-Ready PDF Export 3: All District Presidents (<= 1 MB)
+  const handleDownloadDistrictPresidentsPdf = async () => {
+    if (isGeneratingDirPdf || activePdfKey) return;
+    setIsGeneratingDirPdf(true);
+    setActivePdfKey('dist_pres');
+    setPdfProgressStatus('सर्व जिल्हाध्यक्षांची माहिती लोड होत आहे...');
+    try {
+      const { freshOfficials } = await ensureFreshSqlData();
+      const distPresidents = freshOfficials
+        .filter((o) => (o.appointedPost || '').includes('जिल्हाध्यक्ष'))
+        .map((m) => ({
+          district: m.district,
+          name: `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim(),
+          cadre: [normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख'), m.workingPlace].filter(Boolean).join(' - '),
+          post: m.appointedPost,
+          mobile: m.mobile || '-'
+        }));
+      if (distPresidents.length === 0) {
+        showToast('कोणत्याही जिल्हाध्यक्षाची नोंद सापडली नाही.', 'error');
+        return;
+      }
+      const result = await generateDistrictPresidentsOfficePdf(distPresidents, (status) => {
+        setPdfProgressStatus(status);
+      });
+      if (result) {
+        showToast(
+          `सर्व जिल्हाध्यक्ष यादी PDF डाऊनलोड झाली! (${toEnglishDigits(result.pageCount)} पाने · ${toEnglishDigits(result.sizeKb)} KB)`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
+    } finally {
+      setIsGeneratingDirPdf(false);
+      setActivePdfKey(null);
+      setPdfProgressStatus('');
     }
   };
 
@@ -1231,6 +1338,46 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
+  // Official A4 Print-Ready PDF Export 4: All Taluka Presidents (<= 1 MB)
+  const handleDownloadTalukaPresidentsPdf = async () => {
+    if (isGeneratingDirPdf || activePdfKey) return;
+    setIsGeneratingDirPdf(true);
+    setActivePdfKey('taluka_pres');
+    setPdfProgressStatus('सर्व तालुका अध्यक्षांची माहिती लोड होत आहे...');
+    try {
+      const { freshOfficials } = await ensureFreshSqlData();
+      const talukaPresidents = freshOfficials
+        .filter((o) => (o.appointedPost || '').includes('तालुका अध्यक्ष'))
+        .map((m) => ({
+          district: m.district,
+          taluka: m.taluka || '',
+          name: `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`.trim(),
+          cadre: [normalizeOfficialCadre(m.currentCadre, 'केंद्रप्रमुख'), m.workingPlace].filter(Boolean).join(' - '),
+          post: m.appointedPost,
+          mobile: m.mobile || '-'
+        }));
+      if (talukaPresidents.length === 0) {
+        showToast('कोणत्याही तालुका अध्यक्षाची नोंद सापडली नाही.', 'error');
+        return;
+      }
+      const result = await generateTalukaPresidentsOfficePdf(talukaPresidents, (status) => {
+        setPdfProgressStatus(status);
+      });
+      if (result) {
+        showToast(
+          `सर्व तालुका अध्यक्ष यादी PDF डाऊनलोड झाली! (${toEnglishDigits(result.pageCount)} पाने · ${toEnglishDigits(result.sizeKb)} KB)`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
+    } finally {
+      setIsGeneratingDirPdf(false);
+      setActivePdfKey(null);
+      setPdfProgressStatus('');
+    }
+  };
+
   // Excel Export 6: Approved Registered Members List (Pulls fresh SQL data)
   const handleDownloadRegisteredMembersExcel = async () => {
     try {
@@ -1240,6 +1387,37 @@ export const AppointmentsTab: React.FC = () => {
       showToast('नोंदणीकृत सदस्य यादी एक्सेल फाइल यशस्वीपणे डाऊनलोड झाली!', 'success');
     } catch (err: any) {
       showToast('एक्सेल फाइल त्रुटी: ' + err.message, 'error');
+    }
+  };
+
+  // Official A4 Print-Ready PDF Export 5: Approved Registered Members (<= 1 MB)
+  const handleDownloadRegisteredMembersPdf = async () => {
+    if (isGeneratingDirPdf || activePdfKey) return;
+    setIsGeneratingDirPdf(true);
+    setActivePdfKey('members');
+    setPdfProgressStatus('नोंदणीकृत सदस्यांची यादी लोड होत आहे...');
+    try {
+      const { freshApps } = await ensureFreshSqlData();
+      const approvedApps = freshApps.filter((a) => a.status === 'approved');
+      if (approvedApps.length === 0) {
+        showToast('मंजूर नोंदणीकृत सदस्यांची कोणतीही नोंद उपलब्ध नाही.', 'error');
+        return;
+      }
+      const result = await generateRegisteredMembersOfficePdf(approvedApps, (status) => {
+        setPdfProgressStatus(status);
+      });
+      if (result) {
+        showToast(
+          `नोंदणीकृत सदस्य यादी PDF डाऊनलोड झाली! (${toEnglishDigits(result.pageCount)} पाने · ${toEnglishDigits(result.sizeKb)} KB)`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
+    } finally {
+      setIsGeneratingDirPdf(false);
+      setActivePdfKey(null);
+      setPdfProgressStatus('');
     }
   };
 
@@ -1738,87 +1916,149 @@ export const AppointmentsTab: React.FC = () => {
                 </button>
               </div>
 
-              {/* Clean Institutional Report & Export Toolbar */}
-              <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowStatusMatrixModal(true);
-                    ensureFreshSqlData();
-                  }}
-                  className="bg-[#193568] hover:bg-[#11254a] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
-                  title="महाराष्ट्रातील सर्व 34 जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता पहा व डाऊनलोड करा"
-                >
-                  <Eye className="w-3.5 h-3.5 text-[#efb24b]" />
-                  संघटना सद्यस्थिती (34 जिल्हे)
-                </button>
+              {/* 6x2 Vertical Capsule Report & Export Panel (Left: Excel | Right: PDF) */}
+              <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                  <div className="text-xs sm:text-sm font-bold text-[#0b1e36]">
+                    अधिकृत अहवाल डाऊनलोड पॅनेल (डावीकडे Excel · उजवीकडे PDF)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStatusMatrixModal(true);
+                      ensureFreshSqlData();
+                    }}
+                    className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                    title="३४ जिल्ह्यांचा संघटनात्मक सद्यस्थिती तक्ता स्क्रीनवर पहा"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-[#df6b16]" />
+                    <span>३४ जिल्हे तक्ता पहा</span>
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadDistrictExecutiveExcel}
-                  disabled={districtOfficials.length === 0}
-                  className="bg-[#df6b16] hover:bg-[#c2590d] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="या जिल्ह्याची अधिकृत कार्यकारिणी Excel (XLSX) फाइल डाऊनलोड करा"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  जिल्हा कार्यकारिणी (Excel)
-                </button>
+                {/* Column Titles */}
+                <div className="grid grid-cols-2 gap-x-2.5 sm:gap-x-4 text-[11px] sm:text-xs font-extrabold uppercase tracking-wide">
+                  <div className="text-emerald-800 px-2 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                    <span>Excel डाऊनलोड (६ अहवाल)</span>
+                  </div>
+                  <div className="text-[#0b1e36] px-2 flex items-center gap-1.5">
+                    <Download className="w-3.5 h-3.5 text-[#df6b16] shrink-0" />
+                    <span>PDF डाऊनलोड (लेटरपॅड व स्वाक्षरीसह)</span>
+                  </div>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadDistrictExecutivePdf}
-                  disabled={districtOfficials.length === 0 || isGeneratingDirPdf}
-                  className="bg-[#0b1e36] hover:bg-[#193568] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="या जिल्ह्याची लेटरपॅड व स्वाक्षरीसह प्रिंट-योग्य अधिकृत A4 PDF (≤ 500 KB) डाऊनलोड करा"
-                >
-                  {isGeneratingDirPdf ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#efb24b]" />
-                  ) : (
-                    <Download className="w-3.5 h-3.5 text-[#efb24b]" />
-                  )}
-                  {isGeneratingDirPdf ? 'PDF तयार होत आहे...' : 'जिल्हा कार्यकारिणी (PDF)'}
-                </button>
+                {/* 6 Aligned Left-Excel / Right-PDF Vertical Capsule Rows */}
+                <div className="grid grid-cols-2 gap-x-2.5 sm:gap-x-4 gap-y-2">
+                  {[
+                    {
+                      key: 'status',
+                      label: 'संघटना सद्यस्थिती (३४ जिल्हे)',
+                      onExcel: handleDownloadStatusMatrixExcel,
+                      onPdf: handleDownloadStatusMatrixPdf,
+                      excelDisabled: false,
+                      pdfDisabled: false,
+                      excelTitle: '३४ जिल्ह्यांचा संघटना सद्यस्थिती अहवाल Excel फाइल डाऊनलोड करा',
+                      pdfTitle: '३४ जिल्ह्यांचा संघटना सद्यस्थिती अहवाल लेटरपॅड व स्वाक्षरीसह A4 PDF (≤ 1 MB) डाऊनलोड करा',
+                    },
+                    {
+                      key: 'district_exec',
+                      label: 'जिल्हा कार्यकारिणी',
+                      onExcel: handleDownloadDistrictExecutiveExcel,
+                      onPdf: handleDownloadDistrictExecutivePdf,
+                      excelDisabled: districtOfficials.length === 0,
+                      pdfDisabled: districtOfficials.length === 0,
+                      excelTitle: `'${currentDistrict}' जिल्ह्याची अधिकृत कार्यकारिणी Excel फाइल डाऊनलोड करा`,
+                      pdfTitle: `'${currentDistrict}' जिल्ह्याची लेटरपॅड व स्वाक्षरीसह A4 PDF (≤ 500 KB) डाऊनलोड करा`,
+                    },
+                    {
+                      key: 'dist_pres',
+                      label: 'सर्व जिल्हाध्यक्ष',
+                      onExcel: handleDownloadDistrictPresidentsExcel,
+                      onPdf: handleDownloadDistrictPresidentsPdf,
+                      excelDisabled: false,
+                      pdfDisabled: false,
+                      excelTitle: 'महाराष्ट्रातील सर्व जिल्हाध्यक्षांची अधिकृत Excel फाइल डाऊनलोड करा',
+                      pdfTitle: 'महाराष्ट्रातील सर्व जिल्हाध्यक्षांची लेटरपॅड व स्वाक्षरीसह A4 PDF (≤ 1 MB) डाऊनलोड करा',
+                    },
+                    {
+                      key: 'taluka_pres',
+                      label: 'सर्व तालुका अध्यक्ष',
+                      onExcel: handleDownloadTalukaPresidentsExcel,
+                      onPdf: handleDownloadTalukaPresidentsPdf,
+                      excelDisabled: false,
+                      pdfDisabled: false,
+                      excelTitle: 'महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत Excel फाइल डाऊनलोड करा',
+                      pdfTitle: 'महाराष्ट्रातील सर्व तालुकाध्यक्षांची लेटरपॅड व स्वाक्षरीसह A4 PDF (≤ 1 MB) डाऊनलोड करा',
+                    },
+                    {
+                      key: 'members',
+                      label: 'नोंदणीकृत सदस्य',
+                      onExcel: handleDownloadRegisteredMembersExcel,
+                      onPdf: handleDownloadRegisteredMembersPdf,
+                      excelDisabled: false,
+                      pdfDisabled: false,
+                      excelTitle: 'वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य Excel फाइल डाऊनलोड करा',
+                      pdfTitle: 'वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य लेटरपॅड व स्वाक्षरीसह A4 PDF (≤ 1 MB) डाऊनलोड करा',
+                    },
+                    {
+                      key: 'registry',
+                      label: 'नियुक्ती नोंदवही',
+                      onExcel: handleDownloadStatewideRegistryExcel,
+                      onPdf: handleDownloadStatewideRegistryPdf,
+                      excelDisabled: officials.length === 0,
+                      pdfDisabled: officials.length === 0,
+                      excelTitle: 'राज्यस्तरीय नियुक्त्या व नोंदवही Excel फाइल डाऊनलोड करा',
+                      pdfTitle: 'राज्यस्तरीय नियुक्त्या व नोंदवही लेटरपॅड व स्वाक्षरीसह A4 PDF (≤ 1 MB) डाऊनलोड करा',
+                    },
+                  ].map((item) => {
+                    const isThisPdfRunning = activePdfKey === item.key;
+                    const anyPdfRunning = isGeneratingDirPdf || Boolean(activePdfKey);
+                    return (
+                      <React.Fragment key={item.key}>
+                        {/* Left Capsule: Excel */}
+                        <button
+                          type="button"
+                          onClick={item.onExcel}
+                          disabled={item.excelDisabled}
+                          title={item.excelTitle}
+                          className="w-full bg-emerald-700 hover:bg-emerald-800 active:scale-[0.99] text-white text-[11px] sm:text-xs font-bold px-3 sm:px-4 py-2 rounded-full shadow-sm flex items-center justify-between gap-1.5 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="inline-flex items-center gap-1.5 min-w-0">
+                            <FileText className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </span>
+                          <span className="text-[10px] font-extrabold bg-white/15 px-1.5 py-0.5 rounded-full shrink-0 tracking-wide">
+                            Excel
+                          </span>
+                        </button>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadDistrictPresidentsExcel}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
-                  title="महाराष्ट्रातील सर्व जिल्हाध्यक्षांची अधिकृत एक्सेल फाइल"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  सर्व जिल्हाध्यक्ष (Excel)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadTalukaPresidentsExcel}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
-                  title="महाराष्ट्रातील सर्व तालुकाध्यक्षांची अधिकृत एक्सेल फाइल"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  सर्व तालुका अध्यक्ष (Excel)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadRegisteredMembersExcel}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors"
-                  title="वेबसाईटवर मंजूर झालेले सर्व अधिकृत सदस्य एक्सेल फाइल"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  नोंदणीकृत सदस्य (Excel)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownloadStatewideRegistryExcel}
-                  disabled={officials.length === 0}
-                  className="bg-white hover:bg-slate-100 text-[#193568] border border-slate-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
-                  title="राज्यस्तरीय नियुक्त्या व नोंदवही एक्सेल फाइल"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  नियुक्ती नोंदवही (Excel)
-                </button>
+                        {/* Right Capsule: PDF */}
+                        <button
+                          type="button"
+                          onClick={item.onPdf}
+                          disabled={item.pdfDisabled || anyPdfRunning}
+                          title={item.pdfTitle}
+                          className="w-full bg-[#0b1e36] hover:bg-[#193568] active:scale-[0.99] text-white text-[11px] sm:text-xs font-bold px-3 sm:px-4 py-2 rounded-full shadow-sm flex items-center justify-between gap-1.5 cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="inline-flex items-center gap-1.5 min-w-0">
+                            {isThisPdfRunning ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#efb24b] shrink-0" />
+                            ) : (
+                              <Download className="w-3.5 h-3.5 text-[#efb24b] shrink-0" />
+                            )}
+                            <span className="truncate">
+                              {isThisPdfRunning ? 'तयार होत आहे...' : item.label}
+                            </span>
+                          </span>
+                          <span className="text-[10px] font-extrabold bg-[#efb24b]/20 text-[#efb24b] px-1.5 py-0.5 rounded-full shrink-0 tracking-wide">
+                            PDF
+                          </span>
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* PDF Render Progress Notice */}

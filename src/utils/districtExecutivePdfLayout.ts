@@ -1,11 +1,21 @@
 import { OfficialMember } from '../data/rkMaharashtraData';
-import { normalizeOfficialCadre } from '../data/mahasanghData';
+import {
+  MembershipApplication,
+  normalizeCadreInText,
+  normalizeOfficialCadre,
+} from '../data/mahasanghData';
 import { toEnglishDigits } from './formatters';
+import {
+  formatMemberDisplayName,
+  resolveEffectiveSalutation,
+  resolveMemberGender,
+} from './memberGender';
+import { sortMembersForUnifiedExcel } from './excelExporter';
 
 /**
- * Pure geometry, 6-column specification, Devanagari-safe wrapping,
- * A4 pagination, and <= 500 KB adaptive byte-budget planner for the
- * Official District Executive Committee PDF (राज्याध्यक्ष लॉगिन).
+ * Pure geometry, column specifications, Devanagari-safe wrapping,
+ * A4 Portrait/Landscape pagination, and <= 500 KB / <= 1 MB adaptive byte-budget planner
+ * shared by ALL 6 Official Office PDFs in State President Login (राज्याध्यक्ष लॉगिन).
  */
 
 export const A4_WIDTH_MM = 210;
@@ -13,19 +23,21 @@ export const A4_HEIGHT_MM = 297;
 export const PAGE_MARGIN_X_MM = 10;
 export const PAGE_MARGIN_TOP_MM = 8.5;
 export const PAGE_MARGIN_BOTTOM_MM = 10;
-export const CONTENT_WIDTH_MM = A4_WIDTH_MM - PAGE_MARGIN_X_MM * 2; // 190 mm exact
+export const CONTENT_WIDTH_MM = A4_WIDTH_MM - PAGE_MARGIN_X_MM * 2; // 190 mm exact (Portrait)
+export const LANDSCAPE_CONTENT_WIDTH_MM = A4_HEIGHT_MM - PAGE_MARGIN_X_MM * 2; // 277 mm exact (Landscape)
 export const FOOTER_AREA_MM = 6.5;
 
-/** Strictly enforced target PDF size cap (500 KB = 512,000 bytes). */
-export const TARGET_MAX_PDF_BYTES = 500 * 1024;
-/** Safety headroom below 500 KB to account for PDF object header overhead. */
+/** Strictly enforced target PDF size caps */
+export const TARGET_MAX_PDF_BYTES = 500 * 1024; // 500 KB for District Executive
 export const SAFE_TARGET_PDF_BYTES = 492 * 1024;
+export const TARGET_MAX_MULTI_PDF_BYTES = 1024 * 1024; // 1 MB for other 5 multi-page reports
+export const SAFE_TARGET_MULTI_PDF_BYTES = 990 * 1024;
 
 export const DISTRICT_PDF_FONT_FAMILY =
   "'Noto Sans Devanagari', 'Kohinoor Devanagari', 'Nirmala UI', sans-serif";
 
-export interface DistrictPdfColumnSpec {
-  key: 'serial' | 'fullName' | 'cadreAndCenter' | 'appointedPost' | 'mobile' | 'taluka';
+export interface OfficePdfColumnSpec {
+  key: string;
   header: string;
   widthMm: number;
   /** Strictly horizontal-left across ALL columns per user specification. */
@@ -35,75 +47,118 @@ export interface DistrictPdfColumnSpec {
   boldBody?: boolean;
 }
 
-/**
- * Exact 6-column layout matching `exportDistrictExecutiveExcel` 1:1.
- * Total width = 12 + 47 + 45 + 38 + 25 + 23 = 190.0 mm (full A4 printable width).
- */
-export const DISTRICT_EXECUTIVE_PDF_COLUMNS: readonly DistrictPdfColumnSpec[] = [
-  {
-    key: 'serial',
-    header: 'अ.क्र.',
-    widthMm: 12,
-    hAlign: 'left',
-    vAlign: 'middle',
-    boldBody: true,
-  },
-  {
-    key: 'fullName',
-    header: 'पदाधिकाऱ्याचे संपूर्ण नाव',
-    widthMm: 47,
-    hAlign: 'left',
-    vAlign: 'middle',
-    boldBody: true,
-  },
-  {
-    key: 'cadreAndCenter',
-    header: 'सध्याचे पद व कार्यक्षेत्र',
-    widthMm: 45,
-    hAlign: 'left',
-    vAlign: 'middle',
-    boldBody: false,
-  },
-  {
-    key: 'appointedPost',
-    header: 'संघटनेतील बहाल पद',
-    widthMm: 38,
-    hAlign: 'left',
-    vAlign: 'middle',
-    boldBody: true,
-  },
-  {
-    key: 'mobile',
-    header: 'मोबाईल नंबर',
-    widthMm: 25,
-    hAlign: 'left',
-    vAlign: 'middle',
-    boldBody: false,
-  },
-  {
-    key: 'taluka',
-    header: 'तालुका',
-    widthMm: 23,
-    hAlign: 'left',
-    vAlign: 'middle',
-    boldBody: false,
-  },
-] as const;
+export type DistrictPdfColumnSpec = OfficePdfColumnSpec;
 
-export interface DistrictPdfRowData {
-  cells: [string, string, string, string, string, string];
+export interface OfficePdfRowData {
+  cells: string[];
+  isSummary?: boolean;
 }
 
+export type DistrictPdfRowData = OfficePdfRowData;
+
 /**
- * Formats officials into the exact 6-column values matching the Excel export:
- * [अ.क्र., संपूर्ण नाव, संवर्ग - कार्यरत केंद्र, बहाल पद, मोबाईल, तालुका]
+ * 1. District Executive Committee PDF Columns (A4 Portrait, 190 mm exact)
+ * Exact 6 columns matching `exportDistrictExecutiveExcel` 1:1.
+ * Total width = 12 + 46 + 44 + 38 + 27 + 23 = 190.0 mm
  */
-export function buildDistrictExecutivePdfRows(officials: OfficialMember[]): DistrictPdfRowData[] {
+export const DISTRICT_EXECUTIVE_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
+  { key: 'serial', header: 'अ.क्र.', widthMm: 12, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'fullName', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 46, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadreAndCenter', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 44, hAlign: 'left', vAlign: 'middle', boldBody: false },
+  { key: 'appointedPost', header: 'संघटनेतील बहाल पद', widthMm: 38, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 27, hAlign: 'left', vAlign: 'middle', boldBody: false },
+  { key: 'taluka', header: 'तालुका', widthMm: 23, hAlign: 'left', vAlign: 'middle', boldBody: false },
+] as const;
+
+/**
+ * 2. Organization Status Matrix PDF Columns (A4 Landscape, 277 mm exact)
+ * Exact 11 columns matching `exportOrganizationStatusExcel` 1:1.
+ * Total width = 13 + 42 + 23 + 25 + 25 + 25 + 25 + 29 + 22 + 24 + 24 = 277.0 mm
+ */
+export const ORGANIZATION_STATUS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
+  { key: 'serial', header: 'अ.क्र.', widthMm: 13, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'district', header: 'जिल्ह्याचे नाव', widthMm: 42, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'stateRep', header: 'राज्य प्रतिनिधी', widthMm: 23, hAlign: 'left', vAlign: 'middle' },
+  { key: 'divRep', header: 'विभागीय प्रतिनिधी', widthMm: 25, hAlign: 'left', vAlign: 'middle' },
+  { key: 'distOff', header: 'जिल्हा पदाधिकारी', widthMm: 25, hAlign: 'left', vAlign: 'middle' },
+  { key: 'talukaOff', header: 'तालुका पदाधिकारी', widthMm: 25, hAlign: 'left', vAlign: 'middle' },
+  { key: 'offTot', header: 'एकूण पदाधिकारी', widthMm: 25, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'extOfficer', header: 'शिक्षण विस्तार अधिकारी', widthMm: 29, hAlign: 'left', vAlign: 'middle' },
+  { key: 'headmaster', header: 'केंद्रप्रमुख', widthMm: 22, hAlign: 'left', vAlign: 'middle' },
+  { key: 'memTot', header: 'एकूण सदस्य', widthMm: 24, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'grandTot', header: 'एकूण बेरीज', widthMm: 24, hAlign: 'left', vAlign: 'middle', boldBody: true },
+] as const;
+
+/**
+ * 3. All District Presidents PDF Columns (A4 Portrait, 190 mm exact)
+ * Exact 6 columns matching `exportDistrictPresidentsExcel` 1:1.
+ * Total width = 12 + 29 + 46 + 44 + 32 + 27 = 190.0 mm
+ */
+export const DISTRICT_PRESIDENTS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
+  { key: 'serial', header: 'अ.क्र.', widthMm: 12, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'district', header: 'जिल्हा', widthMm: 29, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'name', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 46, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadre', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 44, hAlign: 'left', vAlign: 'middle' },
+  { key: 'post', header: 'संघटनेतील पद', widthMm: 32, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 27, hAlign: 'left', vAlign: 'middle' },
+] as const;
+
+/**
+ * 4. All Taluka Presidents PDF Columns (A4 Portrait, 190 mm exact)
+ * Exact 6 columns matching `exportTalukaPresidentsExcel` 1:1.
+ * Total width = 12 + 34 + 44 + 43 + 30 + 27 = 190.0 mm
+ */
+export const TALUKA_PRESIDENTS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
+  { key: 'serial', header: 'अ.क्र.', widthMm: 12, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'districtTaluka', header: 'जिल्हा व तालुका', widthMm: 34, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'name', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 44, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadre', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 43, hAlign: 'left', vAlign: 'middle' },
+  { key: 'post', header: 'संघटनेतील पद', widthMm: 30, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 27, hAlign: 'left', vAlign: 'middle' },
+] as const;
+
+/**
+ * 5. Approved Registered Members PDF Columns (A4 Portrait, 190 mm exact)
+ * Clean 8 columns with member number, name, gender, cadre, district/taluka, working center, mobile.
+ * Total width = 11 + 26 + 37 + 13 + 24 + 28 + 27 + 24 = 190.0 mm
+ */
+export const REGISTERED_MEMBERS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
+  { key: 'serial', header: 'अ.क्र.', widthMm: 11, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'memberNo', header: 'सदस्य क्र.', widthMm: 26, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'fullName', header: 'संपूर्ण नाव', widthMm: 37, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'gender', header: 'लिंग', widthMm: 13, hAlign: 'left', vAlign: 'middle' },
+  { key: 'cadre', header: 'पद / संवर्ग', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
+  { key: 'districtTaluka', header: 'जिल्हा व तालुका', widthMm: 28, hAlign: 'left', vAlign: 'middle' },
+  { key: 'centerName', header: 'कार्यरत केंद्र', widthMm: 27, hAlign: 'left', vAlign: 'middle' },
+  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
+] as const;
+
+/**
+ * 6. Statewide Appointments Registry PDF Columns (A4 Portrait, 190 mm exact)
+ * Exact 8 columns matching `exportStatewideRegistryExcel` 1:1.
+ * Total width = 11 + 35 + 22 + 20 + 28 + 24 + 26 + 24 = 190.0 mm
+ */
+export const STATEWIDE_REGISTRY_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
+  { key: 'serial', header: 'अ.क्र.', widthMm: 11, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'fullName', header: 'संपूर्ण नाव', widthMm: 35, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'district', header: 'जिल्हा', widthMm: 22, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'taluka', header: 'तालुका', widthMm: 20, hAlign: 'left', vAlign: 'middle' },
+  { key: 'appointedPost', header: 'बहाल पद', widthMm: 28, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadre', header: 'सध्याचे पद', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
+  { key: 'workingPlace', header: 'कार्यरत केंद्र', widthMm: 26, hAlign: 'left', vAlign: 'middle' },
+  { key: 'mobile', header: 'मोबाईल', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
+] as const;
+
+/**
+ * Row Builder 1: District Executive Committee
+ */
+export function buildDistrictExecutivePdfRows(officials: OfficialMember[]): OfficePdfRowData[] {
   return (officials || []).map((m, idx) => {
-    const fullName = [m.salutation, m.firstName, m.middleName, m.lastName]
-      .map((part) => (part || '').trim())
-      .filter(Boolean)
-      .join(' ') || '-';
+    const fullName =
+      [m.salutation, m.firstName, m.middleName, m.lastName]
+        .map((part) => (part || '').trim())
+        .filter(Boolean)
+        .join(' ') || '-';
 
     const cadreAndCenter =
       [normalizeOfficialCadre(m.currentCadre, ''), (m.workingPlace || '').trim()]
@@ -118,6 +173,191 @@ export function buildDistrictExecutivePdfRows(officials: OfficialMember[]): Dist
         (m.appointedPost || '').trim() || '-',
         toEnglishDigits((m.mobile || '').trim() || '-'),
         (m.taluka || '').trim() || '-',
+      ],
+    };
+  });
+}
+
+/**
+ * Row Builder 2: 34 Districts Organization Status Matrix (includes bold totals summary row)
+ */
+export function buildOrganizationStatusPdfRows(stats: Array<any>): {
+  rows: OfficePdfRowData[];
+  totalOfficials: number;
+  totalMembers: number;
+} {
+  let tStateRep = 0;
+  let tDivRep = 0;
+  let tDistOff = 0;
+  let tTalukaOff = 0;
+  let tOffTot = 0;
+  let tExt = 0;
+  let tHm = 0;
+  let tMemTot = 0;
+  let tGrandTot = 0;
+
+  const rows: OfficePdfRowData[] = (stats || []).map((st, idx) => {
+    const stateRep = Number(st.stateRep || 0);
+    const divRep = Number(st.divRep || 0);
+    const distOff = Number(st.distOfficial || 0);
+    const talukaOff = Number(st.talukaOfficial || 0);
+    const offTot = st.officialsTotal ?? stateRep + divRep + distOff + talukaOff;
+
+    const ext = Number(st.extOfficerCount || 0);
+    const hm = Number(st.headmasterCount ?? st.members ?? 0);
+    const memTot = st.membersTotal ?? ext + hm;
+    const rowTot = st.rowTotal !== undefined ? Number(st.rowTotal) : memTot;
+
+    tStateRep += stateRep;
+    tDivRep += divRep;
+    tDistOff += distOff;
+    tTalukaOff += talukaOff;
+    tOffTot += offTot;
+    tExt += ext;
+    tHm += hm;
+    tMemTot += memTot;
+    tGrandTot += rowTot;
+
+    return {
+      cells: [
+        toEnglishDigits(idx + 1),
+        String(st.district || '-'),
+        toEnglishDigits(stateRep),
+        toEnglishDigits(divRep),
+        toEnglishDigits(distOff),
+        toEnglishDigits(talukaOff),
+        toEnglishDigits(offTot),
+        toEnglishDigits(ext),
+        toEnglishDigits(hm),
+        toEnglishDigits(memTot),
+        toEnglishDigits(rowTot),
+      ],
+    };
+  });
+
+  rows.push({
+    isSummary: true,
+    cells: [
+      '',
+      'एकूण बेरीज (राज्य)',
+      toEnglishDigits(tStateRep),
+      toEnglishDigits(tDivRep),
+      toEnglishDigits(tDistOff),
+      toEnglishDigits(tTalukaOff),
+      toEnglishDigits(tOffTot),
+      toEnglishDigits(tExt),
+      toEnglishDigits(tHm),
+      toEnglishDigits(tMemTot),
+      toEnglishDigits(tGrandTot),
+    ],
+  });
+
+  return { rows, totalOfficials: tOffTot, totalMembers: tMemTot };
+}
+
+/**
+ * Row Builder 3: All District Presidents
+ */
+export function buildDistrictPresidentsPdfRows(
+  list: Array<{ district: string; name: string; cadre: string; post: string; mobile: string }>
+): OfficePdfRowData[] {
+  return (list || []).map((item, idx) => ({
+    cells: [
+      toEnglishDigits(idx + 1),
+      (item.district || '').trim() || '-',
+      (item.name || '').trim() || '-',
+      normalizeCadreInText(item.cadre, '-'),
+      (item.post || '').trim() || '-',
+      toEnglishDigits((item.mobile || '').trim() || '-'),
+    ],
+  }));
+}
+
+/**
+ * Row Builder 4: All Taluka Presidents
+ */
+export function buildTalukaPresidentsPdfRows(
+  list: Array<{
+    district: string;
+    taluka?: string;
+    name: string;
+    cadre: string;
+    post: string;
+    mobile: string;
+  }>
+): OfficePdfRowData[] {
+  return (list || []).map((item, idx) => ({
+    cells: [
+      toEnglishDigits(idx + 1),
+      `${(item.district || '').trim()}${item.taluka ? ` (${item.taluka.trim()})` : ''}` || '-',
+      (item.name || '').trim() || '-',
+      normalizeCadreInText(item.cadre, '-'),
+      (item.post || '').trim() || '-',
+      toEnglishDigits((item.mobile || '').trim() || '-'),
+    ],
+  }));
+}
+
+/**
+ * Row Builder 5: Approved Registered Members (Unified order, gender & working center)
+ */
+export function buildRegisteredMembersPdfRows(list: MembershipApplication[]): {
+  rows: OfficePdfRowData[];
+  maleCount: number;
+  femaleCount: number;
+} {
+  const sorted = sortMembersForUnifiedExcel(list);
+  let maleCount = 0;
+  let femaleCount = 0;
+
+  const rows: OfficePdfRowData[] = sorted.map((m, idx) => {
+    const salutation = resolveEffectiveSalutation(m);
+    const gender = resolveMemberGender(m);
+    if (gender === 'पुरुष') maleCount += 1;
+    else if (gender === 'स्त्री') femaleCount += 1;
+
+    const fullName = formatMemberDisplayName(salutation, m.fullName) || '-';
+    const districtTaluka =
+      [m.district, m.taluka ? `ता. ${m.taluka}` : ''].filter(Boolean).join(', ') || '-';
+
+    return {
+      cells: [
+        toEnglishDigits(idx + 1),
+        toEnglishDigits((m.memberNumber || m.applicationNumber || '').trim() || '-'),
+        fullName,
+        gender || '-',
+        normalizeOfficialCadre(m.professional, '-'),
+        districtTaluka,
+        (m.centerName || '').trim() || '-',
+        toEnglishDigits((m.phone || '').trim() || '-'),
+      ],
+    };
+  });
+
+  return { rows, maleCount, femaleCount };
+}
+
+/**
+ * Row Builder 6: Statewide Appointments Master Registry
+ */
+export function buildStatewideRegistryPdfRows(officials: OfficialMember[]): OfficePdfRowData[] {
+  return (officials || []).map((m, idx) => {
+    const fullName =
+      [m.salutation, m.firstName, m.middleName, m.lastName]
+        .map((part) => (part || '').trim())
+        .filter(Boolean)
+        .join(' ') || '-';
+
+    return {
+      cells: [
+        toEnglishDigits(idx + 1),
+        fullName,
+        (m.district || '').trim() || '-',
+        (m.taluka || '').trim() || '-',
+        (m.appointedPost || '').trim() || '-',
+        normalizeOfficialCadre(m.currentCadre, '-'),
+        (m.workingPlace || '').trim() || '-',
+        toEnglishDigits((m.mobile || '').trim() || '-'),
       ],
     };
   });
@@ -224,7 +464,7 @@ export interface PaginatedDistrictPagePlan {
 }
 
 /**
- * Pure height-based A4 page packer for the District Executive PDF:
+ * Pure height-based A4 page packer for all 6 office PDFs:
  * - Page 1 uses `firstPageTableMaxMm` (below full-color letterhead + title + meta + table header)
  * - Page 2+ uses `continuationPageTableMaxMm` (below compact header + repeated table header)
  * - Reserves `signatureReserveMm` on the final page so the State President signature block
@@ -276,7 +516,6 @@ export function paginateMeasuredDistrictRows(params: {
     rawPages.push(pageRows);
   }
 
-  // Verify signature fits cleanly below the last row on the final page
   const lastIdx = rawPages.length - 1;
   const lastCap = lastIdx === 0 ? firstPageTableMaxMm : continuationPageTableMaxMm;
   const sumHeights = (indices: number[]) =>
@@ -286,8 +525,6 @@ export function paginateMeasuredDistrictRows(params: {
     const spill: number[] = [];
     let remainingHeight = sumHeights(rawPages[lastIdx]);
 
-    // Move trailing rows (leaving at least 2 rows on previous page when possible)
-    // so the final page has rows + signature together (no lonely floating signature)
     while (
       rawPages[lastIdx].length > 2 &&
       remainingHeight + signatureReserveMm > lastCap
@@ -303,7 +540,6 @@ export function paginateMeasuredDistrictRows(params: {
       const moved = rawPages[lastIdx].pop()!;
       rawPages.push([moved]);
     } else {
-      // Only 1 very tall row on the last page — give signature its own clean continuation page
       rawPages.push([]);
     }
   }
@@ -327,11 +563,15 @@ export interface AdaptivePdfQualityProfile {
 }
 
 /**
- * Ordered quality ladder for the automatic <= 500 KB byte-budget optimizer.
- * Starts crisp for the given page count and smoothly tunes compression only if needed.
+ * Page-count & byte-budget-aware quality ladder for automatic <= 500 KB / <= 1 MB control.
+ * Computes the per-page byte budget so even 20–40 page statewide reports start at the
+ * right crisp DPI immediately and reliably land below the configured target byte cap.
  * Native PDF vector borders remain infinite-DPI across every profile.
  */
-export function getAdaptivePdfQualityLadder(pageCount: number): AdaptivePdfQualityProfile[] {
+export function getAdaptivePdfQualityLadder(
+  pageCount: number,
+  targetMaxBytes: number = TARGET_MAX_PDF_BYTES
+): AdaptivePdfQualityProfile[] {
   const allProfiles: AdaptivePdfQualityProfile[] = [
     {
       label: 'ultra-print',
@@ -363,8 +603,8 @@ export function getAdaptivePdfQualityLadder(pageCount: number): AdaptivePdfQuali
     {
       label: 'compact-print',
       dpi: 140,
-      textJpegQuality: 0.66,
-      letterheadMaxWidthPx: 1050,
+      textJpegQuality: 0.64,
+      letterheadMaxWidthPx: 1040,
       letterheadQuality: 0.6,
       signMaxWidthPx: 320,
       signQuality: 0.72,
@@ -372,34 +612,59 @@ export function getAdaptivePdfQualityLadder(pageCount: number): AdaptivePdfQuali
     {
       label: 'tight-multi',
       dpi: 122,
-      textJpegQuality: 0.6,
-      letterheadMaxWidthPx: 940,
-      letterheadQuality: 0.55,
+      textJpegQuality: 0.56,
+      letterheadMaxWidthPx: 920,
+      letterheadQuality: 0.54,
       signMaxWidthPx: 290,
       signQuality: 0.68,
     },
     {
       label: 'dense-multi',
       dpi: 108,
-      textJpegQuality: 0.55,
-      letterheadMaxWidthPx: 840,
-      letterheadQuality: 0.5,
+      textJpegQuality: 0.49,
+      letterheadMaxWidthPx: 820,
+      letterheadQuality: 0.48,
       signMaxWidthPx: 260,
-      signQuality: 0.64,
+      signQuality: 0.62,
     },
     {
-      label: 'ultra-compact',
-      dpi: 96,
-      textJpegQuality: 0.5,
-      letterheadMaxWidthPx: 760,
-      letterheadQuality: 0.46,
+      label: 'high-volume',
+      dpi: 95,
+      textJpegQuality: 0.43,
+      letterheadMaxWidthPx: 740,
+      letterheadQuality: 0.44,
       signMaxWidthPx: 240,
-      signQuality: 0.6,
+      signQuality: 0.58,
+    },
+    {
+      label: 'ultra-volume',
+      dpi: 84,
+      textJpegQuality: 0.38,
+      letterheadMaxWidthPx: 660,
+      letterheadQuality: 0.4,
+      signMaxWidthPx: 220,
+      signQuality: 0.54,
+    },
+    {
+      label: 'max-volume',
+      dpi: 74,
+      textJpegQuality: 0.34,
+      letterheadMaxWidthPx: 600,
+      letterheadQuality: 0.36,
+      signMaxWidthPx: 200,
+      signQuality: 0.5,
     },
   ];
 
-  if (pageCount <= 2) return allProfiles;
-  if (pageCount <= 4) return allProfiles.slice(1);
-  if (pageCount <= 6) return allProfiles.slice(2);
-  return allProfiles.slice(3);
+  const safePages = Math.max(1, pageCount);
+  const usableBytes = Math.max(80 * 1024, targetMaxBytes - 75 * 1024);
+  const budgetKbPerPage = usableBytes / safePages / 1024;
+
+  if (budgetKbPerPage >= 150) return allProfiles;
+  if (budgetKbPerPage >= 100) return allProfiles.slice(1);
+  if (budgetKbPerPage >= 70) return allProfiles.slice(2);
+  if (budgetKbPerPage >= 48) return allProfiles.slice(3);
+  if (budgetKbPerPage >= 34) return allProfiles.slice(4);
+  if (budgetKbPerPage >= 24) return allProfiles.slice(5);
+  return allProfiles.slice(6);
 }

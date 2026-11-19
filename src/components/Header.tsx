@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import { ORG_DETAILS } from '../data/mahasanghData';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   currentTab: string;
@@ -89,10 +88,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
           </span>
         </button>
 
-        {/* Right Slot: PWA Install CTA when available, preserving optical alignment */}
-        <div className="min-w-12 min-[380px]:min-w-14 sm:min-w-16 md:min-w-20 shrink-0 flex items-center justify-end">
-          <PWAInstallButton variant="header" />
-        </div>
+        {/* Right Spacer: Preserves optical alignment for centered title */}
+        <div className="min-w-12 min-[380px]:min-w-14 sm:min-w-16 md:min-w-20 shrink-0" aria-hidden="true" />
       </div>
 
       {/* 2. Submenu Bar (सब मेनू पट्टी - आकर्षक, ठळक अक्षरे व सुंदर रंगसंगती) */}

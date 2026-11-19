@@ -1,23 +1,21 @@
 /**
- * Modern Hybrid Vector + Native-Shaped Devanagari A4 PDF Engine
- * for Official District Executive Committee Lists (राज्याध्यक्ष लॉगिन)
+ * Unified Modern Hybrid Vector + Native-Shaped Devanagari A4 PDF Engine
+ * for ALL 6 Official Office Reports in State President Login (राज्याध्यक्ष लॉगिन)
  *
- * Architecture:
- * 1. Native PDF Vector Chrome (jsPDF primitives):
- *    - Infinite-DPI razor-sharp outer borders, horizontal row dividers, vertical column separators,
- *      header bottom rule, metadata box border, and page footer hairline.
- * 2. Direct Native Image Embedding:
- *    - Full-color official letterhead (/heding.jpg) embedded natively ONLY on Page 1.
- *    - Clean blue-ink State President signature (/sign.jpg) embedded natively ONLY on Final Page.
- * 3. Browser-Shaped Devanagari Text Layer (Canvas 2D + Noto Sans Devanagari):
- *    - 100% accurate HarfBuzz/DirectWrite/CoreText Marathi conjuncts & vowel marks (जोडाक्षरे/वेलांटी/उकार).
- *    - Strictly Vertical-Center + Horizontal-Left alignment in EVERY header & data cell.
- * 4. Automatic <= 500 KB Adaptive Byte-Budget Optimizer:
- *    - Measures exact generated PDF bytes (`arraybuffer.byteLength`) and auto-tunes encoding
- *      so every district PDF (1 page or multi-page) lands cleanly <= 500 KB while staying print-sharp.
+ * Shared Guarantees across ALL 6 PDFs:
+ * 1. Full-color official letterhead (/heding.jpg) on Page 1 ONLY.
+ * 2. Compact institutional continuation header + page numbering + repeated table header on Page 2+.
+ * 3. Strictly Vertical-Center + Horizontal-Left alignment in EVERY header & data cell.
+ * 4. Larger, crisp, print-optimized Devanagari typography (Noto Sans Devanagari).
+ * 5. Infinite-DPI native PDF vector table borders drawn on top of clean text bands.
+ * 6. Official State President signature (/sign.jpg) with name & designation at the end of the final page.
+ * 7. Automatic adaptive byte-budget controller:
+ *    - District Executive PDF: <= 500 KB
+ *    - All other 5 multi-page PDFs: <= 1 MB (even across 10–30+ pages)
  */
 
 import { OfficialMember } from '../data/rkMaharashtraData';
+import { MembershipApplication } from '../data/mahasanghData';
 import { resolveImageUrlForPdf } from '../utils/cloudinary';
 import { toEnglishDigits } from '../utils/formatters';
 import {
@@ -26,13 +24,27 @@ import {
   PAGE_MARGIN_X_MM,
   PAGE_MARGIN_TOP_MM,
   PAGE_MARGIN_BOTTOM_MM,
-  CONTENT_WIDTH_MM,
   FOOTER_AREA_MM,
   DISTRICT_PDF_FONT_FAMILY,
   DISTRICT_EXECUTIVE_PDF_COLUMNS,
+  ORGANIZATION_STATUS_PDF_COLUMNS,
+  DISTRICT_PRESIDENTS_PDF_COLUMNS,
+  TALUKA_PRESIDENTS_PDF_COLUMNS,
+  REGISTERED_MEMBERS_PDF_COLUMNS,
+  STATEWIDE_REGISTRY_PDF_COLUMNS,
   SAFE_TARGET_PDF_BYTES,
+  SAFE_TARGET_MULTI_PDF_BYTES,
+  TARGET_MAX_PDF_BYTES,
+  TARGET_MAX_MULTI_PDF_BYTES,
+  OfficePdfColumnSpec,
+  OfficePdfRowData,
   AdaptivePdfQualityProfile,
   buildDistrictExecutivePdfRows,
+  buildOrganizationStatusPdfRows,
+  buildDistrictPresidentsPdfRows,
+  buildTalukaPresidentsPdfRows,
+  buildRegisteredMembersPdfRows,
+  buildStatewideRegistryPdfRows,
   wrapTextToLines,
   computeVerticalCenteredBaselines,
   paginateMeasuredDistrictRows,
@@ -45,6 +57,8 @@ export interface DistrictExecutivePdfResult {
   sizeBytes: number;
   sizeKb: number;
 }
+
+export type OfficeHybridPdfResult = DistrictExecutivePdfResult;
 
 const MM_PER_INCH = 25.4;
 
@@ -91,7 +105,7 @@ interface OptimizedImageAsset {
   dataUrl: string;
   naturalWidth: number;
   naturalHeight: number;
-  aspectRatio: number; // width / height
+  aspectRatio: number;
 }
 
 async function encodeOptimizedJpegAsset(
@@ -124,7 +138,6 @@ async function encodeOptimizedJpegAsset(
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, targetW, targetH);
 
-  // For signature: remove light scanner gray tint so it blends invisibly onto pure white A4 paper
   if (cleanWhiteBackground) {
     try {
       const imgData = ctx.getImageData(0, 0, targetW, targetH);
@@ -136,7 +149,6 @@ async function encodeOptimizedJpegAsset(
           px[i + 1] = 255;
           px[i + 2] = 255;
         } else if (lum < 190) {
-          // Slightly deepen blue ink for crisp print contrast
           px[i] = Math.max(8, Math.round(px[i] * 0.78));
           px[i + 1] = Math.max(22, Math.round(px[i + 1] * 0.82));
           px[i + 2] = Math.min(210, Math.round(px[i + 2] * 0.98));
@@ -159,6 +171,7 @@ async function encodeOptimizedJpegAsset(
 interface MeasuredRowLayout {
   wrappedCells: string[][];
   heightMm: number;
+  isSummary?: boolean;
 }
 
 interface MeasuredTableGeometry {
@@ -173,22 +186,36 @@ interface MeasuredTableGeometry {
   cellPadYMm: number;
 }
 
-function measureTableGeometry(
-  rawRows: ReturnType<typeof buildDistrictExecutivePdfRows>
-): MeasuredTableGeometry {
+function measureTableGeometry(params: {
+  columns: readonly OfficePdfColumnSpec[];
+  rawRows: OfficePdfRowData[];
+  bodyFontPt: number;
+  headerFontPt: number;
+  bodyLineHeightMm: number;
+  headerLineHeightMm: number;
+  cellPadXMm: number;
+  cellPadYMm: number;
+  minRowHeightMm: number;
+  minHeaderHeightMm: number;
+}): MeasuredTableGeometry {
+  const {
+    columns,
+    rawRows,
+    bodyFontPt,
+    headerFontPt,
+    bodyLineHeightMm,
+    headerLineHeightMm,
+    cellPadXMm,
+    cellPadYMm,
+    minRowHeightMm,
+    minHeaderHeightMm,
+  } = params;
+
   const measureDpi = 192;
   const canvas = document.createElement('canvas');
   canvas.width = 40;
   canvas.height = 40;
   const ctx = canvas.getContext('2d');
-
-  const bodyFontPt = 8.4;
-  const headerFontPt = 8.5;
-  const bodyLineHeightMm = 4.25;
-  const headerLineHeightMm = 4.25;
-  const cellPadXMm = 2.0;
-  const cellPadYMm = 1.95;
-
   const ptToPx = (pt: number) => (pt / 72) * measureDpi;
 
   const measureWithFont = (fontSpec: string) => {
@@ -199,39 +226,41 @@ function measureTableGeometry(
     };
   };
 
-  const headerFontSpec = `700 ${ptToPx(headerFontPt)}px ${DISTRICT_PDF_FONT_FAMILY}`;
-  const headerMeasure = measureWithFont(headerFontSpec);
+  const headerMeasure = measureWithFont(
+    `700 ${ptToPx(headerFontPt)}px ${DISTRICT_PDF_FONT_FAMILY}`
+  );
+  const boldMeasure = measureWithFont(
+    `700 ${ptToPx(bodyFontPt)}px ${DISTRICT_PDF_FONT_FAMILY}`
+  );
+  const regularMeasure = measureWithFont(
+    `500 ${ptToPx(bodyFontPt)}px ${DISTRICT_PDF_FONT_FAMILY}`
+  );
 
-  const headerWrapped: string[][] = DISTRICT_EXECUTIVE_PDF_COLUMNS.map((col) => {
+  const headerWrapped: string[][] = columns.map((col) => {
     const innerWidthPx = mmToPx(col.widthMm - cellPadXMm * 2, measureDpi);
     return wrapTextToLines(col.header, innerWidthPx, headerMeasure);
   });
 
   const maxHeaderLines = Math.max(1, ...headerWrapped.map((lines) => lines.length));
   const headerHeightMm = Math.max(
-    8.8,
+    minHeaderHeightMm,
     maxHeaderLines * headerLineHeightMm + cellPadYMm * 2 + 0.6
   );
 
-  const boldBodyFontSpec = `700 ${ptToPx(bodyFontPt)}px ${DISTRICT_PDF_FONT_FAMILY}`;
-  const regularBodyFontSpec = `500 ${ptToPx(bodyFontPt)}px ${DISTRICT_PDF_FONT_FAMILY}`;
-  const boldMeasure = measureWithFont(boldBodyFontSpec);
-  const regularMeasure = measureWithFont(regularBodyFontSpec);
-
   const rows: MeasuredRowLayout[] = rawRows.map((row) => {
-    const wrappedCells = DISTRICT_EXECUTIVE_PDF_COLUMNS.map((col, colIdx) => {
+    const wrappedCells = columns.map((col, colIdx) => {
       const innerWidthPx = mmToPx(col.widthMm - cellPadXMm * 2, measureDpi);
-      const measurer = col.boldBody ? boldMeasure : regularMeasure;
-      return wrapTextToLines(row.cells[colIdx], innerWidthPx, measurer);
+      const measurer = row.isSummary || col.boldBody ? boldMeasure : regularMeasure;
+      return wrapTextToLines(row.cells[colIdx] ?? '-', innerWidthPx, measurer);
     });
 
     const maxLines = Math.max(1, ...wrappedCells.map((lines) => lines.length));
     const heightMm = Math.max(
-      7.6,
-      maxLines * bodyLineHeightMm + cellPadYMm * 2 + 0.4
+      minRowHeightMm,
+      maxLines * bodyLineHeightMm + cellPadYMm * 2 + 0.5
     );
 
-    return { wrappedCells, heightMm };
+    return { wrappedCells, heightMm, isSummary: row.isSummary };
   });
 
   return {
@@ -247,9 +276,6 @@ function measureTableGeometry(
   };
 }
 
-/**
- * Measures reliable Devanagari ascent/descent metrics in pixels for true visual vertical centering.
- */
 function getFontVerticalMetricsPx(
   ctx: CanvasRenderingContext2D,
   fontPx: number
@@ -266,9 +292,6 @@ function getFontVerticalMetricsPx(
   return { ascent, descent };
 }
 
-/**
- * Renders a crisp band of Devanagari text onto a pure-white/tinted Canvas 2D and returns a JPEG data URL.
- */
 function renderCanvasBand(
   widthMm: number,
   heightMm: number,
@@ -291,29 +314,59 @@ function renderCanvasBand(
   return canvas.toDataURL('image/jpeg', jpegQuality);
 }
 
-/**
- * Builds the complete jsPDF document for a given adaptive quality profile.
- */
-async function buildDistrictExecutiveJsPdfDocument(params: {
-  district: string;
-  totalOfficials: number;
+export interface OfficeHybridTablePdfOptions {
+  orientation: 'portrait' | 'landscape';
+  reportTitle: string;
+  leftMeta: string;
+  fileName: string;
+  columns: readonly OfficePdfColumnSpec[];
+  rows: OfficePdfRowData[];
+  targetMaxBytes: number;
+  safeTargetBytes: number;
+  sizeLimitLabel: string;
+  bodyFontPt?: number;
+  headerFontPt?: number;
+  bodyLineHeightMm?: number;
+  headerLineHeightMm?: number;
+  cellPadXMm?: number;
+  cellPadYMm?: number;
+  minRowHeightMm?: number;
+  minHeaderHeightMm?: number;
+  onProgress?: (status: string) => void;
+}
+
+async function buildOfficeHybridJsPdfDocument(params: {
+  orientation: 'portrait' | 'landscape';
+  pageWidthMm: number;
+  pageHeightMm: number;
+  contentWidthMm: number;
+  reportTitle: string;
+  leftMeta: string;
   todayStr: string;
+  columns: readonly OfficePdfColumnSpec[];
   geometry: MeasuredTableGeometry;
   pages: ReturnType<typeof paginateMeasuredDistrictRows>;
   letterheadImg: HTMLImageElement | null;
   signImg: HTMLImageElement | null;
+  letterheadDrawWidthMm: number;
   letterheadHeightMm: number;
   profile: AdaptivePdfQualityProfile;
   onPageProgress?: (pageIdx: number, totalPages: number) => void;
 }) {
   const {
-    district,
-    totalOfficials,
+    orientation,
+    pageWidthMm,
+    pageHeightMm,
+    contentWidthMm,
+    reportTitle,
+    leftMeta,
     todayStr,
+    columns,
     geometry,
     pages,
     letterheadImg,
     signImg,
+    letterheadDrawWidthMm,
     letterheadHeightMm,
     profile,
     onPageProgress,
@@ -321,13 +374,12 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
 
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({
-    orientation: 'portrait',
+    orientation,
     unit: 'mm',
     format: 'a4',
     compress: true,
   });
 
-  // Pre-encode letterhead & signature ONCE at the current quality profile
   const [letterheadAsset, signAsset] = await Promise.all([
     letterheadImg
       ? encodeOptimizedJpegAsset(
@@ -359,64 +411,59 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
 
     const plan = pages[pIdx];
     if (pIdx > 0) {
-      pdf.addPage('a4', 'portrait');
+      pdf.addPage('a4', orientation);
     }
 
     let cursorY = PAGE_MARGIN_TOP_MM;
 
-    // -----------------------------------------------------------------------
-    // 1. HEADER AREA (Page 1: Full-Color Letterhead | Page 2+: Compact Title)
-    // -----------------------------------------------------------------------
+    // 1. HEADER AREA (Page 1: Full-Color Official Letterhead | Page 2+: Compact Institutional Header)
     if (plan.showLetterhead && letterheadAsset?.dataUrl) {
+      const lhX = PAGE_MARGIN_X_MM + (contentWidthMm - letterheadDrawWidthMm) / 2;
       pdf.addImage(
         letterheadAsset.dataUrl,
         'JPEG',
-        PAGE_MARGIN_X_MM,
+        lhX,
         cursorY,
-        CONTENT_WIDTH_MM,
+        letterheadDrawWidthMm,
         letterheadHeightMm,
         'letterhead_heding',
         'FAST'
       );
       cursorY += letterheadHeightMm + 1.4;
 
-      // Crisp native vector rule beneath letterhead
       pdf.setDrawColor(15, 23, 42);
       pdf.setLineWidth(0.45);
-      pdf.line(PAGE_MARGIN_X_MM, cursorY, PAGE_MARGIN_X_MM + CONTENT_WIDTH_MM, cursorY);
-      cursorY += 2.2;
+      pdf.line(PAGE_MARGIN_X_MM, cursorY, PAGE_MARGIN_X_MM + contentWidthMm, cursorY);
+      cursorY += 2.0;
 
-      // Report Title + Metadata Band (Canvas 2D crisp Devanagari + Vector frame)
-      const titleBandHeightMm = 14.5;
+      const titleBandHeightMm = 15.2;
       const titleBandImg = renderCanvasBand(
-        CONTENT_WIDTH_MM,
+        contentWidthMm,
         titleBandHeightMm,
         dpi,
         q,
         (ctx, s) => {
-          // Row 1: Report Title (Vertical Center + Horizontal Left)
-          const titleFontPx = ptToPx(11.5);
+          const titleFontPx = ptToPx(12.2);
           ctx.font = `800 ${titleFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#0f172a';
           ctx.textAlign = 'left';
           const titleMetrics = getFontVerticalMetricsPx(ctx, titleFontPx);
           const titleY = computeVerticalCenteredBaselines({
             cellTop: 0,
-            cellHeight: 6.8 * s,
+            cellHeight: 7.2 * s,
             lineCount: 1,
-            lineHeight: 6.8 * s,
+            lineHeight: 7.2 * s,
             ascent: titleMetrics.ascent,
             descent: titleMetrics.descent,
           })[0];
-          ctx.fillText(`अधिकृत जिल्हा कार्यकारिणी यादी — ${district}`, 0.5 * s, titleY);
+          ctx.fillText(reportTitle, 0.5 * s, titleY);
 
-          // Row 2: Clean Light-Gray Office Metadata Strip
-          const metaTopPx = 7.4 * s;
-          const metaHeightPx = 6.8 * s;
+          const metaTopPx = 7.8 * s;
+          const metaHeightPx = 7.0 * s;
           ctx.fillStyle = '#f8fafc';
-          ctx.fillRect(0, metaTopPx, CONTENT_WIDTH_MM * s, metaHeightPx);
+          ctx.fillRect(0, metaTopPx, contentWidthMm * s, metaHeightPx);
 
-          const metaFontPx = ptToPx(8.6);
+          const metaFontPx = ptToPx(9.2);
           ctx.font = `700 ${metaFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#0f172a';
           const metaMetrics = getFontVerticalMetricsPx(ctx, metaFontPx);
@@ -430,18 +477,14 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
           })[0];
 
           ctx.textAlign = 'left';
-          ctx.fillText(
-            `जिल्हा: ${district}   |   एकूण पदाधिकारी: ${toEnglishDigits(totalOfficials)}`,
-            2.4 * s,
-            metaY
-          );
+          ctx.fillText(leftMeta, 2.4 * s, metaY);
 
           ctx.textAlign = 'right';
           const pageMeta =
             totalPages > 1
               ? `दिनांक: ${todayStr}   |   पृष्ठ: ${toEnglishDigits(plan.pageNumber)} / ${toEnglishDigits(totalPages)}`
               : `दिनांक: ${todayStr}`;
-          ctx.fillText(pageMeta, (CONTENT_WIDTH_MM - 2.4) * s, metaY);
+          ctx.fillText(pageMeta, (contentWidthMm - 2.4) * s, metaY);
         }
       );
 
@@ -451,74 +494,71 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
           'JPEG',
           PAGE_MARGIN_X_MM,
           cursorY,
-          CONTENT_WIDTH_MM,
+          contentWidthMm,
           titleBandHeightMm,
           undefined,
           'FAST'
         );
       }
 
-      // Native PDF Vector border around metadata strip
       pdf.setDrawColor(148, 163, 184);
       pdf.setLineWidth(0.25);
-      pdf.rect(PAGE_MARGIN_X_MM, cursorY + 7.4, CONTENT_WIDTH_MM, 6.8, 'S');
+      pdf.rect(PAGE_MARGIN_X_MM, cursorY + 7.8, contentWidthMm, 7.0, 'S');
 
       cursorY += titleBandHeightMm + 2.2;
     } else {
-      // Continuation Pages (Page 2+): Compact Institutional Header (NO repeated letterhead)
-      const contHeaderHeightMm = 13.5;
+      const contHeaderHeightMm = 14.0;
       const contHeaderImg = renderCanvasBand(
-        CONTENT_WIDTH_MM,
+        contentWidthMm,
         contHeaderHeightMm,
         dpi,
         q,
         (ctx, s) => {
-          const orgFontPx = ptToPx(8.2);
+          const orgFontPx = ptToPx(8.6);
           ctx.font = `600 ${orgFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#475569';
           ctx.textAlign = 'left';
           const orgMetrics = getFontVerticalMetricsPx(ctx, orgFontPx);
           const orgY = computeVerticalCenteredBaselines({
             cellTop: 0.4 * s,
-            cellHeight: 5.2 * s,
+            cellHeight: 5.4 * s,
             lineCount: 1,
-            lineHeight: 5.2 * s,
+            lineHeight: 5.4 * s,
             ascent: orgMetrics.ascent,
             descent: orgMetrics.descent,
           })[0];
           ctx.fillText('महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ', 0.5 * s, orgY);
 
-          const subTitleFontPx = ptToPx(10.2);
+          const subTitleFontPx = ptToPx(10.8);
           ctx.font = `800 ${subTitleFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#0f172a';
           const subMetrics = getFontVerticalMetricsPx(ctx, subTitleFontPx);
           const subY = computeVerticalCenteredBaselines({
-            cellTop: 5.6 * s,
-            cellHeight: 6.4 * s,
+            cellTop: 5.8 * s,
+            cellHeight: 6.6 * s,
             lineCount: 1,
-            lineHeight: 6.4 * s,
+            lineHeight: 6.6 * s,
             ascent: subMetrics.ascent,
             descent: subMetrics.descent,
           })[0];
-          ctx.fillText(`अधिकृत जिल्हा कार्यकारिणी यादी — ${district}`, 0.5 * s, subY);
+          ctx.fillText(reportTitle, 0.5 * s, subY);
 
-          // Right side date & page indicator
-          const metaFontPx = ptToPx(8.3);
+          const metaFontPx = ptToPx(8.8);
           ctx.font = `700 ${metaFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#334155';
           ctx.textAlign = 'right';
           const metaMetrics = getFontVerticalMetricsPx(ctx, metaFontPx);
           const metaY = computeVerticalCenteredBaselines({
-            cellTop: 5.6 * s,
-            cellHeight: 6.4 * s,
+            cellTop: 5.8 * s,
+            cellHeight: 6.6 * s,
             lineCount: 1,
-            lineHeight: 6.4 * s,
+            lineHeight: 6.6 * s,
             ascent: metaMetrics.ascent,
             descent: metaMetrics.descent,
           })[0];
           ctx.fillText(
             `दिनांक: ${todayStr}   |   पृष्ठ: ${toEnglishDigits(plan.pageNumber)} / ${toEnglishDigits(totalPages)}`,
-            (CONTENT_WIDTH_MM - 0.5) * s,
+            (contentWidthMm - 0.5) * s,
             metaY
           );
         }
@@ -530,29 +570,26 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
           'JPEG',
           PAGE_MARGIN_X_MM,
           cursorY,
-          CONTENT_WIDTH_MM,
+          contentWidthMm,
           contHeaderHeightMm,
           undefined,
           'FAST'
         );
       }
 
-      // Native PDF vector divider rule
       pdf.setDrawColor(15, 23, 42);
       pdf.setLineWidth(0.4);
       pdf.line(
         PAGE_MARGIN_X_MM,
         cursorY + contHeaderHeightMm - 0.6,
-        PAGE_MARGIN_X_MM + CONTENT_WIDTH_MM,
+        PAGE_MARGIN_X_MM + contentWidthMm,
         cursorY + contHeaderHeightMm - 0.6
       );
 
       cursorY += contHeaderHeightMm + 2.2;
     }
 
-    // -----------------------------------------------------------------------
     // 2. TABLE BAND (Canvas 2D Crisp Devanagari Text + Native PDF Vector Grid)
-    // -----------------------------------------------------------------------
     if (plan.rowIndices.length > 0) {
       const pageRows = plan.rowIndices.map((idx) => geometry.rows[idx]);
       const tableHeightMm =
@@ -561,9 +598,8 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
 
       const tableStartY = cursorY;
 
-      // Render table backgrounds + ALL Devanagari text (strictly Vertical Center + Horizontal Left)
       const tableCanvasImg = renderCanvasBand(
-        CONTENT_WIDTH_MM,
+        contentWidthMm,
         tableHeightMm,
         dpi,
         q,
@@ -572,18 +608,18 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
           const bodyFontPx = ptToPx(geometry.bodyFontPt);
           const padXPx = geometry.cellPadXMm * s;
 
-          // --- Table Header Background & Text ---
+          // Header background
           ctx.fillStyle = '#eef2f6';
-          ctx.fillRect(0, 0, CONTENT_WIDTH_MM * s, geometry.headerHeightMm * s);
+          ctx.fillRect(0, 0, contentWidthMm * s, geometry.headerHeightMm * s);
 
           ctx.font = `700 ${headerFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#0f172a';
-          ctx.textAlign = 'left';
+          ctx.textAlign = 'left'; // Strictly Horizontal Left
           const hMetrics = getFontVerticalMetricsPx(ctx, headerFontPx);
           const hLinePx = geometry.headerLineHeightMm * s;
 
           let colLeftMm = 0;
-          DISTRICT_EXECUTIVE_PDF_COLUMNS.forEach((col, colIdx) => {
+          columns.forEach((col, colIdx) => {
             const lines = geometry.headerWrapped[colIdx];
             const baselines = computeVerticalCenteredBaselines({
               cellTop: 0,
@@ -601,7 +637,7 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
             colLeftMm += col.widthMm;
           });
 
-          // --- Table Data Rows ---
+          // Data rows
           let rowTopMm = geometry.headerHeightMm;
           const bLinePx = geometry.bodyLineHeightMm * s;
 
@@ -609,13 +645,16 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
             const rowHeightPx = rowLayout.heightMm * s;
             const rowTopPx = rowTopMm * s;
 
-            // Subtle office alternating row tint
-            ctx.fillStyle = localRowIdx % 2 === 1 ? '#f8fafc' : '#ffffff';
-            ctx.fillRect(0, rowTopPx, CONTENT_WIDTH_MM * s, rowHeightPx);
+            ctx.fillStyle = rowLayout.isSummary
+              ? '#e2e8f0'
+              : localRowIdx % 2 === 1
+                ? '#f8fafc'
+                : '#ffffff';
+            ctx.fillRect(0, rowTopPx, contentWidthMm * s, rowHeightPx);
 
             let cellLeftMm = 0;
-            DISTRICT_EXECUTIVE_PDF_COLUMNS.forEach((col, colIdx) => {
-              const weight = col.boldBody ? '700' : '500';
+            columns.forEach((col, colIdx) => {
+              const weight = rowLayout.isSummary || col.boldBody ? '700' : '500';
               ctx.font = `${weight} ${bodyFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
               ctx.fillStyle = '#0f172a';
               ctx.textAlign = 'left'; // Strictly Horizontal Left
@@ -650,23 +689,20 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
           'JPEG',
           PAGE_MARGIN_X_MM,
           tableStartY,
-          CONTENT_WIDTH_MM,
+          contentWidthMm,
           tableHeightMm,
           undefined,
           'FAST'
         );
       }
 
-      // --- Native PDF Vector Borders Drawn ON TOP (Infinite Laser Print DPI) ---
-      // Vertical column dividers
+      // Native PDF Vector Borders Drawn ON TOP (Infinite Laser Print DPI)
       let vx = PAGE_MARGIN_X_MM;
-      for (let c = 0; c < DISTRICT_EXECUTIVE_PDF_COLUMNS.length - 1; c++) {
-        vx += DISTRICT_EXECUTIVE_PDF_COLUMNS[c].widthMm;
-        // Header vertical divider (slightly darker)
+      for (let c = 0; c < columns.length - 1; c++) {
+        vx += columns[c].widthMm;
         pdf.setDrawColor(100, 116, 139);
         pdf.setLineWidth(0.24);
         pdf.line(vx, tableStartY, vx, tableStartY + geometry.headerHeightMm);
-        // Body vertical divider
         pdf.setDrawColor(203, 213, 225);
         pdf.setLineWidth(0.2);
         pdf.line(
@@ -677,42 +713,37 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
         );
       }
 
-      // Header bottom bold rule
       pdf.setDrawColor(15, 23, 42);
       pdf.setLineWidth(0.38);
       pdf.line(
         PAGE_MARGIN_X_MM,
         tableStartY + geometry.headerHeightMm,
-        PAGE_MARGIN_X_MM + CONTENT_WIDTH_MM,
+        PAGE_MARGIN_X_MM + contentWidthMm,
         tableStartY + geometry.headerHeightMm
       );
 
-      // Horizontal body row dividers
-      pdf.setDrawColor(203, 213, 225);
-      pdf.setLineWidth(0.2);
       let hy = tableStartY + geometry.headerHeightMm;
       for (let r = 0; r < pageRows.length - 1; r++) {
         hy += pageRows[r].heightMm;
-        pdf.line(PAGE_MARGIN_X_MM, hy, PAGE_MARGIN_X_MM + CONTENT_WIDTH_MM, hy);
+        const nextIsSummary = Boolean(pageRows[r + 1]?.isSummary);
+        pdf.setDrawColor(nextIsSummary ? 15 : 203, nextIsSummary ? 23 : 213, nextIsSummary ? 42 : 225);
+        pdf.setLineWidth(nextIsSummary ? 0.36 : 0.2);
+        pdf.line(PAGE_MARGIN_X_MM, hy, PAGE_MARGIN_X_MM + contentWidthMm, hy);
       }
 
-      // Crisp Dark Outer Table Frame
       pdf.setDrawColor(15, 23, 42);
       pdf.setLineWidth(0.45);
-      pdf.rect(PAGE_MARGIN_X_MM, tableStartY, CONTENT_WIDTH_MM, tableHeightMm, 'S');
+      pdf.rect(PAGE_MARGIN_X_MM, tableStartY, contentWidthMm, tableHeightMm, 'S');
 
       cursorY = tableStartY + tableHeightMm;
     }
 
-    // -----------------------------------------------------------------------
-    // 3. FINAL PAGE STATE PRESIDENT SIGNATURE BLOCK (With Full Name & Title)
-    // -----------------------------------------------------------------------
+    // 3. FINAL PAGE STATE PRESIDENT SIGNATURE BLOCK
     if (plan.showSignature) {
-      const signBlockWidthMm = 76;
-      const signBlockX = PAGE_MARGIN_X_MM + CONTENT_WIDTH_MM - signBlockWidthMm;
-      let signCursorY = cursorY + 6.5;
+      const signBlockWidthMm = 78;
+      const signBlockX = PAGE_MARGIN_X_MM + contentWidthMm - signBlockWidthMm;
+      let signCursorY = cursorY + 6.0;
 
-      // Native blue-ink signature image (centered inside right-aligned signature block)
       if (signAsset?.dataUrl) {
         const signH = 13.5;
         const signW = Math.min(46, signH * signAsset.aspectRatio);
@@ -732,8 +763,7 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
         signCursorY += 12.0;
       }
 
-      // Signature Name & Designation (Canvas 2D crisp Marathi text)
-      const signTextHeightMm = 14.5;
+      const signTextHeightMm = 15.0;
       const signTextImg = renderCanvasBand(
         signBlockWidthMm,
         signTextHeightMm,
@@ -743,43 +773,43 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
           const cx = (signBlockWidthMm / 2) * s;
           ctx.textAlign = 'center';
 
-          const nameFontPx = ptToPx(9.8);
+          const nameFontPx = ptToPx(10.2);
           ctx.font = `700 ${nameFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#0f172a';
           const m1 = getFontVerticalMetricsPx(ctx, nameFontPx);
           const y1 = computeVerticalCenteredBaselines({
             cellTop: 0,
-            cellHeight: 5.0 * s,
+            cellHeight: 5.2 * s,
             lineCount: 1,
-            lineHeight: 5.0 * s,
+            lineHeight: 5.2 * s,
             ascent: m1.ascent,
             descent: m1.descent,
           })[0];
           ctx.fillText('( श्री. राजेंद्र शिवाजी खैरनार )', cx, y1);
 
-          const roleFontPx = ptToPx(8.6);
+          const roleFontPx = ptToPx(9.0);
           ctx.font = `700 ${roleFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#334155';
           const m2 = getFontVerticalMetricsPx(ctx, roleFontPx);
           const y2 = computeVerticalCenteredBaselines({
-            cellTop: 5.0 * s,
-            cellHeight: 4.5 * s,
+            cellTop: 5.2 * s,
+            cellHeight: 4.8 * s,
             lineCount: 1,
-            lineHeight: 4.5 * s,
+            lineHeight: 4.8 * s,
             ascent: m2.ascent,
             descent: m2.descent,
           })[0];
           ctx.fillText('संस्थापक राज्याध्यक्ष', cx, y2);
 
-          const orgFontPx = ptToPx(7.8);
+          const orgFontPx = ptToPx(8.2);
           ctx.font = `600 ${orgFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
           ctx.fillStyle = '#475569';
           const m3 = getFontVerticalMetricsPx(ctx, orgFontPx);
           const y3 = computeVerticalCenteredBaselines({
-            cellTop: 9.5 * s,
-            cellHeight: 4.5 * s,
+            cellTop: 10.0 * s,
+            cellHeight: 4.6 * s,
             lineCount: 1,
-            lineHeight: 4.5 * s,
+            lineHeight: 4.6 * s,
             ascent: m3.ascent,
             descent: m3.descent,
           })[0];
@@ -801,27 +831,26 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
       }
     }
 
-    // -----------------------------------------------------------------------
-    // 4. CLEAN OFFICE PAGE FOOTER (Every Page)
-    // -----------------------------------------------------------------------
-    const footerLineY = A4_HEIGHT_MM - PAGE_MARGIN_BOTTOM_MM - 3.6;
+    // 4. CLEAN OFFICE PAGE FOOTER
+    const footerLineY = pageHeightMm - PAGE_MARGIN_BOTTOM_MM - 3.6;
     pdf.setDrawColor(203, 213, 225);
     pdf.setLineWidth(0.2);
     pdf.line(
       PAGE_MARGIN_X_MM,
       footerLineY,
-      PAGE_MARGIN_X_MM + CONTENT_WIDTH_MM,
+      PAGE_MARGIN_X_MM + contentWidthMm,
       footerLineY
     );
 
+    const footerDpi = Math.min(dpi, 145);
     const footerBandH = 4.6;
     const footerImg = renderCanvasBand(
-      CONTENT_WIDTH_MM,
+      contentWidthMm,
       footerBandH,
-      Math.min(dpi, 155),
-      Math.min(q, 0.72),
+      footerDpi,
+      Math.min(q, 0.7),
       (ctx, s) => {
-        const fFontPx = (7.4 / 72) * Math.min(dpi, 155);
+        const fFontPx = (7.6 / 72) * footerDpi;
         ctx.font = `500 ${fFontPx}px ${DISTRICT_PDF_FONT_FAMILY}`;
         ctx.fillStyle = '#64748b';
         const fm = getFontVerticalMetricsPx(ctx, fFontPx);
@@ -844,7 +873,7 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
         ctx.textAlign = 'right';
         ctx.fillText(
           `पृष्ठ ${toEnglishDigits(plan.pageNumber)} / ${toEnglishDigits(totalPages)}`,
-          (CONTENT_WIDTH_MM - 0.3) * s,
+          (contentWidthMm - 0.3) * s,
           fy
         );
       }
@@ -856,31 +885,48 @@ async function buildDistrictExecutiveJsPdfDocument(params: {
         'JPEG',
         PAGE_MARGIN_X_MM,
         footerLineY + 0.6,
-        CONTENT_WIDTH_MM,
+        contentWidthMm,
         footerBandH,
         undefined,
         'FAST'
       );
     }
+
+    // Preserve explicit reference to pageWidthMm for orientation completeness
+    void pageWidthMm;
   }
 
   return pdf;
 }
 
 /**
- * Generates and downloads the Official Office-Grade District Executive Committee A4 PDF.
- * - Page 1: Official full-color letterhead (/heding.jpg) + title + meta + 6-column table
- * - Page 2+: Compact institutional header + repeated column headers + remaining rows
- * - Final page: State President signature (/sign.jpg) with name & designation
- * - Strict Vertical-Center + Horizontal-Left alignment across ALL table cells
- * - Automatically stays <= 500 KB via adaptive byte-budget optimization
+ * Core Unified Office Hybrid PDF Generator used by ALL 6 reports.
  */
-export async function generateDistrictExecutiveOfficePdf(
-  district: string,
-  list: OfficialMember[],
-  onProgress?: (status: string) => void
-): Promise<DistrictExecutivePdfResult | null> {
-  if (!list || list.length === 0) {
+export async function generateOfficeHybridTablePdf(
+  options: OfficeHybridTablePdfOptions
+): Promise<OfficeHybridPdfResult | null> {
+  const {
+    orientation,
+    reportTitle,
+    leftMeta,
+    fileName,
+    columns,
+    rows,
+    targetMaxBytes,
+    safeTargetBytes,
+    sizeLimitLabel,
+    bodyFontPt = 9.8,
+    headerFontPt = 9.6,
+    bodyLineHeightMm = 4.9,
+    headerLineHeightMm = 4.7,
+    cellPadXMm = 2.0,
+    cellPadYMm = 2.1,
+    minRowHeightMm = 8.8,
+    minHeaderHeightMm = 9.8,
+    onProgress,
+  } = options;
+
+  if (!rows || rows.length === 0) {
     return null;
   }
 
@@ -899,32 +945,53 @@ export async function generateDistrictExecutiveOfficePdf(
     signDataUrl ? loadHtmlImage(signDataUrl).catch(() => null) : Promise.resolve(null),
   ]);
 
-  // Compute exact letterhead height on A4 width (capped cleanly so Page 1 holds ample rows)
-  let letterheadHeightMm = 36;
+  const pageWidthMm = orientation === 'landscape' ? A4_HEIGHT_MM : A4_WIDTH_MM;
+  const pageHeightMm = orientation === 'landscape' ? A4_WIDTH_MM : A4_HEIGHT_MM;
+  const contentWidthMm = pageWidthMm - PAGE_MARGIN_X_MM * 2;
+
+  // Preserve exact natural letterhead aspect ratio cleanly on both Portrait & Landscape
+  let letterheadDrawWidthMm = contentWidthMm;
+  let letterheadHeightMm = orientation === 'landscape' ? 32 : 37;
   if (letterheadImg && letterheadImg.naturalWidth > 0 && letterheadImg.naturalHeight > 0) {
     const aspect = letterheadImg.naturalWidth / letterheadImg.naturalHeight;
-    letterheadHeightMm = Math.min(41, Math.max(28, CONTENT_WIDTH_MM / aspect));
+    if (orientation === 'landscape') {
+      // Keep letterhead crisp & centered without eating excessive vertical height on landscape A4
+      letterheadHeightMm = 31;
+      letterheadDrawWidthMm = Math.min(contentWidthMm, letterheadHeightMm * aspect);
+    } else {
+      letterheadDrawWidthMm = contentWidthMm;
+      letterheadHeightMm = Math.min(41, Math.max(28, contentWidthMm / aspect));
+    }
   }
 
-  const rawRows = buildDistrictExecutivePdfRows(list);
-  const geometry = measureTableGeometry(rawRows);
+  const geometry = measureTableGeometry({
+    columns,
+    rawRows: rows,
+    bodyFontPt,
+    headerFontPt,
+    bodyLineHeightMm,
+    headerLineHeightMm,
+    cellPadXMm,
+    cellPadYMm,
+    minRowHeightMm,
+    minHeaderHeightMm,
+  });
 
-  // Compute exact vertical space budgets (in mm)
-  const usableBottomY = A4_HEIGHT_MM - PAGE_MARGIN_BOTTOM_MM - FOOTER_AREA_MM;
+  const usableBottomY = pageHeightMm - PAGE_MARGIN_BOTTOM_MM - FOOTER_AREA_MM;
   const page1TableStartY =
     PAGE_MARGIN_TOP_MM +
-    (letterheadImg ? letterheadHeightMm + 1.4 + 2.2 + 14.5 + 2.2 : 13.5 + 2.2);
-  const contTableStartY = PAGE_MARGIN_TOP_MM + 13.5 + 2.2;
+    (letterheadImg ? letterheadHeightMm + 1.4 + 2.0 + 15.2 + 2.2 : 14.0 + 2.2);
+  const contTableStartY = PAGE_MARGIN_TOP_MM + 14.0 + 2.2;
 
   const firstPageTableMaxMm = Math.max(
-    70,
+    55,
     usableBottomY - page1TableStartY - geometry.headerHeightMm - 1.5
   );
   const continuationPageTableMaxMm = Math.max(
-    110,
+    85,
     usableBottomY - contTableStartY - geometry.headerHeightMm - 1.5
   );
-  const signatureReserveMm = 37; // 6.5mm gap + 13.5mm sign + 1mm + 14.5mm text + 1.5mm buffer
+  const signatureReserveMm = 37;
 
   const pages = paginateMeasuredDistrictRows({
     rowHeightsMm: geometry.rows.map((r) => r.heightMm),
@@ -934,21 +1001,28 @@ export async function generateDistrictExecutiveOfficePdf(
   });
 
   const todayStr = getTodayFormattedDate();
-  const ladder = getAdaptivePdfQualityLadder(pages.length);
+  const ladder = getAdaptivePdfQualityLadder(pages.length, targetMaxBytes);
 
-  let finalPdf: Awaited<ReturnType<typeof buildDistrictExecutiveJsPdfDocument>> | null = null;
+  let finalPdf: Awaited<ReturnType<typeof buildOfficeHybridJsPdfDocument>> | null = null;
   let finalBytes = 0;
 
-  for (let stepIdx = 0; stepIdx < ladder.length; stepIdx++) {
+  let stepIdx = 0;
+  while (stepIdx < ladder.length) {
     const profile = ladder[stepIdx];
-    const pdf = await buildDistrictExecutiveJsPdfDocument({
-      district,
-      totalOfficials: list.length,
+    const pdf = await buildOfficeHybridJsPdfDocument({
+      orientation,
+      pageWidthMm,
+      pageHeightMm,
+      contentWidthMm,
+      reportTitle,
+      leftMeta,
       todayStr,
+      columns,
       geometry,
       pages,
       letterheadImg,
       signImg,
+      letterheadDrawWidthMm,
       letterheadHeightMm,
       profile,
       onPageProgress: (pageIdx, totalPages) => {
@@ -961,7 +1035,7 @@ export async function generateDistrictExecutiveOfficePdf(
           );
         } else {
           onProgress(
-            `५०० KB आकार अनुकूलन सुरू आहे (पान ${toEnglishDigits(pageIdx + 1)} / ${toEnglishDigits(totalPages)})...`
+            `${sizeLimitLabel} आकार अनुकूलन सुरू आहे (पान ${toEnglishDigits(pageIdx + 1)} / ${toEnglishDigits(totalPages)})...`
           );
         }
       },
@@ -971,17 +1045,21 @@ export async function generateDistrictExecutiveOfficePdf(
     finalPdf = pdf;
     finalBytes = buf.byteLength;
 
-    if (finalBytes <= SAFE_TARGET_PDF_BYTES) {
+    if (finalBytes <= safeTargetBytes) {
       break;
     }
+
+    // Smart proportional jump if significantly over budget to avoid slow multi-pass retries
+    const ratio = finalBytes / safeTargetBytes;
+    const jump = ratio > 1.75 ? 2 : 1;
+    const nextIdx = Math.min(ladder.length - 1, stepIdx + jump);
+    if (nextIdx === stepIdx) break;
+    stepIdx = nextIdx;
   }
 
   if (!finalPdf) {
     return null;
   }
-
-  const cleanDistrict = district.replace(/\s+/g, '_');
-  const fileName = `अधिकृत_जिल्हा_कार्यकारिणी_${cleanDistrict}.pdf`;
 
   if (onProgress) {
     onProgress('PDF फाईल डाऊनलोड होत आहे...');
@@ -995,4 +1073,205 @@ export async function generateDistrictExecutiveOfficePdf(
     sizeBytes: finalBytes,
     sizeKb: Math.max(1, Math.round(finalBytes / 1024)),
   };
+}
+
+/**
+ * 1. District Executive Committee Official A4 PDF (<= 500 KB, Larger 9.8pt Font)
+ */
+export async function generateDistrictExecutiveOfficePdf(
+  district: string,
+  list: OfficialMember[],
+  onProgress?: (status: string) => void
+): Promise<OfficeHybridPdfResult | null> {
+  if (!list || list.length === 0) return null;
+  const rows = buildDistrictExecutivePdfRows(list);
+  const cleanDistrict = district.replace(/\s+/g, '_');
+
+  return generateOfficeHybridTablePdf({
+    orientation: 'portrait',
+    reportTitle: `अधिकृत जिल्हा कार्यकारिणी यादी — ${district}`,
+    leftMeta: `जिल्हा: ${district}   |   एकूण पदाधिकारी: ${toEnglishDigits(list.length)}`,
+    fileName: `अधिकृत_जिल्हा_कार्यकारिणी_${cleanDistrict}.pdf`,
+    columns: DISTRICT_EXECUTIVE_PDF_COLUMNS,
+    rows,
+    targetMaxBytes: TARGET_MAX_PDF_BYTES,
+    safeTargetBytes: SAFE_TARGET_PDF_BYTES,
+    sizeLimitLabel: '५०० KB',
+    bodyFontPt: 9.8,
+    headerFontPt: 9.6,
+    bodyLineHeightMm: 4.9,
+    headerLineHeightMm: 4.7,
+    cellPadXMm: 2.0,
+    cellPadYMm: 2.1,
+    minRowHeightMm: 8.8,
+    minHeaderHeightMm: 10.0,
+    onProgress,
+  });
+}
+
+/**
+ * 2. Organization Status Matrix (34 Districts) Official A4 Landscape PDF (<= 1 MB)
+ */
+export async function generateOrganizationStatusOfficePdf(
+  stats: Array<any>,
+  onProgress?: (status: string) => void
+): Promise<OfficeHybridPdfResult | null> {
+  if (!stats || stats.length === 0) return null;
+  const { rows, totalOfficials, totalMembers } = buildOrganizationStatusPdfRows(stats);
+
+  return generateOfficeHybridTablePdf({
+    orientation: 'landscape',
+    reportTitle: 'संघटना सद्यस्थिती अहवाल (३४ जिल्हे)',
+    leftMeta: `एकूण जिल्हे: ${toEnglishDigits(stats.length)}   |   एकूण पदाधिकारी: ${toEnglishDigits(totalOfficials)}   |   एकूण सदस्य: ${toEnglishDigits(totalMembers)}`,
+    fileName: `संघटना_सद्यस्थिती_अहवाल_३४_जिल्हे.pdf`,
+    columns: ORGANIZATION_STATUS_PDF_COLUMNS,
+    rows,
+    targetMaxBytes: TARGET_MAX_MULTI_PDF_BYTES,
+    safeTargetBytes: SAFE_TARGET_MULTI_PDF_BYTES,
+    sizeLimitLabel: '१ MB',
+    bodyFontPt: 9.0,
+    headerFontPt: 8.6,
+    bodyLineHeightMm: 4.5,
+    headerLineHeightMm: 4.3,
+    cellPadXMm: 1.8,
+    cellPadYMm: 1.8,
+    minRowHeightMm: 7.8,
+    minHeaderHeightMm: 10.2,
+    onProgress,
+  });
+}
+
+/**
+ * 3. All District Presidents Official A4 Portrait PDF (<= 1 MB, Larger 9.8pt Font)
+ */
+export async function generateDistrictPresidentsOfficePdf(
+  list: Array<{ district: string; name: string; cadre: string; post: string; mobile: string }>,
+  onProgress?: (status: string) => void
+): Promise<OfficeHybridPdfResult | null> {
+  if (!list || list.length === 0) return null;
+  const rows = buildDistrictPresidentsPdfRows(list);
+
+  return generateOfficeHybridTablePdf({
+    orientation: 'portrait',
+    reportTitle: 'महाराष्ट्र राज्य सर्व जिल्हाध्यक्ष अधिकृत यादी',
+    leftMeta: `एकूण जिल्हाध्यक्ष: ${toEnglishDigits(list.length)}`,
+    fileName: `महाराष्ट्र_राज्य_सर्व_जिल्हाध्यक्ष_यादी.pdf`,
+    columns: DISTRICT_PRESIDENTS_PDF_COLUMNS,
+    rows,
+    targetMaxBytes: TARGET_MAX_MULTI_PDF_BYTES,
+    safeTargetBytes: SAFE_TARGET_MULTI_PDF_BYTES,
+    sizeLimitLabel: '१ MB',
+    bodyFontPt: 9.8,
+    headerFontPt: 9.6,
+    bodyLineHeightMm: 4.9,
+    headerLineHeightMm: 4.7,
+    cellPadXMm: 2.0,
+    cellPadYMm: 2.1,
+    minRowHeightMm: 8.8,
+    minHeaderHeightMm: 10.0,
+    onProgress,
+  });
+}
+
+/**
+ * 4. All Taluka Presidents Official A4 Portrait PDF (<= 1 MB, Larger 9.8pt Font)
+ */
+export async function generateTalukaPresidentsOfficePdf(
+  list: Array<{
+    district: string;
+    taluka?: string;
+    name: string;
+    cadre: string;
+    post: string;
+    mobile: string;
+  }>,
+  onProgress?: (status: string) => void
+): Promise<OfficeHybridPdfResult | null> {
+  if (!list || list.length === 0) return null;
+  const rows = buildTalukaPresidentsPdfRows(list);
+
+  return generateOfficeHybridTablePdf({
+    orientation: 'portrait',
+    reportTitle: 'महाराष्ट्र राज्य सर्व तालुका अध्यक्ष अधिकृत यादी',
+    leftMeta: `एकूण तालुका अध्यक्ष: ${toEnglishDigits(list.length)}`,
+    fileName: `महाराष्ट्र_राज्य_सर्व_तालुका_अध्यक्ष_यादी.pdf`,
+    columns: TALUKA_PRESIDENTS_PDF_COLUMNS,
+    rows,
+    targetMaxBytes: TARGET_MAX_MULTI_PDF_BYTES,
+    safeTargetBytes: SAFE_TARGET_MULTI_PDF_BYTES,
+    sizeLimitLabel: '१ MB',
+    bodyFontPt: 9.8,
+    headerFontPt: 9.6,
+    bodyLineHeightMm: 4.9,
+    headerLineHeightMm: 4.7,
+    cellPadXMm: 2.0,
+    cellPadYMm: 2.1,
+    minRowHeightMm: 8.8,
+    minHeaderHeightMm: 10.0,
+    onProgress,
+  });
+}
+
+/**
+ * 5. Approved Registered Members Official A4 Portrait PDF (<= 1 MB, Handles Large Multi-Page Lists)
+ */
+export async function generateRegisteredMembersOfficePdf(
+  list: MembershipApplication[],
+  onProgress?: (status: string) => void
+): Promise<OfficeHybridPdfResult | null> {
+  if (!list || list.length === 0) return null;
+  const { rows, maleCount, femaleCount } = buildRegisteredMembersPdfRows(list);
+
+  return generateOfficeHybridTablePdf({
+    orientation: 'portrait',
+    reportTitle: 'अधिकृत नोंदणीकृत आजीवन सदस्य यादी',
+    leftMeta: `एकूण सदस्य: ${toEnglishDigits(list.length)}   |   पुरुष: ${toEnglishDigits(maleCount)}   |   स्त्री: ${toEnglishDigits(femaleCount)}`,
+    fileName: `अधिकृत_नोंदणीकृत_सदस्य_यादी_${new Date().toISOString().split('T')[0]}.pdf`,
+    columns: REGISTERED_MEMBERS_PDF_COLUMNS,
+    rows,
+    targetMaxBytes: TARGET_MAX_MULTI_PDF_BYTES,
+    safeTargetBytes: SAFE_TARGET_MULTI_PDF_BYTES,
+    sizeLimitLabel: '१ MB',
+    bodyFontPt: 9.0,
+    headerFontPt: 8.8,
+    bodyLineHeightMm: 4.5,
+    headerLineHeightMm: 4.4,
+    cellPadXMm: 1.6,
+    cellPadYMm: 1.85,
+    minRowHeightMm: 8.2,
+    minHeaderHeightMm: 9.6,
+    onProgress,
+  });
+}
+
+/**
+ * 6. Statewide Appointments Master Registry Official A4 Portrait PDF (<= 1 MB)
+ */
+export async function generateStatewideRegistryOfficePdf(
+  officials: OfficialMember[],
+  onProgress?: (status: string) => void
+): Promise<OfficeHybridPdfResult | null> {
+  if (!officials || officials.length === 0) return null;
+  const rows = buildStatewideRegistryPdfRows(officials);
+
+  return generateOfficeHybridTablePdf({
+    orientation: 'portrait',
+    reportTitle: 'राज्यस्तरीय नियुक्त्या व अधिकृत नोंदवही',
+    leftMeta: `एकूण नोंदणीकृत पदाधिकारी: ${toEnglishDigits(officials.length)}`,
+    fileName: `राज्यस्तरीय_नियुक्ती_नोंदवही.pdf`,
+    columns: STATEWIDE_REGISTRY_PDF_COLUMNS,
+    rows,
+    targetMaxBytes: TARGET_MAX_MULTI_PDF_BYTES,
+    safeTargetBytes: SAFE_TARGET_MULTI_PDF_BYTES,
+    sizeLimitLabel: '१ MB',
+    bodyFontPt: 9.0,
+    headerFontPt: 8.8,
+    bodyLineHeightMm: 4.5,
+    headerLineHeightMm: 4.4,
+    cellPadXMm: 1.6,
+    cellPadYMm: 1.85,
+    minRowHeightMm: 8.2,
+    minHeaderHeightMm: 9.6,
+    onProgress,
+  });
 }

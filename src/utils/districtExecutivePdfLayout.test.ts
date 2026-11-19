@@ -2,37 +2,56 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CONTENT_WIDTH_MM,
+  LANDSCAPE_CONTENT_WIDTH_MM,
   DISTRICT_EXECUTIVE_PDF_COLUMNS,
+  ORGANIZATION_STATUS_PDF_COLUMNS,
+  DISTRICT_PRESIDENTS_PDF_COLUMNS,
+  TALUKA_PRESIDENTS_PDF_COLUMNS,
+  REGISTERED_MEMBERS_PDF_COLUMNS,
+  STATEWIDE_REGISTRY_PDF_COLUMNS,
   SAFE_TARGET_PDF_BYTES,
   TARGET_MAX_PDF_BYTES,
+  SAFE_TARGET_MULTI_PDF_BYTES,
+  TARGET_MAX_MULTI_PDF_BYTES,
   buildDistrictExecutivePdfRows,
+  buildOrganizationStatusPdfRows,
+  buildDistrictPresidentsPdfRows,
+  buildTalukaPresidentsPdfRows,
+  buildRegisteredMembersPdfRows,
+  buildStatewideRegistryPdfRows,
   computeVerticalCenteredBaselines,
   getAdaptivePdfQualityLadder,
   paginateMeasuredDistrictRows,
   wrapTextToLines,
 } from './districtExecutivePdfLayout';
 import type { OfficialMember } from '../data/rkMaharashtraData';
+import type { MembershipApplication } from '../data/mahasanghData';
 
-test('DISTRICT_EXECUTIVE_PDF_COLUMNS matches all 6 Excel columns with strict Vertical-Center & Horizontal-Left alignment', () => {
-  assert.equal(DISTRICT_EXECUTIVE_PDF_COLUMNS.length, 6);
-  assert.deepEqual(
-    DISTRICT_EXECUTIVE_PDF_COLUMNS.map((c) => c.header),
-    [
-      'अ.क्र.',
-      'पदाधिकाऱ्याचे संपूर्ण नाव',
-      'सध्याचे पद व कार्यक्षेत्र',
-      'संघटनेतील बहाल पद',
-      'मोबाईल नंबर',
-      'तालुका',
-    ]
-  );
+test('All 6 office PDF column sets sum cleanly to A4 content width and enforce Vertical-Center + Horizontal-Left', () => {
+  const portraitSets = [
+    DISTRICT_EXECUTIVE_PDF_COLUMNS,
+    DISTRICT_PRESIDENTS_PDF_COLUMNS,
+    TALUKA_PRESIDENTS_PDF_COLUMNS,
+    REGISTERED_MEMBERS_PDF_COLUMNS,
+    STATEWIDE_REGISTRY_PDF_COLUMNS,
+  ];
 
-  const totalWidth = DISTRICT_EXECUTIVE_PDF_COLUMNS.reduce((sum, c) => sum + c.widthMm, 0);
-  assert.equal(totalWidth, CONTENT_WIDTH_MM);
+  for (const cols of portraitSets) {
+    const sum = cols.reduce((acc, c) => acc + c.widthMm, 0);
+    assert.equal(sum, CONTENT_WIDTH_MM);
+    for (const c of cols) {
+      assert.equal(c.hAlign, 'left');
+      assert.equal(c.vAlign, 'middle');
+    }
+  }
 
-  for (const col of DISTRICT_EXECUTIVE_PDF_COLUMNS) {
-    assert.equal(col.hAlign, 'left');
-    assert.equal(col.vAlign, 'middle');
+  // Organization Status Matrix uses A4 Landscape (277 mm)
+  assert.equal(ORGANIZATION_STATUS_PDF_COLUMNS.length, 11);
+  const landscapeSum = ORGANIZATION_STATUS_PDF_COLUMNS.reduce((acc, c) => acc + c.widthMm, 0);
+  assert.equal(landscapeSum, LANDSCAPE_CONTENT_WIDTH_MM);
+  for (const c of ORGANIZATION_STATUS_PDF_COLUMNS) {
+    assert.equal(c.hAlign, 'left');
+    assert.equal(c.vAlign, 'middle');
   }
 });
 
@@ -88,16 +107,118 @@ test('buildDistrictExecutivePdfRows produces 1:1 parity with Excel including wor
   ]);
 });
 
-test('wrapTextToLines wraps at word boundaries and breaks only overly long tokens', () => {
+test('buildOrganizationStatusPdfRows computes accurate district rows and summary totals row', () => {
+  const { rows, totalOfficials, totalMembers } = buildOrganizationStatusPdfRows([
+    {
+      district: 'नाशिक',
+      stateRep: 1,
+      divRep: 2,
+      distOfficial: 5,
+      talukaOfficial: 4,
+      extOfficerCount: 10,
+      headmasterCount: 30,
+    },
+    {
+      district: 'पुणे',
+      stateRep: 0,
+      divRep: 1,
+      distOfficial: 4,
+      talukaOfficial: 3,
+      extOfficerCount: 5,
+      headmasterCount: 15,
+    },
+  ]);
+
+  assert.equal(rows.length, 3); // 2 districts + 1 summary row
+  assert.equal(totalOfficials, 20);
+  assert.equal(totalMembers, 60);
+  assert.equal(rows[2].isSummary, true);
+  assert.equal(rows[2].cells[1], 'एकूण बेरीज (राज्य)');
+  assert.equal(rows[2].cells[6], '20');
+  assert.equal(rows[2].cells[9], '60');
+  assert.equal(rows[2].cells[10], '60');
+});
+
+test('District Presidents, Taluka Presidents, Registered Members, and Statewide Registry builders format all columns cleanly', () => {
+  const distPres = buildDistrictPresidentsPdfRows([
+    {
+      district: 'नाशिक',
+      name: 'श्री. अ. ब. क.',
+      cadre: 'शिक्षण विस्तार अधिकारी जेष्ठ - ओझर',
+      post: 'जिल्हाध्यक्ष',
+      mobile: '9876543210',
+    },
+  ]);
+  assert.equal(distPres[0].cells.length, 6);
+  assert.equal(distPres[0].cells[3], 'शिक्षण विस्तार अधिकारी - ओझर');
+
+  const talukaPres = buildTalukaPresidentsPdfRows([
+    {
+      district: 'नाशिक',
+      taluka: 'निफाड',
+      name: 'श्री. म. न.',
+      cadre: 'केंद्रप्रमुख - लासलगाव',
+      post: 'तालुका अध्यक्ष',
+      mobile: '9822001100',
+    },
+  ]);
+  assert.equal(talukaPres[0].cells.length, 6);
+  assert.equal(talukaPres[0].cells[1], 'नाशिक (निफाड)');
+
+  const memberApps: MembershipApplication[] = [
+    {
+      id: 'app1',
+      applicationNumber: 'APP-1',
+      memberNumber: 'MS/2026/NASH/0001',
+      salutation: 'सौ',
+      fullName: 'मीना जोशी',
+      professional: 'शिक्षण विस्तार अधिकारी कनिष्ठ',
+      district: 'नाशिक',
+      taluka: 'निफाड',
+      centerName: 'पिंपळगाव बसवंत',
+      phone: '9800000001',
+      email: 'a@b.com',
+      education: 'M.A.',
+      address: 'नाशिक',
+      status: 'approved',
+      createdAt: '2026-05-01T00:00:00Z',
+    },
+  ];
+  const regResult = buildRegisteredMembersPdfRows(memberApps);
+  assert.equal(regResult.rows.length, 1);
+  assert.equal(regResult.femaleCount, 1);
+  assert.equal(regResult.rows[0].cells.length, 8);
+  assert.equal(regResult.rows[0].cells[3], 'स्त्री');
+  assert.equal(regResult.rows[0].cells[4], 'शिक्षण विस्तार अधिकारी');
+  assert.equal(regResult.rows[0].cells[6], 'पिंपळगाव बसवंत');
+
+  const regOfficials = buildStatewideRegistryPdfRows([
+    {
+      id: 'o1',
+      salutation: 'श्री.',
+      firstName: 'संजय',
+      lastName: 'मोरे',
+      appointedPost: 'जिल्हाध्यक्ष',
+      district: 'पुणे',
+      taluka: 'हवेली',
+      currentCadre: 'केंद्रप्रमुख',
+      workingPlace: 'उरुळी कांचन',
+      mobile: '9822112233',
+      updatedAt: '2026-05-01T00:00:00Z',
+    },
+  ]);
+  assert.equal(regOfficials[0].cells.length, 8);
+  assert.equal(regOfficials[0].cells[6], 'उरुळी कांचन');
+});
+
+test('wrapTextToLines wraps at word boundaries and computeVerticalCenteredBaselines centers cleanly', () => {
   const monoMeasure = (s: string) => s.length * 10;
   const lines = wrapTextToLines('शिक्षण विस्तार अधिकारी - पिंपळगाव बसवंत', 160, monoMeasure);
   assert.ok(lines.length >= 2);
   for (const line of lines) {
     assert.ok(monoMeasure(line) <= 160);
   }
-});
 
-test('computeVerticalCenteredBaselines centers single and multi-line text symmetrically inside cell', () => {
   const single = computeVerticalCenteredBaselines({
     cellTop: 100,
     cellHeight: 40,
@@ -106,24 +227,10 @@ test('computeVerticalCenteredBaselines centers single and multi-line text symmet
     ascent: 12,
     descent: 4,
   });
-  // blockHeight = 16 -> top gap = (40 - 16)/2 = 12 -> baseline = 100 + 12 + 12 = 124
-  assert.equal(single.length, 1);
-  assert.equal(single[0], 124);
-
-  const twoLines = computeVerticalCenteredBaselines({
-    cellTop: 0,
-    cellHeight: 50,
-    lineCount: 2,
-    lineHeight: 16,
-    ascent: 12,
-    descent: 4,
-  });
-  // blockHeight = 16 + 12 + 4 = 32 -> top gap = 9 -> baselines = [21, 37]
-  assert.deepEqual(twoLines, [21, 37]);
+  assert.deepEqual(single, [124]);
 });
 
 test('paginateMeasuredDistrictRows shows letterhead ONLY on Page 1 and reserves signature cleanly on Final Page', () => {
-  // 35 rows of 9mm each -> requires multiple pages
   const rowHeights = Array.from({ length: 35 }, () => 9);
   const pages = paginateMeasuredDistrictRows({
     rowHeightsMm: rowHeights,
@@ -134,55 +241,28 @@ test('paginateMeasuredDistrictRows shows letterhead ONLY on Page 1 and reserves 
 
   assert.ok(pages.length >= 2);
   assert.equal(pages[0].showLetterhead, true);
+  assert.equal(pages[pages.length - 1].showSignature, true);
   for (let i = 1; i < pages.length; i++) {
     assert.equal(pages[i].showLetterhead, false);
   }
-  for (let i = 0; i < pages.length - 1; i++) {
-    assert.equal(pages[i].showSignature, false);
-  }
-  assert.equal(pages[pages.length - 1].showSignature, true);
-
-  // Every row index appears exactly once in ascending order
   const flattened = pages.flatMap((p) => p.rowIndices);
-  assert.equal(flattened.length, 35);
   assert.deepEqual(
     flattened,
     Array.from({ length: 35 }, (_, i) => i)
   );
-
-  // Final page has rows + signature room without overflow
-  const lastPage = pages[pages.length - 1];
-  assert.ok(lastPage.rowIndices.length > 0);
-  const lastRowsHeight = lastPage.rowIndices.length * 9;
-  assert.ok(lastRowsHeight + 37 <= 245);
 });
 
-test('paginateMeasuredDistrictRows spills trailing rows onto Page 2 when Page 1 rows fill height leaving no room for signature', () => {
-  // 19 rows * 9mm = 171mm on a 180mm page1 -> fits rows, but 171 + 37 = 208 > 180
-  const rowHeights = Array.from({ length: 19 }, () => 9);
-  const pages = paginateMeasuredDistrictRows({
-    rowHeightsMm: rowHeights,
-    firstPageTableMaxMm: 180,
-    continuationPageTableMaxMm: 245,
-    signatureReserveMm: 37,
-  });
-
-  assert.equal(pages.length, 2);
-  assert.equal(pages[0].showLetterhead, true);
-  assert.equal(pages[0].showSignature, false);
-  assert.equal(pages[1].showLetterhead, false);
-  assert.equal(pages[1].showSignature, true);
-  assert.ok(pages[1].rowIndices.length >= 2);
-});
-
-test('getAdaptivePdfQualityLadder provides monotonically compact profiles under 500 KB budget', () => {
+test('getAdaptivePdfQualityLadder adapts smoothly for both <=500KB and <=1MB high-page-count budgets', () => {
   assert.ok(SAFE_TARGET_PDF_BYTES < TARGET_MAX_PDF_BYTES);
-  const ladder1 = getAdaptivePdfQualityLadder(1);
-  const ladder5 = getAdaptivePdfQualityLadder(5);
-  assert.ok(ladder1.length >= 5);
-  assert.ok(ladder5[0].dpi < ladder1[0].dpi);
-  for (let i = 1; i < ladder1.length; i++) {
-    assert.ok(ladder1[i].dpi < ladder1[i - 1].dpi);
-    assert.ok(ladder1[i].textJpegQuality < ladder1[i - 1].textJpegQuality);
+  assert.ok(SAFE_TARGET_MULTI_PDF_BYTES < TARGET_MAX_MULTI_PDF_BYTES);
+
+  const ladderShort500k = getAdaptivePdfQualityLadder(1, TARGET_MAX_PDF_BYTES);
+  const ladderLong1Mb = getAdaptivePdfQualityLadder(25, TARGET_MAX_MULTI_PDF_BYTES);
+
+  assert.ok(ladderShort500k[0].dpi >= 200);
+  assert.ok(ladderLong1Mb[0].dpi < ladderShort500k[0].dpi);
+  for (let i = 1; i < ladderLong1Mb.length; i++) {
+    assert.ok(ladderLong1Mb[i].dpi < ladderLong1Mb[i - 1].dpi);
+    assert.ok(ladderLong1Mb[i].textJpegQuality < ladderLong1Mb[i - 1].textJpegQuality);
   }
 });

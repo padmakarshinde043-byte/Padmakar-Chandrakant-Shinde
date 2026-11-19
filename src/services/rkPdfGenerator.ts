@@ -58,10 +58,23 @@ import {
 } from '../utils/pdfReportLayout';
 import {
   generateDistrictExecutiveOfficePdf,
+  generateOrganizationStatusOfficePdf,
+  generateDistrictPresidentsOfficePdf,
+  generateTalukaPresidentsOfficePdf,
+  generateRegisteredMembersOfficePdf,
+  generateStatewideRegistryOfficePdf,
   DistrictExecutivePdfResult,
+  OfficeHybridPdfResult,
 } from './districtExecutivePdfEngine';
 
-export type { DistrictExecutivePdfResult };
+export {
+  generateOrganizationStatusOfficePdf,
+  generateDistrictPresidentsOfficePdf,
+  generateTalukaPresidentsOfficePdf,
+  generateRegisteredMembersOfficePdf,
+  generateStatewideRegistryOfficePdf,
+};
+export type { DistrictExecutivePdfResult, OfficeHybridPdfResult };
 
 let cachedHedingBase64: string | null = null;
 let cachedSignBase64: string | null = null;
