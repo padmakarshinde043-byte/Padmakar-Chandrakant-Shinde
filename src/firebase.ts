@@ -1028,6 +1028,18 @@ let approvedMembersLastFetchedAt = 0;
 let registeredCountCache: number | null = null;
 let registeredCountInFlight: Promise<number> | null = null;
 
+export function invalidateApprovedMembersClientCache(): void {
+  approvedMembersCache = null;
+  approvedMembersLastFetchedAt = 0;
+  registeredCountCache = null;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('mahasangh_approved_members_cache_v1');
+      localStorage.removeItem('mahasangh_registered_count_cache_v1');
+    }
+  } catch {}
+}
+
 export async function fetchApprovedMembersCached(forceRefresh = false): Promise<MembershipApplication[]> {
   if (
     !forceRefresh &&

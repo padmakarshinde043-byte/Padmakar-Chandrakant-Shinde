@@ -1384,12 +1384,19 @@ export async function generateRegisteredMembersPdf(
     { header: 'सदस्य क्रमांक', width: '128px', align: 'center' },
     { header: 'संपूर्ण नाव', flex: 1.25, align: 'left' },
     { header: 'सध्याचे पद / संवर्ग', flex: 1, align: 'left' },
-    { header: 'तालुका व जिल्हा', width: '125px', align: 'left' },
+    { header: 'केंद्र, तालुका व जिल्हा', width: '150px', align: 'left' },
     { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
   ];
 
   const rowsCells = list.map((m, idx) => {
-    const place = m.taluka ? `${m.taluka}, ${m.district}` : m.district || '-';
+    const place =
+      [
+        m.centerName ? `केंद्र: ${m.centerName}` : '',
+        m.taluka ? `ता. ${m.taluka}` : '',
+        m.district || '',
+      ]
+        .filter(Boolean)
+        .join(', ') || '-';
     return [
       { text: String(idx + 1), bold: true },
       { text: m.memberNumber || '-', bold: true },

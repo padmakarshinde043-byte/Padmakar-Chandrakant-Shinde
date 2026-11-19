@@ -173,3 +173,95 @@ export function buildCenterUpdateShareMessage(origin?: string): string {
     '(टीप: ज्यांचे केंद्राचे नाव अद्याप भरलेले नाही, फक्त त्यांचीच नावे या लिंकमध्ये दिसतील व एकदा सबमिट केल्यावर माहिती आपल्या अधिकृत नोंदीत आपोआप जोडली जाईल.)',
   ].join('\n');
 }
+
+const DISTRICT_ALIAS_MAP: Record<string, string> = {
+  'अहमदनगर': 'अहिल्यानगर',
+  'औरंगाबाद': 'छत्रपती संभाजीनगर',
+  'संभाजीनगर': 'छत्रपती संभाजीनगर',
+  'उस्मानाबाद': 'धाराशिव',
+  'वाशिम': 'वाशीम',
+};
+
+export function normalizeDistrictKey(district?: string | null): string {
+  const cleaned = String(district || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  return DISTRICT_ALIAS_MAP[cleaned] || cleaned;
+}
+
+export function normalizePersonNameKey(fullName?: string | null): string {
+  return String(fullName || '')
+    .replace(/^(श्रीमान|श्रीमती|श्रीम|कुमारी|सुश्री|सौ|श्री|कु|डॉ|मा\.?\s*श्री|मा\.?\s*सौ|Mr|Mrs|Ms|Miss|Smt|Shri|Shree|Sau|Kumari|Dr)\.?\s+/i, '')
+    .replace(/[\.\,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeLast10Digits(phone?: string | null): string {
+  const digits = String(phone || '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
+}
+
+/**
+ * Matches an OfficialMember row with a MembershipApplication row
+ * by normalized 10-digit mobile number OR canonical district + normalized full name.
+ */
+export function doesOfficialMatchMember(
+  official: {
+    mobile?: string | null;
+    district?: string | null;
+    firstName?: string | null;
+    middleName?: string | null;
+    lastName?: string | null;
+  },
+  member: {
+    phone?: string | null;
+    district?: string | null;
+    fullName?: string | null;
+  }
+): boolean {
+  const offPhone = normalizeLast10Digits(official.mobile);
+  const memPhone = normalizeLast10Digits(member.phone);
+  if (offPhone && memPhone && offPhone === memPhone) {
+    return true;
+  }
+
+  const offDist = normalizeDistrictKey(official.district);
+  const memDist = normalizeDistrictKey(member.district);
+  if (!offDist || !memDist || offDist !== memDist) {
+    return false;
+  }
+
+  const offCombined = [official.firstName, official.middleName, official.lastName]
+    .filter(Boolean)
+    .join(' ');
+  const offName = normalizePersonNameKey(offCombined);
+  const memName = normalizePersonNameKey(member.fullName);
+  return Boolean(offName && memName && offName === memName);
+}
+
+/**
+ * Resolves the freshest workingPlace / center name for an OfficialMember by checking
+ * whether the matched member record has a newer or missing-fill centerName.
+ */
+export function resolveOfficialWorkingPlaceFromMember(
+  official: { workingPlace?: string | null; updatedAt?: string | null },
+  member: { centerName?: string | null; updatedAt?: string | null }
+): string {
+  const offPlace = String(official.workingPlace || '').trim();
+  const memCenter = String(member.centerName || '').trim();
+  if (isMissingCenterName(memCenter)) {
+    return offPlace;
+  }
+  if (isMissingCenterName(offPlace)) {
+    return memCenter;
+  }
+  const offTs = official.updatedAt ? new Date(official.updatedAt).getTime() : 0;
+  const memTs = member.updatedAt ? new Date(member.updatedAt).getTime() : 0;
+  if (Number.isFinite(memTs) && memTs > 0 && (!Number.isFinite(offTs) || memTs > offTs)) {
+    return memCenter;
+  }
+  return offPlace;
+}

@@ -817,6 +817,11 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         );
                       })()}
                     </div>
+                    {app.centerName && (
+                      <div className="text-[11px] text-slate-600 mt-0.5 truncate">
+                        केंद्र: {app.centerName}
+                      </div>
+                    )}
                     {(dupPhone || dupName || dupMemNo || is0001) && (
                       <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px] font-bold text-rose-700">
                         {dupPhone && <span>[दुबार मोबाईल]</span>}

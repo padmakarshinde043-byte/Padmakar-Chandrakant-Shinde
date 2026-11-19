@@ -53,6 +53,17 @@ function safeCacheOfficials(list: OfficialMember[]): void {
   safeRkStorageSet(CACHE_KEY_OFFICIALS_TIMESTAMP, String(officialsLastFetchedAt));
 }
 
+export function invalidateOfficialsClientCache(): void {
+  officialsMemoryCache = null;
+  officialsLastFetchedAt = 0;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CACHE_KEY_OFFICIALS);
+      localStorage.removeItem(CACHE_KEY_OFFICIALS_TIMESTAMP);
+    }
+  } catch {}
+}
+
 function safeCacheLeaders(list: Leader[], version?: string | number): void {
   leadersMemoryCache = list;
   const lightweight = stripHeavyPhotosForCache(list);
@@ -85,7 +96,7 @@ export async function fetchOfficials(forceRefresh = false): Promise<OfficialMemb
 
   const runFetch = (async (): Promise<OfficialMember[]> => {
     try {
-      const res = await fetch('/api/db/rk/officials', {
+      const res = await fetch(`/api/db/rk/officials${forceRefresh ? '?refresh=1' : ''}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',

@@ -30,6 +30,10 @@ import {
   filterMissingCenterMembers,
   isMissingCenterName,
   normalizeTalukaValue,
+  normalizeDistrictKey,
+  normalizePersonNameKey,
+  doesOfficialMatchMember,
+  resolveOfficialWorkingPlaceFromMember,
 } from '../utils/centerUpdateHelper';
 import { toEnglishDigits } from '../utils/formatters';
 import { computeNextVisitorStats } from '../utils/visitorCounter';
@@ -370,6 +374,15 @@ export async function mysqlSubmitOneTimeCenterUpdate(params: {
         [cleanCenter, finalTaluka, nowIso, updatedExtraJson, targetId]
       );
 
+      // Automatically sync newly submitted working center into any matching Official record (पदाधिकारी)
+      await syncMemberCenterToOfficials(conn, {
+        phone: String(row.phone || ''),
+        district: String(row.district || ''),
+        fullName: String(row.full_name || ''),
+        centerName: cleanCenter,
+        nowIso,
+      });
+
       return {
         id: targetId,
         memberNumber: String(row.member_number || ''),
@@ -383,6 +396,54 @@ export async function mysqlSubmitOneTimeCenterUpdate(params: {
       };
     })
   );
+}
+
+async function syncMemberCenterToOfficials(
+  executor: Pick<PoolConnection, 'query' | 'execute'>,
+  params: {
+    phone: string;
+    district: string;
+    fullName: string;
+    centerName: string;
+    nowIso: string;
+  }
+): Promise<number> {
+  const cleanCenter = String(params.centerName || '').trim();
+  if (isMissingCenterName(cleanCenter)) return 0;
+
+  try {
+    const [officialRows] = await executor.query<RowDataPacket[]>(
+      'SELECT `id`, `first_name`, `middle_name`, `last_name`, `district`, `mobile`, `working_place` FROM `officials`'
+    );
+    let updatedCount = 0;
+    for (const off of officialRows || []) {
+      const matched = doesOfficialMatchMember(
+        {
+          mobile: String(off.mobile || ''),
+          district: String(off.district || ''),
+          firstName: String(off.first_name || ''),
+          middleName: String(off.middle_name || ''),
+          lastName: String(off.last_name || ''),
+        },
+        {
+          phone: params.phone,
+          district: params.district,
+          fullName: params.fullName,
+        }
+      );
+      if (matched) {
+        await executor.execute(
+          'UPDATE `officials` SET `working_place` = ?, `updated_at` = ? WHERE `id` = ?',
+          [cleanCenter, params.nowIso, String(off.id)]
+        );
+        updatedCount += 1;
+      }
+    }
+    return updatedCount;
+  } catch (err) {
+    console.warn('syncMemberCenterToOfficials notice:', err);
+    return 0;
+  }
 }
 
 export async function mysqlCountApprovedMembers(): Promise<number> {
@@ -534,6 +595,16 @@ export async function mysqlUpdateApplication(
   };
 
   await mysqlUpsertApplication(merged);
+  if (!isMissingCenterName(String(merged.centerName || ''))) {
+    const pool = getMysqlPool();
+    await syncMemberCenterToOfficials(pool, {
+      phone: String(merged.phone || ''),
+      district: String(merged.district || ''),
+      fullName: String(merged.fullName || ''),
+      centerName: String(merged.centerName || ''),
+      nowIso,
+    });
+  }
   const fresh = await mysqlGetApplicationById(targetId);
   return fresh || (merged as MembershipApplication & Record<string, any>);
 }
@@ -1633,23 +1704,81 @@ export async function mysqlListOfficials(): Promise<OfficialMember[]> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();
   const [rows] = await pool.query<RowDataPacket[]>('SELECT * FROM `officials`');
-  return rows.map((r) => ({
-    id: String(r.id),
-    salutation: String(r.salutation || 'श्री.'),
-    firstName: String(r.first_name || ''),
-    middleName: String(r.middle_name || ''),
-    lastName: String(r.last_name || ''),
-    appointedPost: String(r.appointed_post || ''),
-    district: String(r.district || ''),
-    taluka: String(r.taluka || ''),
-    currentCadre: normalizeOfficialCadre(String(r.current_cadre || '')),
-    workingPlace: String(r.working_place || ''),
-    mobile: toEnglishDigits(String(r.mobile || '')),
-    updatedAt: String(r.updated_at || ''),
-    photo: String(r.photo || ''),
-    appointedDate: String(r.appointed_date || ''),
-    orderNumber: String(r.order_number || ''),
-  }));
+
+  // Retroactively enrich officials' workingPlace from members' center_name updates (including /center-update)
+  const centerByPhone = new Map<string, { centerName: string; updatedAt: string }>();
+  const centerByDistName = new Map<string, { centerName: string; updatedAt: string }>();
+  try {
+    const [appRows] = await pool.query<RowDataPacket[]>(
+      `SELECT \`phone\`, \`district\`, \`full_name\`, \`center_name\`, \`updated_at\`
+       FROM \`applications\`
+       WHERE \`status\` != 'rejected'
+         AND \`center_name\` IS NOT NULL
+         AND TRIM(\`center_name\`) NOT IN ('', '-', '--', '—', 'नाही', 'NA', 'N/A', 'na', 'n/a')`
+    );
+    for (const a of appRows || []) {
+      const cName = String(a.center_name || '').trim();
+      if (!cName) continue;
+      const entry = { centerName: cName, updatedAt: String(a.updated_at || '') };
+      const p10 = normalizePhone10(String(a.phone || ''));
+      if (p10.length === 10) {
+        const prev = centerByPhone.get(p10);
+        if (!prev || entry.updatedAt > prev.updatedAt) {
+          centerByPhone.set(p10, entry);
+        }
+      }
+      const dKey = normalizeDistrictKey(String(a.district || ''));
+      const nKey = normalizePersonNameKey(String(a.full_name || ''));
+      if (dKey && nKey) {
+        const composite = `${dKey}::${nKey}`;
+        const prev = centerByDistName.get(composite);
+        if (!prev || entry.updatedAt > prev.updatedAt) {
+          centerByDistName.set(composite, entry);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('mysqlListOfficials center enrichment notice:', err);
+  }
+
+  return rows.map((r) => {
+    const mobile = toEnglishDigits(String(r.mobile || ''));
+    const p10 = normalizePhone10(mobile);
+    const dKey = normalizeDistrictKey(String(r.district || ''));
+    const nKey = normalizePersonNameKey(
+      [r.first_name, r.middle_name, r.last_name].filter(Boolean).join(' ')
+    );
+    const matchedMember =
+      (p10.length === 10 ? centerByPhone.get(p10) : undefined) ||
+      (dKey && nKey ? centerByDistName.get(`${dKey}::${nKey}`) : undefined);
+
+    const rawWorkingPlace = String(r.working_place || '');
+    const updatedAt = String(r.updated_at || '');
+    const workingPlace = matchedMember
+      ? resolveOfficialWorkingPlaceFromMember(
+          { workingPlace: rawWorkingPlace, updatedAt },
+          matchedMember
+        )
+      : rawWorkingPlace;
+
+    return {
+      id: String(r.id),
+      salutation: String(r.salutation || 'श्री.'),
+      firstName: String(r.first_name || ''),
+      middleName: String(r.middle_name || ''),
+      lastName: String(r.last_name || ''),
+      appointedPost: String(r.appointed_post || ''),
+      district: String(r.district || ''),
+      taluka: String(r.taluka || ''),
+      currentCadre: normalizeOfficialCadre(String(r.current_cadre || '')),
+      workingPlace,
+      mobile,
+      updatedAt,
+      photo: String(r.photo || ''),
+      appointedDate: String(r.appointed_date || ''),
+      orderNumber: String(r.order_number || ''),
+    };
+  });
 }
 
 export async function mysqlSaveOfficial(member: OfficialMember): Promise<void> {

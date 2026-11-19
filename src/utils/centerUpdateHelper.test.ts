@@ -4,11 +4,13 @@ import {
   MISSING_TALUKA_SENTINEL,
   buildCenterUpdateShareMessage,
   buildCenterUpdateShareUrl,
+  doesOfficialMatchMember,
   filterMissingCenterMembers,
   getDistrictsWithMissingCenters,
   getMembersForDistrictAndTaluka,
   getTalukasForDistrict,
   isMissingCenterName,
+  resolveOfficialWorkingPlaceFromMember,
 } from './centerUpdateHelper';
 
 test('isMissingCenterName accurately identifies empty and placeholder center names', () => {
@@ -126,3 +128,62 @@ test('buildCenterUpdateShareUrl and message include standalone /center-update li
   assert.ok(msg.includes('https://mahasangh.in/center-update'));
   assert.ok(msg.includes('कार्यरत केंद्राचे नाव'));
 });
+
+test('doesOfficialMatchMember matches by 10-digit mobile or canonical district + full name', () => {
+  // Match by mobile even if district spelling differs
+  assert.equal(
+    doesOfficialMatchMember(
+      { mobile: '+91 98765-43210', district: 'पुणे', firstName: 'अशोक', lastName: 'पवार' },
+      { phone: '9876543210', district: 'नाशिक', fullName: 'श्री. अशोक पवार' }
+    ),
+    true
+  );
+
+  // Match by canonical district alias (अहमदनगर -> अहिल्यानगर) + salutation-stripped full name
+  assert.equal(
+    doesOfficialMatchMember(
+      { mobile: '', district: 'अहमदनगर', firstName: 'सुनीता', middleName: 'राम', lastName: 'कुलकर्णी' },
+      { phone: '9000011111', district: 'अहिल्यानगर', fullName: 'सौ. सुनीता राम कुलकर्णी' }
+    ),
+    true
+  );
+
+  // Non-match when district and phone both differ
+  assert.equal(
+    doesOfficialMatchMember(
+      { mobile: '9822001122', district: 'सातारा', firstName: 'राजेश', lastName: 'जाधव' },
+      { phone: '9822009999', district: 'सांगली', fullName: 'राजेश जाधव' }
+    ),
+    false
+  );
+});
+
+test('resolveOfficialWorkingPlaceFromMember fills blank workingPlace and prefers newer /center-update', () => {
+  // Blank official workingPlace filled from member centerName
+  assert.equal(
+    resolveOfficialWorkingPlaceFromMember(
+      { workingPlace: '', updatedAt: '2026-05-10T10:00:00Z' },
+      { centerName: 'पिंपळगाव बसवंत', updatedAt: '2026-05-01T10:00:00Z' }
+    ),
+    'पिंपळगाव बसवंत'
+  );
+
+  // Newer member /center-update overrides older official workingPlace
+  assert.equal(
+    resolveOfficialWorkingPlaceFromMember(
+      { workingPlace: 'जुने केंद्र', updatedAt: '2026-04-01T10:00:00Z' },
+      { centerName: 'नवीन केंद्र', updatedAt: '2026-05-05T10:00:00Z' }
+    ),
+    'नवीन केंद्र'
+  );
+
+  // Newer manual official edit is preserved
+  assert.equal(
+    resolveOfficialWorkingPlaceFromMember(
+      { workingPlace: 'अद्ययावत केंद्र', updatedAt: '2026-06-01T10:00:00Z' },
+      { centerName: 'जुने केंद्र', updatedAt: '2026-05-01T10:00:00Z' }
+    ),
+    'अद्ययावत केंद्र'
+  );
+});
+

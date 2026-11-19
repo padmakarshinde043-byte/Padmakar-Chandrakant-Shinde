@@ -22,9 +22,11 @@ import { formatMemberDisplayName } from '../utils/memberGender';
 import { toEnglishDigits } from '../utils/formatters';
 import {
   fetchApprovedMembersCached,
+  invalidateApprovedMembersClientCache,
   safeStorageGet,
   safeCacheApplications,
 } from '../firebase';
+import { invalidateOfficialsClientCache } from '../services/rkFirebaseService';
 
 interface CenterUpdatePageProps {
   onGoHome: () => void;
@@ -241,6 +243,8 @@ export const CenterUpdatePage: React.FC<CenterUpdatePageProps> = ({ onGoHome }) 
   };
 
   const syncLocalCacheAfterUpdate = (id: string, centerName: string, taluka: string) => {
+    invalidateApprovedMembersClientCache();
+    invalidateOfficialsClientCache();
     try {
       const saved = safeStorageGet('mahasangh_applications');
       if (saved) {
@@ -662,7 +666,6 @@ export const CenterUpdatePage: React.FC<CenterUpdatePageProps> = ({ onGoHome }) 
                   value={centerNameInput}
                   onChange={(e) => setCenterNameInput(e.target.value)}
                   disabled={!selectedMember}
-                  placeholder="उदा. केंद्र - पिंपळगाव बसवंत (मराठीत लिहा)"
                   maxLength={160}
                   required
                   className="w-full min-h-[46px] pl-10 pr-3.5 py-2.5 text-base sm:text-sm bg-white border border-slate-300 rounded-lg text-[#0b1e36] font-medium disabled:bg-slate-100 disabled:text-slate-400 focus:outline-none focus:border-[#193568] focus:ring-2 focus:ring-[#193568]/15"

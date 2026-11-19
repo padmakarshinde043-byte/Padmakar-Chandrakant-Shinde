@@ -1947,6 +1947,7 @@ app.post('/api/db/applications/submit-center-update', appSubmitLimiter, async (r
       taluka: taluka ? String(taluka) : undefined,
     });
     invalidateReadCache('apps:');
+    invalidateReadCache('officials:');
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ status: 'success', updated });
   } catch (err: any) {
@@ -2107,6 +2108,7 @@ app.put('/api/db/applications/:id', requireAdminOrSubAdmin(['approveMembers', 'e
     }
     const application = await mysqlUpdateApplication(req.params.id, req.body || {});
     invalidateReadCache('apps:');
+    invalidateReadCache('officials:');
     sendFreshJson(req, res, { status: 'success', application });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });

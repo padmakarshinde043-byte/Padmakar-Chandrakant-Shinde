@@ -3501,7 +3501,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               </p>
                               <p>
                                 {normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')} • <strong className="text-[#102a43]">{app.district}</strong>
+                                {app.taluka ? ` · ता. ${app.taluka}` : ''}
                               </p>
+                              {app.centerName && (
+                                <p className="text-[11px] text-[#102a43] font-medium">
+                                  केंद्र: {app.centerName}
+                                </p>
+                              )}
                               <p className="font-mono text-[#df6b16] font-bold">{app.phone}</p>
                             </div>
                           </div>
@@ -3640,8 +3646,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                             <td className="py-3 px-4 text-[#102a43]">
                               {normalizeOfficialCadre(app.professional, 'केंद्रप्रमुख')}
                               <span className="block text-[11px] text-[#607184] font-semibold">
-                                {app.district}
+                                {app.district}{app.taluka ? ` (ता. ${app.taluka})` : ''}
                               </span>
+                              {app.centerName && (
+                                <span className="block text-[11px] text-[#102a43] font-medium mt-0.5">
+                                  केंद्र: {app.centerName}
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 font-mono tabular-nums">
                               {app.phone}
@@ -8269,12 +8280,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
               {/* Geographical & Organizational Details */}
               <div className="grid grid-cols-2 gap-3 bg-white p-3.5 border border-[#e7ded1] rounded-2xl">
                 <div>
-                  <span className="text-[#607184] block text-[10px]">जिल्हा:</span>
-                  <strong className="text-[#0b1e36]">{selectedAppForVerification.district}</strong>
+                  <span className="text-[#607184] block text-[10px]">जिल्हा / तालुका:</span>
+                  <strong className="text-[#0b1e36]">
+                    {selectedAppForVerification.district}
+                    {selectedAppForVerification.taluka ? ` (ता. ${selectedAppForVerification.taluka})` : ''}
+                  </strong>
                 </div>
                 <div>
                   <span className="text-[#607184] block text-[10px]">सध्याचे पद / संवर्ग:</span>
                   <strong className="text-[#0b1e36]">{normalizeOfficialCadre(selectedAppForVerification.professional, 'केंद्रप्रमुख')}</strong>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-[#607184] block text-[10px]">कार्यरत केंद्राचे नाव:</span>
+                  <strong className="text-[#0b1e36]">{selectedAppForVerification.centerName || '-'}</strong>
                 </div>
                 <div>
                   <span className="text-[#607184] block text-[10px]">शैक्षणिक पात्रता:</span>

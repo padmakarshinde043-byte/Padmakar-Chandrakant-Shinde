@@ -38,10 +38,16 @@ export function exportDistrictExecutiveExcel(districtName: string, officials: Of
 
   officials.forEach((m, idx) => {
     const fullName = `${m.salutation || ''} ${m.firstName} ${m.middleName || ''} ${m.lastName}`.trim();
+    const cadreAndCenter = [
+      normalizeOfficialCadre(m.currentCadre, ''),
+      (m.workingPlace || '').trim(),
+    ]
+      .filter(Boolean)
+      .join(' - ') || '-';
     data.push([
       idx + 1,
       fullName,
-      normalizeOfficialCadre(m.currentCadre, '-'),
+      cadreAndCenter,
       m.appointedPost || '-',
       toEnglishDigits(m.mobile || '-'),
       m.taluka || '-'
@@ -53,7 +59,7 @@ export function exportDistrictExecutiveExcel(districtName: string, officials: Of
   ws['!cols'] = [
     { wch: 7 },   // अ.क्र.
     { wch: 26 },  // नाव
-    { wch: 24 },  // सध्याचे पद
+    { wch: 30 },  // सध्याचे पद व कार्यक्षेत्र
     { wch: 22 },  // बहाल पद
     { wch: 15 },  // मोबाईल
     { wch: 16 }   // तालुका
@@ -533,7 +539,7 @@ export function exportRegisteredMembersExcel(list: MembershipApplication[]) {
 export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
   const titleRow = ['महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ - राज्यस्तरीय नियुक्त्या व नोंदवही'];
   const subRow = [`एकूण नोंदणी: ${officials.length} | दिनांक: ${new Date().toLocaleDateString('en-IN')}`];
-  const headerRow = ['अ.क्र.', 'नाव', 'जिल्हा', 'तालुका', 'बहाल पद', 'सध्याचे पद', 'मोबाईल'];
+  const headerRow = ['अ.क्र.', 'नाव', 'जिल्हा', 'तालुका', 'बहाल पद', 'सध्याचे पद', 'कार्यरत केंद्र', 'मोबाईल'];
 
   const data: (string | number)[][] = [titleRow, subRow, [], headerRow];
 
@@ -546,6 +552,7 @@ export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
       m.taluka || '-',
       m.appointedPost || '-',
       normalizeOfficialCadre(m.currentCadre, '-'),
+      (m.workingPlace || '').trim() || '-',
       toEnglishDigits(m.mobile || '-')
     ]);
   });
@@ -559,16 +566,17 @@ export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
     { wch: 16 },
     { wch: 22 },
     { wch: 22 },
+    { wch: 24 },
     { wch: 15 }
   ];
 
   ws['!rows'] = [{ hpt: 26 }, { hpt: 18 }, { hpt: 6 }, { hpt: 32 }];
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 7 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }
   ];
 
-  for (let c = 0; c <= 6; c++) {
+  for (let c = 0; c <= 7; c++) {
     const r0 = XLSX.utils.encode_cell({ r: 0, c });
     if (!ws[r0]) ws[r0] = { t: 's', v: '' };
     ws[r0].s = {
@@ -593,10 +601,10 @@ export function exportStatewideRegistryExcel(officials: OfficialMember[]) {
     const bg = isZebra ? 'F8FAFC' : 'FFFFFF';
     ws['!rows'].push({ hpt: 22 });
 
-    for (let c = 0; c <= 6; c++) {
+    for (let c = 0; c <= 7; c++) {
       const ref = XLSX.utils.encode_cell({ r, c });
       if (!ws[ref]) continue;
-      const isCenter = c === 0 || c === 6;
+      const isCenter = c === 0 || c === 7;
       ws[ref].s = {
         font: { name: 'Calibri', sz: 10, color: { rgb: '1E293B' }, bold: c === 1 || c === 4 },
         fill: { fgColor: { rgb: bg } },

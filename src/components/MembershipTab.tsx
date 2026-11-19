@@ -763,6 +763,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     </span>
                     <span className="text-sm text-slate-600">
                       जिल्हा: <strong>{searchResult.district}</strong>
+                      {searchResult.taluka && ` · तालुका: ${searchResult.taluka}`}
+                      {searchResult.centerName && ` · केंद्र: ${searchResult.centerName}`}
                       {searchResult.professional && ` · संवर्ग: ${normalizeOfficialCadre(searchResult.professional)}`}
                     </span>
                   </div>
