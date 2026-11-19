@@ -56,6 +56,12 @@ import {
   buildSingleAppointmentLetterHtml,
   packMeasuredRowsIntoPages,
 } from '../utils/pdfReportLayout';
+import {
+  generateDistrictExecutiveOfficePdf,
+  DistrictExecutivePdfResult,
+} from './districtExecutivePdfEngine';
+
+export type { DistrictExecutivePdfResult };
 
 let cachedHedingBase64: string | null = null;
 let cachedSignBase64: string | null = null;
@@ -735,51 +741,18 @@ export async function generateSingleLetterPdf(
 }
 
 /**
- * 2. District Executive Committee Letterhead Multi-Page PDF
- * Uses official letterhead on Page 1 + standard crisp table + signature on final page
+ * 2. District Executive Committee Official A4 Office PDF (<= 500 KB, Hybrid Vector + Native Devanagari)
+ * - Page 1: Full-color official letterhead (/heding.jpg) + 6-column table
+ * - Page 2+: Compact institutional continuation header + repeated column headers
+ * - All cells strictly Vertical-Center + Horizontal-Left
+ * - Final page: State President signature with name & designation
  */
 export async function generateDistrictExecutivePdf(
   district: string,
   list: OfficialMember[],
   onProgress?: (status: string) => void
-): Promise<void> {
-  if (!list || list.length === 0) {
-    return;
-  }
-
-  if (onProgress) onProgress('लेटरपॅड व स्वाक्षरी लोड करत आहे...');
-  const [hedingUrl, signUrl] = await Promise.all([getHedingDataUrl(), getSignDataUrl()]);
-
-  const columns: ReportColumn[] = [
-    { header: 'अनु.', width: '44px', align: 'center' },
-    { header: 'पदाधिकाऱ्याचे संपूर्ण नाव', width: '230px', align: 'left' },
-    { header: 'सध्याचे पद व कार्यक्षेत्र', width: '215px', align: 'left' },
-    { header: 'महासंघातील बहाल पद', flex: 1, align: 'left' },
-  ];
-
-  const rowsCells = list.map((m, idx) => {
-    const wp = getWorkingPlaceDisplay(m);
-    const fullCadreArea = `${wp.cadre}${wp.details ? ' (' + wp.details + ')' : ''}`;
-    const fullName = `${m.salutation} ${m.firstName} ${m.middleName ? m.middleName + ' ' : ''}${m.lastName}`;
-    return [
-      { text: String(idx + 1), bold: true },
-      { text: fullName, bold: true },
-      { text: fullCadreArea },
-      { text: getDisplayPost(m), bold: true },
-    ];
-  });
-
-  await renderStandardPaginatedTablePdf({
-    reportTitle: `जिल्हा कार्यकारिणी सूची : ${district}`,
-    leftMeta: `एकूण पदाधिकारी: ${toEnglishDigits(list.length)}`,
-    rightMeta: `दिनांक: ${getTodayFormattedDate()}`,
-    columns,
-    rowsCells,
-    fileName: `अधिकृत_कार्यकारिणी_यादी_${district}.pdf`,
-    letterheadUrl: hedingUrl,
-    signUrl,
-    onProgress,
-  });
+): Promise<DistrictExecutivePdfResult | null> {
+  return generateDistrictExecutiveOfficePdf(district, list, onProgress);
 }
 
 /**

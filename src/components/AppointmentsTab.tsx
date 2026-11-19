@@ -23,7 +23,7 @@ import {
   fetchDistrictPasswords, updateDistrictPasswordInRtdb, fetchAppointedPosts,
   fetchPresidentPasswordFromFirebase, updatePresidentPasswordInFirebase
 } from '../services/rkFirebaseService';
-import { generateSingleLetterPdf } from '../services/rkPdfGenerator';
+import { generateSingleLetterPdf, generateDistrictExecutivePdf } from '../services/rkPdfGenerator';
 import {
   exportDistrictExecutiveExcel,
   exportDistrictPresidentsExcel,
@@ -1138,6 +1138,35 @@ export const AppointmentsTab: React.FC = () => {
     }
   };
 
+  // Official A4 Print-Ready PDF Export: District Executive List (Pulls fresh SQL data, <= 500 KB)
+  const handleDownloadDistrictExecutivePdf = async () => {
+    if (isGeneratingDirPdf) return;
+    setIsGeneratingDirPdf(true);
+    setPdfProgressStatus('ताजी जिल्हा कार्यकारिणी माहिती लोड होत आहे...');
+    try {
+      const { freshOfficials } = await ensureFreshSqlData();
+      const currentList = filterAndSortDistrictOfficials(freshOfficials, currentDistrict, postsList);
+      if (currentList.length === 0) {
+        showToast(`'${currentDistrict}' जिल्ह्यासाठी कोणताही पदाधिकारी नोंदवलेला नाही.`, 'error');
+        return;
+      }
+      const result = await generateDistrictExecutivePdf(currentDistrict, currentList, (status) => {
+        setPdfProgressStatus(status);
+      });
+      if (result) {
+        showToast(
+          `'${currentDistrict}' जिल्हा कार्यकारिणी PDF डाऊनलोड झाली! (${toEnglishDigits(result.pageCount)} पाने · ${toEnglishDigits(result.sizeKb)} KB)`,
+          'success'
+        );
+      }
+    } catch (err: any) {
+      showToast('PDF तयार करताना त्रुटी: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'), 'error');
+    } finally {
+      setIsGeneratingDirPdf(false);
+      setPdfProgressStatus('');
+    }
+  };
+
   // Excel Export 2: Statewide Master Registry (Pulls fresh SQL data)
   const handleDownloadStatewideRegistryExcel = async () => {
     try {
@@ -1733,6 +1762,21 @@ export const AppointmentsTab: React.FC = () => {
                 >
                   <FileText className="w-3.5 h-3.5" />
                   जिल्हा कार्यकारिणी (Excel)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadDistrictExecutivePdf}
+                  disabled={districtOfficials.length === 0 || isGeneratingDirPdf}
+                  className="bg-[#0b1e36] hover:bg-[#193568] text-white text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-md flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50"
+                  title="या जिल्ह्याची लेटरपॅड व स्वाक्षरीसह प्रिंट-योग्य अधिकृत A4 PDF (≤ 500 KB) डाऊनलोड करा"
+                >
+                  {isGeneratingDirPdf ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#efb24b]" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5 text-[#efb24b]" />
+                  )}
+                  {isGeneratingDirPdf ? 'PDF तयार होत आहे...' : 'जिल्हा कार्यकारिणी (PDF)'}
                 </button>
 
                 <button
