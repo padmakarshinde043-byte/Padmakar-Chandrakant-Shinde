@@ -665,13 +665,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 setActiveJumpTab('track');
                 trackSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}
-              className={`px-2.5 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+              className={`my-1.5 px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold rounded-md border whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs ${
                 activeJumpTab === 'track'
-                  ? 'border-[#193568] text-[#193568] bg-white'
-                  : 'border-transparent text-slate-600 hover:text-[#193568]'
+                  ? 'bg-[#193568] text-white border-[#193568] ring-2 ring-amber-400/70'
+                  : 'bg-[#193568]/10 text-[#193568] border-[#193568]/35 hover:bg-[#193568] hover:text-white'
               }`}
             >
-              २. अर्जाची स्थिती
+              <Search className="w-3.5 h-3.5 shrink-0" />
+              <span>२. अर्जाची स्थिती तपासा</span>
             </button>
             <button
               type="button"
@@ -691,47 +692,52 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         </div>
 
         {/* 1. अधिकृत नोंदणीकृत सदस्य यादी */}
-        <div ref={directorySectionRef}>
+        <div ref={directorySectionRef} className="scroll-mt-24">
           <RegisteredMembersDirectory applications={applications} />
         </div>
 
-        {/* 2. अर्जाची स्थिती तपासा */}
-        <div ref={trackSectionRef} className="bg-white rounded-md border border-slate-300 mb-8 overflow-hidden">
-          <div className="bg-[#f8fafc] border-b border-slate-200 px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <Search className="w-5 h-5 text-[#193568] shrink-0" />
-              <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#193568] leading-tight">
+        {/* 2. अर्जाची स्थिती तपासा (ठळक व सहज नजरेत भरणारा विभाग — पानाच्या #193568 निळ्या व सुवर्ण रंगसंगतीशी सुसंगत) */}
+        <div
+          ref={trackSectionRef}
+          className="scroll-mt-24 bg-white rounded-lg border-2 border-[#193568] shadow-md mb-8 overflow-hidden"
+        >
+          <div className="bg-gradient-to-r from-[#193568] to-[#11254a] border-b-2 border-amber-400 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-amber-400/15 border border-amber-400/40 flex items-center justify-center shrink-0">
+                <Search className="w-5 h-5 text-amber-300" />
+              </div>
+              <h3 className="font-serifDevanagari font-extrabold text-lg sm:text-xl text-white leading-tight tracking-tight">
                 अर्जाची स्थिती तपासा व आय-कार्ड मिळवा
               </h3>
             </div>
-            <span className="text-xs sm:text-sm font-medium text-slate-500">
+            <span className="text-xs sm:text-sm font-semibold text-amber-200 bg-white/10 border border-white/15 px-3 py-1 rounded-md self-start sm:self-auto">
               मोबाईल क्र. · सदस्य क्र. · अर्ज क्र.
             </span>
           </div>
 
-          <div className="p-5 sm:p-6">
+          <div className="p-5 sm:p-6 bg-[#f4f7fc]/70">
             <div className="flex flex-col gap-3">
-              <p className="text-base text-slate-700 font-medium leading-relaxed">
+              <p className="text-sm sm:text-base text-[#193568] font-bold leading-relaxed">
                 आपला १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज संदर्भ क्रमांक खालील रकान्यात प्रविष्ट करा:
               </p>
 
               <form onSubmit={handleTrackStatus} className="flex flex-col sm:flex-row gap-2.5 w-full">
                 <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-[#193568]/60 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     placeholder="उदा. 9876543210 किंवा MS/2026/..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full text-sm sm:text-base text-slate-900 bg-white border border-slate-300 focus:border-[#193568] rounded-md pl-10 pr-4 py-2.5 focus:outline-none"
+                    className="w-full text-sm sm:text-base text-slate-900 bg-white border-2 border-[#193568]/30 focus:border-[#193568] rounded-md pl-10 pr-4 py-2.5 focus:outline-none shadow-2xs"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={isTrackingStatus}
-                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-70 text-white text-sm sm:text-base font-semibold px-6 py-2.5 rounded-md shrink-0 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-70 text-white text-sm sm:text-base font-bold px-6 py-2.5 rounded-md shrink-0 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm border border-amber-400/40"
                 >
-                  <Search className="w-4 h-4" />
+                  <Search className="w-4 h-4 text-amber-300" />
                   <span>{isTrackingStatus ? 'तपासत आहे...' : 'स्थिती तपासा'}</span>
                 </button>
               </form>

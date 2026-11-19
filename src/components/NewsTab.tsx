@@ -273,69 +273,71 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         ========================================================================= */}
         {isCircularsMode && (
         <>
-        {/* Clear Non-Government Disclaimer & Official Government / Court Source Links (Google Play Policy Compliance) */}
+        {/* Compact Non-Government Disclaimer & Official Government / Court Source Links (Google Play Policy Compliance) */}
         <section
           aria-label="Disclaimer and Official Sources"
-          className="mb-5 bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 sm:p-6 shadow-xs space-y-3"
+          className="mb-4 bg-amber-50/90 border border-amber-300 rounded-xl px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs space-y-1.5"
         >
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="w-6 h-6 text-amber-800 shrink-0 mt-0.5" />
-            <div className="space-y-1.5 text-xs sm:text-sm text-slate-800 leading-relaxed">
-              <h2 className="font-bold text-base sm:text-lg text-[#0b1e36]">
-                Disclaimer &amp; Official Sources
-              </h2>
-              <p>
-                <strong>Disclaimer:</strong> This app and website do <strong>NOT</strong> represent any government or judicial entity and are not affiliated with, authorized by, or endorsed by the Government of Maharashtra or any court. This is an independent informational platform of the registered employees&apos; association (Maharashtra State Federation of Centre Heads and Officers). All Government Resolutions (GRs), circulars, and court orders listed below are provided solely for informational reference from publicly available official government and court portals:
-              </p>
-            </div>
-          </div>
+          <p className="text-[11px] sm:text-xs text-slate-800 leading-snug">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-800 inline-block mr-1 -mt-0.5" />
+            <strong className="text-[#0b1e36]">Disclaimer:</strong> This app/website does <strong>NOT</strong> represent any government or judicial entity (independent platform of Maharashtra State Federation of Centre Heads and Officers). All GRs, circulars, and court orders below are for informational reference from official portals.
+          </p>
 
-          <div className="pt-2 border-t border-amber-200 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-            <span className="font-bold text-[#0b1e36] mr-1">Official Sources:</span>
+          <div className="pt-1.5 border-t border-amber-200/80 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs">
+            <span className="font-bold text-[#0b1e36]">Official Sources:</span>
             <a
               href="https://gr.maharashtra.gov.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+              title="Maharashtra Govt GR Portal"
+              className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>gr.maharashtra.gov.in (Maharashtra Govt GR)</span>
+              <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
+              <span>gr.maharashtra.gov.in</span>
             </a>
+            <span className="text-amber-400" aria-hidden="true">·</span>
             <a
               href="https://education.maharashtra.gov.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+              title="School Education Department, Maharashtra"
+              className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>education.maharashtra.gov.in (School Education Dept.)</span>
+              <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
+              <span>education.maharashtra.gov.in</span>
             </a>
+            <span className="text-amber-400" aria-hidden="true">·</span>
             <a
               href="https://www.maharashtra.gov.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+              title="Government of Maharashtra"
+              className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>maharashtra.gov.in (Govt. of Maharashtra)</span>
+              <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
+              <span>maharashtra.gov.in</span>
             </a>
+            <span className="text-amber-400" aria-hidden="true">·</span>
             <a
               href="https://www.sci.gov.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+              title="Supreme Court of India"
+              className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>sci.gov.in (Supreme Court of India)</span>
+              <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
+              <span>sci.gov.in (Supreme Court)</span>
             </a>
+            <span className="text-amber-400" aria-hidden="true">·</span>
             <a
               href="https://bombayhighcourt.nic.in"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+              title="High Court of Bombay"
+              className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>bombayhighcourt.nic.in (High Court of Bombay)</span>
+              <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
+              <span>bombayhighcourt.nic.in (Bombay HC)</span>
             </a>
           </div>
         </section>

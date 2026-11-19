@@ -121,73 +121,23 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
         </div>
       </div>
 
-      {/* Clear Non-Government Entity Disclaimer & Official Government Sources (Google Play Compliance) */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mt-4 pt-3.5 border-t border-white/15 text-[11px] sm:text-xs text-slate-300 leading-relaxed space-y-1.5">
+      {/* Clear Non-Government Entity Disclaimer & Privacy Policy Link */}
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mt-4 pt-3.5 border-t border-white/15 text-[11px] sm:text-xs text-slate-300 leading-relaxed flex flex-col md:flex-row items-center justify-between gap-2">
         <p className="text-center md:text-left">
           <strong className="text-amber-300">Disclaimer:</strong> हे संकेतस्थळ / ॲप कोणत्याही शासकीय संस्थेचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नाही. हे केवळ नोंदणीकृत कर्मचारी संघटनेचे स्वतंत्र माहिती व्यासपीठ आहे.
         </p>
-        <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-slate-300">
-          <span className="text-slate-400 font-semibold">शासकीय माहिती स्त्रोत:</span>
-          <a
-            href="https://gr.maharashtra.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-300 hover:text-amber-200 underline"
+        {setCurrentTab && (
+          <button
+            type="button"
+            onClick={() => {
+              setCurrentTab('privacy');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="text-white hover:text-amber-200 underline font-semibold cursor-pointer shrink-0"
           >
-            gr.maharashtra.gov.in
-          </a>
-          <span aria-hidden="true">·</span>
-          <a
-            href="https://education.maharashtra.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-300 hover:text-amber-200 underline"
-          >
-            education.maharashtra.gov.in
-          </a>
-          <span aria-hidden="true">·</span>
-          <a
-            href="https://www.maharashtra.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-300 hover:text-amber-200 underline"
-          >
-            maharashtra.gov.in
-          </a>
-          <span aria-hidden="true">·</span>
-          <a
-            href="https://www.sci.gov.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-300 hover:text-amber-200 underline"
-          >
-            sci.gov.in
-          </a>
-          <span aria-hidden="true">·</span>
-          <a
-            href="https://bombayhighcourt.nic.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-300 hover:text-amber-200 underline"
-          >
-            bombayhighcourt.nic.in
-          </a>
-          {setCurrentTab && (
-            <>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentTab('privacy');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="text-white hover:text-amber-200 underline font-semibold cursor-pointer"
-              >
-                Privacy &amp; Disclaimer Policy
-              </button>
-            </>
-          )}
-        </div>
+            Privacy &amp; Disclaimer Policy
+          </button>
+        )}
       </div>
     </footer>
   );
