@@ -124,7 +124,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
       {/* Clear Non-Government Entity Disclaimer & Official Government Sources (Google Play Compliance) */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mt-4 pt-3.5 border-t border-white/15 text-[11px] sm:text-xs text-slate-300 leading-relaxed space-y-1.5">
         <p className="text-center md:text-left">
-          <strong className="text-amber-300">Disclaimer:</strong> हे संकेतस्थळ / ॲप कोणत्याही शासकीय संस्थेचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नाही. हे केवळ नोंदणीकृत कर्मचारी संघटनेचे ({ORG_DETAILS.registrationNo}) स्वतंत्र माहिती व्यासपीठ आहे.
+          <strong className="text-amber-300">Disclaimer:</strong> हे संकेतस्थळ / ॲप कोणत्याही शासकीय संस्थेचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नाही. हे केवळ नोंदणीकृत कर्मचारी संघटनेचे स्वतंत्र माहिती व्यासपीठ आहे.
         </p>
         <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-slate-300">
           <span className="text-slate-400 font-semibold">शासकीय माहिती स्त्रोत:</span>
@@ -153,6 +153,24 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
             className="text-amber-300 hover:text-amber-200 underline"
           >
             maharashtra.gov.in
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="https://www.sci.gov.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-300 hover:text-amber-200 underline"
+          >
+            sci.gov.in
+          </a>
+          <span aria-hidden="true">·</span>
+          <a
+            href="https://bombayhighcourt.nic.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-300 hover:text-amber-200 underline"
+          >
+            bombayhighcourt.nic.in
           </a>
           {setCurrentTab && (
             <>

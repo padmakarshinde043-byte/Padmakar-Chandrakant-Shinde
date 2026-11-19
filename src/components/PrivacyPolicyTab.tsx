@@ -162,6 +162,28 @@ export const PrivacyPolicyTab: React.FC = () => {
                     <span>https://www.maharashtra.gov.in — महाराष्ट्र शासन अधिकृत संकेतस्थळ</span>
                   </a>
                 </li>
+                <li>
+                  <a
+                    href="https://www.sci.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span>https://www.sci.gov.in — Supreme Court of India (सर्वोच्च न्यायालय)</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://bombayhighcourt.nic.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span>https://bombayhighcourt.nic.in — High Court of Bombay (मुंबई उच्च न्यायालय)</span>
+                  </a>
+                </li>
               </ul>
             </div>
           </div>

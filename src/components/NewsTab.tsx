@@ -273,28 +273,25 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         ========================================================================= */}
         {isCircularsMode && (
         <>
-        {/* Clear Non-Government Disclaimer & Official .gov.in Source Links (Google Play Policy Compliance) */}
+        {/* Clear Non-Government Disclaimer & Official Government / Court Source Links (Google Play Policy Compliance) */}
         <section
-          aria-label="अस्वीकरण व शासकीय माहितीचे अधिकृत स्त्रोत"
+          aria-label="Disclaimer and Official Sources"
           className="mb-5 bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 sm:p-6 shadow-xs space-y-3"
         >
           <div className="flex items-start gap-3">
             <ShieldCheck className="w-6 h-6 text-amber-800 shrink-0 mt-0.5" />
-            <div className="space-y-1.5 text-sm sm:text-[15px] text-slate-800 leading-relaxed">
-              <h2 className="font-serifDevanagari font-extrabold text-base sm:text-lg text-[#0b1e36]">
-                महत्त्वाचे अस्वीकरण व शासकीय माहितीचे मूळ स्त्रोत (Disclaimer &amp; Official Sources)
+            <div className="space-y-1.5 text-xs sm:text-sm text-slate-800 leading-relaxed">
+              <h2 className="font-bold text-base sm:text-lg text-[#0b1e36]">
+                Disclaimer &amp; Official Sources
               </h2>
               <p>
-                <strong>अस्वीकरण:</strong> हे ॲप व संकेतस्थळ कोणत्याही सरकारी संस्थेचे, मंत्रालयाचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नाही. हे केवळ <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</strong> (श्रमिक संघ नोंदणी क्र. महा/एनएसके/एन/2427) या नोंदणीकृत कर्मचारी संघटनेचे सदस्यांच्या माहिती व संदर्भासाठीचे स्वतंत्र व्यासपीठ आहे.
-              </p>
-              <p className="text-xs sm:text-sm text-slate-700">
-                <strong>Disclaimer:</strong> This app and website do <strong>NOT</strong> represent a government entity and are not affiliated with or endorsed by the Government of Maharashtra. All Government Resolutions (GRs) and circulars listed below are provided solely for informational reference from publicly available official government portals:
+                <strong>Disclaimer:</strong> This app and website do <strong>NOT</strong> represent any government or judicial entity and are not affiliated with, authorized by, or endorsed by the Government of Maharashtra or any court. This is an independent informational platform of the registered employees&apos; association (Maharashtra State Federation of Centre Heads and Officers). All Government Resolutions (GRs), circulars, and court orders listed below are provided solely for informational reference from publicly available official government and court portals:
               </p>
             </div>
           </div>
 
           <div className="pt-2 border-t border-amber-200 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-            <span className="font-bold text-[#0b1e36] mr-1">अधिकृत मूळ स्त्रोत (Official Sources):</span>
+            <span className="font-bold text-[#0b1e36] mr-1">Official Sources:</span>
             <a
               href="https://gr.maharashtra.gov.in"
               target="_blank"
@@ -302,7 +299,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>gr.maharashtra.gov.in (महाराष्ट्र शासन GR पोर्टल)</span>
+              <span>gr.maharashtra.gov.in (Maharashtra Govt GR)</span>
             </a>
             <a
               href="https://education.maharashtra.gov.in"
@@ -311,7 +308,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>education.maharashtra.gov.in (शालेय शिक्षण विभाग)</span>
+              <span>education.maharashtra.gov.in (School Education Dept.)</span>
             </a>
             <a
               href="https://www.maharashtra.gov.in"
@@ -320,7 +317,25 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-              <span>maharashtra.gov.in (महाराष्ट्र शासन पोर्टल)</span>
+              <span>maharashtra.gov.in (Govt. of Maharashtra)</span>
+            </a>
+            <a
+              href="https://www.sci.gov.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>sci.gov.in (Supreme Court of India)</span>
+            </a>
+            <a
+              href="https://bombayhighcourt.nic.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>bombayhighcourt.nic.in (High Court of Bombay)</span>
             </a>
           </div>
         </section>
