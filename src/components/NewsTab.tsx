@@ -124,15 +124,15 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         <div className="border-b border-slate-200 pb-3 flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-              {isCircularsMode ? 'अधिकृत शासन निर्णय दालन' : 'अधिकृत प्रसिद्धी दालन'}
+              {isCircularsMode ? 'शासन निर्णय व परिपत्रके संदर्भ दालन' : 'संघटना प्रसिद्धी दालन'}
             </span>
             <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
               {isCircularsMode ? 'शासन निर्णय व परिपत्रके' : 'बातम्या'}
             </h1>
             <p className="text-base text-slate-700 mt-2 max-w-2xl leading-relaxed">
               {isCircularsMode
-                ? 'महाराष्ट्र शासन, शिक्षण आयुक्तालय व शालेय शिक्षण विभागाचे अधिकृत शासन निर्णय (GR) व परिपत्रके.'
-                : 'राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित अधिकृत बातम्या, घोषणा आणि संघटना घडामोडी.'}
+                ? 'सदस्यांच्या माहिती व संदर्भासाठी महाराष्ट्र शासन व शालेय शिक्षण विभागाचे सार्वजनिक शासन निर्णय (GR) व परिपत्रके.'
+                : 'राज्यातील केंद्रप्रमुख व विस्तार अधिकाऱ्यांच्या कामकाजाशी संबंधित बातम्या, घोषणा आणि संघटना घडामोडी.'}
             </p>
           </div>
 
@@ -273,19 +273,71 @@ export const NewsTab: React.FC<NewsTabProps> = ({
         ========================================================================= */}
         {isCircularsMode && (
         <>
+        {/* Clear Non-Government Disclaimer & Official .gov.in Source Links (Google Play Policy Compliance) */}
+        <section
+          aria-label="अस्वीकरण व शासकीय माहितीचे अधिकृत स्त्रोत"
+          className="mb-5 bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 sm:p-6 shadow-xs space-y-3"
+        >
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-6 h-6 text-amber-800 shrink-0 mt-0.5" />
+            <div className="space-y-1.5 text-sm sm:text-[15px] text-slate-800 leading-relaxed">
+              <h2 className="font-serifDevanagari font-extrabold text-base sm:text-lg text-[#0b1e36]">
+                महत्त्वाचे अस्वीकरण व शासकीय माहितीचे मूळ स्त्रोत (Disclaimer &amp; Official Sources)
+              </h2>
+              <p>
+                <strong>अस्वीकरण:</strong> हे ॲप व संकेतस्थळ कोणत्याही सरकारी संस्थेचे, मंत्रालयाचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नाही. हे केवळ <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</strong> (श्रमिक संघ नोंदणी क्र. महा/एनएसके/एन/2427) या नोंदणीकृत कर्मचारी संघटनेचे सदस्यांच्या माहिती व संदर्भासाठीचे स्वतंत्र व्यासपीठ आहे.
+              </p>
+              <p className="text-xs sm:text-sm text-slate-700">
+                <strong>Disclaimer:</strong> This app and website do <strong>NOT</strong> represent a government entity and are not affiliated with or endorsed by the Government of Maharashtra. All Government Resolutions (GRs) and circulars listed below are provided solely for informational reference from publicly available official government portals:
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-amber-200 flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+            <span className="font-bold text-[#0b1e36] mr-1">अधिकृत मूळ स्त्रोत (Official Sources):</span>
+            <a
+              href="https://gr.maharashtra.gov.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>gr.maharashtra.gov.in (महाराष्ट्र शासन GR पोर्टल)</span>
+            </a>
+            <a
+              href="https://education.maharashtra.gov.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>education.maharashtra.gov.in (शालेय शिक्षण विभाग)</span>
+            </a>
+            <a
+              href="https://www.maharashtra.gov.in"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-white hover:bg-amber-100 text-[#193568] border border-amber-300 font-bold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>maharashtra.gov.in (महाराष्ट्र शासन पोर्टल)</span>
+            </a>
+          </div>
+        </section>
+
         <section className="bg-white p-5 sm:p-7 rounded-2xl border border-slate-200/90 shadow-xs">
           {/* Section 2 Header: Clear, Bold & Distinct */}
           <div className="pb-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mb-1">
                 <FileText className="w-3.5 h-3.5 text-emerald-600" />
-                <span>विभाग २</span>
+                <span>संदर्भ विभाग</span>
               </div>
               <h2 className="font-serifDevanagari text-xl sm:text-2xl font-black text-[#0b1e36] tracking-tight">
-                २. अधिकृत शासन निर्णय व परिपत्रके
+                शासन निर्णय (GR) व परिपत्रके (माहितीसाठी)
               </h2>
               <p className="text-base text-slate-600 mt-1">
-                महाराष्ट्र शासन, शिक्षण आयुक्तालय व शालेय शिक्षण विभागाचे अधिकृत शासन निर्णय (GR) व परिपत्रके.
+                अधिकृत शासकीय पोर्टलवरून सदस्यांच्या सोयीसाठी संकलित केलेले सार्वजनिक शासन निर्णय व परिपत्रके.
               </p>
             </div>
 

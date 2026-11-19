@@ -21,7 +21,6 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
     { id: 'circulars', label: 'शासन निर्णय व परिपत्रके' },
     { id: 'membership', label: 'सदस्यत्व नोंदणी' },
     { id: 'contact', label: 'संपर्क' },
-    { id: 'privacy', label: 'Privacy & Copyright Policy' },
   ];
 
   const handleNavClick = (id: string) => {

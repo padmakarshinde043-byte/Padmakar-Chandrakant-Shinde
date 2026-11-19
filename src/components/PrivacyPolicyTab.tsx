@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Lock, Copyright, Mail } from 'lucide-react';
+import { ShieldCheck, Lock, Copyright, Mail, ExternalLink, AlertCircle } from 'lucide-react';
 
 export const PrivacyPolicyTab: React.FC = () => {
   return (
@@ -20,7 +20,7 @@ export const PrivacyPolicyTab: React.FC = () => {
           </div>
         </div>
         <p className="text-xs sm:text-sm text-slate-500 font-medium pt-2 border-t border-slate-100">
-          शेवटचे अद्यतन: 18 नोव्हेंबर 2026
+          शेवटचे अद्यतन: 19 नोव्हेंबर 2026
         </p>
       </div>
 
@@ -108,12 +108,71 @@ export const PrivacyPolicyTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Part 3: Contact Us */}
+        {/* Part 3: Non-Government Disclaimer & Official Sources (Google Play Compliance) */}
+        <div className="space-y-4 pt-4 border-t border-slate-200">
+          <div className="flex items-center gap-2.5 text-[#0b1e36]">
+            <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
+            <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold">
+              भाग 3: अस्वीकरण व शासकीय माहितीचे स्त्रोत (Disclaimer &amp; Sources of Government Information)
+            </h2>
+          </div>
+
+          <div className="bg-amber-50/70 border border-amber-300 rounded-xl p-4 sm:p-5 space-y-3 text-slate-800 text-xs sm:text-sm leading-relaxed">
+            <p>
+              <strong>शासकीय संलग्नता नसल्याचे स्पष्ट अस्वीकरण:</strong> हे ॲप व संकेतस्थळ (<strong>mahasangh.in</strong>) कोणत्याही सरकारी संस्थेचे, मंत्रालयाचे, शिक्षण विभागाचे किंवा महाराष्ट्र शासनाचे अधिकृत ॲप नाही आणि आम्ही कोणत्याही सरकारी संस्थेचे प्रतिनिधित्व करत नाही. हे केवळ <strong>महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</strong> (श्रमिक संघ नोंदणी क्र. महा/एनएसके/एन/2427) या नोंदणीकृत कर्मचारी संघटनेचे सदस्यांच्या माहिती, संवाद आणि संदर्भासाठी तयार केलेले स्वतंत्र व्यासपीठ आहे.
+            </p>
+            <p className="text-slate-700">
+              <strong>Non-Government Affiliation Disclaimer (English):</strong> This application and website do <strong>NOT</strong> represent any government entity and are not affiliated with, authorized by, or endorsed by the Government of Maharashtra or any government department. This is an independent platform of the registered employees&apos; association &ldquo;Maharashtra State Federation of Centre Heads and Officers&rdquo; (Trade Union Reg. No. Maha/NSK/N/2427).
+            </p>
+            <div className="pt-2 border-t border-amber-200 space-y-1.5">
+              <div className="font-bold text-[#0b1e36]">
+                शासकीय परिपत्रके व GR माहितीचे अधिकृत मूळ स्त्रोत (Official Public Sources of Government Information):
+              </div>
+              <ul className="space-y-1.5 pl-1">
+                <li>
+                  <a
+                    href="https://gr.maharashtra.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span>https://gr.maharashtra.gov.in — महाराष्ट्र शासन निर्णय (GR) अधिकृत पोर्टल</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://education.maharashtra.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span>https://education.maharashtra.gov.in — शालेय शिक्षण व क्रीडा विभाग, महाराष्ट्र शासन</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://www.maharashtra.gov.in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                    <span>https://www.maharashtra.gov.in — महाराष्ट्र शासन अधिकृत संकेतस्थळ</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Part 4: Contact Us */}
         <div className="space-y-4 pt-4 border-t border-slate-200">
           <div className="flex items-center gap-2.5 text-[#0b1e36]">
             <Mail className="w-5 h-5 text-amber-700 shrink-0" />
             <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold">
-              भाग 3: संपर्क साधा (Contact Us)
+              भाग 4: संपर्क साधा (Contact Us)
             </h2>
           </div>
 
