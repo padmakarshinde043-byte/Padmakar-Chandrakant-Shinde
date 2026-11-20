@@ -49,16 +49,19 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
           aria-label="महासंघ मुख्यपृष्ठ"
         >
           <div className="relative">
-            <img
-              src="/logo.png"
-              alt="महासंघ अधिकृत मानचिन्ह"
-              width="72"
-              height="72"
-              loading="eager"
-              decoding="async"
-              {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
-              className="w-12 h-12 min-[380px]:w-14 min-[380px]:h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 object-contain rounded-full ring-2 ring-amber-500 shadow-md group-hover:scale-105 transition-transform bg-white"
-            />
+            <picture>
+              <source srcSet="/logo-opt.webp" type="image/webp" />
+              <img
+                src="/logo.png"
+                alt="महासंघ अधिकृत मानचिन्ह"
+                width="80"
+                height="80"
+                loading="eager"
+                decoding="async"
+                {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
+                className="w-12 h-12 min-[380px]:w-14 min-[380px]:h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 object-contain rounded-full ring-2 ring-amber-500 shadow-md group-hover:scale-105 transition-transform bg-white"
+              />
+            </picture>
             <span
               className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-600 border-2 border-white rounded-full"
               title="अधिकृत नोंदणीकृत"

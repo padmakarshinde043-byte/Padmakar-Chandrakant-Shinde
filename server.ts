@@ -3441,10 +3441,16 @@ async function startServer() {
           const normalized = filePath.replace(/\\/g, '/');
           if (normalized.includes('/assets/')) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-          } else if (normalized.endsWith('/index.html')) {
+          } else if (
+            normalized.endsWith('/index.html') ||
+            normalized.endsWith('/sw.js') ||
+            normalized.endsWith('/registerSW.js')
+          ) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          } else if (/\.(?:webp|png|jpe?g|svg|ico|woff2?|avif)$/i.test(normalized)) {
+            res.setHeader('Cache-Control', 'public, max-age=2592000');
           } else {
-            res.setHeader('Cache-Control', 'public, max-age=3600');
+            res.setHeader('Cache-Control', 'public, max-age=86400');
           }
         },
       })

@@ -6,6 +6,7 @@ import {
 } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { getSharpLogoDataUrl } from '../services/rkPdfGenerator';
+import { ensureMontserratFontLoaded } from '../utils/imageOptimize';
 
 interface MembershipIdCardPreviewProps {
   app: Partial<MembershipApplication> & {
@@ -23,6 +24,7 @@ export const MembershipIdCardPreview: React.FC<MembershipIdCardPreviewProps> = (
   const [sharpLogoUrl, setSharpLogoUrl] = useState<string>('/logo.png');
 
   useEffect(() => {
+    ensureMontserratFontLoaded();
     let active = true;
     getSharpLogoDataUrl(560)
       .then((url) => {

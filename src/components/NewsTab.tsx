@@ -4,6 +4,7 @@ import { Calendar, Tag, ArrowRight, X, Search, FileText, RefreshCw, ChevronRight
 import { NewsItem, GovOrder, INITIAL_GOV_ORDERS, INITIAL_NEWS } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { sortNewsDescending, parseNewsDateMs } from '../firebase';
+import { optimizeCloudinaryImageUrl } from '../utils/imageOptimize';
 
 interface NewsTabProps {
   mode?: 'news' | 'circulars';
@@ -223,10 +224,11 @@ export const NewsTab: React.FC<NewsTabProps> = ({
                         {imgUrl && (
                           <div className="w-full h-44 bg-slate-900/5 relative overflow-hidden border-b border-slate-200">
                             <img
-                              src={imgUrl}
+                              src={optimizeCloudinaryImageUrl(imgUrl, 640)}
                               alt={news.title}
                               className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
                               loading="lazy"
+                              decoding="async"
                             />
                             <div className="absolute top-2.5 right-2.5 bg-black/75 backdrop-blur-xs text-white text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
                               <ImageIcon className="w-3 h-3 text-amber-400" />
@@ -446,10 +448,11 @@ export const NewsTab: React.FC<NewsTabProps> = ({
               {(selectedNews.imageUrl || selectedNews.image) && (
                 <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 shadow-xs">
                   <img
-                    src={selectedNews.imageUrl || selectedNews.image}
+                    src={optimizeCloudinaryImageUrl(selectedNews.imageUrl || selectedNews.image, 1100)}
                     alt={selectedNews.title}
                     className="w-full max-h-[440px] object-contain mx-auto bg-slate-950/5"
                     loading="lazy"
+                    decoding="async"
                   />
                   <div className="p-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs sm:text-sm text-slate-700">
                     <span className="font-semibold text-slate-600 flex items-center gap-1.5">

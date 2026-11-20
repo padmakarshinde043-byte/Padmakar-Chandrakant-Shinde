@@ -26,21 +26,22 @@
       }
     </script>
 
-    <!-- Preconnect & non-blocking Google Fonts -->
+    <!-- Preconnect & non-blocking Google Fonts (Home page Devanagari fonts preserved intact) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
     <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
-    <link rel="preload" as="image" href="/logo.png" fetchpriority="high" />
+    <link rel="preload" as="image" href="/logo-opt.webp" type="image/webp" fetchpriority="high" />
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Rozha+One&family=Yatra+One&family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&family=Rozha+One&family=Yatra+One&family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700;800;900&family=Noto+Serif+Devanagari:wght@600;700;800;900&display=swap"
       />
     </noscript>
     <style>
@@ -101,7 +102,7 @@
   <body class="bg-slate-50 text-slate-900 font-devanagari antialiased selection:bg-amber-200" oncontextmenu="return false;">
     <div id="root">
       <div id="mhs-boot-shell" aria-label="वेबसाईट लोड होत आहे">
-        <img id="mhs-boot-logo" src="/logo.png" alt="महासंघ मानचिन्ह" width="72" height="72" />
+        <img id="mhs-boot-logo" src="/logo-opt.webp" onerror="this.onerror=null;this.src='/logo.png';" alt="महासंघ मानचिन्ह" width="72" height="72" />
         <p id="mhs-boot-title">केंद्रप्रमुख व अधिकारी महासंघ</p>
         <p id="mhs-boot-sub">महाराष्ट्र राज्य</p>
         <div id="mhs-boot-bar"><span></span></div>

@@ -25,6 +25,7 @@
 import type { jsPDF as JsPdfType } from 'jspdf';
 import QRCode from 'qrcode';
 import { OfficialMember, formatAppointedPostWithTaluka } from '../data/rkMaharashtraData';
+import { ensureMontserratFontLoaded } from '../utils/imageOptimize';
 
 async function loadPdfEngines() {
   const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
@@ -486,6 +487,7 @@ function getWorkingPlaceDisplay(m: OfficialMember): { cadre: string; details: st
 const DEFAULT_ORG_TITLE = 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ';
 
 async function waitForFontsAndImages(root: HTMLElement): Promise<void> {
+  ensureMontserratFontLoaded();
   if (typeof document !== 'undefined' && (document as any).fonts) {
     try {
       await Promise.allSettled([

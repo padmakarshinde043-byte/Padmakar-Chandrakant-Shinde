@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowRight, ShieldCheck, Users, School, Award, ChevronRight,
-  FileText, Phone, CheckCircle2, BookOpen, Scale, Sparkles, AlertCircle,
-  X
+  ArrowRight, ShieldCheck, Users, School, Award,
+  FileText, Phone, X
 } from 'lucide-react';
-import { ORG_DETAILS, CORE_PRINCIPLES, INITIAL_NEWS, NewsItem, LatestBannerItem } from '../data/mahasanghData';
+import { ORG_DETAILS, NewsItem, LatestBannerItem } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
 import { AnimatedCounter } from '../utils/animations';
-import { sortNewsDescending } from '../firebase';
+import { optimizeCloudinaryImageUrl } from '../utils/imageOptimize';
 
 interface HomeTabProps {
   setCurrentTab: (tab: string) => void;
@@ -39,12 +38,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
     }
   }, [fullScreenPhoto]);
 
-  const list = useMemo(
-    () => sortNewsDescending(newsList && newsList.length > 0 ? newsList : INITIAL_NEWS),
-    [newsList]
-  );
-  const recentNews = list.slice(0, 6);
-
   return (
     <div className="bg-slate-50 text-slate-800">
       {/* Hero Section: Compact, Executive Asymmetric Portal */}
@@ -52,7 +45,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
         {/* Subtle architectural background texture */}
         <div
           className="absolute inset-0 opacity-10 bg-cover bg-center pointer-events-none mix-blend-overlay"
-          style={{ backgroundImage: `url('/heding.jpg')` }}
+          style={{ backgroundImage: `url('/heding.webp')` }}
         />
         <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -163,14 +156,19 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               </div>
 
               <div className="flex items-center gap-3.5 mb-3">
-                <img
-                  src="/president.jpg"
-                  alt={ORG_DETAILS.founderPresident.name}
-                  loading="eager"
-                  decoding="async"
-                  {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover object-center ring-2 ring-amber-500 shadow-md shrink-0 bg-white"
-                />
+                <picture className="shrink-0">
+                  <source srcSet="/president.webp" type="image/webp" />
+                  <img
+                    src="/president.jpg"
+                    alt={ORG_DETAILS.founderPresident.name}
+                    width="80"
+                    height="80"
+                    loading="eager"
+                    decoding="async"
+                    {...({ fetchpriority: 'high' } as React.ImgHTMLAttributes<HTMLImageElement>)}
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover object-center ring-2 ring-amber-500 shadow-md shrink-0 bg-white"
+                  />
+                </picture>
                 <div>
                   <span className="text-xs sm:text-sm font-bold text-amber-400 tracking-wide block">
                     {ORG_DETAILS.founderPresident.role}
@@ -571,15 +569,19 @@ function LatestUpdatesCarousel({ banners, setFullScreenPhoto }: { banners: Lates
         </div>
 
         {/* मधला भाग: छायाचित्र किंवा इनलाईन शॉर्ट व्हिडिओ (Zero external player, plays inline) */}
-        <div className="relative w-full bg-slate-950/5 flex items-center justify-center">
+        <div className="relative w-full min-h-[220px] sm:min-h-[280px] bg-slate-950/5 flex items-center justify-center">
           {current.mediaType === 'video' || current.videoUrl ? (
             <div className="w-full flex items-center justify-center p-2 bg-black/90">
               <video
                 src={current.videoUrl || current.imageUrl}
                 controls
                 playsInline
-                preload="metadata"
-                poster={current.imageUrl && current.imageUrl !== current.videoUrl ? current.imageUrl : undefined}
+                preload="none"
+                poster={
+                  current.imageUrl && current.imageUrl !== current.videoUrl
+                    ? optimizeCloudinaryImageUrl(current.imageUrl, 960)
+                    : undefined
+                }
                 className="w-full h-auto max-h-[75vh] object-contain mx-auto block rounded"
               >
                 आपला ब्राऊझर या व्हिडिओला सपोर्ट करत नाही.
@@ -591,10 +593,11 @@ function LatestUpdatesCarousel({ banners, setFullScreenPhoto }: { banners: Lates
               className="w-full flex items-center justify-center cursor-pointer p-2"
             >
               <img
-                src={imgUrl}
+                src={optimizeCloudinaryImageUrl(imgUrl, 960)}
                 alt={current.title || 'ताज्या घडामोडी'}
                 className="w-full h-auto max-h-[75vh] object-contain mx-auto block"
-                loading="eager"
+                loading="lazy"
+                decoding="async"
               />
             </div>
           )}

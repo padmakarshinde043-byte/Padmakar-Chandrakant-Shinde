@@ -114,7 +114,6 @@ import {
   shouldRemoveFromCacheOnDelete,
   normalizePhone10,
 } from './utils/applicationCleanup';
-import { fetchDynamicLeaders, fetchOfficials, fetchAppointedPosts } from './services/rkFirebaseService';
 
 function isPathAdminRoute(): boolean {
   if (typeof window === 'undefined') return false;
@@ -306,25 +305,40 @@ export function App() {
     };
   }, []);
 
-  // On initial mount (and when switching from /admin or /center-update to public site): load cached data cleanly without blocking UI
+  // On initial mount (and when switching from /admin or /center-update to public site):
+  // Immediately load only Home-critical data (banners + member count) and defer secondary tab prefetches
+  // to browser idle time so FCP/LCP/TBT stay fast with zero network waterfall congestion.
   const hasLoadedPublicStartupRef = React.useRef(false);
+  const hasLoadedNewsAndOrdersRef = React.useRef(false);
+
+  const loadSecondaryPublicData = React.useCallback(() => {
+    if (hasLoadedNewsAndOrdersRef.current) return;
+    hasLoadedNewsAndOrdersRef.current = true;
+    Promise.allSettled([fetchNewsCached(false), fetchGovOrders(false)])
+      .then(([newsRes, govRes]) => {
+        if (newsRes.status === 'fulfilled') setNewsList(newsRes.value);
+        if (govRes.status === 'fulfilled') setGovOrders(govRes.value);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (currentTab === 'news' || currentTab === 'circulars') {
+      loadSecondaryPublicData();
+    }
+  }, [currentTab, loadSecondaryPublicData]);
+
   useEffect(() => {
     if (currentTab === 'admin' || currentTab === 'center_update' || hasLoadedPublicStartupRef.current) return;
     hasLoadedPublicStartupRef.current = true;
 
-    testConnectionOncePerSession().catch(() => {});
-
-    // Load banners, news, gov orders, and lightweight count in parallel
+    // 1. Critical Home data only (above-the-fold count + latest banners)
     Promise.allSettled([
       fetchLatestBannersCached(false),
-      fetchNewsCached(false),
-      fetchGovOrders(false),
       getRegisteredMembersCountOncePerSession(),
     ])
-      .then(([bannerRes, newsRes, govRes, countRes]) => {
+      .then(([bannerRes, countRes]) => {
         if (bannerRes.status === 'fulfilled' && Array.isArray(bannerRes.value)) setLatestBanners(bannerRes.value);
-        if (newsRes.status === 'fulfilled') setNewsList(newsRes.value);
-        if (govRes.status === 'fulfilled') setGovOrders(govRes.value);
         if (countRes.status === 'fulfilled' && typeof countRes.value === 'number') {
           setRegisteredMembersCount(countRes.value);
         }
@@ -333,11 +347,30 @@ export function App() {
         console.warn('Data init error:', err);
       });
 
-    // Prefetch secondary leadership/officials data immediately
-    fetchDynamicLeaders(false).catch(() => {});
-    fetchOfficials(false).catch(() => {});
-    fetchAppointedPosts(false).catch(() => {});
-  }, [currentTab]);
+    // 2. Defer non-critical background prefetches until browser is idle
+    const runDeferredPrefetches = () => {
+      testConnectionOncePerSession().catch(() => {});
+      loadSecondaryPublicData();
+      import('./services/rkFirebaseService')
+        .then(({ fetchDynamicLeaders, fetchOfficials, fetchAppointedPosts }) => {
+          fetchDynamicLeaders(false).catch(() => {});
+          fetchOfficials(false).catch(() => {});
+          fetchAppointedPosts(false).catch(() => {});
+        })
+        .catch(() => {});
+    };
+
+    const w = window as unknown as {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (typeof w.requestIdleCallback === 'function') {
+      const idleId = w.requestIdleCallback(runDeferredPrefetches, { timeout: 2400 });
+      return () => w.cancelIdleCallback?.(idleId);
+    }
+    const timerId = window.setTimeout(runDeferredPrefetches, 2000);
+    return () => window.clearTimeout(timerId);
+  }, [currentTab, loadSecondaryPublicData]);
 
   useEffect(() => {
     // Listen to photo hydration across components

@@ -75,12 +75,30 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
       }
     };
 
-    syncStats();
+    const scheduleInitialSync = () => {
+      const w = window as unknown as {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      };
+      if (typeof w.requestIdleCallback === 'function') {
+        const idleId = w.requestIdleCallback(() => {
+          if (isMounted) syncStats();
+        }, { timeout: 1800 });
+        return () => w.cancelIdleCallback?.(idleId);
+      }
+      const timerId = window.setTimeout(() => {
+        if (isMounted) syncStats();
+      }, 1400);
+      return () => window.clearTimeout(timerId);
+    };
+
+    const cancelInitialSync = scheduleInitialSync();
     scheduleMidnightReset();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       isMounted = false;
+      cancelInitialSync();
       if (midnightTimer) window.clearTimeout(midnightTimer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
