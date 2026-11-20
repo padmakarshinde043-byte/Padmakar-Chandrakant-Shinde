@@ -115,38 +115,17 @@ import {
   shouldRemoveFromCacheOnDelete,
   normalizePhone10,
 } from './utils/applicationCleanup';
-
-function isPathAdminRoute(): boolean {
-  if (typeof window === 'undefined') return false;
-  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase();
-  const hash = window.location.hash.toLowerCase();
-  return path === '/admin' || hash === '#admin' || hash === '#/admin';
-}
-
-function isPathCenterUpdateRoute(): boolean {
-  if (typeof window === 'undefined') return false;
-  const path = window.location.pathname.replace(/\/+$/, '').toLowerCase();
-  const hash = window.location.hash.toLowerCase();
-  return (
-    path === '/center-update' ||
-    path === '/kendra-update' ||
-    hash === '#center-update' ||
-    hash === '#/center-update' ||
-    hash === '#kendra-update' ||
-    hash === '#/kendra-update'
-  );
-}
-
-function resolveInitialTab(): string {
-  if (isPathAdminRoute()) return 'admin';
-  if (isPathCenterUpdateRoute()) return 'center_update';
-  return 'home';
-}
+import {
+  resolveTabFromLocation,
+  normalizeTabId,
+  syncBrowserUrlForTab,
+  syncDocumentMetaForTab,
+} from './utils/routes';
 
 export function App() {
-  const [currentTab, setCurrentTab] = useState<string>(() => resolveInitialTab());
+  const [currentTab, setCurrentTabState] = useState<string>(() => resolveTabFromLocation());
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => ({
-    [resolveInitialTab()]: true,
+    [resolveTabFromLocation()]: true,
   }));
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
@@ -155,11 +134,24 @@ export function App() {
     getCachedRegisteredMembersCountSync()
   );
 
-  // Track visited tabs so only active/visited tabs mount on mobile (eliminates heavy startup DOM & network burst)
+  // Unified tab navigation: updates React state AND pushes clean page URL to browser address bar
+  const navigateToTab = React.useCallback((nextTab: string) => {
+    const normalized = normalizeTabId(nextTab);
+    setCurrentTabState(normalized);
+    syncBrowserUrlForTab(normalized, 'push');
+  }, []);
+
+  // Track visited tabs, keep document <title> + canonical link synced, and normalize legacy hash routes
   useEffect(() => {
-    const normalized = currentTab === 'objectives' ? 'about' : currentTab;
+    const normalized = normalizeTabId(currentTab);
     setVisitedTabs((prev) => (prev[normalized] ? prev : { ...prev, [normalized]: true }));
+    syncDocumentMetaForTab(normalized);
   }, [currentTab]);
+
+  // On initial mount, normalize any legacy hash or alias path (e.g. /#admin, /#/membership) to its clean URL
+  useEffect(() => {
+    syncBrowserUrlForTab(resolveTabFromLocation(), 'replace');
+  }, []);
 
   // Applications state (Starts from local storage, defaults to empty array)
   const [applications, setApplications] = useState<MembershipApplication[]>(() => {
@@ -234,16 +226,11 @@ export function App() {
     });
   };
 
-  // Listen to browser URL changes (e.g. /admin, /center-update)
+  // Listen to browser Back/Forward (popstate) and hashchange events across all pages
   useEffect(() => {
     const handleLocationChange = () => {
-      if (isPathAdminRoute()) {
-        setCurrentTab('admin');
-      } else if (isPathCenterUpdateRoute()) {
-        setCurrentTab('center_update');
-      } else if (currentTab === 'admin' || currentTab === 'center_update') {
-        setCurrentTab('home');
-      }
+      const resolved = resolveTabFromLocation();
+      setCurrentTabState(resolved);
     };
 
     window.addEventListener('popstate', handleLocationChange);
@@ -252,7 +239,7 @@ export function App() {
       window.removeEventListener('popstate', handleLocationChange);
       window.removeEventListener('hashchange', handleLocationChange);
     };
-  }, [currentTab]);
+  }, []);
 
   // Global Right Click & Copy (Ctrl+C / Selection) Protection across website
   useEffect(() => {
@@ -439,17 +426,7 @@ export function App() {
 
   // Exit Admin or standalone Center Update page to Main Public Website
   const handleExitAdmin = () => {
-    setCurrentTab('home');
-    const pathLower = window.location.pathname.toLowerCase();
-    if (pathLower === '/admin' || pathLower === '/center-update' || pathLower === '/kendra-update') {
-      window.history.pushState(null, '', '/');
-    } else if (
-      window.location.hash.toLowerCase().includes('admin') ||
-      window.location.hash.toLowerCase().includes('center-update') ||
-      window.location.hash.toLowerCase().includes('kendra-update')
-    ) {
-      window.history.pushState(null, '', window.location.pathname);
-    }
+    navigateToTab('home');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -727,7 +704,7 @@ export function App() {
 
   const handleSelectNews = (news: NewsItem) => {
     setSelectedNews(news);
-    setCurrentTab('news');
+    navigateToTab('news');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -781,7 +758,7 @@ export function App() {
     <div className="min-h-screen flex flex-col bg-[#fbf8f2] text-[#102a43]">
       <Header
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={navigateToTab}
         onPrefetchTab={prefetchTabChunk}
       />
 
@@ -789,7 +766,7 @@ export function App() {
         {(visitedTabs.home || currentTab === 'home') && (
           <div className={currentTab === 'home' ? 'block mhs-tab-enter' : 'hidden'}>
             <HomeTab
-              setCurrentTab={setCurrentTab}
+              setCurrentTab={navigateToTab}
               onSelectNews={handleSelectNews}
               newsList={newsList}
               latestBanners={latestBanners}
@@ -801,17 +778,17 @@ export function App() {
         <Suspense fallback={<TabLoadingFallback />}>
           {(visitedTabs.about || currentTab === 'about' || currentTab === 'objectives') && (
             <div className={currentTab === 'about' || currentTab === 'objectives' ? 'block mhs-tab-enter' : 'hidden'}>
-              <AboutTab setCurrentTab={setCurrentTab} />
+              <AboutTab setCurrentTab={navigateToTab} />
             </div>
           )}
           {(visitedTabs.leadership || currentTab === 'leadership') && (
             <div className={currentTab === 'leadership' ? 'block mhs-tab-enter' : 'hidden'}>
-              <LeadershipTab setCurrentTab={setCurrentTab} />
+              <LeadershipTab setCurrentTab={navigateToTab} />
             </div>
           )}
           {(visitedTabs.district_leadership || currentTab === 'district_leadership') && (
             <div className={currentTab === 'district_leadership' ? 'block mhs-tab-enter' : 'hidden'}>
-              <DistrictLeadershipTab setCurrentTab={setCurrentTab} />
+              <DistrictLeadershipTab setCurrentTab={navigateToTab} />
             </div>
           )}
           {(visitedTabs.advisory || currentTab === 'advisory') && (
@@ -874,7 +851,7 @@ export function App() {
         </Suspense>
       </main>
 
-      <Footer setCurrentTab={setCurrentTab} />
+      <Footer setCurrentTab={navigateToTab} />
       <OfflineIndicator />
     </div>
   );
