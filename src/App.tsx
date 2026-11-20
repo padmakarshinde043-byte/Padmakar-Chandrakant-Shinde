@@ -52,6 +52,7 @@ const prefetchTabChunk = (tabId: string) => {
       break;
     case 'membership':
       loadMembershipTab();
+      fetchApprovedMembersCached(false).catch(() => {});
       break;
     case 'contact':
       loadContactTab();
@@ -429,6 +430,7 @@ export function App() {
         .then((approved) => {
           if (Array.isArray(approved)) {
             setApplications(approved);
+            setRegisteredMembersCount(approved.length);
           }
         })
         .catch((err) => console.warn('Public approved members cache load notice:', err));
@@ -852,6 +854,7 @@ export function App() {
             <div className={currentTab === 'membership' ? 'block mhs-tab-enter' : 'hidden'}>
               <MembershipTab
                 applications={applications}
+                registeredMembersCount={registeredMembersCount}
                 onAddApplication={handleAddApplication}
                 onTrackRemote={handleTrackRemote}
                 onPurgeLocalContact={handlePurgeLocalContact}

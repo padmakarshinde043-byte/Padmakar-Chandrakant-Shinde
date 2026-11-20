@@ -1013,12 +1013,63 @@ export async function syncMemberCounter(highestKnownCount: number): Promise<void
   }
 }
 
+const APPROVED_DIRECTORY_CACHE_KEY = 'mahasangh_approved_directory_cache_v2';
+const REGISTERED_COUNT_CACHE_KEY = 'mahasangh_registered_count_cache_v1';
+
+function compactApprovedForCache(apps: MembershipApplication[]): MembershipApplication[] {
+  return apps.map((a) => ({
+    id: a.id,
+    applicationNumber: a.applicationNumber || '',
+    salutation: a.salutation,
+    fullName: a.fullName,
+    phone: '',
+    email: '',
+    address: '',
+    district: a.district,
+    taluka: a.taluka,
+    centerName: a.centerName,
+    education: '',
+    professional: a.professional,
+    status: a.status || 'approved',
+    memberNumber: a.memberNumber,
+    approvedAt: a.approvedAt,
+    createdAt: a.createdAt,
+    isOfficial: a.isOfficial,
+    officialPost: a.officialPost,
+    officialTaluka: a.officialTaluka,
+    officialDistrict: a.officialDistrict,
+  }));
+}
+
+function persistCompactApprovedDirectory(items: MembershipApplication[]): void {
+  try {
+    if (typeof localStorage === 'undefined' || !Array.isArray(items)) return;
+    const compact = compactApprovedForCache(items);
+    safeStorageSetItem(localStorage, APPROVED_DIRECTORY_CACHE_KEY, JSON.stringify(compact), [
+      ADMIN_APPS_CACHE_KEY,
+      'mahasangh_approved_members_cache_v1',
+      'mahasangh_dynamic_leadership_v1',
+      'rk2026_officials_cache_v1',
+    ]);
+  } catch {}
+}
+
 export function getCachedApprovedMembersSync(): MembershipApplication[] | null {
   if (approvedMembersCache && approvedMembersCache.length > 0) {
     return approvedMembersCache;
   }
+  const savedDir = safeStorageGet(APPROVED_DIRECTORY_CACHE_KEY);
+  if (savedDir) {
+    try {
+      const parsed = JSON.parse(savedDir);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    } catch {}
+  }
   const apps = loadLocalApplications();
-  return apps.filter((a) => a.status === 'approved');
+  const approvedFromLocal = apps.filter((a) => a.status === 'approved');
+  return approvedFromLocal.length > 0 ? approvedFromLocal : null;
 }
 
 let approvedMembersCache: MembershipApplication[] | null = null;
@@ -1028,6 +1079,10 @@ let approvedMembersLastFetchedAt = 0;
 let registeredCountCache: number | null = null;
 let registeredCountInFlight: Promise<number> | null = null;
 
+export function hasLiveApprovedDirectoryLoaded(): boolean {
+  return approvedMembersLastFetchedAt > 0;
+}
+
 export function invalidateApprovedMembersClientCache(): void {
   approvedMembersCache = null;
   approvedMembersLastFetchedAt = 0;
@@ -1035,7 +1090,8 @@ export function invalidateApprovedMembersClientCache(): void {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('mahasangh_approved_members_cache_v1');
-      localStorage.removeItem('mahasangh_registered_count_cache_v1');
+      localStorage.removeItem(APPROVED_DIRECTORY_CACHE_KEY);
+      localStorage.removeItem(REGISTERED_COUNT_CACHE_KEY);
     }
   } catch {}
 }
@@ -1063,6 +1119,8 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
           approvedMembersCache = res.items;
           approvedMembersLastFetchedAt = Date.now();
           registeredCountCache = res.items.length;
+          safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(res.items.length));
+          persistCompactApprovedDirectory(res.items);
           return res.items;
         }
       } catch {}
@@ -1073,6 +1131,8 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
     approvedMembersCache = approved;
     approvedMembersLastFetchedAt = Date.now();
     registeredCountCache = approved.length;
+    safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(approved.length));
+    persistCompactApprovedDirectory(approved);
     return approved;
   })().finally(() => {
     approvedMembersInFlight = null;
@@ -1086,13 +1146,21 @@ export async function fetchApprovedMembersCached(forceRefresh = false): Promise<
 
 export function getCachedRegisteredMembersCountSync(): number | null {
   if (typeof registeredCountCache === 'number') return registeredCountCache;
-  const cachedCount = safeStorageGet('mahasangh_registered_count_cache_v1');
+  const cachedCount = safeStorageGet(REGISTERED_COUNT_CACHE_KEY);
   if (cachedCount !== null) {
     const parsed = Number(cachedCount);
     if (Number.isFinite(parsed) && parsed >= 0) return parsed;
   }
+  const savedDir = safeStorageGet(APPROVED_DIRECTORY_CACHE_KEY);
+  if (savedDir) {
+    try {
+      const parsed = JSON.parse(savedDir);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.length;
+    } catch {}
+  }
   const apps = loadLocalApplications();
-  return apps.filter((a) => a.status === 'approved').length;
+  const approvedCount = apps.filter((a) => a.status === 'approved').length;
+  return approvedCount > 0 ? approvedCount : null;
 }
 
 export async function getRegisteredMembersCountOncePerSession(): Promise<number> {
@@ -1109,7 +1177,7 @@ export async function getRegisteredMembersCountOncePerSession(): Promise<number>
         const res = await sqlApiRequest<{ count: number }>('/api/db/applications/approved-count');
         if (typeof res?.count === 'number' && res.count >= 0) {
           registeredCountCache = res.count;
-          safeStorageSet('mahasangh_registered_count_cache_v1', String(res.count));
+          safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(res.count));
           return res.count;
         }
       } catch {}
@@ -1142,6 +1210,8 @@ export function addApprovedMemberToCache(app: MembershipApplication): void {
     }
     approvedMembersLastFetchedAt = Date.now();
     registeredCountCache = approvedMembersCache.length;
+    safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(approvedMembersCache.length));
+    persistCompactApprovedDirectory(approvedMembersCache);
   } else {
     approvedMembersLastFetchedAt = 0;
     registeredCountCache = null;
@@ -1170,6 +1240,8 @@ export function removeMemberFromCaches(identifier: string): void {
         toEnglishDigits(a.memberNumber || '').toLowerCase() !== term
     );
     registeredCountCache = approvedMembersCache.length;
+    safeStorageSet(REGISTERED_COUNT_CACHE_KEY, String(approvedMembersCache.length));
+    persistCompactApprovedDirectory(approvedMembersCache);
   }
 }
 

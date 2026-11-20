@@ -3,7 +3,13 @@ import { Search, Users, Filter, MapPin, RefreshCw, ArrowUpDown, Check } from 'lu
 import { MembershipApplication, MAHARASHTRA_DISTRICTS } from '../data/mahasanghData';
 import { DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import { toEnglishDigits } from '../utils/formatters';
-import { fetchApprovedMembersCached, getCachedApprovedMembersSync } from '../firebase';
+import {
+  fetchApprovedMembersCached,
+  getCachedApprovedMembersSync,
+  getCachedRegisteredMembersCountSync,
+  getRegisteredMembersCountOncePerSession,
+  hasLiveApprovedDirectoryLoaded,
+} from '../firebase';
 import {
   RegisteredMemberItem,
   DirectorySortOrder,
@@ -15,6 +21,7 @@ export type { RegisteredMemberItem };
 
 interface RegisteredMembersDirectoryProps {
   applications: MembershipApplication[];
+  registeredMembersCount?: number | null;
   onRefreshFromFirebase?: () => Promise<void> | void;
 }
 
@@ -23,6 +30,7 @@ const LOAD_MORE_STEP = 150;
 
 export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProps> = ({
   applications: propApplications,
+  registeredMembersCount,
   onRefreshFromFirebase
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,14 +66,40 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     });
   }, [propApplications]);
 
+  const [hasLiveDirectory, setHasLiveDirectory] = useState<boolean>(() => hasLiveApprovedDirectoryLoaded());
+  const [latestKnownCount, setLatestKnownCount] = useState<number | null>(() => {
+    if (typeof registeredMembersCount === 'number' && registeredMembersCount > 0) {
+      return registeredMembersCount;
+    }
+    return getCachedRegisteredMembersCountSync();
+  });
+
+  useEffect(() => {
+    if (typeof registeredMembersCount === 'number' && registeredMembersCount > 0) {
+      setLatestKnownCount(registeredMembersCount);
+    }
+  }, [registeredMembersCount]);
+
   // Initial mount + global approved-list sync (deduplicated network request)
   useEffect(() => {
     let isMounted = true;
+
+    // Lightweight instant count endpoint (~100ms) ensures latest count appears immediately
+    getRegisteredMembersCountOncePerSession()
+      .then((count) => {
+        if (isMounted && typeof count === 'number' && count > 0) {
+          setLatestKnownCount(count);
+        }
+      })
+      .catch(() => {});
+
     const loadApprovedApps = async () => {
       try {
         const fresh = await fetchApprovedMembersCached(false);
         if (isMounted && Array.isArray(fresh)) {
           setLocalLiveApps(fresh);
+          setHasLiveDirectory(true);
+          setLatestKnownCount(fresh.length);
         }
       } catch (err) {
         console.warn('Approved members fetch error:', err);
@@ -76,6 +110,8 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
       const customEvent = e as CustomEvent;
       if (isMounted && Array.isArray(customEvent.detail)) {
         setLocalLiveApps(customEvent.detail);
+        setHasLiveDirectory(true);
+        setLatestKnownCount(customEvent.detail.length);
       }
     };
 
@@ -109,6 +145,8 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
       ]);
       if (Array.isArray(fresh)) {
         setLocalLiveApps(fresh);
+        setHasLiveDirectory(true);
+        setLatestKnownCount(fresh.length);
         setRefreshSucceeded(true);
         if (refreshBadgeTimerRef.current) {
           window.clearTimeout(refreshBadgeTimerRef.current);
@@ -222,6 +260,12 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
     }
   };
 
+  const hasActiveFilter = Boolean(selectedDistrict || selectedTaluka || searchTerm.trim());
+  const displayedTotalCount = hasLiveDirectory
+    ? allRegisteredMembers.length
+    : Math.max(allRegisteredMembers.length, latestKnownCount ?? 0);
+  const displayedFilteredCount = hasActiveFilter ? filteredMembers.length : displayedTotalCount;
+
   return (
     <div className="bg-white rounded-md border border-slate-300 overflow-hidden mb-8">
       {/* Institutional Header Bar */}
@@ -241,7 +285,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
             <span>
               एकूण मंजूर सदस्य:{' '}
               <strong className="text-[#efb24b] font-mono text-base font-bold">
-                {allRegisteredMembers.length}
+                {displayedTotalCount}
               </strong>
             </span>
             {refreshSucceeded && (
@@ -302,7 +346,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               }}
               className="w-full text-sm pl-8 pr-3 py-2 bg-white border border-slate-300 rounded focus:outline-none focus:border-[#193568] appearance-none cursor-pointer"
             >
-              <option value="">सर्व जिल्हे ({allRegisteredMembers.length})</option>
+              <option value="">सर्व जिल्हे ({displayedTotalCount})</option>
               {MAHARASHTRA_DISTRICTS.map((d) => (
                 <option key={d} value={d}>
                   {d}
@@ -355,12 +399,12 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
         <div className="flex flex-wrap items-center gap-3 sm:gap-5">
           <div className="flex items-center gap-2 bg-[#193568] text-white px-3.5 py-1.5 rounded-lg shadow-sm">
             <span className="text-xs sm:text-sm font-bold text-amber-200">
-              {selectedDistrict || selectedTaluka || searchTerm.trim()
+              {hasActiveFilter
                 ? `${[selectedDistrict, selectedTaluka].filter(Boolean).join(' • ') || 'शोध निकाल'} (दाखवले):`
                 : 'दाखवले:'}
             </span>
             <span className="font-mono tabular-nums text-base sm:text-lg font-extrabold text-[#efb24b]">
-              {filteredMembers.length}
+              {displayedFilteredCount}
             </span>
           </div>
 
@@ -369,7 +413,7 @@ export const RegisteredMembersDirectory: React.FC<RegisteredMembersDirectoryProp
               एकूण मंजूर सदस्य:
             </span>
             <span className="font-mono tabular-nums text-base sm:text-lg font-extrabold text-[#193568]">
-              {allRegisteredMembers.length}
+              {displayedTotalCount}
             </span>
           </div>
         </div>

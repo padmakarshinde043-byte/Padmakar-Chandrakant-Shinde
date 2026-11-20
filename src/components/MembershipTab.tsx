@@ -38,6 +38,7 @@ interface MembershipTabProps {
     options?: { skipFirestore?: boolean }
   ) => Promise<void> | void;
   applications: MembershipApplication[];
+  registeredMembersCount?: number | null;
   onTrackRemote?: (query: string) => Promise<MembershipApplication | null>;
   onPurgeLocalContact?: (params: { phone?: string; email?: string; queryTerm?: string }) => void;
   initialTrackQuery?: string;
@@ -46,6 +47,7 @@ interface MembershipTabProps {
 export const MembershipTab: React.FC<MembershipTabProps> = ({
   onAddApplication,
   applications,
+  registeredMembersCount,
   onTrackRemote,
   onPurgeLocalContact,
   initialTrackQuery,
@@ -693,7 +695,10 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
         {/* 1. अधिकृत नोंदणीकृत सदस्य यादी */}
         <div ref={directorySectionRef} className="scroll-mt-24">
-          <RegisteredMembersDirectory applications={applications} />
+          <RegisteredMembersDirectory
+            applications={applications}
+            registeredMembersCount={registeredMembersCount}
+          />
         </div>
 
         {/* 2. अर्जाची स्थिती तपासा (ठळक व सहज नजरेत भरणारा विभाग — पानाच्या #193568 निळ्या व सुवर्ण रंगसंगतीशी सुसंगत) */}
