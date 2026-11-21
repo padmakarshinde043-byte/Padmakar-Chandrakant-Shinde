@@ -6,7 +6,7 @@ import {
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
-  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench
 } from 'lucide-react';
 import JSZip from 'jszip';
 import {
@@ -198,6 +198,7 @@ type AdminSubTabKey =
   | 'gov_order'
   | 'manage_admins'
   | 'contact_messages'
+  | 'maintenance'
   | 'password'
   | 'cloudinary';
 
@@ -2973,6 +2974,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageCloudinary),
     },
     {
+      key: 'maintenance',
+      label: 'Maintenance',
+      shortLabel: 'Maintain',
+      icon: <Wrench className="w-4 h-4 shrink-0 text-amber-700" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
+    },
+    {
       key: 'password',
       label: 'Password',
       shortLabel: 'Password',
@@ -3344,83 +3352,6 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    {currentUser?.isSuperAdmin && (
-                      <>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (activeCircleAction === 'resequence') {
-                                handleResequence();
-                                setActiveCircleAction(null);
-                              } else {
-                                setActiveCircleAction('resequence');
-                              }
-                            }}
-                            disabled={isResequencing}
-                            className="min-w-[40px] min-h-[40px] rounded-xl bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-2.5"
-                            title="Resequence all member numbers"
-                          >
-                            {isResequencing ? '...' : 'Resequence'}
-                          </button>
-                          {activeCircleAction === 'resequence' && (
-                            <div className="absolute left-0 sm:left-auto sm:right-0 top-11 z-30 bg-[#0b1e36] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2 border border-[#efb24b]">
-                              <span>Confirm resequence? Tap again</span>
-                              <button
-                                type="button"
-                                onClick={() => setActiveCircleAction(null)}
-                                className="text-[#efb24b] hover:text-white font-bold px-1"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (activeCircleAction === 'reset') {
-                                handleResetCounter();
-                                setActiveCircleAction(null);
-                              } else {
-                                setActiveCircleAction('reset');
-                              }
-                            }}
-                            disabled={isResettingCounter}
-                            className="min-w-[40px] min-h-[40px] rounded-xl bg-[#193568] hover:bg-[#0b1e36] text-white flex items-center justify-center text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-2.5"
-                            title="Reset counter to highest number"
-                          >
-                            {isResettingCounter ? '...' : 'Reset Counter'}
-                          </button>
-                          {activeCircleAction === 'reset' && (
-                            <div className="absolute left-0 sm:left-auto sm:right-0 top-11 z-30 bg-[#0b1e36] text-white text-xs font-bold px-3 py-2 rounded-xl shadow-xl whitespace-nowrap flex items-center gap-2 border border-[#efb24b]">
-                              <span>Reset counter? Tap again</span>
-                              <button
-                                type="button"
-                                onClick={() => setActiveCircleAction(null)}
-                                className="text-[#efb24b] hover:text-white font-bold px-1"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handlePurgeDeletedGhosts}
-                          disabled={isPurgingGhosts}
-                          className="min-h-[40px] bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-                          title="Clean rejected, deleted, and duplicate pending records"
-                        >
-                          <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
-                          <span>{isPurgingGhosts ? 'Cleaning...' : 'Clean Data'}</span>
-                        </button>
-                      </>
-                    )}
-
                     {onFetchApplications && (
                       <button
                         type="button"
@@ -8110,6 +8041,110 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   }
                 }}
               />
+            )}
+
+            {/* Super Admin Only: System & Member Number Maintenance Tools */}
+            {activeAdminSubTab === 'maintenance' && currentUser?.isSuperAdmin && (
+              <div className="bg-white p-4 sm:p-6 rounded-2xl border border-[#e7ded1] shadow-xs space-y-5">
+                <div className="border-b border-[#e7ded1] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md mb-1.5">
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Super Admin Utility</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-[#0b1e36]">
+                      Maintenance
+                    </h3>
+                    <p className="text-xs text-[#607184] mt-0.5">
+                      Occasional database utilities for member numbering and record cleanup.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 sm:p-4 flex items-start gap-3 text-xs sm:text-sm text-amber-950">
+                  <ShieldAlert className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    <strong>Caution:</strong> These maintenance operations directly update member sequence numbers, counter values, or remove deleted/duplicate pending records. Use only when specifically required; every action requires confirmation before running.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Card 1: Resequence Member Numbers */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-[#fbf8f2] border border-[#e7ded1] flex flex-col justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-100 text-amber-800">
+                        <RotateCcw className="w-4 h-4" />
+                      </span>
+                      <h4 className="text-base font-bold text-[#0b1e36]">
+                        Resequence Member Numbers
+                      </h4>
+                      <p className="text-xs text-[#607184] leading-relaxed">
+                        Re-assigns sequential member numbers across all approved applications in chronological order and synchronizes the counter.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleResequence()}
+                      disabled={isResequencing}
+                      className="w-full min-h-[42px] rounded-xl bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2 text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-3.5"
+                      title="Resequence all member numbers"
+                    >
+                      <RotateCcw className={`w-3.5 h-3.5 ${isResequencing ? 'animate-spin' : ''}`} />
+                      <span>{isResequencing ? 'Resequencing...' : 'Resequence'}</span>
+                    </button>
+                  </div>
+
+                  {/* Card 2: Reset Counter */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-[#fbf8f2] border border-[#e7ded1] flex flex-col justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-[#193568]/10 text-[#193568]">
+                        <RefreshCw className="w-4 h-4" />
+                      </span>
+                      <h4 className="text-base font-bold text-[#0b1e36]">
+                        Reset Member Counter
+                      </h4>
+                      <p className="text-xs text-[#607184] leading-relaxed">
+                        Aligns the server member counter to the actual highest approved member number so the next approval continues cleanly.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleResetCounter()}
+                      disabled={isResettingCounter}
+                      className="w-full min-h-[42px] rounded-xl bg-[#193568] hover:bg-[#0b1e36] text-white flex items-center justify-center gap-2 text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 px-3.5"
+                      title="Reset counter to highest number"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isResettingCounter ? 'animate-spin' : ''}`} />
+                      <span>{isResettingCounter ? 'Resetting...' : 'Reset Counter'}</span>
+                    </button>
+                  </div>
+
+                  {/* Card 3: Clean Data */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-[#fbf8f2] border border-[#e7ded1] flex flex-col justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-rose-100 text-rose-700">
+                        <Trash2 className="w-4 h-4" />
+                      </span>
+                      <h4 className="text-base font-bold text-[#0b1e36]">
+                        Clean Ghost & Duplicate Data
+                      </h4>
+                      <p className="text-xs text-[#607184] leading-relaxed">
+                        Permanently removes rejected, soft-deleted, and duplicate pending records while keeping all approved members untouched.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handlePurgeDeletedGhosts}
+                      disabled={isPurgingGhosts}
+                      className="w-full min-h-[42px] bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-bold px-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
+                      title="Clean rejected, deleted, and duplicate pending records"
+                    >
+                      <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
+                      <span>{isPurgingGhosts ? 'Cleaning...' : 'Clean Data'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
 
             </main>
