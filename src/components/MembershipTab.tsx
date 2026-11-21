@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   UserCheck, ShieldCheck, CheckCircle2, AlertCircle, Phone, Download, Search,
-  Upload, Image as ImageIcon, Check, ExternalLink, Mail, CreditCard
+  Upload, Image as ImageIcon, Check, ExternalLink, Mail, CreditCard, Crop
 } from 'lucide-react';
 import {
   ORG_DETAILS,
@@ -31,6 +31,7 @@ import {
 import { initiateRazorpayPayment } from '../utils/razorpay';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { deriveGenderFromSalutation } from '../utils/memberGender';
+import { PassportPhotoCropperModal } from './PassportPhotoCropperModal';
 
 interface MembershipTabProps {
   onAddApplication: (
@@ -68,11 +69,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [professional, setProfessional] = useState('');
   const [customProfessional, setCustomProfessional] = useState('');
   
-  // Passport photo (<200KB base64) with live preview
+  // Passport photo (<200KB base64) with interactive cropper & live ID card preview
   const [photoDataUrl, setPhotoDataUrl] = useState<string>('');
   const [photoSizeKb, setPhotoSizeKb] = useState<number>(0);
   const [photoError, setPhotoError] = useState<string>('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
+  const [rawCropPhotoSrc, setRawCropPhotoSrc] = useState<string>('');
+  const [showPhotoCropModal, setShowPhotoCropModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Question: आपण सध्या संघटनेचे पदाधिकारी आहात काय?
@@ -227,20 +230,46 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     return /[a-zA-Z]/.test(val || '');
   };
 
-  // Handle Photo selection: compress (<30KB) and upload to Cloudinary with automatic Base64 fallback
+  // Handle Photo selection: open interactive passport cropper locked to exact ID card aspect ratio
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhotoError('');
-    const file = e.target.files?.[0];
+    const inputEl = e.target;
+    const file = inputEl.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
       setPhotoError('कृपया वैध फोटो फाईल (JPG किंवा PNG) निवडा.');
+      inputEl.value = '';
       return;
     }
 
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const resultUrl = typeof reader.result === 'string' ? reader.result : '';
+        if (resultUrl) {
+          setRawCropPhotoSrc(resultUrl);
+          setShowPhotoCropModal(true);
+        }
+      };
+      reader.onerror = () => {
+        setPhotoError('फोटो वाचताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.');
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setPhotoError(err?.message || 'फोटो प्रोसेस करताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.');
+    } finally {
+      inputEl.value = '';
+    }
+  };
+
+  // Upload the exact cropped 360x440 passport photo
+  const handleConfirmCroppedPhoto = async (croppedFile: File) => {
+    setShowPhotoCropModal(false);
+    setPhotoError('');
     setIsUploadingPhoto(true);
     try {
-      const result = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.72);
+      const result = await uploadCompressedPhotoToCloudinaryOrFallback(croppedFile, 360, 440, 0.78);
       setPhotoDataUrl(result.urlOrBase64);
       setPhotoSizeKb(result.sizeKb);
     } catch (err: any) {
@@ -550,6 +579,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     setProfessionalQualification('');
     setProfessional('');
     setPhotoDataUrl('');
+    setRawCropPhotoSrc('');
+    setShowPhotoCropModal(false);
     setPhotoSizeKb(0);
     setIsOfficial(false);
     setOfficialDistrict('');
@@ -903,28 +934,30 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               <strong>सूचना:</strong> अर्जातील वैयक्तिक माहिती (नाव, पत्ता, केंद्राचे नाव व छंद) <strong>फक्त मराठी भाषेतच</strong> भरावी.
             </div>
 
-            {/* Passport Photo Upload & Live Preview Section */}
-            <div className="bg-slate-50 border border-slate-200 rounded-md p-4 sm:p-5">
-              <label className="font-bold text-[#193568] block mb-1 text-sm sm:text-base">
-                पासपोर्ट फोटो अपलोड करा <span className="text-[#df6b16]">*</span>
-              </label>
-              <p className="text-sm text-slate-600 mb-3 leading-relaxed">
-                अधिकृत ओळखपत्रासाठी रंगीत पासपोर्ट फोटो (JPG / PNG) निवडा; निवडताच उजवीकडे पूर्वावलोकन दिसेल.
-              </p>
+            {/* Passport Photo Upload, Interactive Crop & Live Sample ID Card Preview Section */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 sm:p-5 space-y-4">
+              <div>
+                <label className="font-bold text-[#193568] block mb-1 text-sm sm:text-base">
+                  पासपोर्ट फोटो अपलोड व सेट करा <span className="text-[#df6b16]">*</span>
+                </label>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  फोटो निवडताच स्क्रीनवर क्रॉप चौकट उघडेल. चेहरा मध्यभागी सेट करून पक्का करा; खालील नमुना आय-कार्डवर आपला फोटो जसाच्या तसा कसा दिसेल हे लगेच पाहता येईल.
+                </p>
+              </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                {/* File Upload Box */}
-                <div className="flex-1 w-full">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+                {/* Left: File Upload & Re-crop Controls */}
+                <div className="lg:col-span-5 space-y-2.5">
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="border border-dashed border-slate-400 hover:border-[#193568] bg-white rounded-md p-5 text-center cursor-pointer transition-colors hover:bg-slate-50"
+                    className="border-2 border-dashed border-slate-300 hover:border-[#193568] bg-white rounded-xl p-4 text-center cursor-pointer transition-colors hover:bg-slate-50"
                   >
                     <Upload className="w-7 h-7 text-[#193568] mx-auto mb-1.5" />
-                    <p className="text-sm sm:text-base font-semibold text-[#193568]">
-                      फोटो फाईल निवडण्यासाठी येथे क्लिक करा
+                    <p className="text-sm font-bold text-[#193568]">
+                      {photoDataUrl ? 'दुसरा फोटो निवडण्यासाठी क्लिक करा' : 'फोटो निवडण्यासाठी येथे क्लिक करा'}
                     </p>
-                    <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                      फोटो आकार स्वयंचलित ऑप्टिमाइझ करून सुरक्षित जतन केला जाईल
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      JPG / PNG · निवडल्यावर चेहरा क्रॉप करता येईल
                     </p>
                     <input
                       ref={fileInputRef}
@@ -935,48 +968,180 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     />
                   </div>
 
+                  {photoDataUrl && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!rawCropPhotoSrc) setRawCropPhotoSrc(photoDataUrl);
+                          setShowPhotoCropModal(true);
+                        }}
+                        className="flex-1 min-h-[38px] px-3 py-1.5 rounded-lg bg-[#193568] hover:bg-[#0b1e36] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                      >
+                        <Crop className="w-3.5 h-3.5 text-amber-300" />
+                        <span>फोटो पुन्हा अ‍ॅडजस्ट करा</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="min-h-[38px] px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-[#0b1e36] text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                      >
+                        <Upload className="w-3.5 h-3.5 text-[#df6b16]" />
+                        <span>बदला</span>
+                      </button>
+                    </div>
+                  )}
+
                   {isUploadingPhoto && (
-                    <p className="text-sm text-[#193568] mt-2 font-semibold">
+                    <p className="text-xs sm:text-sm text-[#193568] font-semibold">
                       फोटो प्रक्रिया सुरू आहे...
                     </p>
                   )}
                   {photoError && (
-                    <p className="text-sm text-rose-700 mt-2 font-semibold">
+                    <p className="text-xs sm:text-sm text-rose-700 font-semibold">
                       {photoError}
                     </p>
                   )}
                   {photoSizeKb > 0 && !photoError && !isUploadingPhoto && (
-                    <p className="text-sm text-emerald-700 mt-2 font-semibold flex items-center gap-1">
+                    <p className="text-xs sm:text-sm text-emerald-700 font-semibold flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" />
-                      फोटो जोडला गेला (आकार: {photoSizeKb} KB)
+                      फोटो सेट झाला (आकार: {photoSizeKb} KB)
                     </p>
                   )}
                 </div>
 
-                {/* Live Preview Box on the Right */}
-                <div className="shrink-0 flex flex-col items-center">
-                  <div className="w-32 h-40 bg-white border border-slate-300 rounded-md overflow-hidden flex items-center justify-center relative">
-                    {photoDataUrl ? (
+                {/* Right: Live Mini Sample ID Card Preview (Matches Real PDF Layout & Photo Ratio) */}
+                <div className="lg:col-span-7 flex flex-col items-center">
+                  <div className="w-full max-w-[390px] rounded-xl overflow-hidden shadow-md border border-slate-300 bg-white select-none">
+                    {/* Top Navy Header */}
+                    <div className="bg-gradient-to-r from-[#09244f] via-[#133875] to-[#0b2559] px-2.5 py-2 border-b-[2.5px] border-[#d4af37] flex items-center gap-2">
                       <img
-                        src={photoDataUrl}
-                        alt="Passport Preview"
-                        className="w-full h-full object-cover"
+                        src="/logo-opt.webp"
+                        onError={(ev) => {
+                          ev.currentTarget.onerror = null;
+                          ev.currentTarget.src = '/logo.png';
+                        }}
+                        alt="महासंघ मानचिन्ह"
+                        className="w-9 h-9 rounded-full border-2 border-[#eab308] bg-white object-contain shrink-0"
                       />
-                    ) : (
-                      <div className="text-center p-2 text-slate-400">
-                        <ImageIcon className="w-7 h-7 mx-auto mb-1 opacity-50" />
-                        <span className="text-xs sm:text-sm block leading-tight font-medium">
-                          पासपोर्ट फोटो पूर्वावलोकन
-                        </span>
+                      <div className="flex-1 text-center leading-tight pr-2">
+                        <div className="text-[9px] font-bold text-amber-300">महाराष्ट्र राज्य</div>
+                        <div className="font-serifDevanagari text-[13px] sm:text-sm font-black text-white">
+                          केंद्रप्रमुख व अधिकारी महासंघ
+                        </div>
+                        <div className="text-[8px] text-slate-200 font-semibold">
+                          नोंदणी क्र. श्रमिक संघ - महा/एनएसके/एन/2427
+                        </div>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Card Body */}
+                    <div className="p-2.5 sm:p-3 bg-gradient-to-b from-white to-slate-50/70">
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex-1 text-center pl-14">
+                          <span className="font-serifDevanagari text-[11px] sm:text-xs font-extrabold text-slate-800">
+                            आजीवन सदस्य
+                          </span>
+                        </div>
+                        <div className="text-right leading-none shrink-0">
+                          <span className="block text-[8px] font-bold text-slate-600">सदस्य क्र:</span>
+                          <span className="block text-[9px] font-mono font-black text-[#091e42]">
+                            MS/2026/XXXX
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5 sm:gap-3">
+                        {/* Exact ID Card Golden-Bordered Passport Photo Ratio (154:189 ≈ 360:440) */}
+                        <div
+                          onClick={() => {
+                            if (photoDataUrl) {
+                              if (!rawCropPhotoSrc) setRawCropPhotoSrc(photoDataUrl);
+                              setShowPhotoCropModal(true);
+                            } else {
+                              fileInputRef.current?.click();
+                            }
+                          }}
+                          title={photoDataUrl ? 'फोटो पुन्हा अ‍ॅडजस्ट करा' : 'फोटो अपलोड करा'}
+                          className="w-[74px] sm:w-[82px] aspect-[360/440] rounded-lg border-[2.5px] border-[#d4af37] bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center shadow-xs cursor-pointer relative group"
+                        >
+                          {photoDataUrl ? (
+                            <img
+                              src={photoDataUrl}
+                              alt="आय-कार्ड फोटो पूर्वावलोकन"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-center p-1 text-slate-400">
+                              <ImageIcon className="w-5 h-5 mx-auto mb-0.5 opacity-60" />
+                              <span className="text-[9px] block leading-tight font-bold">
+                                आपला फोटो
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Live Member Details */}
+                        <div className="flex-1 min-w-0 space-y-0.5 text-[10px] sm:text-[11px] leading-snug">
+                          <div className="font-serifDevanagari font-black text-[#b91c1c] text-xs sm:text-[13px] truncate">
+                            {fullName.trim()
+                              ? `${salutation} ${fullName.trim()}`
+                              : `${salutation} आपले संपूर्ण नाव`}
+                          </div>
+                          <div className="font-bold text-slate-800 truncate">
+                            पद: {professional || 'केंद्रप्रमुख'}
+                          </div>
+                          <div className="font-bold text-slate-800 truncate">
+                            कार्यक्षेत्र:{' '}
+                            {district
+                              ? taluka
+                                ? `${district} (ता. ${taluka})`
+                                : district
+                              : 'जिल्हा (ता. तालुका)'}
+                          </div>
+                          <div className="font-bold text-slate-800 truncate">
+                            मोबाईल:{' '}
+                            <span className="font-mono">
+                              {toEnglishDigits(phone).replace(/\D/g, '') || '98XXXXXXXX'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Mini QR Placeholder */}
+                        <div className="hidden xs:flex sm:flex flex-col items-center shrink-0">
+                          <div className="w-11 h-11 rounded border border-slate-300 bg-white flex items-center justify-center text-[8px] font-mono font-bold text-slate-400">
+                            QR
+                          </div>
+                          <span className="text-[7px] font-bold text-slate-600 mt-1">
+                            श्री. राजेंद्र खैरनार
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2 pt-1 border-t border-slate-200/80 flex items-center justify-between text-[8px] sm:text-[9px] font-extrabold">
+                        <span className="text-[#991b1b]">आजीवन डिजिटल आय-कार्ड (नमुना)</span>
+                        <span className="text-[#0b2559]">संस्थापक राज्याध्यक्ष स्वाक्षरी</span>
+                      </div>
+                    </div>
+
+                    {/* Bottom Gold + Navy Strip */}
+                    <div className="h-2.5 bg-gradient-to-r from-[#09244f] via-[#133875] to-[#0b2559] border-t-2 border-[#d4af37]" />
                   </div>
-                  <span className="text-xs sm:text-sm font-medium text-slate-600 mt-1.5">
-                    फोटो पूर्वावलोकन
+                  <span className="text-[11px] sm:text-xs font-semibold text-slate-600 mt-1.5 text-center">
+                    आय-कार्डवर आपला फोटो असा दिसेल (चेहरा स्पष्ट दिसत असल्याची खात्री करा)
                   </span>
                 </div>
               </div>
             </div>
+
+            {showPhotoCropModal && rawCropPhotoSrc && (
+              <PassportPhotoCropperModal
+                imageSrc={rawCropPhotoSrc}
+                language="mr"
+                onCancel={() => setShowPhotoCropModal(false)}
+                onConfirm={(croppedFile) => handleConfirmCroppedPhoto(croppedFile)}
+              />
+            )}
 
             {/* Personal Details Inputs with Strict Marathi Guidance */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm sm:text-base pt-2">

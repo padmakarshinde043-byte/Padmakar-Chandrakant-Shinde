@@ -16,6 +16,7 @@ import {
   Check,
   Sparkles,
   Building2,
+  Crop,
 } from 'lucide-react';
 import {
   MembershipApplication,
@@ -39,6 +40,7 @@ import {
   resolveMemberGender,
 } from '../utils/memberGender';
 import { isMissingCenterName } from '../utils/centerUpdateHelper';
+import { PassportPhotoCropperModal } from './PassportPhotoCropperModal';
 
 interface MemberEditManagerProps {
   applications: MembershipApplication[];
@@ -85,6 +87,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const [statusBanner, setStatusBanner] = useState<{ text: string; type: 'success' | 'error'; member?: MembershipApplication } | null>(null);
   const [photoError, setPhotoError] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [cropSourceUrl, setCropSourceUrl] = useState<string>('');
+  const [showPhotoCropModal, setShowPhotoCropModal] = useState<boolean>(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   // Safe Delete Modal State
@@ -313,15 +317,37 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       return;
     }
 
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const resultUrl = typeof reader.result === 'string' ? reader.result : '';
+        if (resultUrl) {
+          setCropSourceUrl(resultUrl);
+          setShowPhotoCropModal(true);
+        }
+      };
+      reader.onerror = () => {
+        setPhotoError('Failed to read selected image file.');
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setPhotoError('Photo error: ' + (err.message || 'Error'));
+    } finally {
+      inputEl.value = '';
+    }
+  };
+
+  const handleConfirmAdminCroppedPhoto = async (croppedFile: File) => {
+    setShowPhotoCropModal(false);
+    setPhotoError('');
     setIsUploadingPhoto(true);
     try {
-      const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.75);
+      const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(croppedFile, 360, 440, 0.78);
       setEditingMember((prev) => (prev ? { ...prev, photo: urlOrBase64 } : prev));
     } catch (err: any) {
       setPhotoError('Photo error: ' + (err.message || 'Error'));
     } finally {
       setIsUploadingPhoto(false);
-      inputEl.value = '';
     }
   };
 
@@ -1120,18 +1146,33 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       {isUploadingPhoto ? 'Uploading...' : 'Upload Photo'}
                     </button>
                     {editingMember.photo && (
-                      <button
-                        type="button"
-                        disabled={isUploadingPhoto}
-                        onClick={() => {
-                          setPhotoError('');
-                          if (photoInputRef.current) photoInputRef.current.value = '';
-                          setEditingMember((prev) => (prev ? { ...prev, photo: '' } : prev));
-                        }}
-                        className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-60"
-                      >
-                        Remove
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          disabled={isUploadingPhoto}
+                          onClick={() => {
+                            setPhotoError('');
+                            setCropSourceUrl(editingMember.photo || '');
+                            setShowPhotoCropModal(true);
+                          }}
+                          className="bg-[#193568] hover:bg-[#0b1e36] text-white font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                        >
+                          <Crop className="w-3.5 h-3.5 text-amber-300" />
+                          <span>Crop / Adjust</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUploadingPhoto}
+                          onClick={() => {
+                            setPhotoError('');
+                            if (photoInputRef.current) photoInputRef.current.value = '';
+                            setEditingMember((prev) => (prev ? { ...prev, photo: '' } : prev));
+                          }}
+                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      </>
                     )}
                     <input
                       ref={photoInputRef}
@@ -1144,6 +1185,15 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                   {photoError && <p className="text-rose-600 font-bold">{photoError}</p>}
                 </div>
               </div>
+
+              {showPhotoCropModal && cropSourceUrl && (
+                <PassportPhotoCropperModal
+                  imageSrc={cropSourceUrl}
+                  language="en"
+                  onCancel={() => setShowPhotoCropModal(false)}
+                  onConfirm={(croppedFile) => handleConfirmAdminCroppedPhoto(croppedFile)}
+                />
+              )}
 
               {/* Personal & Work Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
