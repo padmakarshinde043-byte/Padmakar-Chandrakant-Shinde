@@ -6,7 +6,7 @@ import {
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
-  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy
 } from 'lucide-react';
 import JSZip from 'jszip';
 import {
@@ -104,6 +104,11 @@ import {
   restorePersistentAdminAuthTokenToSession,
 } from '../api/sqlBridge';
 import type { RazorpayMatchBy } from '../utils/razorpaySyncMatcher';
+import {
+  isMissingCenterName,
+  buildCenterUpdateShareUrl,
+  buildCenterUpdateShareMessage,
+} from '../utils/centerUpdateHelper';
 
 const PERSISTED_ADMIN_USER_KEY = 'mahasangh_admin_persisted_user_v1';
 
@@ -412,6 +417,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [appsVisibleCount, setAppsVisibleCount] = useState(50);
+  const [copiedCenterUpdateMode, setCopiedCenterUpdateMode] = useState<'url' | 'message' | null>(null);
 
   // Unified in-app feedback banner & confirmation dialog (replaces native alert/confirm)
   const [adminFeedbackBanner, setAdminFeedbackBanner] = useState<{
@@ -2849,6 +2855,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const approvedCount = applications.filter((a) => a.status === 'approved').length;
   const pendingCount = applications.filter((a) => a.status === 'pending').length;
   const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
+  const missingCenterCount = applications.filter(
+    (a) => a.status !== 'rejected' && isMissingCenterName(a.centerName)
+  ).length;
 
   // Ordered Navigation Items tailored for Mobile Bottom Bar + Bottom Sheet Drawer + Desktop Sidebar
   const adminNavItems: Array<{
@@ -8119,14 +8128,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     </button>
                   </div>
 
-                  {/* Card 3: Clean Data */}
+                  {/* Card 3: Clean Data / Clean Trash */}
                   <div className="p-4 sm:p-5 rounded-xl bg-[#fbf8f2] border border-[#e7ded1] flex flex-col justify-between gap-4">
                     <div className="space-y-1.5">
                       <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-rose-100 text-rose-700">
                         <Trash2 className="w-4 h-4" />
                       </span>
                       <h4 className="text-base font-bold text-[#0b1e36]">
-                        Clean Ghost & Duplicate Data
+                        Clean Data / Clean Trash
                       </h4>
                       <p className="text-xs text-[#607184] leading-relaxed">
                         Permanently removes rejected, soft-deleted, and duplicate pending records while keeping all approved members untouched.
@@ -8140,7 +8149,95 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       title="Clean rejected, deleted, and duplicate pending records"
                     >
                       <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
-                      <span>{isPurgingGhosts ? 'Cleaning...' : 'Clean Data'}</span>
+                      <span>{isPurgingGhosts ? 'Cleaning...' : 'Clean Trash / Data'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Shareable Standalone One-Time Center Update Link (Super Admin Only) */}
+                <div className="bg-[#fbf8f2] border border-[#e7ded1] rounded-xl p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 allow-copy">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-bold text-[#0b1e36]">
+                      <Link2 className="w-4 h-4 text-[#df6b16] shrink-0" />
+                      <span>
+                        One-Time Center Update Link (Pending:{' '}
+                        <span className="font-mono tabular-nums text-[#df6b16]">
+                          {toEnglishDigits(missingCenterCount)}
+                        </span>
+                        )
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#607184] leading-relaxed">
+                      Share this standalone link with members missing their center name to auto-update their records once.
+                    </p>
+                    <div className="text-xs font-mono text-[#193568] font-semibold truncate select-all pt-0.5">
+                      {buildCenterUpdateShareUrl()}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const url = buildCenterUpdateShareUrl();
+                        try {
+                          await navigator.clipboard.writeText(url);
+                        } catch {
+                          const ta = document.createElement('textarea');
+                          ta.value = url;
+                          document.body.appendChild(ta);
+                          ta.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(ta);
+                        }
+                        setCopiedCenterUpdateMode('url');
+                        setTimeout(() => setCopiedCenterUpdateMode(null), 2500);
+                      }}
+                      className="min-h-[40px] bg-[#193568] hover:bg-[#0b1e36] text-white text-xs font-bold px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                      {copiedCenterUpdateMode === 'url' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>Link Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const msg = buildCenterUpdateShareMessage();
+                        try {
+                          await navigator.clipboard.writeText(msg);
+                        } catch {
+                          const ta = document.createElement('textarea');
+                          ta.value = msg;
+                          document.body.appendChild(ta);
+                          ta.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(ta);
+                        }
+                        setCopiedCenterUpdateMode('message');
+                        setTimeout(() => setCopiedCenterUpdateMode(null), 2500);
+                      }}
+                      className="min-h-[40px] bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 text-xs font-bold px-3.5 py-2 rounded-lg inline-flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                      {copiedCenterUpdateMode === 'message' ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Message Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-[#df6b16]" />
+                          <span>Copy WhatsApp Text</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
