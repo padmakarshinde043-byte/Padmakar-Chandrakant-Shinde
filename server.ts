@@ -96,6 +96,8 @@ import {
   clearSessionCookie,
   signPaymentProof,
   verifyPaymentProof,
+  ADMIN_PERSISTENT_TTL_MS,
+  ADMIN_PERSISTENT_MAX_AGE_SECONDS,
   SessionPayload,
   SessionRole,
 } from './src/utils/serverAuth';
@@ -1087,9 +1089,76 @@ async function getServerPresidentPasswordUnified(): Promise<string> {
   return mockPresidentPassword || SUPER_ADMIN_PASSWORD;
 }
 
-app.get('/api/auth/session', (req, res) => {
-  const session = extractRequestSession(req);
-  res.json({ authenticated: Boolean(session), session });
+app.get('/api/auth/session', async (req, res) => {
+  try {
+    const session = extractRequestSession(req);
+    if (!session) {
+      return res.json({ authenticated: false, session: null });
+    }
+
+    if (session.role === 'super_admin') {
+      const creds = await getServerAdminCredsUnified();
+      const validSuperEmail = String(creds.email || session.email || DEFAULT_ADMIN_EMAIL)
+        .trim()
+        .toLowerCase();
+      const refreshedToken = signSessionToken(
+        {
+          role: 'super_admin',
+          email: validSuperEmail,
+          name: 'मुख्य प्रशासक (Super Admin)',
+          permissions: ALL_SUPER_ADMIN_PERMISSIONS,
+        },
+        ADMIN_PERSISTENT_TTL_MS
+      );
+      setSessionCookie(res, refreshedToken, req, ADMIN_PERSISTENT_MAX_AGE_SECONDS);
+      return res.json({
+        authenticated: true,
+        session,
+        token: refreshedToken,
+        user: {
+          id: 'super-admin',
+          email: validSuperEmail,
+          name: 'मुख्य प्रशासक (Super Admin)',
+          isSuperAdmin: true,
+          permissions: ALL_SUPER_ADMIN_PERMISSIONS,
+          createdAt: '',
+        },
+      });
+    }
+
+    if (session.role === 'sub_admin') {
+      const subAdmins = await getServerSubAdminsUnified();
+      const matching = subAdmins.find(
+        (a) => String(a.email || '').trim().toLowerCase() === String(session.email || '').trim().toLowerCase()
+      );
+      if (!matching) {
+        clearSessionCookie(res, req);
+        return res.json({ authenticated: false, session: null });
+      }
+      const sanitized = sanitizeSubAdminForResponse(matching);
+      const refreshedToken = signSessionToken(
+        {
+          role: 'sub_admin',
+          email: String(sanitized.email || session.email || '').toLowerCase(),
+          name: String(sanitized.name || ''),
+          permissions: (sanitized.permissions || {}) as Record<string, boolean>,
+        },
+        ADMIN_PERSISTENT_TTL_MS
+      );
+      setSessionCookie(res, refreshedToken, req, ADMIN_PERSISTENT_MAX_AGE_SECONDS);
+      return res.json({
+        authenticated: true,
+        session,
+        token: refreshedToken,
+        user: sanitized,
+      });
+    }
+
+    return res.json({ authenticated: true, session });
+  } catch {
+    const session = extractRequestSession(req);
+    return res.json({ authenticated: Boolean(session), session });
+  }
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -1125,13 +1194,16 @@ app.post('/api/auth/admin-login', async (req, res) => {
         return res.status(401).json({ status: 'error', message: 'चुकीचा पासवर्ड. कृपया पुन्हा प्रयत्न करा.' });
       }
 
-      const token = signSessionToken({
-        role: 'super_admin',
-        email: validSuperEmail,
-        name: 'मुख्य प्रशासक (Super Admin)',
-        permissions: ALL_SUPER_ADMIN_PERMISSIONS,
-      });
-      setSessionCookie(res, token, req);
+      const token = signSessionToken(
+        {
+          role: 'super_admin',
+          email: validSuperEmail,
+          name: 'मुख्य प्रशासक (Super Admin)',
+          permissions: ALL_SUPER_ADMIN_PERMISSIONS,
+        },
+        ADMIN_PERSISTENT_TTL_MS
+      );
+      setSessionCookie(res, token, req, ADMIN_PERSISTENT_MAX_AGE_SECONDS);
 
       return res.json({
         status: 'success',
@@ -1178,13 +1250,16 @@ app.post('/api/auth/admin-login', async (req, res) => {
       await mysqlTouchSubAdminLastLogin(String(matchingSubAdmin.id)).catch(() => {});
     }
 
-    const token = signSessionToken({
-      role: 'sub_admin',
-      email: String(matchingSubAdmin.email).toLowerCase(),
-      name: String(matchingSubAdmin.name || ''),
-      permissions: (matchingSubAdmin.permissions || {}) as Record<string, boolean>,
-    });
-    setSessionCookie(res, token, req);
+    const token = signSessionToken(
+      {
+        role: 'sub_admin',
+        email: String(matchingSubAdmin.email).toLowerCase(),
+        name: String(matchingSubAdmin.name || ''),
+        permissions: (matchingSubAdmin.permissions || {}) as Record<string, boolean>,
+      },
+      ADMIN_PERSISTENT_TTL_MS
+    );
+    setSessionCookie(res, token, req, ADMIN_PERSISTENT_MAX_AGE_SECONDS);
 
     return res.json({
       status: 'success',
@@ -1232,13 +1307,16 @@ app.post('/api/auth/sub-admin-first-login', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'सब-ॲडमिन खाते सापडले नाही.' });
     }
 
-    const token = signSessionToken({
-      role: 'sub_admin',
-      email: targetEmail,
-      name: String(updatedUser.name || ''),
-      permissions: (updatedUser.permissions || {}) as Record<string, boolean>,
-    });
-    setSessionCookie(res, token, req);
+    const token = signSessionToken(
+      {
+        role: 'sub_admin',
+        email: targetEmail,
+        name: String(updatedUser.name || ''),
+        permissions: (updatedUser.permissions || {}) as Record<string, boolean>,
+      },
+      ADMIN_PERSISTENT_TTL_MS
+    );
+    setSessionCookie(res, token, req, ADMIN_PERSISTENT_MAX_AGE_SECONDS);
 
     res.json({
       status: 'success',

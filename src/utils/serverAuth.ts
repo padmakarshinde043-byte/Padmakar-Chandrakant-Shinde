@@ -110,6 +110,9 @@ function fromBase64Url(str: string): string {
   return Buffer.from(padded, 'base64').toString('utf-8');
 }
 
+export const ADMIN_PERSISTENT_TTL_MS = 365 * 24 * 60 * 60 * 1000;
+export const ADMIN_PERSISTENT_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+
 export function signSessionToken(
   payload: Omit<SessionPayload, 'exp'>,
   ttlMs = 12 * 60 * 60 * 1000

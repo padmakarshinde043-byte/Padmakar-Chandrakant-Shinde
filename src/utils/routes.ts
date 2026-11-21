@@ -144,6 +144,37 @@ export function resolveTabFromLocation(
   return 'home';
 }
 
+const RELOAD_EXEMPT_TABS = new Set<string>(['admin', 'center_update']);
+
+export function isPageReloadNavigation(): boolean {
+  if (typeof window === 'undefined' || typeof performance === 'undefined') {
+    return false;
+  }
+  try {
+    if (typeof performance.getEntriesByType === 'function') {
+      const entries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+      if (entries && entries.length > 0) {
+        return entries[0].type === 'reload';
+      }
+    }
+    const legacyNav = (performance as unknown as { navigation?: { type?: number } }).navigation;
+    if (legacyNav && typeof legacyNav.type === 'number') {
+      return legacyNav.type === 1;
+    }
+  } catch {
+    // Ignore unsupported navigation timing APIs
+  }
+  return false;
+}
+
+export function resolveInitialTabOnLoad(): string {
+  const resolved = resolveTabFromLocation();
+  if (isPageReloadNavigation() && !RELOAD_EXEMPT_TABS.has(resolved)) {
+    return 'home';
+  }
+  return resolved;
+}
+
 export function getPathForTab(tabId: string): string {
   const normalized = normalizeTabId(tabId);
   return ROUTE_BY_TAB.get(normalized)?.path || '/';

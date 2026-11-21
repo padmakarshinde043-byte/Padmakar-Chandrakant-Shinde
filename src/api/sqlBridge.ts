@@ -92,34 +92,79 @@ export function isFirebaseAllowedSync(): boolean {
 }
 
 const AUTH_TOKEN_KEY = 'mahasangh_auth_token_v1';
+const ADMIN_AUTH_TOKEN_KEY = 'mahasangh_admin_auth_token_v1';
 
-export function getAuthSessionToken(): string {
+export function getPersistentAdminAuthToken(): string {
   try {
-    if (typeof sessionStorage !== 'undefined') {
-      return sessionStorage.getItem(AUTH_TOKEN_KEY) || '';
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(ADMIN_AUTH_TOKEN_KEY) || '';
     }
   } catch {}
   return '';
 }
 
-export function setAuthSessionToken(token?: string | null): void {
+export function restorePersistentAdminAuthTokenToSession(): string {
+  const adminToken = getPersistentAdminAuthToken();
+  if (adminToken) {
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem(AUTH_TOKEN_KEY, adminToken);
+      }
+    } catch {}
+  }
+  return adminToken;
+}
+
+export function getAuthSessionToken(): string {
   try {
     if (typeof sessionStorage !== 'undefined') {
-      if (token && token.trim()) {
-        sessionStorage.setItem(AUTH_TOKEN_KEY, token.trim());
+      const sessionToken = sessionStorage.getItem(AUTH_TOKEN_KEY);
+      if (sessionToken) return sessionToken;
+    }
+  } catch {}
+  return getPersistentAdminAuthToken();
+}
+
+export function setAuthSessionToken(
+  token?: string | null,
+  options?: { persistAdmin?: boolean }
+): void {
+  const trimmed = token ? token.trim() : '';
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      if (trimmed) {
+        sessionStorage.setItem(AUTH_TOKEN_KEY, trimmed);
       } else {
         sessionStorage.removeItem(AUTH_TOKEN_KEY);
       }
     }
   } catch {}
+  if (options?.persistAdmin) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (trimmed) {
+          localStorage.setItem(ADMIN_AUTH_TOKEN_KEY, trimmed);
+        } else {
+          localStorage.removeItem(ADMIN_AUTH_TOKEN_KEY);
+        }
+      }
+    } catch {}
+  }
 }
 
-export function clearAuthSessionToken(): void {
+export function clearAuthSessionToken(options?: { clearPersistentAdmin?: boolean }): void {
   try {
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.removeItem(AUTH_TOKEN_KEY);
     }
   } catch {}
+  if (options?.clearPersistentAdmin) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(ADMIN_AUTH_TOKEN_KEY);
+      }
+    } catch {}
+  }
 }
 
 export function getAuthHeaders(): Record<string, string> {

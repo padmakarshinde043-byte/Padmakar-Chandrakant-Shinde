@@ -100,8 +100,60 @@ import {
   setAuthSessionToken,
   clearAuthSessionToken,
   getAuthHeaders,
+  getPersistentAdminAuthToken,
+  restorePersistentAdminAuthTokenToSession,
 } from '../api/sqlBridge';
 import type { RazorpayMatchBy } from '../utils/razorpaySyncMatcher';
+
+const PERSISTED_ADMIN_USER_KEY = 'mahasangh_admin_persisted_user_v1';
+
+function readPersistedAdminUser(): AdminUser | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    if (!getPersistentAdminAuthToken()) return null;
+    const raw = localStorage.getItem(PERSISTED_ADMIN_USER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AdminUser;
+    if (!parsed || typeof parsed !== 'object' || !parsed.email || !parsed.permissions) {
+      return null;
+    }
+    return {
+      id: String(parsed.id || (parsed.isSuperAdmin ? 'super-admin' : '')),
+      email: String(parsed.email),
+      name: String(parsed.name || ''),
+      isSuperAdmin: Boolean(parsed.isSuperAdmin),
+      permissions: parsed.permissions,
+      createdAt: String(parsed.createdAt || ''),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedAdminUser(user: AdminUser): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    const safeUser: AdminUser = {
+      id: String(user.id || (user.isSuperAdmin ? 'super-admin' : '')),
+      email: String(user.email || ''),
+      name: String(user.name || ''),
+      isSuperAdmin: Boolean(user.isSuperAdmin),
+      permissions: user.permissions,
+      createdAt: String(user.createdAt || ''),
+    };
+    localStorage.setItem(PERSISTED_ADMIN_USER_KEY, JSON.stringify(safeUser));
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
+function clearPersistedAdminUser(): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(PERSISTED_ADMIN_USER_KEY);
+    }
+  } catch {}
+}
 
 interface AdminTabProps {
   applications: MembershipApplication[];
@@ -319,14 +371,24 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   isLoadingApps,
   onExitAdmin,
 }) => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const initialPersistedAdminRef = useRef<AdminUser | null | undefined>(undefined);
+  if (initialPersistedAdminRef.current === undefined) {
+    const restored = readPersistedAdminUser();
+    if (restored) {
+      restorePersistentAdminAuthTokenToSession();
+    }
+    initialPersistedAdminRef.current = restored;
+  }
+  const initialPersistedAdmin = initialPersistedAdminRef.current;
+
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => Boolean(initialPersistedAdmin));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
 
   // Logged-in admin user information & RBAC permissions
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => initialPersistedAdmin);
   const [adminUsersList, setAdminUsersList] = useState<AdminUser[]>([]);
 
   // First Login Password Creation State (when a sub-admin logs in for the first time)
@@ -341,7 +403,12 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [isApprovingApp, setIsApprovingApp] = useState(false);
 
   // Active view inside Admin Dashboard + Mobile App Navigation Drawer
-  const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTabKey>('applications');
+  const [activeAdminSubTab, setActiveAdminSubTab] = useState<AdminSubTabKey>(() => {
+    if (!initialPersistedAdmin) return 'applications';
+    return initialPersistedAdmin.isSuperAdmin
+      ? 'applications'
+      : getFirstAllowedAdminTab(initialPersistedAdmin.permissions);
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [appsVisibleCount, setAppsVisibleCount] = useState(50);
 
@@ -1719,7 +1786,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     return !clean || clean === '-' || clean === '.' || clean === '0';
   };
 
-  // Hydrate sub-admin list from local cache on mount; live cloud credentials are verified on login
+  // Unified Admin Logout: only clears persistent Admin session when user explicitly clicks Logout
+  const handleAdminLogout = () => {
+    clearPersistedAdminUser();
+    clearAuthSessionToken({ clearPersistentAdmin: true });
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setIsMobileMenuOpen(false);
+  };
+
+  // Hydrate sub-admin list from local cache & verify/restore persistent Admin session on mount
   useEffect(() => {
     try {
       const cached = localStorage.getItem('mahasangh_sub_admins_v1');
@@ -1730,6 +1807,85 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     } catch {
       // ignore cache parse errors
     }
+
+    let cancelled = false;
+    const hadInitialPersisted = Boolean(initialPersistedAdminRef.current);
+    restorePersistentAdminAuthTokenToSession();
+
+    (async () => {
+      try {
+        const { ok, data } = await authApiRequest<{
+          authenticated?: boolean;
+          token?: string;
+          user?: AdminUser;
+          session?: {
+            role?: string;
+            email?: string;
+            name?: string;
+            permissions?: AdminPermissions;
+          } | null;
+        }>('/api/auth/session', undefined, 'GET');
+
+        if (cancelled || !ok) return;
+
+        const role = data?.session?.role;
+        if (data?.authenticated && (role === 'super_admin' || role === 'sub_admin')) {
+          if (data.token) {
+            setAuthSessionToken(data.token, { persistAdmin: true });
+          }
+
+          const restoredUser: AdminUser = data.user || {
+            id: role === 'super_admin' ? 'super-admin' : String(data.session?.email || ''),
+            email: String(data.session?.email || ''),
+            name: String(data.session?.name || (role === 'super_admin' ? 'मुख्य प्रशासक (Super Admin)' : '')),
+            isSuperAdmin: role === 'super_admin',
+            permissions: (data.session?.permissions || {}) as AdminPermissions,
+            createdAt: '',
+          };
+
+          savePersistedAdminUser(restoredUser);
+          setCurrentUser(restoredUser);
+          setIsLoggedIn(true);
+
+          if (!hadInitialPersisted) {
+            setActiveAdminSubTab(
+              restoredUser.isSuperAdmin
+                ? 'applications'
+                : getFirstAllowedAdminTab(restoredUser.permissions)
+            );
+          }
+
+          if (restoredUser.isSuperAdmin || restoredUser.permissions?.manageAdmins) {
+            fetchAdminUsers()
+              .then((list) => {
+                if (!cancelled) setAdminUsersList(list);
+              })
+              .catch(() => {});
+          }
+
+          if (
+            (restoredUser.isSuperAdmin ||
+              restoredUser.permissions?.approveMembers ||
+              restoredUser.permissions?.editMembers) &&
+            onFetchApplications
+          ) {
+            onFetchApplications();
+          }
+        } else if (data?.authenticated === false && hadInitialPersisted) {
+          // Server explicitly confirmed the saved token is no longer valid
+          clearPersistedAdminUser();
+          clearAuthSessionToken({ clearPersistentAdmin: true });
+          setIsLoggedIn(false);
+          setCurrentUser(null);
+        }
+      } catch {
+        // Keep persisted login intact during temporary offline/network glitches
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
 
@@ -1772,10 +1928,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       }
 
       if (data.token) {
-        setAuthSessionToken(data.token);
+        setAuthSessionToken(data.token, { persistAdmin: true });
       }
 
       const loggedUser = data.user;
+      savePersistedAdminUser(loggedUser);
       if (Array.isArray(data.subAdmins)) {
         setAdminUsersList(data.subAdmins);
       } else if (loggedUser.isSuperAdmin || loggedUser.permissions?.manageAdmins) {
@@ -1845,9 +2002,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       }
 
       if (data.token) {
-        setAuthSessionToken(data.token);
+        setAuthSessionToken(data.token, { persistAdmin: true });
       }
       const user = data.user;
+      savePersistedAdminUser(user);
       setFirstLoginSuccess('Password set. Opening dashboard...');
       setTimeout(() => {
         setIsFirstLoginMode(false);
@@ -2874,13 +3032,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
             {isLoggedIn && (
               <button
                 type="button"
-                onClick={() => {
-                  clearAuthSessionToken();
-                  fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
-                  setIsLoggedIn(false);
-                  setCurrentUser(null);
-                  setIsMobileMenuOpen(false);
-                }}
+                onClick={handleAdminLogout}
                 className="min-h-[40px] px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-[#df6b16] hover:bg-[#c85c0e] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                 title="Sign out of Admin Panel"
               >
@@ -8115,13 +8267,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    clearAuthSessionToken();
-                    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {});
-                    setIsMobileMenuOpen(false);
-                    setIsLoggedIn(false);
-                    setCurrentUser(null);
-                  }}
+                  onClick={handleAdminLogout}
                   className="min-h-[48px] bg-rose-600 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />

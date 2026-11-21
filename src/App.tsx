@@ -117,15 +117,16 @@ import {
 } from './utils/applicationCleanup';
 import {
   resolveTabFromLocation,
+  resolveInitialTabOnLoad,
   normalizeTabId,
   syncBrowserUrlForTab,
   syncDocumentMetaForTab,
 } from './utils/routes';
 
 export function App() {
-  const [currentTab, setCurrentTabState] = useState<string>(() => resolveTabFromLocation());
+  const [currentTab, setCurrentTabState] = useState<string>(() => resolveInitialTabOnLoad());
   const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>(() => ({
-    [resolveTabFromLocation()]: true,
+    [currentTab]: true,
   }));
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isRefreshingNews, setIsRefreshingNews] = useState(false);
@@ -148,9 +149,9 @@ export function App() {
     syncDocumentMetaForTab(normalized);
   }, [currentTab]);
 
-  // On initial mount, normalize any legacy hash or alias path (e.g. /#admin, /#/membership) to its clean URL
+  // On initial mount, sync the address bar to the resolved initial tab (resets to '/' on public page reload, or normalizes legacy hash/alias paths)
   useEffect(() => {
-    syncBrowserUrlForTab(resolveTabFromLocation(), 'replace');
+    syncBrowserUrlForTab(currentTab, 'replace');
   }, []);
 
   // Applications state (Starts from local storage, defaults to empty array)
