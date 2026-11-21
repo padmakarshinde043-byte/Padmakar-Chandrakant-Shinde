@@ -149,7 +149,7 @@ export const AdvisoryBoardTab: React.FC = () => {
           )}
         </section>
 
-        {/* २. खालचा विभाग: मार्गदर्शक */}
+        {/* 2. खालचा विभाग: राज्य सल्लागार */}
         <section className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xs">
           <div className="pb-4 mb-6 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
@@ -158,10 +158,10 @@ export const AdvisoryBoardTab: React.FC = () => {
               </div>
               <div>
                 <h2 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-                  मार्गदर्शक
+                  राज्य सल्लागार
                 </h2>
                 <p className="text-sm text-slate-600">
-                  महासंघाचे सन्माननीय मार्गदर्शक व ज्येष्ठ सल्लागार
+                  महासंघाचे सन्माननीय राज्य सल्लागार
                 </p>
               </div>
             </div>

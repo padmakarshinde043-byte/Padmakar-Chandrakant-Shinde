@@ -142,7 +142,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentTab }) => {
       {/* Clear Non-Government Entity Disclaimer & Privacy Policy Link */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mt-2 pt-2 border-t border-white/15 text-[11px] text-slate-300 leading-snug flex flex-col md:flex-row items-center justify-between gap-1.5">
         <p className="text-center md:text-left">
-          <strong className="text-amber-300">Disclaimer:</strong> हे संकेतस्थळ / ॲप कोणत्याही शासकीय संस्थेचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नाही. हे केवळ नोंदणीकृत कर्मचारी संघटनेचे स्वतंत्र माहिती व्यासपीठ आहे.
+          <strong className="text-amber-300">Disclaimer:</strong> हे संकेतस्थळ/ॲप कोणत्याही शासकीय संस्थेचे किंवा महाराष्ट्र शासनाचे प्रतिनिधित्व करत नसून हे नोंदणीकृत कर्मचारी संघटनेचे माहिती पोर्टल आहे.
         </p>
         {setCurrentTab && (
           <button
