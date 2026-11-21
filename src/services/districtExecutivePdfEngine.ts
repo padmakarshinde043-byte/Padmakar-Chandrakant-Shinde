@@ -949,18 +949,27 @@ export async function generateOfficeHybridTablePdf(
   const pageHeightMm = orientation === 'landscape' ? A4_WIDTH_MM : A4_HEIGHT_MM;
   const contentWidthMm = pageWidthMm - PAGE_MARGIN_X_MM * 2;
 
-  // Preserve exact natural letterhead aspect ratio cleanly on both Portrait & Landscape
+  // Preserve exact natural letterhead aspect ratio cleanly (ZERO horizontal stretching or squashing)
   let letterheadDrawWidthMm = contentWidthMm;
-  let letterheadHeightMm = orientation === 'landscape' ? 32 : 37;
+  let letterheadHeightMm = orientation === 'landscape' ? 44 : 62.8;
   if (letterheadImg && letterheadImg.naturalWidth > 0 && letterheadImg.naturalHeight > 0) {
     const aspect = letterheadImg.naturalWidth / letterheadImg.naturalHeight;
     if (orientation === 'landscape') {
-      // Keep letterhead crisp & centered without eating excessive vertical height on landscape A4
-      letterheadHeightMm = 31;
+      // Balanced stately letterhead centered on landscape A4 without distorting emblems
+      letterheadHeightMm = 44;
       letterheadDrawWidthMm = Math.min(contentWidthMm, letterheadHeightMm * aspect);
+      letterheadHeightMm = letterheadDrawWidthMm / aspect;
     } else {
-      letterheadDrawWidthMm = contentWidthMm;
-      letterheadHeightMm = Math.min(41, Math.max(28, contentWidthMm / aspect));
+      // Full table-width (190 mm) letterhead rendered at exact natural aspect ratio (~62.8 mm for 1400x463)
+      const naturalHeightAtFullWidth = contentWidthMm / aspect;
+      const maxPortraitHeightMm = 66;
+      if (naturalHeightAtFullWidth <= maxPortraitHeightMm) {
+        letterheadDrawWidthMm = contentWidthMm;
+        letterheadHeightMm = naturalHeightAtFullWidth;
+      } else {
+        letterheadHeightMm = maxPortraitHeightMm;
+        letterheadDrawWidthMm = Math.min(contentWidthMm, letterheadHeightMm * aspect);
+      }
     }
   }
 

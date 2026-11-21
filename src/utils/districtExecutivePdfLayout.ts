@@ -58,16 +58,15 @@ export type DistrictPdfRowData = OfficePdfRowData;
 
 /**
  * 1. District Executive Committee PDF Columns (A4 Portrait, 190 mm exact)
- * Exact 6 columns matching `exportDistrictExecutiveExcel` 1:1.
- * Total width = 12 + 46 + 44 + 38 + 27 + 23 = 190.0 mm
+ * Clean 5 official print columns (Mobile Number omitted on letterhead PDFs for privacy).
+ * Total width = 12 + 55 + 53 + 43 + 27 = 190.0 mm
  */
 export const DISTRICT_EXECUTIVE_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
   { key: 'serial', header: 'अ.क्र.', widthMm: 12, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'fullName', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 46, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'cadreAndCenter', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 44, hAlign: 'left', vAlign: 'middle', boldBody: false },
-  { key: 'appointedPost', header: 'संघटनेतील बहाल पद', widthMm: 38, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 27, hAlign: 'left', vAlign: 'middle', boldBody: false },
-  { key: 'taluka', header: 'तालुका', widthMm: 23, hAlign: 'left', vAlign: 'middle', boldBody: false },
+  { key: 'fullName', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 55, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadreAndCenter', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 53, hAlign: 'left', vAlign: 'middle', boldBody: false },
+  { key: 'appointedPost', header: 'संघटनेतील बहाल पद', widthMm: 43, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'taluka', header: 'तालुका', widthMm: 27, hAlign: 'left', vAlign: 'middle', boldBody: false },
 ] as const;
 
 /**
@@ -91,62 +90,58 @@ export const ORGANIZATION_STATUS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
 
 /**
  * 3. All District Presidents PDF Columns (A4 Portrait, 190 mm exact)
- * Exact 6 columns matching `exportDistrictPresidentsExcel` 1:1.
- * Total width = 12 + 29 + 46 + 44 + 32 + 27 = 190.0 mm
+ * Clean 5 official print columns (Mobile Number omitted on letterhead PDFs).
+ * Total width = 12 + 33 + 56 + 53 + 36 = 190.0 mm
  */
 export const DISTRICT_PRESIDENTS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
   { key: 'serial', header: 'अ.क्र.', widthMm: 12, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'district', header: 'जिल्हा', widthMm: 29, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'name', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 46, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'cadre', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 44, hAlign: 'left', vAlign: 'middle' },
-  { key: 'post', header: 'संघटनेतील पद', widthMm: 32, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 27, hAlign: 'left', vAlign: 'middle' },
+  { key: 'district', header: 'जिल्हा', widthMm: 33, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'name', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 56, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadre', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 53, hAlign: 'left', vAlign: 'middle' },
+  { key: 'post', header: 'संघटनेतील पद', widthMm: 36, hAlign: 'left', vAlign: 'middle', boldBody: true },
 ] as const;
 
 /**
  * 4. All Taluka Presidents PDF Columns (A4 Portrait, 190 mm exact)
- * Exact 6 columns matching `exportTalukaPresidentsExcel` 1:1.
- * Total width = 12 + 34 + 44 + 43 + 30 + 27 = 190.0 mm
+ * Clean 5 official print columns (Mobile Number omitted on letterhead PDFs).
+ * Total width = 12 + 40 + 54 + 50 + 34 = 190.0 mm
  */
 export const TALUKA_PRESIDENTS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
   { key: 'serial', header: 'अ.क्र.', widthMm: 12, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'districtTaluka', header: 'जिल्हा व तालुका', widthMm: 34, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'name', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 44, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'cadre', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 43, hAlign: 'left', vAlign: 'middle' },
-  { key: 'post', header: 'संघटनेतील पद', widthMm: 30, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 27, hAlign: 'left', vAlign: 'middle' },
+  { key: 'districtTaluka', header: 'जिल्हा व तालुका', widthMm: 40, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'name', header: 'पदाधिकाऱ्याचे संपूर्ण नाव', widthMm: 54, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadre', header: 'सध्याचे पद व कार्यक्षेत्र', widthMm: 50, hAlign: 'left', vAlign: 'middle' },
+  { key: 'post', header: 'संघटनेतील पद', widthMm: 34, hAlign: 'left', vAlign: 'middle', boldBody: true },
 ] as const;
 
 /**
  * 5. Approved Registered Members PDF Columns (A4 Portrait, 190 mm exact)
- * Clean 8 columns with member number, name, gender, cadre, district/taluka, working center, mobile.
- * Total width = 11 + 26 + 37 + 13 + 24 + 28 + 27 + 24 = 190.0 mm
+ * Clean 7 columns with member number, name, gender, cadre, district/taluka, working center (Mobile omitted on PDF).
+ * Total width = 11 + 28 + 44 + 14 + 28 + 33 + 32 = 190.0 mm
  */
 export const REGISTERED_MEMBERS_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
   { key: 'serial', header: 'अ.क्र.', widthMm: 11, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'memberNo', header: 'सदस्य क्र.', widthMm: 26, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'fullName', header: 'संपूर्ण नाव', widthMm: 37, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'gender', header: 'लिंग', widthMm: 13, hAlign: 'left', vAlign: 'middle' },
-  { key: 'cadre', header: 'पद / संवर्ग', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
-  { key: 'districtTaluka', header: 'जिल्हा व तालुका', widthMm: 28, hAlign: 'left', vAlign: 'middle' },
-  { key: 'centerName', header: 'कार्यरत केंद्र', widthMm: 27, hAlign: 'left', vAlign: 'middle' },
-  { key: 'mobile', header: 'मोबाईल नंबर', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
+  { key: 'memberNo', header: 'सदस्य क्र.', widthMm: 28, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'fullName', header: 'संपूर्ण नाव', widthMm: 44, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'gender', header: 'लिंग', widthMm: 14, hAlign: 'left', vAlign: 'middle' },
+  { key: 'cadre', header: 'पद / संवर्ग', widthMm: 28, hAlign: 'left', vAlign: 'middle' },
+  { key: 'districtTaluka', header: 'जिल्हा व तालुका', widthMm: 33, hAlign: 'left', vAlign: 'middle' },
+  { key: 'centerName', header: 'कार्यरत केंद्र', widthMm: 32, hAlign: 'left', vAlign: 'middle' },
 ] as const;
 
 /**
  * 6. Statewide Appointments Registry PDF Columns (A4 Portrait, 190 mm exact)
- * Exact 8 columns matching `exportStatewideRegistryExcel` 1:1.
- * Total width = 11 + 35 + 22 + 20 + 28 + 24 + 26 + 24 = 190.0 mm
+ * Clean 7 official print columns (Mobile Number omitted on letterhead PDFs).
+ * Total width = 11 + 42 + 25 + 23 + 33 + 26 + 30 = 190.0 mm
  */
 export const STATEWIDE_REGISTRY_PDF_COLUMNS: readonly OfficePdfColumnSpec[] = [
   { key: 'serial', header: 'अ.क्र.', widthMm: 11, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'fullName', header: 'संपूर्ण नाव', widthMm: 35, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'district', header: 'जिल्हा', widthMm: 22, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'taluka', header: 'तालुका', widthMm: 20, hAlign: 'left', vAlign: 'middle' },
-  { key: 'appointedPost', header: 'बहाल पद', widthMm: 28, hAlign: 'left', vAlign: 'middle', boldBody: true },
-  { key: 'cadre', header: 'सध्याचे पद', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
-  { key: 'workingPlace', header: 'कार्यरत केंद्र', widthMm: 26, hAlign: 'left', vAlign: 'middle' },
-  { key: 'mobile', header: 'मोबाईल', widthMm: 24, hAlign: 'left', vAlign: 'middle' },
+  { key: 'fullName', header: 'संपूर्ण नाव', widthMm: 42, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'district', header: 'जिल्हा', widthMm: 25, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'taluka', header: 'तालुका', widthMm: 23, hAlign: 'left', vAlign: 'middle' },
+  { key: 'appointedPost', header: 'बहाल पद', widthMm: 33, hAlign: 'left', vAlign: 'middle', boldBody: true },
+  { key: 'cadre', header: 'सध्याचे पद', widthMm: 26, hAlign: 'left', vAlign: 'middle' },
+  { key: 'workingPlace', header: 'कार्यरत केंद्र', widthMm: 30, hAlign: 'left', vAlign: 'middle' },
 ] as const;
 
 /**
@@ -171,7 +166,6 @@ export function buildDistrictExecutivePdfRows(officials: OfficialMember[]): Offi
         fullName,
         cadreAndCenter,
         (m.appointedPost || '').trim() || '-',
-        toEnglishDigits((m.mobile || '').trim() || '-'),
         (m.taluka || '').trim() || '-',
       ],
     };
@@ -259,7 +253,7 @@ export function buildOrganizationStatusPdfRows(stats: Array<any>): {
  * Row Builder 3: All District Presidents
  */
 export function buildDistrictPresidentsPdfRows(
-  list: Array<{ district: string; name: string; cadre: string; post: string; mobile: string }>
+  list: Array<{ district: string; name: string; cadre: string; post: string; mobile?: string }>
 ): OfficePdfRowData[] {
   return (list || []).map((item, idx) => ({
     cells: [
@@ -268,7 +262,6 @@ export function buildDistrictPresidentsPdfRows(
       (item.name || '').trim() || '-',
       normalizeCadreInText(item.cadre, '-'),
       (item.post || '').trim() || '-',
-      toEnglishDigits((item.mobile || '').trim() || '-'),
     ],
   }));
 }
@@ -283,7 +276,7 @@ export function buildTalukaPresidentsPdfRows(
     name: string;
     cadre: string;
     post: string;
-    mobile: string;
+    mobile?: string;
   }>
 ): OfficePdfRowData[] {
   return (list || []).map((item, idx) => ({
@@ -293,7 +286,6 @@ export function buildTalukaPresidentsPdfRows(
       (item.name || '').trim() || '-',
       normalizeCadreInText(item.cadre, '-'),
       (item.post || '').trim() || '-',
-      toEnglishDigits((item.mobile || '').trim() || '-'),
     ],
   }));
 }
@@ -329,7 +321,6 @@ export function buildRegisteredMembersPdfRows(list: MembershipApplication[]): {
         normalizeOfficialCadre(m.professional, '-'),
         districtTaluka,
         (m.centerName || '').trim() || '-',
-        toEnglishDigits((m.phone || '').trim() || '-'),
       ],
     };
   });
@@ -357,7 +348,6 @@ export function buildStatewideRegistryPdfRows(officials: OfficialMember[]): Offi
         (m.appointedPost || '').trim() || '-',
         normalizeOfficialCadre(m.currentCadre, '-'),
         (m.workingPlace || '').trim() || '-',
-        toEnglishDigits((m.mobile || '').trim() || '-'),
       ],
     };
   });

@@ -42,6 +42,7 @@ test('All 6 office PDF column sets sum cleanly to A4 content width and enforce V
     for (const c of cols) {
       assert.equal(c.hAlign, 'left');
       assert.equal(c.vAlign, 'middle');
+      assert.notEqual(c.key, 'mobile');
     }
   }
 
@@ -52,6 +53,7 @@ test('All 6 office PDF column sets sum cleanly to A4 content width and enforce V
   for (const c of ORGANIZATION_STATUS_PDF_COLUMNS) {
     assert.equal(c.hAlign, 'left');
     assert.equal(c.vAlign, 'middle');
+    assert.notEqual(c.key, 'mobile');
   }
 });
 
@@ -94,7 +96,6 @@ test('buildDistrictExecutivePdfRows produces 1:1 parity with Excel including wor
     'श्री. राजेश पांडुरंग पाटील',
     'शिक्षण विस्तार अधिकारी - पिंपळगाव बसवंत',
     'जिल्हाध्यक्ष',
-    '9860704098',
     'निफाड',
   ]);
   assert.deepEqual(rows[1].cells, [
@@ -102,7 +103,6 @@ test('buildDistrictExecutivePdfRows produces 1:1 parity with Excel including wor
     'सौ. सुनीता कुलकर्णी',
     'केंद्रप्रमुख',
     'जिल्हा महिला प्रतिनिधी',
-    '9822001122',
     '-',
   ]);
 });
@@ -149,7 +149,7 @@ test('District Presidents, Taluka Presidents, Registered Members, and Statewide 
       mobile: '9876543210',
     },
   ]);
-  assert.equal(distPres[0].cells.length, 6);
+  assert.equal(distPres[0].cells.length, 5);
   assert.equal(distPres[0].cells[3], 'शिक्षण विस्तार अधिकारी - ओझर');
 
   const talukaPres = buildTalukaPresidentsPdfRows([
@@ -162,7 +162,7 @@ test('District Presidents, Taluka Presidents, Registered Members, and Statewide 
       mobile: '9822001100',
     },
   ]);
-  assert.equal(talukaPres[0].cells.length, 6);
+  assert.equal(talukaPres[0].cells.length, 5);
   assert.equal(talukaPres[0].cells[1], 'नाशिक (निफाड)');
 
   const memberApps: MembershipApplication[] = [
@@ -187,7 +187,7 @@ test('District Presidents, Taluka Presidents, Registered Members, and Statewide 
   const regResult = buildRegisteredMembersPdfRows(memberApps);
   assert.equal(regResult.rows.length, 1);
   assert.equal(regResult.femaleCount, 1);
-  assert.equal(regResult.rows[0].cells.length, 8);
+  assert.equal(regResult.rows[0].cells.length, 7);
   assert.equal(regResult.rows[0].cells[3], 'स्त्री');
   assert.equal(regResult.rows[0].cells[4], 'शिक्षण विस्तार अधिकारी');
   assert.equal(regResult.rows[0].cells[6], 'पिंपळगाव बसवंत');
@@ -207,7 +207,7 @@ test('District Presidents, Taluka Presidents, Registered Members, and Statewide 
       updatedAt: '2026-05-01T00:00:00Z',
     },
   ]);
-  assert.equal(regOfficials[0].cells.length, 8);
+  assert.equal(regOfficials[0].cells.length, 7);
   assert.equal(regOfficials[0].cells[6], 'उरुळी कांचन');
 });
 

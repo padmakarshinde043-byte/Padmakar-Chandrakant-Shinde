@@ -1522,52 +1522,66 @@ export const AppointmentsTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Standard Horizontal Portal Navigation Tabs */}
-          <div className="border-t border-slate-200 bg-slate-50 px-2 sm:px-6 flex items-center gap-0.5 sm:gap-2 overflow-x-auto no-scrollbar">
+          {/* Portal Navigation Strip: Public Directory Tab + Distinct Prominent Login Capsules */}
+          <div className="border-t border-slate-200 bg-slate-50/90 px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
             <button
               type="button"
               onClick={handleTabClickDirectory}
-              className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-bold rounded-lg border whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeSubTab === 'directory'
-                  ? 'border-[#193568] text-[#193568] bg-white'
-                  : 'border-transparent text-slate-600 hover:text-[#193568]'
+                  ? 'bg-[#193568] text-white border-[#193568] shadow-xs'
+                  : 'bg-white text-[#193568] border-slate-300 hover:bg-slate-100'
               }`}
             >
               <Users className="w-4 h-4 shrink-0" />
               <span>पदाधिकारी सूची</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleTabClickManage}
-              className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeSubTab === 'manage'
-                  ? 'border-[#193568] text-[#193568] bg-white'
-                  : 'border-transparent text-slate-600 hover:text-[#193568]'
-              }`}
-            >
-              <Building className="w-4 h-4 shrink-0" />
-              <span>जिल्हाध्यक्ष</span>
-              {!isManageUnlocked && !isSuperAdmin && (
-                <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              )}
-            </button>
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+              <button
+                type="button"
+                onClick={handleTabClickManage}
+                className={`px-5 sm:px-6 py-2.5 text-sm sm:text-base font-extrabold rounded-full border-2 whitespace-nowrap shrink-0 flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${
+                  activeSubTab === 'manage'
+                    ? 'bg-[#0b1e36] text-[#efb24b] border-[#efb24b] shadow-lg ring-2 ring-[#efb24b]/40'
+                    : 'bg-[#193568] hover:bg-[#11274f] text-white border-sky-300/70 shadow-md hover:shadow-lg'
+                }`}
+              >
+                <Building
+                  className={`w-4 h-4 sm:w-[18px] sm:h-[18px] shrink-0 ${
+                    activeSubTab === 'manage' ? 'text-[#efb24b]' : 'text-sky-200'
+                  }`}
+                />
+                <span>जिल्हाध्यक्ष</span>
+                {!isManageUnlocked && !isSuperAdmin && (
+                  <Lock
+                    className={`w-4 h-4 shrink-0 ${
+                      activeSubTab === 'manage' ? 'text-[#efb24b]' : 'text-sky-200'
+                    }`}
+                  />
+                )}
+              </button>
 
-            <button
-              type="button"
-              onClick={handleTabClickLetters}
-              className={`px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer ${
-                activeSubTab === 'letters'
-                  ? 'border-[#193568] text-[#193568] bg-white'
-                  : 'border-transparent text-slate-600 hover:text-[#193568]'
-              }`}
-            >
-              <Award className="w-4 h-4 shrink-0" />
-              <span>राज्याध्यक्ष</span>
-              {!isLettersUnlocked && !isSuperAdmin && (
-                <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              )}
-            </button>
+              <button
+                type="button"
+                onClick={handleTabClickLetters}
+                className={`px-5 sm:px-6 py-2.5 text-sm sm:text-base font-extrabold rounded-full border-2 whitespace-nowrap shrink-0 flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${
+                  activeSubTab === 'letters'
+                    ? 'bg-[#0b1e36] text-[#efb24b] border-[#efb24b] shadow-lg ring-2 ring-[#efb24b]/50'
+                    : 'bg-[#0f264c] hover:bg-[#0b1e36] text-white border-[#efb24b] shadow-md hover:shadow-lg'
+                }`}
+              >
+                <Award
+                  className={`w-4 h-4 sm:w-[18px] sm:h-[18px] shrink-0 text-[#efb24b]`}
+                />
+                <span>राज्याध्यक्ष</span>
+                {!isLettersUnlocked && !isSuperAdmin && (
+                  <Lock
+                    className="w-4 h-4 shrink-0 text-[#efb24b]"
+                  />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

@@ -1282,17 +1282,16 @@ export async function generateDistrictPresidentsPdf(
     name: string;
     cadre: string;
     post: string;
-    mobile: string;
+    mobile?: string;
   }>,
   onProgress?: (s: string) => void
 ): Promise<void> {
   const columns: ReportColumn[] = [
-    { header: 'अनु.', width: '40px', align: 'center' },
-    { header: 'जिल्हा', width: '112px', align: 'left' },
-    { header: 'पदाधिकाऱ्याचे नाव', flex: 1.2, align: 'left' },
-    { header: 'सध्याचे पद व कार्यक्षेत्र', flex: 1.1, align: 'left' },
-    { header: 'संघटनेतील पद', width: '108px', align: 'left' },
-    { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
+    { header: 'अनु.', width: '42px', align: 'center' },
+    { header: 'जिल्हा', width: '124px', align: 'left' },
+    { header: 'पदाधिकाऱ्याचे नाव', flex: 1.25, align: 'left' },
+    { header: 'सध्याचे पद व कार्यक्षेत्र', flex: 1.15, align: 'left' },
+    { header: 'संघटनेतील पद', width: '126px', align: 'left' },
   ];
 
   const rowsCells = list.map((item, idx) => [
@@ -1301,7 +1300,6 @@ export async function generateDistrictPresidentsPdf(
     { text: item.name, bold: true },
     { text: normalizeCadreInText(item.cadre, '-') },
     { text: item.post, bold: true },
-    { text: toEnglishDigits(item.mobile), bold: true },
   ]);
 
   await renderStandardPaginatedTablePdf({
@@ -1326,17 +1324,16 @@ export async function generateTalukaPresidentsPdf(
     name: string;
     cadre: string;
     post: string;
-    mobile: string;
+    mobile?: string;
   }>,
   onProgress?: (s: string) => void
 ): Promise<void> {
   const columns: ReportColumn[] = [
-    { header: 'अनु.', width: '40px', align: 'center' },
-    { header: 'जिल्हा व तालुका', width: '132px', align: 'left' },
-    { header: 'पदाधिकाऱ्याचे नाव', flex: 1.2, align: 'left' },
-    { header: 'सध्याचे पद व कार्यक्षेत्र', flex: 1.1, align: 'left' },
-    { header: 'संघटनेतील पद', width: '104px', align: 'left' },
-    { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
+    { header: 'अनु.', width: '42px', align: 'center' },
+    { header: 'जिल्हा व तालुका', width: '146px', align: 'left' },
+    { header: 'पदाधिकाऱ्याचे नाव', flex: 1.25, align: 'left' },
+    { header: 'सध्याचे पद व कार्यक्षेत्र', flex: 1.15, align: 'left' },
+    { header: 'संघटनेतील पद', width: '120px', align: 'left' },
   ];
 
   const rowsCells = list.map((item, idx) => [
@@ -1345,7 +1342,6 @@ export async function generateTalukaPresidentsPdf(
     { text: item.name, bold: true },
     { text: normalizeCadreInText(item.cadre, '-') },
     { text: item.post, bold: true },
-    { text: toEnglishDigits(item.mobile), bold: true },
   ]);
 
   await renderStandardPaginatedTablePdf({
@@ -1368,12 +1364,11 @@ export async function generateRegisteredMembersPdf(
   onProgress?: (s: string) => void
 ): Promise<void> {
   const columns: ReportColumn[] = [
-    { header: 'अनु.', width: '40px', align: 'center' },
-    { header: 'सदस्य क्रमांक', width: '128px', align: 'center' },
-    { header: 'संपूर्ण नाव', flex: 1.25, align: 'left' },
-    { header: 'सध्याचे पद / संवर्ग', flex: 1, align: 'left' },
-    { header: 'केंद्र, तालुका व जिल्हा', width: '150px', align: 'left' },
-    { header: 'मोबाईल क्र.', width: '94px', align: 'center' },
+    { header: 'अनु.', width: '42px', align: 'center' },
+    { header: 'सदस्य क्रमांक', width: '136px', align: 'center' },
+    { header: 'संपूर्ण नाव', flex: 1.3, align: 'left' },
+    { header: 'सध्याचे पद / संवर्ग', flex: 1.05, align: 'left' },
+    { header: 'केंद्र, तालुका व जिल्हा', width: '190px', align: 'left' },
   ];
 
   const rowsCells = list.map((m, idx) => {
@@ -1391,7 +1386,6 @@ export async function generateRegisteredMembersPdf(
       { text: `${m.salutation || ''} ${m.fullName || ''}`.trim(), bold: true },
       { text: normalizeOfficialCadre(m.professional, '-') },
       { text: place },
-      { text: toEnglishDigits(m.phone), bold: true },
     ];
   });
 
