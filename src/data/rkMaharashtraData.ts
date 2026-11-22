@@ -164,6 +164,7 @@ export interface OfficialMember {
   mobile: string;
   updatedAt: string;
   photo?: string;
+  memberNumber?: string;
   appointedDate?: string;
   orderNumber?: string;
 }

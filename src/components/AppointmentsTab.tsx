@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search, ShieldCheck, Award, FileText, Share2,
   Lock, Unlock, Plus, Trash2, Edit3, RefreshCw, KeyRound, CheckCircle2,
-  AlertCircle, ChevronRight, Phone, MapPin, Building, Calendar, Users, Download, X, Eye, EyeOff, ImageIcon
+  AlertCircle, ChevronRight, ChevronDown, ChevronUp, Phone, MapPin, Building, Calendar, Users, Download, X, Eye, EyeOff, ImageIcon, UserCheck
 } from 'lucide-react';
 import {
   uploadToCloudinary,
@@ -79,6 +79,59 @@ const ToastPortal: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (typeof document === 'undefined') return null;
   return createPortal(children, document.body);
 };
+
+function normalizeMobile10(raw?: string): string {
+  const digits = toEnglishDigits(String(raw || '')).replace(/\D/g, '');
+  if (digits.length > 10) return digits.slice(-10);
+  return digits;
+}
+
+function normalizeSalutationChoice(raw?: string): string {
+  const cleaned = String(raw || '').trim();
+  if (!cleaned) return 'श्री.';
+  if (cleaned.startsWith('श्रीमती')) return 'श्रीमती';
+  if (cleaned.startsWith('सौ')) return 'सौ.';
+  if (cleaned.startsWith('डॉ')) return 'डॉ.';
+  if (cleaned.startsWith('श्री')) return 'श्री.';
+  return 'श्री.';
+}
+
+function parseMemberNameParts(
+  rawFullName?: string,
+  rawSalutation?: string
+): { salutation: string; firstName: string; middleName: string; lastName: string } {
+  let text = String(rawFullName || '').trim().replace(/\s+/g, ' ');
+  let salutation = rawSalutation ? normalizeSalutationChoice(rawSalutation) : '';
+
+  const prefixMatch = text.match(/^(श्री\.?|श्रीमती\.?|सौ\.?|डॉ\.?|प्रा\.?|ॲड\.?)\s+/);
+  if (prefixMatch) {
+    if (!salutation) {
+      salutation = normalizeSalutationChoice(prefixMatch[1]);
+    }
+    text = text.slice(prefixMatch[0].length).trim();
+  }
+
+  if (!salutation) {
+    salutation = 'श्री.';
+  }
+
+  const parts = text.split(' ').filter(Boolean);
+  if (parts.length === 0) {
+    return { salutation, firstName: '', middleName: '', lastName: '' };
+  }
+  if (parts.length === 1) {
+    return { salutation, firstName: parts[0], middleName: '', lastName: '' };
+  }
+  if (parts.length === 2) {
+    return { salutation, firstName: parts[0], middleName: '', lastName: parts[1] };
+  }
+  return {
+    salutation,
+    firstName: parts[0],
+    middleName: parts.slice(1, -1).join(' '),
+    lastName: parts[parts.length - 1],
+  };
+}
 
 const OFFICER_CAPSULE_TINTS = [
   {
@@ -217,7 +270,21 @@ export const AppointmentsTab: React.FC = () => {
   const [formMobile, setFormMobile] = useState<string>('');
   const [formPhoto, setFormPhoto] = useState<string>('');
   const [formPhotoUrl, setFormPhotoUrl] = useState<string>('');
+  const [formMemberNumber, setFormMemberNumber] = useState<string>('');
   const [isUploadingMemberPhoto, setIsUploadingMemberPhoto] = useState<boolean>(false);
+
+  // District Approved Member Picker states (strict registered-member-only selection for New Official)
+  const [districtApprovedMembers, setDistrictApprovedMembers] = useState<MembershipApplication[]>([]);
+  const [loadedMembersDistrict, setLoadedMembersDistrict] = useState<string>('');
+  const [isLoadingDistrictMembers, setIsLoadingDistrictMembers] = useState<boolean>(false);
+  const [districtMembersError, setDistrictMembersError] = useState<string>('');
+  const [memberPickerSearch, setMemberPickerSearch] = useState<string>('');
+  const [memberPickerTaluka, setMemberPickerTaluka] = useState<string>('');
+  const [selectedMemberId, setSelectedMemberId] = useState<string>('');
+  const [selectedMemberRecord, setSelectedMemberRecord] = useState<MembershipApplication | null>(null);
+  const [isLoadingSelectedMemberPhoto, setIsLoadingSelectedMemberPhoto] = useState<boolean>(false);
+  const [showEditableMemberFields, setShowEditableMemberFields] = useState<boolean>(false);
+  const activeSelectedMemberIdRef = useRef<string>('');
 
   const handleMemberPhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -425,6 +492,63 @@ export const AppointmentsTab: React.FC = () => {
   const districtOfficials = useMemo(() => {
     return filterAndSortDistrictOfficials(officials, currentDistrict, postsList);
   }, [officials, currentDistrict, postsList]);
+
+  // Existing officials in the active modal's district keyed by normalized 10-digit mobile for duplicate alerts
+  const existingOfficialsInFormDistrictByMobile = useMemo(() => {
+    const map = new Map<string, OfficialMember>();
+    for (const off of officials) {
+      if (!matchesDistrictName(off.district, formDistrict)) continue;
+      const mob10 = normalizeMobile10(off.mobile);
+      if (mob10.length === 10 && !map.has(mob10)) {
+        map.set(mob10, off);
+      }
+    }
+    return map;
+  }, [officials, formDistrict]);
+
+  // Available taluka counts among the loaded approved members of formDistrict
+  const memberPickerTalukaCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of districtApprovedMembers) {
+      const t = String(m.taluka || '').trim();
+      if (t) {
+        counts.set(t, (counts.get(t) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [districtApprovedMembers]);
+
+  // Filtered district approved members for the interactive member picker
+  const filteredDistrictApprovedMembers = useMemo(() => {
+    const q = memberPickerSearch.trim().toLowerCase();
+    const qDigits = toEnglishDigits(memberPickerSearch).replace(/\D/g, '');
+    return districtApprovedMembers.filter((m) => {
+      if (memberPickerTaluka) {
+        const memberTal = String(m.taluka || '').trim();
+        if (memberTal !== memberPickerTaluka) return false;
+      }
+      if (!q) return true;
+      const nameStr = `${m.salutation || ''} ${m.fullName || ''}`.toLowerCase();
+      const centerStr = String(m.centerName || '').toLowerCase();
+      const talukaStr = String(m.taluka || '').toLowerCase();
+      const memberNoStr = String(m.memberNumber || '').toLowerCase();
+      const phoneStr = normalizeMobile10(m.phone);
+      return (
+        nameStr.includes(q) ||
+        centerStr.includes(q) ||
+        talukaStr.includes(q) ||
+        memberNoStr.includes(q) ||
+        (qDigits.length >= 3 && phoneStr.includes(qDigits))
+      );
+    });
+  }, [districtApprovedMembers, memberPickerSearch, memberPickerTaluka]);
+
+  const existingDuplicateForSelectedMember = useMemo(() => {
+    if (!selectedMemberRecord) return null;
+    const mob10 = normalizeMobile10(selectedMemberRecord.phone || formMobile);
+    if (mob10.length !== 10) return null;
+    return existingOfficialsInFormDistrictByMobile.get(mob10) || null;
+  }, [selectedMemberRecord, formMobile, existingOfficialsInFormDistrictByMobile]);
 
   // Searched Officials
   const searchedOfficials = useMemo(() => {
@@ -748,6 +872,157 @@ export const AppointmentsTab: React.FC = () => {
     showToast('यशस्वीपणे लॉगआउट केले.', 'success');
   };
 
+  // Load approved registered members strictly for the active district (fast, without heavy base64 photos)
+  const loadDistrictApprovedMembers = async (targetDistrict: string, forceRefresh = false) => {
+    if (!targetDistrict) return;
+    if (!forceRefresh && loadedMembersDistrict === targetDistrict && districtApprovedMembers.length > 0) {
+      return;
+    }
+    setIsLoadingDistrictMembers(true);
+    setDistrictMembersError('');
+    try {
+      let items: MembershipApplication[] = [];
+      let loadedFromServer = false;
+
+      if (await isSqlBackendActive()) {
+        try {
+          const url = `/api/db/applications/district-members?district=${encodeURIComponent(targetDistrict)}${forceRefresh ? '&refresh=1' : ''}&_t=${Date.now()}`;
+          const res = await fetch(url, {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: { ...getAuthHeaders() },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.status === 'success' && data?.mysqlActive && Array.isArray(data.items)) {
+              items = data.items;
+              loadedFromServer = true;
+            }
+          }
+        } catch {
+          // fallback below
+        }
+      }
+
+      if (!loadedFromServer) {
+        const allApproved = await fetchApprovedMembersCached(forceRefresh);
+        items = (allApproved || []).filter((m) => matchesDistrictName(m.district, targetDistrict));
+      }
+
+      const sorted = [...items].sort((a, b) =>
+        String(a.fullName || '').localeCompare(String(b.fullName || ''), 'mr')
+      );
+      setDistrictApprovedMembers(sorted);
+      setLoadedMembersDistrict(targetDistrict);
+    } catch (err: any) {
+      setDistrictMembersError(err?.message || 'जिल्ह्याची सदस्य यादी लोड करताना अडचण आली.');
+    } finally {
+      setIsLoadingDistrictMembers(false);
+    }
+  };
+
+  // Select a registered member from the district list & auto-fill all details + lazy-load passport photo
+  const handleSelectDistrictMember = async (member: MembershipApplication) => {
+    setFormError('');
+    setSelectedMemberId(member.id);
+    setSelectedMemberRecord(member);
+    activeSelectedMemberIdRef.current = member.id;
+
+    const parsed = parseMemberNameParts(member.fullName, member.salutation);
+    setFormSalutation(parsed.salutation);
+    setFormFirstName(parsed.firstName);
+    setFormMiddleName(parsed.middleName);
+    setFormLastName(parsed.lastName);
+
+    const normalizedCadre = normalizeOfficialCadre(member.professional, 'केंद्रप्रमुख');
+    setFormCadre(
+      (OFFICIAL_CADRES as readonly string[]).includes(normalizedCadre) ? normalizedCadre : 'केंद्रप्रमुख'
+    );
+    setCustomCadreInput('');
+
+    const memberCenter = String(member.centerName || '').trim();
+    const memberTalukaRaw = String(member.taluka || '').trim();
+    const matchedTaluka =
+      formAvailableTalukas.find((t) => t === memberTalukaRaw) || memberTalukaRaw;
+
+    setFormWorkingPlace(memberCenter);
+    setFormWorkingTaluka(matchedTaluka);
+
+    // If a taluka-level post is currently selected, pre-fill the appointment taluka with the member's working taluka
+    if (isPostNeedsTaluka && matchedTaluka && formAvailableTalukas.includes(matchedTaluka)) {
+      setFormTaluka(matchedTaluka);
+    }
+
+    const mobile10 = normalizeMobile10(member.phone);
+    setFormMobile(mobile10);
+    setFormMemberNumber(String(member.memberNumber || '').trim());
+
+    const inlinePhoto = String(member.photo || '').trim();
+    setFormPhoto(inlinePhoto);
+    setFormPhotoUrl(inlinePhoto.startsWith('http') ? inlinePhoto : '');
+
+    // Auto-open editable details ONLY if any required field was missing in the old registration record
+    const hasMissingRequired =
+      !parsed.firstName.trim() ||
+      !parsed.lastName.trim() ||
+      !memberCenter ||
+      mobile10.length !== 10;
+    setShowEditableMemberFields(hasMissingRequired);
+
+    // Lazy-load passport photo on demand for just this 1 selected member
+    if (!inlinePhoto && (await isSqlBackendActive())) {
+      setIsLoadingSelectedMemberPhoto(true);
+      try {
+        const res = await fetch(
+          `/api/db/applications/district-member-photo/${encodeURIComponent(member.id)}?_t=${Date.now()}`,
+          {
+            credentials: 'include',
+            cache: 'no-store',
+            headers: { ...getAuthHeaders() },
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (activeSelectedMemberIdRef.current === member.id && data?.photo) {
+            const loadedPhoto = String(data.photo).trim();
+            setFormPhoto(loadedPhoto);
+            setFormPhotoUrl(loadedPhoto.startsWith('http') ? loadedPhoto : '');
+          }
+        }
+      } catch {
+        // Keep empty photo gracefully if unavailable
+      } finally {
+        if (activeSelectedMemberIdRef.current === member.id) {
+          setIsLoadingSelectedMemberPhoto(false);
+        }
+      }
+    } else {
+      setIsLoadingSelectedMemberPhoto(false);
+    }
+  };
+
+  // Clear selected member to pick a different member from the district list
+  const handleClearSelectedMember = () => {
+    activeSelectedMemberIdRef.current = '';
+    setSelectedMemberId('');
+    setSelectedMemberRecord(null);
+    setIsLoadingSelectedMemberPhoto(false);
+    setShowEditableMemberFields(false);
+    setFormError('');
+    setFormSalutation('श्री.');
+    setFormFirstName('');
+    setFormMiddleName('');
+    setFormLastName('');
+    setFormTaluka('');
+    setFormCadre('केंद्रप्रमुख');
+    setFormWorkingPlace('');
+    setFormWorkingTaluka('');
+    setFormMobile('');
+    setFormPhoto('');
+    setFormPhotoUrl('');
+    setFormMemberNumber('');
+  };
+
   // Open Add Member Modal
   const handleOpenAddModal = () => {
     const activeDist = isSuperAdmin ? currentDistrict : (lockedDistrictName || currentDistrict);
@@ -756,8 +1031,15 @@ export const AppointmentsTab: React.FC = () => {
       setPostsList(latestLocalPosts);
     }
     const initialDefaultPost = latestLocalPosts[0]?.name || postsList[0]?.name || 'जिल्हाध्यक्ष';
+    activeSelectedMemberIdRef.current = '';
     setFormError('');
     setEditingMemberId(null);
+    setSelectedMemberId('');
+    setSelectedMemberRecord(null);
+    setMemberPickerSearch('');
+    setMemberPickerTaluka('');
+    setIsLoadingSelectedMemberPhoto(false);
+    setShowEditableMemberFields(false);
     setFormSalutation('श्री.');
     setFormFirstName('');
     setFormMiddleName('');
@@ -772,7 +1054,11 @@ export const AppointmentsTab: React.FC = () => {
     setFormMobile('');
     setFormPhoto('');
     setFormPhotoUrl('');
+    setFormMemberNumber('');
     setIsMemberModalOpen(true);
+
+    // Load approved registered members strictly for this district
+    loadDistrictApprovedMembers(activeDist);
 
     // Sync latest order/posts from server right as modal opens without blocking UI
     fetchAppointedPosts(true)
@@ -803,6 +1089,10 @@ export const AppointmentsTab: React.FC = () => {
         }
       })
       .catch(() => {});
+    activeSelectedMemberIdRef.current = '';
+    setSelectedMemberId('');
+    setSelectedMemberRecord(null);
+    setShowEditableMemberFields(true);
     setEditingMemberId(m.id);
     setFormSalutation(m.salutation || 'श्री.');
     setFormFirstName(m.firstName || '');
@@ -824,20 +1114,29 @@ export const AppointmentsTab: React.FC = () => {
     setFormMobile(m.mobile || '');
     setFormPhoto(m.photo || '');
     setFormPhotoUrl(m.photo && m.photo.startsWith('http') ? m.photo : '');
+    setFormMemberNumber(m.memberNumber || '');
     setIsMemberModalOpen(true);
   };
 
-  // Save Member to Firebase RTDB
+  // Save Member to Firebase RTDB / MySQL
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
-    if (!formFirstName.trim() || !formLastName.trim() || !formMobile.trim() || !formWorkingPlace.trim()) {
-      setFormError('कृपया सर्व आवश्यक माहिती (नाव, आडनाव, पद, कार्यक्षेत्र, मोबाईल) भरा.');
+
+    if (!editingMemberId && !selectedMemberId) {
+      setFormError(`कृपया प्रथम '${formDistrict}' जिल्ह्यातील मंजूर सदस्य यादीतून सदस्य निवडा.`);
+      return;
+    }
+
+    const cleanMobile = normalizeMobile10(formMobile);
+    if (!formFirstName.trim() || !formLastName.trim() || cleanMobile.length !== 10 || !formWorkingPlace.trim()) {
+      setShowEditableMemberFields(true);
+      setFormError('कृपया सर्व आवश्यक माहिती (प्रथम नाव, आडनाव, कार्यरत केंद्र आणि 10-अंकी मोबाईल नंबर) तपासून भरा.');
       return;
     }
 
     if (isPostNeedsTaluka && !formTaluka.trim()) {
-      setFormError('कृपया बहाल केलेल्या तालुक्याचे नाव निवडा.');
+      setFormError('कृपया बहाल केलेल्या पदाचा तालुका निवडा.');
       return;
     }
 
@@ -866,8 +1165,9 @@ export const AppointmentsTab: React.FC = () => {
       taluka: finalTaluka,
       currentCadre: finalCadre,
       workingPlace: formWorkingPlace.trim(),
-      mobile: toEnglishDigits(formMobile.trim()),
+      mobile: cleanMobile,
       photo: finalPhoto,
+      ...(formMemberNumber ? { memberNumber: formMemberNumber } : {}),
       updatedAt: new Date().toISOString()
     };
 
@@ -2806,11 +3106,18 @@ export const AppointmentsTab: React.FC = () => {
             role="dialog"
             aria-modal="true"
           >
-            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-lg w-full text-sm max-h-[90dvh] flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-300 shadow-2xl max-w-xl w-full text-sm max-h-[92dvh] flex flex-col overflow-hidden">
               <div className="bg-[#193568] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-[#efb24b] shrink-0">
-                <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold">
-                  {editingMemberId ? 'पदाधिकारी माहिती दुरुस्ती' : `नवीन पदाधिकारी नोंदणी (${formDistrict} जिल्हा)`}
-                </h3>
+                <div>
+                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold leading-tight">
+                    {editingMemberId ? 'पदाधिकारी माहिती दुरुस्ती' : `नवीन पदाधिकारी नोंदणी (${formDistrict} जिल्हा)`}
+                  </h3>
+                  {!editingMemberId && (
+                    <p className="text-[11px] sm:text-xs text-amber-200 mt-0.5">
+                      केवळ '{formDistrict}' जिल्ह्यातील मंजूर सदस्यांमधून निवड करा
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsMemberModalOpen(false)}
@@ -2821,226 +3128,501 @@ export const AppointmentsTab: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveMember} className="p-5 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
-              {formError && (
-                <div className="p-2.5 bg-rose-50 border border-rose-300 text-rose-700 rounded-md text-sm font-semibold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-2.5">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">आदरार्थी *</label>
-                  <select
-                    value={formSalutation}
-                    onChange={(e) => setFormSalutation(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#193568]"
-                  >
-                    <option value="श्री.">श्री.</option>
-                    <option value="श्रीमती">श्रीमती</option>
-                    <option value="सौ.">सौ.</option>
-                    <option value="डॉ.">डॉ.</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="font-semibold text-slate-700 block mb-1">जिल्हा (लॉक):</label>
-                  <input
-                    type="text"
-                    value={formDistrict}
-                    readOnly
-                    className="w-full p-2 border border-slate-300 rounded-md bg-slate-100 font-semibold text-slate-700 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">प्रथम नाव *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formFirstName}
-                    onChange={(e) => setFormFirstName(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">मधले नाव *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formMiddleName}
-                    onChange={(e) => setFormMiddleName(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">आडनाव *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formLastName}
-                    onChange={(e) => setFormLastName(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">सध्याचे संवर्ग पद *</label>
-                <select
-                  value={(OFFICIAL_CADRES as readonly string[]).includes(formCadre) ? formCadre : 'केंद्रप्रमुख'}
-                  onChange={(e) => setFormCadre(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-md bg-white font-medium focus:outline-none focus:border-[#193568]"
-                >
-                  {OFFICIAL_CADRES.map((cadre) => (
-                    <option key={cadre} value={cadre}>
-                      {cadre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">मूळ कार्यरत केंद्र / शाळा / बीट *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formWorkingPlace}
-                    onChange={(e) => setFormWorkingPlace(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
-                  />
-                </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">शाळा / नोकरीचा तालुका (ऐच्छिक)</label>
-                  <select
-                    value={formWorkingTaluka}
-                    onChange={(e) => setFormWorkingTaluka(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#193568]"
-                  >
-                    <option value="">-- शाळा / नोकरीचा तालुका --</option>
-                    {formAvailableTalukas.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className={isPostNeedsTaluka ? '' : 'sm:col-span-2'}>
-                  <label htmlFor="appointed-post-select" className="font-semibold text-slate-700 block mb-1">बहाल करण्यात येणारे पद *</label>
-                  <select
-                    id="appointed-post-select"
-                    value={formPost}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setFormPost(val);
-                      const matched = postsList.find((p) => p.name === val);
-                      if (!isTalukaLevelPost(val, matched?.isTaluka, matched?.level)) {
-                        setFormTaluka('');
-                      }
-                    }}
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white font-semibold focus:outline-none focus:border-[#193568]"
-                  >
-                    {postsList.map((p, idx) => (
-                      <option key={`${p.name}_${idx}`} value={p.name}>
-                        {p.name} ({getPostLevelLabel(p.name, p.level, p.isTaluka)})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {isPostNeedsTaluka && (
-                  <div>
-                    <label className="font-semibold block mb-1 text-[#9a460b]">बहाल केलेल्या पदाचा तालुका निवडा *</label>
-                    <select
-                      value={formTaluka}
-                      onChange={(e) => setFormTaluka(e.target.value)}
-                      required
-                      className="w-full p-2 border border-amber-500 bg-amber-50/40 rounded-md font-semibold text-slate-800 focus:outline-none focus:border-[#193568]"
-                    >
-                      <option value="">-- बहाल पदाचा तालुका निवडा --</option>
-                      {formAvailableTalukas.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+              <form onSubmit={handleSaveMember} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+                {formError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-300 text-rose-700 rounded-md text-sm font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{formError}</span>
                   </div>
                 )}
-              </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">व्हॉट्सअ‍ॅप मोबाईल नंबर (10 अंक इंग्रजीत) *</label>
-                <input
-                  type="tel"
-                  required
-                  pattern="[0-9]{10}"
-                  value={formMobile}
-                  onChange={(e) => setFormMobile(toEnglishDigits(e.target.value))}
-                  className="w-full p-2 border border-slate-300 rounded-md font-semibold font-mono focus:outline-none focus:border-[#193568]"
-                />
-              </div>
+                {/* ============================================================= */}
+                {/* STEP 1 (NEW OFFICIAL ONLY): STRICT REGISTERED MEMBER PICKER   */}
+                {/* ============================================================= */}
+                {!editingMemberId && (
+                  <div className="space-y-3">
+                    {!selectedMemberRecord ? (
+                      <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3.5 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2">
+                            <UserCheck className="w-4 h-4 text-[#193568] shrink-0 mt-0.5" />
+                            <div className="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                              <span className="font-bold text-[#193568]">
+                                पायरी 1: '{formDistrict}' जिल्ह्याचा मंजूर सदस्य निवडा *
+                              </span>
+                              <p className="text-xs text-slate-600 mt-0.5">
+                                पदाधिकारी म्हणून नेमणूक करण्यासाठी संबंधित व्यक्ती महासंघाचा मंजूर सदस्य असणे आवश्यक आहे. नाव यादीत नसल्यास प्रथम <strong>'सदस्यत्व नोंदणी'</strong> पूर्ण करावी.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => loadDistrictApprovedMembers(formDistrict, true)}
+                            disabled={isLoadingDistrictMembers}
+                            className="shrink-0 text-xs font-bold text-[#193568] bg-white hover:bg-slate-50 border border-slate-300 px-2.5 py-1 rounded-md inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            title="सदस्य यादी ताजी करा"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isLoadingDistrictMembers ? 'animate-spin' : ''}`} />
+                            <span>ताजे करा</span>
+                          </button>
+                        </div>
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">पासपोर्ट फोटो (फोटोज लावण्यासाठी)</label>
-                <div className="space-y-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleMemberPhotoSelect}
-                    disabled={isUploadingMemberPhoto}
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white text-xs"
-                  />
-                  {isUploadingMemberPhoto && (
-                    <div className="text-xs text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
-                      <span>फोटो क्लाउडवर अपलोड होत आहे...</span>
-                    </div>
-                  )}
-                  {formPhoto && !isUploadingMemberPhoto && (
-                    <div className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-200 rounded-md">
-                      <img src={formPhoto} alt="प्रीव्ह्यू" className="w-11 h-11 rounded-full object-cover border border-[#efb24b]" />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs font-semibold text-slate-800 block truncate">
-                          फोटो यशस्वीरीत्या जोडला गेला
-                        </span>
+                        {/* Taluka Filter + Search Bar */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                          <div className="sm:col-span-5">
+                            <select
+                              value={memberPickerTaluka}
+                              onChange={(e) => setMemberPickerTaluka(e.target.value)}
+                              className="w-full p-2 text-xs sm:text-sm border border-slate-300 rounded-md bg-white font-medium text-slate-800 focus:outline-none focus:border-[#193568]"
+                              aria-label="तालुका फिल्टर"
+                            >
+                              <option value="">
+                                सर्व तालुके ({districtApprovedMembers.length})
+                              </option>
+                              {formAvailableTalukas.map((t) => {
+                                const cnt = memberPickerTalukaCounts.get(t) || 0;
+                                return (
+                                  <option key={t} value={t}>
+                                    {t} ({cnt})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-7 relative">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <input
+                              type="text"
+                              value={memberPickerSearch}
+                              onChange={(e) => setMemberPickerSearch(e.target.value)}
+                              placeholder="नाव, मोबाईल नंबर किंवा सदस्य क्र. शोधा..."
+                              className="w-full pl-8 pr-8 p-2 text-xs sm:text-sm border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#193568]"
+                            />
+                            {memberPickerSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setMemberPickerSearch('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                                aria-label="शोध साफ करा"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scrollable Member Picker List */}
+                        {districtMembersError ? (
+                          <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-700 font-semibold">
+                            {districtMembersError}
+                          </div>
+                        ) : isLoadingDistrictMembers ? (
+                          <div className="p-6 text-center text-slate-600 text-xs sm:text-sm flex items-center justify-center gap-2 bg-white rounded-md border border-slate-200">
+                            <RefreshCw className="w-4 h-4 animate-spin text-[#193568]" />
+                            <span>'{formDistrict}' जिल्ह्याचे नोंदणीकृत सदस्य लोड होत आहेत...</span>
+                          </div>
+                        ) : districtApprovedMembers.length === 0 ? (
+                          <div className="p-4 text-center bg-white rounded-md border border-amber-200 text-xs sm:text-sm text-amber-900 space-y-1">
+                            <p className="font-bold">'{formDistrict}' जिल्ह्यात अद्याप मंजूर सदस्य नोंद आढळली नाही.</p>
+                            <p className="text-xs text-slate-600">
+                              कृपया प्रथम संबंधित व्यक्तीची सदस्यत्व नोंदणी व मंजुरी पूर्ण करून घ्या, त्यानंतर येथे नाव आपोआप दिसेल.
+                            </p>
+                          </div>
+                        ) : filteredDistrictApprovedMembers.length === 0 ? (
+                          <div className="p-4 text-center bg-white rounded-md border border-slate-200 text-xs text-slate-600">
+                            तुमच्या शोधाशी जुळणारा सदस्य आढळला नाही. कृपया नाव, मोबाईल किंवा तालुका फिल्टर तपासा.
+                          </div>
+                        ) : (
+                          <div className="bg-white rounded-md border border-slate-300 divide-y divide-slate-200 max-h-60 overflow-y-auto">
+                            {filteredDistrictApprovedMembers.map((mem) => {
+                              const memMob10 = normalizeMobile10(mem.phone);
+                              const existingOff =
+                                memMob10.length === 10
+                                  ? existingOfficialsInFormDistrictByMobile.get(memMob10)
+                                  : undefined;
+                              const displayFullName = `${mem.salutation ? mem.salutation + ' ' : ''}${mem.fullName || ''}`.trim();
+
+                              return (
+                                <button
+                                  key={mem.id}
+                                  type="button"
+                                  onClick={() => handleSelectDistrictMember(mem)}
+                                  className="w-full text-left px-3 py-2.5 hover:bg-sky-50 active:bg-sky-100 transition-colors flex items-start justify-between gap-2 cursor-pointer"
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <span className="font-bold text-slate-900 text-sm leading-snug">
+                                        {displayFullName}
+                                      </span>
+                                      {mem.memberNumber && (
+                                        <span className="text-[11px] font-mono font-semibold text-[#193568] bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
+                                          {mem.memberNumber}
+                                        </span>
+                                      )}
+                                      {existingOff && (
+                                        <span className="text-[11px] font-bold text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded">
+                                          आधीपासून पदाधिकारी ({existingOff.appointedPost})
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-slate-600 mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                                      <span>{mem.professional || 'केंद्रप्रमुख'}</span>
+                                      {mem.centerName && (
+                                        <span>· केंद्र: {mem.centerName}</span>
+                                      )}
+                                      {mem.taluka && (
+                                        <span>· ता. {mem.taluka}</span>
+                                      )}
+                                      {memMob10 && (
+                                        <span className="font-mono">· {memMob10}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="shrink-0 text-xs font-bold text-[#193568] bg-sky-100/80 px-2.5 py-1 rounded self-center">
+                                    निवडा
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormPhoto('');
-                          setFormPhotoUrl('');
-                        }}
-                        className="text-xs text-rose-600 font-bold hover:underline cursor-pointer"
-                      >
-                        काढा
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    ) : (
+                      /* Selected Member Auto-Filled Summary Card */
+                      <div className="rounded-lg border border-emerald-300 bg-emerald-50/50 p-3.5 space-y-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="w-14 h-16 rounded-lg overflow-hidden border-2 border-white ring-1 ring-emerald-300 bg-white shrink-0 flex items-center justify-center shadow-xs">
+                            {isLoadingSelectedMemberPhoto ? (
+                              <RefreshCw className="w-4 h-4 animate-spin text-[#193568]" />
+                            ) : formPhoto ? (
+                              <img
+                                src={formPhoto}
+                                alt={formFirstName}
+                                className="w-full h-full object-cover object-top"
+                              />
+                            ) : (
+                              <ImageIcon className="w-5 h-5 text-slate-300" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                <CheckCircle2 className="w-3 h-3" />
+                                नोंदणीकृत सदस्य निवडला
+                              </span>
+                              {formMemberNumber && (
+                                <span className="text-[11px] font-mono font-bold text-[#193568] bg-white border border-slate-200 px-1.5 py-0.5 rounded">
+                                  {formMemberNumber}
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-serifDevanagari font-bold text-base text-[#0b1e36] mt-1 leading-snug">
+                              {formSalutation} {formFirstName} {formMiddleName ? `${formMiddleName} ` : ''}{formLastName}
+                            </div>
+                            <div className="text-xs text-slate-700 mt-1 space-y-0.5">
+                              <div>
+                                <strong>संवर्ग:</strong> {formCadre} · <strong>मोबाईल:</strong>{' '}
+                                <span className="font-mono font-semibold">{formMobile || '—'}</span>
+                              </div>
+                              <div>
+                                <strong>केंद्र / शाळा:</strong> {formWorkingPlace || 'रिकामे (खाली भरा)'}{' '}
+                                {formWorkingTaluka ? `· ता. ${formWorkingTaluka}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
 
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setIsMemberModalOpen(false)}
-                  className="px-4 py-2 border border-slate-300 rounded-md font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
-                >
-                  रद्द करा
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-[#193568] hover:bg-[#11254a] text-white rounded-md font-semibold cursor-pointer"
-                >
-                  सेव्ह करा
-                </button>
-              </div>
-            </form>
-          </div>
+                        {existingDuplicateForSelectedMember && (
+                          <div className="p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900 font-semibold flex items-start gap-1.5">
+                            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <span>
+                              सूचना: हे सदस्य आधीपासून '{existingDuplicateForSelectedMember.appointedPost}' पदावर या जिल्ह्याच्या यादीत नोंदवलेले आहेत. कृपया यादी तपासा किंवा दुसरे पद देत असाल तरच सेव्ह करा.
+                            </span>
+                          </div>
+                        )}
+
+                        {(!formFirstName.trim() || !formLastName.trim() || !formWorkingPlace.trim() || normalizeMobile10(formMobile).length !== 10) && (
+                          <div className="p-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-900 font-semibold flex items-start gap-1.5">
+                            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                            <span>
+                              सदस्य नोंदणीत काही आवश्यक माहिती (उदा. केंद्र नाव किंवा मोबाईल) अपूर्ण होती. कृपया खालील रकाने तपासून पूर्ण करा.
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-emerald-200/80">
+                          <button
+                            type="button"
+                            onClick={handleClearSelectedMember}
+                            className="text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1.5 rounded-md cursor-pointer"
+                          >
+                            सदस्य बदला
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowEditableMemberFields((prev) => !prev)}
+                            className="text-xs font-bold text-[#193568] bg-white hover:bg-sky-50 border border-[#193568]/30 px-2.5 py-1.5 rounded-md inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>{showEditableMemberFields ? 'तपशील लपवा' : 'माहिती बदला / दुरुस्त करा'}</span>
+                            {showEditableMemberFields ? (
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ============================================================= */}
+                {/* STEP 2: PRIMARY APPOINTMENT POST & CONDITIONAL TALUKA         */}
+                {/* ============================================================= */}
+                {(editingMemberId || selectedMemberRecord) && (
+                  <div className="rounded-lg border-2 border-[#193568]/25 bg-amber-50/35 p-3.5 space-y-2.5">
+                    {!editingMemberId && (
+                      <div className="text-xs sm:text-sm font-bold text-[#193568]">
+                        पायरी 2: बहाल करावयाचे पद निवडा *
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className={isPostNeedsTaluka ? '' : 'sm:col-span-2'}>
+                        <label htmlFor="appointed-post-select" className="font-semibold text-slate-800 block mb-1">
+                          बहाल करण्यात येणारे पद *
+                        </label>
+                        <select
+                          id="appointed-post-select"
+                          value={formPost}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormPost(val);
+                            const matched = postsList.find((p) => p.name === val);
+                            const needsTal = isTalukaLevelPost(val, matched?.isTaluka, matched?.level);
+                            if (!needsTal) {
+                              setFormTaluka('');
+                            } else if (!formTaluka && formWorkingTaluka && formAvailableTalukas.includes(formWorkingTaluka)) {
+                              setFormTaluka(formWorkingTaluka);
+                            }
+                          }}
+                          className="w-full p-2 border border-slate-300 rounded-md bg-white font-semibold focus:outline-none focus:border-[#193568]"
+                        >
+                          {postsList.map((p, idx) => (
+                            <option key={`${p.name}_${idx}`} value={p.name}>
+                              {p.name} ({getPostLevelLabel(p.name, p.level, p.isTaluka)})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {isPostNeedsTaluka && (
+                        <div>
+                          <label className="font-semibold block mb-1 text-[#9a460b]">
+                            बहाल केलेल्या पदाचा तालुका निवडा *
+                          </label>
+                          <select
+                            value={formTaluka}
+                            onChange={(e) => setFormTaluka(e.target.value)}
+                            required
+                            className="w-full p-2 border border-amber-500 bg-white rounded-md font-semibold text-slate-800 focus:outline-none focus:border-[#193568]"
+                          >
+                            <option value="">-- बहाल पदाचा तालुका निवडा --</option>
+                            {formAvailableTalukas.map((t) => (
+                              <option key={t} value={t}>
+                                {t}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ============================================================= */}
+                {/* STEP 3: FULL EDITABLE DETAILS (ALWAYS IN EDIT MODE,           */}
+                {/* OR TOGGLEABLE / AUTO-OPEN IF NEEDED IN NEW OFFICIAL MODE)     */}
+                {/* ============================================================= */}
+                {(editingMemberId || (selectedMemberRecord && showEditableMemberFields)) && (
+                  <div className="space-y-3 pt-1 border-t border-slate-200">
+                    {!editingMemberId && (
+                      <div className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                        सदस्य तपशील (गरज पडल्यास दुरुस्ती करा)
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">आदरार्थी *</label>
+                        <select
+                          value={formSalutation}
+                          onChange={(e) => setFormSalutation(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#193568]"
+                        >
+                          <option value="श्री.">श्री.</option>
+                          <option value="श्रीमती">श्रीमती</option>
+                          <option value="सौ.">सौ.</option>
+                          <option value="डॉ.">डॉ.</option>
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="font-semibold text-slate-700 block mb-1">जिल्हा (लॉक):</label>
+                        <input
+                          type="text"
+                          value={formDistrict}
+                          readOnly
+                          className="w-full p-2 border border-slate-300 rounded-md bg-slate-100 font-semibold text-slate-700 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">प्रथम नाव *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formFirstName}
+                          onChange={(e) => setFormFirstName(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">मधले नाव (ऐच्छिक)</label>
+                        <input
+                          type="text"
+                          value={formMiddleName}
+                          onChange={(e) => setFormMiddleName(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">आडनाव *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formLastName}
+                          onChange={(e) => setFormLastName(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">सध्याचे संवर्ग पद *</label>
+                      <select
+                        value={(OFFICIAL_CADRES as readonly string[]).includes(formCadre) ? formCadre : 'केंद्रप्रमुख'}
+                        onChange={(e) => setFormCadre(e.target.value)}
+                        className="w-full p-2 border border-slate-300 rounded-md bg-white font-medium focus:outline-none focus:border-[#193568]"
+                      >
+                        {OFFICIAL_CADRES.map((cadre) => (
+                          <option key={cadre} value={cadre}>
+                            {cadre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">मूळ कार्यरत केंद्र / शाळा / बीट *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formWorkingPlace}
+                          onChange={(e) => setFormWorkingPlace(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md focus:outline-none focus:border-[#193568]"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">शाळा / नोकरीचा तालुका (ऐच्छिक)</label>
+                        <select
+                          value={formWorkingTaluka}
+                          onChange={(e) => setFormWorkingTaluka(e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-md bg-white focus:outline-none focus:border-[#193568]"
+                        >
+                          <option value="">-- शाळा / नोकरीचा तालुका --</option>
+                          {formAvailableTalukas.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">व्हॉट्सअ‍ॅप मोबाईल नंबर (10 अंक इंग्रजीत) *</label>
+                      <input
+                        type="tel"
+                        required
+                        pattern="[0-9]{10}"
+                        value={formMobile}
+                        onChange={(e) => setFormMobile(toEnglishDigits(e.target.value))}
+                        className="w-full p-2 border border-slate-300 rounded-md font-semibold font-mono focus:outline-none focus:border-[#193568]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">पासपोर्ट फोटो (फोटोज लावण्यासाठी / बदलण्यासाठी)</label>
+                      <div className="space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleMemberPhotoSelect}
+                          disabled={isUploadingMemberPhoto}
+                          className="w-full p-2 border border-slate-300 rounded-md bg-white text-xs"
+                        />
+                        {isUploadingMemberPhoto && (
+                          <div className="text-xs text-sky-700 font-bold flex items-center gap-1.5 p-2 bg-sky-50 rounded border border-sky-200">
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                            <span>फोटो क्लाउडवर अपलोड होत आहे...</span>
+                          </div>
+                        )}
+                        {formPhoto && !isUploadingMemberPhoto && (
+                          <div className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-200 rounded-md">
+                            <img src={formPhoto} alt="प्रीव्ह्यू" className="w-11 h-11 rounded-full object-cover object-top border border-[#efb24b]" />
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-semibold text-slate-800 block truncate">
+                                फोटो यशस्वीरीत्या जोडला गेला
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormPhoto('');
+                                setFormPhotoUrl('');
+                              }}
+                              className="text-xs text-rose-600 font-bold hover:underline cursor-pointer"
+                            >
+                              काढा
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-3 flex justify-end gap-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setIsMemberModalOpen(false)}
+                    className="px-4 py-2 border border-slate-300 rounded-md font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    रद्द करा
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={(!editingMemberId && !selectedMemberRecord) || isUploadingMemberPhoto || isLoadingSelectedMemberPhoto}
+                    className="px-5 py-2 bg-[#193568] hover:bg-[#11254a] text-white rounded-md font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    सेव्ह करा
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </ModalPortal>
       )}

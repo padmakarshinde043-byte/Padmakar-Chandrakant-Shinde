@@ -2140,6 +2140,99 @@ app.post('/api/db/applications/photos-batch', requireAdminOrSubAdmin(['approveMe
   }
 });
 
+// Helper: canonical Maharashtra district comparison (handles Ahilyanagar/Ahmednagar, Chh. Sambhajinagar/Aurangabad, Dharashiv/Osmanabad)
+function normalizeCanonicalDistrictForMatch(name: string): string {
+  const n = String(name || '').trim().replace(/\s+/g, ' ');
+  if (n === 'अहमदनगर' || n === 'अहिल्यानगर') return 'अहिल्यानगर';
+  if (n === 'औरंगाबाद' || n === 'छत्रपती संभाजीनगर' || n === 'संभाजीनगर') return 'छत्रपती संभाजीनगर';
+  if (n === 'उस्मानाबाद' || n === 'धाराशिव') return 'धाराशिव';
+  return n;
+}
+
+// District President / State President / Super Admin: fetch approved members strictly for one district (fast, without heavy base64 photos)
+app.get('/api/db/applications/district-members', requireOfficialEditor, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const requestedDistrict = String(req.query.district || '').trim();
+    const effectiveDistrict =
+      session?.role === 'district_admin' && session.district
+        ? session.district
+        : requestedDistrict;
+
+    if (!effectiveDistrict) {
+      return res.status(400).json({ status: 'error', message: 'कृपया जिल्हा निवडा.' });
+    }
+
+    if (!isMysqlActive()) {
+      return sendFreshJson(req, res, { status: 'fallback_local', mysqlActive: false, district: effectiveDistrict, items: [] });
+    }
+
+    const bypass = req.query.refresh === '1' || req.query.refresh === 'true';
+    const allApproved = await getCachedOrFetch('apps:approved-dir', bypass, () => mysqlListApprovedDirectory());
+    const targetCanonical = normalizeCanonicalDistrictForMatch(effectiveDistrict);
+    const filtered = allApproved.filter(
+      (item) => normalizeCanonicalDistrictForMatch(item.district) === targetCanonical
+    );
+
+    sendFreshJson(req, res, {
+      status: 'success',
+      mysqlActive: true,
+      district: effectiveDistrict,
+      items: filtered,
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+// District President / State President / Super Admin: fetch a single approved member's passport photo on demand (strictly scoped to logged-in district)
+app.get('/api/db/applications/district-member-photo/:id', requireOfficialEditor, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const memberId = String(req.params.id || '').trim();
+    if (!memberId) {
+      return res.status(400).json({ status: 'error', message: 'Invalid member ID' });
+    }
+
+    if (!isMysqlActive()) {
+      return sendFreshJson(req, res, { status: 'fallback_local', id: memberId, photo: '' });
+    }
+
+    const member = await mysqlGetApplicationById(memberId);
+    if (!member) {
+      return res.status(404).json({ status: 'error', message: 'सदस्य नोंद आढळली नाही.' });
+    }
+
+    const isApproved = Boolean(
+      member.status === 'approved' || member.memberNumber || member.approvedAt
+    );
+    if (!isApproved) {
+      return res.status(403).json({ status: 'error', message: 'हा अर्ज अद्याप मंजूर झालेला नाही.' });
+    }
+
+    if (session?.role === 'district_admin' && session.district) {
+      const allowedDist = normalizeCanonicalDistrictForMatch(session.district);
+      const memberDist = normalizeCanonicalDistrictForMatch(member.district || '');
+      if (allowedDist !== memberDist) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'आपण केवळ आपल्या जिल्ह्यातील सदस्यांची माहिती पाहू शकता.',
+        });
+      }
+    }
+
+    let photo = String(member.photo || '').trim();
+    if (!photo) {
+      const batch = await mysqlGetApplicationPhotosByIds([memberId]);
+      photo = String(batch[memberId] || '').trim();
+    }
+
+    sendFreshJson(req, res, { status: 'success', id: memberId, photo });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
 app.post('/api/db/applications', appSubmitLimiter, async (req, res) => {
   try {
     const session = extractRequestSession(req);
