@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /center-update
+Disallow: /api/
+
+Sitemap: https://mahasangh.in/sitemap.xml

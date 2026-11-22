@@ -5,12 +5,17 @@
  */
 
 const BASE_TITLE = 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ';
+const HOME_TITLE = 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ | Mahasangh';
+const DEFAULT_DESCRIPTION =
+  'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ (Mahasangh) अधिकृत पोर्टल — ऑनलाईन सदस्यत्व नोंदणी, डिजिटल आयकार्ड, शासन निर्णय, परिपत्रके व पदाधिकारी माहिती.';
 const CANONICAL_ORIGIN = 'https://mahasangh.in';
 
 export interface RouteMeta {
   tabId: string;
   path: string;
   title: string;
+  description?: string;
+  noIndex?: boolean;
   aliases?: string[];
 }
 
@@ -18,75 +23,98 @@ export const APP_ROUTES: RouteMeta[] = [
   {
     tabId: 'home',
     path: '/',
-    title: BASE_TITLE,
+    title: HOME_TITLE,
+    description: DEFAULT_DESCRIPTION,
     aliases: ['/home', '/index.html'],
   },
   {
     tabId: 'about',
     path: '/about',
     title: `आमच्याबद्दल — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची स्थापना, ध्येय, उद्दिष्टे, प्रमुख मागण्या आणि राज्यातील 34 जिल्ह्यांतील कार्यप्रणालीची सविस्तर माहिती.',
     aliases: ['/objectives'],
   },
   {
     tabId: 'leadership',
     path: '/leadership',
     title: `राज्य नेतृत्व — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी व विभागीय पदाधिकाऱ्यांची अधिकृत यादी.',
     aliases: ['/state-leadership'],
   },
   {
     tabId: 'district_leadership',
     path: '/district-leadership',
     title: `जिल्हा नेतृत्व — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्रातील सर्व 34 जिल्ह्यांतील महासंघ जिल्हाध्यक्ष व जिल्हा सरचिटणीस यांची अधिकृत संपर्क निर्देशिका.',
     aliases: ['/district_leadership'],
   },
   {
     tabId: 'appointments',
     path: '/appointments',
     title: `जिल्हा पदाधिकारी — ${BASE_TITLE}`,
+    description:
+      'जिल्हा व तालुका कार्यकारिणी पदाधिकारी यादी आणि महासंघाची अधिकृत स्वाक्षरीयुक्त नियुक्ती पत्रे प्रणाली.',
     aliases: ['/office-bearers'],
   },
   {
     tabId: 'advisory',
     path: '/advisory',
     title: `राज्य सल्लागार मंडळ — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे राज्य सल्लागार मंडळ आणि कायदेविषयक सल्लागार यांची अधिकृत माहिती.',
     aliases: ['/advisory-board'],
   },
   {
     tabId: 'news',
     path: '/news',
     title: `बातम्या — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या ताज्या घडामोडी, बैठका, उपक्रम व अधिकृत बातम्या वाचा.',
   },
   {
     tabId: 'circulars',
     path: '/circulars',
     title: `शासन निर्णय व परिपत्रके — ${BASE_TITLE}`,
+    description:
+      'शालेय शिक्षण विभाग व प्राथमिक शिक्षण संचालनालयाचे अद्ययावत शासन निर्णय (GR), परिपत्रके आणि महासंघाची निवेदने PDF स्वरूपात डाऊनलोड करा.',
     aliases: ['/gov-orders'],
   },
   {
     tabId: 'membership',
     path: '/membership',
     title: `सदस्यत्व नोंदणी — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ ऑनलाईन सदस्यत्व नोंदणी, अर्जाची स्थिती तपासणी, अधिकृत सभासद यादी व डिजिटल ओळखपत्र (PDF).',
   },
   {
     tabId: 'contact',
     path: '/contact',
     title: `संपर्क — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ मुख्य कार्यालय पत्ता, अधिकृत फोन क्रमांक, ई-मेल व थेट संपर्क फॉर्म.',
   },
   {
     tabId: 'privacy',
     path: '/privacy-policy',
     title: `Privacy & Disclaimer Policy — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ वेबसाईट व अ‍ॅपचे गोपनीयता धोरण, माहिती स्त्रोत आणि अस्वीकरण (Privacy & Disclaimer Policy).',
     aliases: ['/privacy', '/disclaimer'],
   },
   {
     tabId: 'admin',
     path: '/admin',
     title: `Admin Panel — ${BASE_TITLE}`,
+    noIndex: true,
   },
   {
     tabId: 'center_update',
     path: '/center-update',
     title: `केंद्र अद्ययावत करा — ${BASE_TITLE}`,
+    noIndex: true,
     aliases: ['/kendra-update', '/center_update'],
   },
 ];
@@ -214,11 +242,35 @@ export function syncBrowserUrlForTab(
 export function syncDocumentMetaForTab(tabId: string): void {
   if (typeof document === 'undefined') return;
   const normalizedTab = normalizeTabId(tabId);
-  document.title = getDocumentTitleForTab(normalizedTab);
+  const route = ROUTE_BY_TAB.get(normalizedTab);
+  const title = route?.title || HOME_TITLE;
+  const description = route?.description || DEFAULT_DESCRIPTION;
+  const path = route?.path || '/';
+  const canonicalUrl = `${CANONICAL_ORIGIN}${path}`;
+
+  document.title = title;
+
+  const setMeta = (selector: string, content: string) => {
+    const el = document.querySelector<HTMLMetaElement>(selector);
+    if (el) el.content = content;
+  };
+
+  setMeta('meta[name="title"]', title);
+  setMeta('meta[name="description"]', description);
+  setMeta('meta[property="og:title"]', title);
+  setMeta('meta[property="og:description"]', description);
+  setMeta('meta[property="og:url"]', canonicalUrl);
+  setMeta('meta[name="twitter:title"]', title);
+  setMeta('meta[name="twitter:description"]', description);
+  setMeta(
+    'meta[name="robots"]',
+    route?.noIndex
+      ? 'noindex, nofollow'
+      : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
+  );
 
   const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
   if (canonical) {
-    const path = getPathForTab(normalizedTab);
-    canonical.href = `${CANONICAL_ORIGIN}${path}`;
+    canonical.href = canonicalUrl;
   }
 }

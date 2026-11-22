@@ -173,9 +173,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                   <span className="text-xs sm:text-sm font-bold text-amber-400 tracking-wide block">
                     {ORG_DETAILS.founderPresident.role}
                   </span>
-                  <h3 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
+                  <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
                     {ORG_DETAILS.founderPresident.name}
-                  </h3>
+                  </h2>
                   <p className="text-sm text-slate-300 mt-0.5 font-mono">
                     {ORG_DETAILS.founderPresident.education}
                   </p>
@@ -372,9 +372,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-amber-100 text-amber-900 flex items-center justify-center font-bold mb-2 text-sm">
                   01
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
+                <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   वेतन व सेवाशर्ती सुधारणा
-                </h4>
+                </h3>
                 <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   केंद्रप्रमुख व शिक्षण विस्तार अधिकाऱ्यांच्या वेतनश्रेणीतील तांत्रिक विसंगती दूर करणे, सेवाज्येष्ठतेनुसार वेळेत पदोन्नतीचे मार्ग मोकळे करणे, स्वतंत्र व सुस्पष्ट सेवा नियमावली लागू करणे आणि जबाबदारीनुसार योग्य आर्थिक मोबदला मिळवून देण्यासाठी मंत्रालय व संचालनालय स्तरावर अभ्यासपूर्ण व निरंतर पाठपुरावा.
                 </p>
@@ -384,9 +384,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-900 flex items-center justify-center font-bold mb-2 text-sm">
                   02
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
+                <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   शैक्षणिक गुणवत्ता सक्षमीकरण
-                </h4>
+                </h3>
                 <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   राष्ट्रीय शैक्षणिक धोरण (NEP 2020), निपुण भारत उपक्रम, शाळा गुणवत्ता मूल्यांकन आणि आधुनिक डिजिटल प्रशासनासाठी केंद्रप्रमुख व विस्तार अधिकाऱ्यांना नियमित प्रशिक्षण, राज्यस्तरीय परिसंवाद, अनुभवी मार्गदर्शकांचे सहकार्य आणि अद्ययावत परिपत्रकांचा संदर्भ उपलब्ध करून देणे.
                 </p>
@@ -396,9 +396,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-900 flex items-center justify-center font-bold mb-2 text-sm">
                   03
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
+                <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   कायदेशीर व प्रशासकीय संरक्षण
-                </h4>
+                </h3>
                 <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   कर्तव्य बजावताना अधिकाऱ्यांचा स्वाभिमान जपणे, प्रशासकीय अडचणी किंवा अनपेक्षित कारवायांविरुद्ध महासंघाच्या कायदेविषयक सल्लागार मंडळामार्फत तज्ज्ञ विधी मार्गदर्शन मिळवून देणे आणि प्रत्येक सभासदाच्या पाठीशी राज्यव्यापी संघटनात्मक पाठबळ खंबीरपणे उभे करणे.
                 </p>
@@ -408,9 +408,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 <div className="w-9 h-9 rounded-lg bg-purple-100 text-purple-900 flex items-center justify-center font-bold mb-2 text-sm">
                   04
                 </div>
-                <h4 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
+                <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl text-[#0b1e36]">
                   पारदर्शक व डिजिटल महासंघ
-                </h4>
+                </h3>
                 <p className="text-base text-slate-600 mt-1.5 leading-relaxed">
                   सर्व 34 जिल्ह्यांत ऑनलाईन सदस्यत्व नोंदणी, अर्जाची स्थिती तपासणी, QR-आधारित डिजिटल ओळखपत्रे, जिल्हा व तालुका पदाधिकाऱ्यांची स्वाक्षरीयुक्त नियुक्ती पत्रे, अधिकृत सभासद यादी, ताज्या घडामोडी व बातम्या, मोबाईल अ‍ॅप (PWA) सुविधा आणि थेट संपर्क प्रणालीद्वारे 100% पारदर्शक व आधुनिक कारभार.
                 </p>

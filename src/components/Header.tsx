@@ -80,9 +80,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
           </span>
 
           {/* दुसरी ओळ: केंद्रप्रमुख व अधिकारी महासंघ (मोठ्या आकारात) */}
-          <h1 className="font-serifDevanagari font-black text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl lg:text-[32px] text-[#0b1e36] group-hover:text-amber-800 transition-colors tracking-tight leading-tight my-0.5 drop-shadow-xs">
+          <span className="block font-serifDevanagari font-black text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl lg:text-[32px] text-[#0b1e36] group-hover:text-amber-800 transition-colors tracking-tight leading-tight my-0.5 drop-shadow-xs">
             केंद्रप्रमुख व अधिकारी महासंघ
-          </h1>
+          </span>
 
           {/* तिसरी ओळ: नोंदणी क्रमांक (आहे त्या आकारात) */}
           <span className="text-[10px] min-[360px]:text-[11px] sm:text-xs text-slate-500 font-semibold tracking-wide leading-tight">

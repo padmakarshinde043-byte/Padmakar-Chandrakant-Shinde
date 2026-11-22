@@ -772,6 +772,28 @@ function isAllowedCorsOrigin(origin?: string): boolean {
   return false;
 }
 
+// Canonical HTTP 301 Redirect: enforce https://mahasangh.in (HTTP -> HTTPS & www -> non-www)
+app.use((req, res, next) => {
+  const rawHost = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  const hostname = rawHost.split(':')[0];
+
+  if (hostname === 'mahasangh.in' || hostname === 'www.mahasangh.in') {
+    const rawProto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https')
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    const needsHttps = rawProto !== 'https';
+    const needsNonWww = hostname === 'www.mahasangh.in';
+    if (needsHttps || needsNonWww) {
+      return res.redirect(301, `https://mahasangh.in${req.originalUrl}`);
+    }
+  }
+  return next();
+});
+
 app.use(
   helmet({
     xFrameOptions: false,
@@ -3454,6 +3476,114 @@ async function startServer() {
   const hasDist = fs.existsSync(path.resolve(process.cwd(), 'dist', 'index.html'));
   let useViteDev = process.env.NODE_ENV !== 'production';
 
+  // Explicit SEO crawler endpoints (never let SPA fallback serve HTML for robots.txt or sitemap.xml)
+  app.get('/robots.txt', (_req, res) => {
+    const candidates = [
+      path.resolve(process.cwd(), 'dist', 'robots.txt'),
+      path.resolve(process.cwd(), 'public', 'robots.txt'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.sendFile(p);
+      }
+    }
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.send(
+      'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /center-update\nDisallow: /api/\n\nSitemap: https://mahasangh.in/sitemap.xml\n'
+    );
+  });
+
+  app.get('/sitemap.xml', (_req, res) => {
+    const candidates = [
+      path.resolve(process.cwd(), 'dist', 'sitemap.xml'),
+      path.resolve(process.cwd(), 'public', 'sitemap.xml'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.sendFile(p);
+      }
+    }
+    return res.status(404).type('text/plain').send('Sitemap not found');
+  });
+
+  // Prevent directory listing probes (return 403 Forbidden for static directory paths)
+  const BLOCKED_DIR_PATHS = new Set([
+    '/assets',
+    '/assets/',
+    '/assets/aistudio',
+    '/assets/aistudio/',
+    '/.well-known',
+    '/.well-known/',
+    '/uploads',
+    '/uploads/',
+    '/public',
+    '/public/',
+    '/dist',
+    '/dist/',
+    '/src',
+    '/src/',
+  ]);
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const reqPath = req.path || '/';
+    if (reqPath === '/' || reqPath.startsWith('/api')) return next();
+
+    const lowerPath = reqPath.toLowerCase();
+    if (BLOCKED_DIR_PATHS.has(lowerPath)) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(403).send('403 Forbidden');
+    }
+
+    // Also block direct requests to any existing static subdirectory inside dist/ or public/
+    const relPath = reqPath.replace(/^\/+/, '');
+    if (relPath && !relPath.includes('..')) {
+      for (const baseDir of [
+        path.resolve(process.cwd(), 'dist'),
+        path.resolve(process.cwd(), 'public'),
+      ]) {
+        const resolved = path.resolve(baseDir, relPath);
+        if (resolved.startsWith(baseDir + path.sep) && fs.existsSync(resolved)) {
+          try {
+            if (fs.statSync(resolved).isDirectory()) {
+              res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+              res.setHeader('Cache-Control', 'no-store');
+              return res.status(403).send('403 Forbidden');
+            }
+          } catch {
+            // ignore stat error
+          }
+        }
+      }
+    }
+
+    if (lowerPath === '/admin' || lowerPath.startsWith('/admin/') || lowerPath === '/center-update') {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+    return next();
+  });
+
+  // Digital Asset Links for Android TWA / PWABuilder verification (express.static skips dotfiles by default)
+  app.get('/.well-known/assetlinks.json', (_req, res) => {
+    const candidates = [
+      path.resolve(process.cwd(), 'dist', '.well-known', 'assetlinks.json'),
+      path.resolve(process.cwd(), 'public', '.well-known', 'assetlinks.json'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return res.sendFile(p);
+      }
+    }
+    return res.status(200).json([]);
+  });
+
   if (useViteDev) {
     try {
       const { createServer: createViteServer } = await import('vite');
@@ -3496,25 +3626,10 @@ async function startServer() {
     }
   }
 
-  // Digital Asset Links for Android TWA / PWABuilder verification (express.static skips dotfiles by default)
-  app.get('/.well-known/assetlinks.json', (_req, res) => {
-    const candidates = [
-      path.resolve(process.cwd(), 'dist', '.well-known', 'assetlinks.json'),
-      path.resolve(process.cwd(), 'public', '.well-known', 'assetlinks.json'),
-    ];
-    for (const p of candidates) {
-      if (fs.existsSync(p)) {
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=300');
-        return res.sendFile(p);
-      }
-    }
-    return res.status(200).json([]);
-  });
-
   if (!useViteDev) {
     app.use(
       express.static(path.resolve(process.cwd(), 'dist'), {
+        redirect: false,
         setHeaders: (res, filePath) => {
           const normalized = filePath.replace(/\\/g, '/');
           if (normalized.includes('/assets/')) {
