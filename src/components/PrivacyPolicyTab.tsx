@@ -137,29 +137,18 @@ export const PrivacyPolicyTab: React.FC = () => {
                     className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
                   >
                     <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                    <span>https://gr.maharashtra.gov.in — महाराष्ट्र शासन निर्णय (GR) अधिकृत पोर्टल</span>
+                    <span>https://gr.maharashtra.gov.in — महाराष्ट्र शासन निर्णय (GR) व शालेय शिक्षण विभाग परिपत्रके अधिकृत पोर्टल</span>
                   </a>
                 </li>
                 <li>
                   <a
-                    href="https://education.maharashtra.gov.in"
+                    href="https://maharashtra.gov.in"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
                   >
                     <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                    <span>https://education.maharashtra.gov.in — शालेय शिक्षण व क्रीडा विभाग, महाराष्ट्र शासन</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="https://www.maharashtra.gov.in"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                    <span>https://www.maharashtra.gov.in — महाराष्ट्र शासन अधिकृत संकेतस्थळ</span>
+                    <span>https://maharashtra.gov.in — महाराष्ट्र शासन अधिकृत संकेतस्थळ (Government of Maharashtra)</span>
                   </a>
                 </li>
                 <li>
@@ -170,18 +159,18 @@ export const PrivacyPolicyTab: React.FC = () => {
                     className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
                   >
                     <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                    <span>https://www.sci.gov.in — Supreme Court of India (सर्वोच्च न्यायालय)</span>
+                    <span>https://www.sci.gov.in — सर्वोच्च न्यायालय (Supreme Court of India)</span>
                   </a>
                 </li>
                 <li>
                   <a
-                    href="https://bombayhighcourt.nic.in"
+                    href="https://judgments.ecourts.gov.in"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-[#193568] hover:text-amber-800 underline font-bold"
                   >
                     <ExternalLink className="w-3.5 h-3.5 shrink-0" />
-                    <span>https://bombayhighcourt.nic.in — High Court of Bombay (मुंबई उच्च न्यायालय)</span>
+                    <span>https://judgments.ecourts.gov.in — ई-कोर्ट्स उच्च न्यायालय निर्णय पोर्टल (High Court of Bombay &amp; High Courts, eCourts)</span>
                   </a>
                 </li>
               </ul>

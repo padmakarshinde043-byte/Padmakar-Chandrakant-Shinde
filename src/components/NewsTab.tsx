@@ -299,18 +299,7 @@ export const NewsTab: React.FC<NewsTabProps> = ({
             </a>
             <span className="text-amber-400" aria-hidden="true">·</span>
             <a
-              href="https://education.maharashtra.gov.in"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="School Education Department, Maharashtra"
-              className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
-            >
-              <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
-              <span>education.maharashtra.gov.in</span>
-            </a>
-            <span className="text-amber-400" aria-hidden="true">·</span>
-            <a
-              href="https://www.maharashtra.gov.in"
+              href="https://maharashtra.gov.in"
               target="_blank"
               rel="noopener noreferrer"
               title="Government of Maharashtra"
@@ -332,14 +321,14 @@ export const NewsTab: React.FC<NewsTabProps> = ({
             </a>
             <span className="text-amber-400" aria-hidden="true">·</span>
             <a
-              href="https://bombayhighcourt.nic.in"
+              href="https://judgments.ecourts.gov.in"
               target="_blank"
               rel="noopener noreferrer"
-              title="High Court of Bombay"
+              title="eCourts Official Judgments Portal (High Court of Bombay & High Courts)"
               className="inline-flex items-center gap-1 text-[#193568] hover:text-amber-800 underline font-semibold"
             >
               <ExternalLink className="w-3 h-3 text-amber-700 shrink-0" />
-              <span>bombayhighcourt.nic.in (Bombay HC)</span>
+              <span>judgments.ecourts.gov.in (High Courts)</span>
             </a>
           </div>
         </section>
