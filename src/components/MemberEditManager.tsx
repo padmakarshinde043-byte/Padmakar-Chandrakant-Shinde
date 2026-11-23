@@ -87,9 +87,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
   const [statusBanner, setStatusBanner] = useState<{ text: string; type: 'success' | 'error'; member?: MembershipApplication } | null>(null);
   const [photoError, setPhotoError] = useState('');
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isLoadingEditPhoto, setIsLoadingEditPhoto] = useState(false);
+  const [photoPreviewBroken, setPhotoPreviewBroken] = useState(false);
   const [cropSourceUrl, setCropSourceUrl] = useState<string>('');
   const [showPhotoCropModal, setShowPhotoCropModal] = useState<boolean>(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const editingMemberIdRef = useRef<string | null>(null);
+  const photoModifiedInModalRef = useRef<boolean>(false);
 
   // Safe Delete Modal State
   const [deletingMember, setDeletingMember] = useState<MembershipApplication | null>(null);
@@ -275,26 +279,78 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     ) || null;
   }, [editingMember, applications]);
 
+  const handleCloseEditModal = () => {
+    editingMemberIdRef.current = null;
+    photoModifiedInModalRef.current = false;
+    setShowPhotoCropModal(false);
+    setCropSourceUrl('');
+    setIsLoadingEditPhoto(false);
+    setPhotoPreviewBroken(false);
+    setPhotoError('');
+    setEditingMember(null);
+  };
+
   const handleOpenEdit = async (member: MembershipApplication) => {
     setPhotoError('');
-    let target = member;
-    if (!member.photo && member.hasPhoto) {
-      const full = await fetchSingleApplicationForAdmin(member.id);
-      if (full) target = full;
-    }
-    const normalizedSal = normalizeSalutation(target.salutation);
+    setPhotoPreviewBroken(false);
+    setShowPhotoCropModal(false);
+    setCropSourceUrl('');
+    editingMemberIdRef.current = member.id;
+    photoModifiedInModalRef.current = false;
+
+    const normalizedSal = normalizeSalutation(member.salutation);
     const resolvedGender = resolveMemberGender({
-      ...target,
+      ...member,
       salutation: normalizedSal,
     });
     setEditingMember({
-      ...target,
+      ...member,
       salutation: normalizedSal,
       gender: resolvedGender,
-      professional: normalizeOfficialCadre(target.professional),
+      professional: normalizeOfficialCadre(member.professional),
     });
-    const parsedSeq = parseMemberNumberSeq(target.memberNumber);
+    const parsedSeq = parseMemberNumberSeq(member.memberNumber);
     setSeqInputForFormat(parsedSeq > 0 ? String(parsedSeq) : '');
+
+    // Always hydrate missing photo cleanly in the background so Edit modal opens instantly
+    if (!member.photo) {
+      setIsLoadingEditPhoto(true);
+      try {
+        let fetchedPhoto = '';
+        const full = await fetchSingleApplicationForAdmin(member.id);
+        if (full?.photo) {
+          fetchedPhoto = full.photo;
+        } else {
+          const batch = await fetchApplicationPhotosBatch([member.id]);
+          if (batch && batch[member.id]) {
+            fetchedPhoto = batch[member.id];
+          }
+        }
+        if (
+          fetchedPhoto &&
+          editingMemberIdRef.current === member.id &&
+          !photoModifiedInModalRef.current
+        ) {
+          setPhotoPreviewBroken(false);
+          setEditingMember((prev) =>
+            prev && prev.id === member.id ? { ...prev, photo: fetchedPhoto, hasPhoto: true } : prev
+          );
+          window.dispatchEvent(
+            new CustomEvent('mahasangh_app_photos_hydrated', {
+              detail: { [member.id]: fetchedPhoto },
+            })
+          );
+        }
+      } catch {
+        // Non-blocking: member may genuinely have no photo yet
+      } finally {
+        if (editingMemberIdRef.current === member.id) {
+          setIsLoadingEditPhoto(false);
+        }
+      }
+    } else {
+      setIsLoadingEditPhoto(false);
+    }
   };
 
   const handleFormatMemberNumberFromSeq = () => {
@@ -337,15 +393,36 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
     }
   };
 
-  const handleConfirmAdminCroppedPhoto = async (croppedFile: File) => {
+  const handleConfirmAdminCroppedPhoto = async (croppedFile: File, previewDataUrl: string) => {
+    const activeId = editingMemberIdRef.current;
     setShowPhotoCropModal(false);
+    setCropSourceUrl('');
     setPhotoError('');
+    setPhotoPreviewBroken(false);
+    photoModifiedInModalRef.current = true;
+
+    // Show cropped preview immediately so admin sees the result without waiting
+    if (previewDataUrl) {
+      setEditingMember((prev) =>
+        prev && (!activeId || prev.id === activeId)
+          ? { ...prev, photo: previewDataUrl, hasPhoto: true }
+          : prev
+      );
+    }
+
     setIsUploadingPhoto(true);
     try {
-      const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(croppedFile, 360, 440, 0.78);
-      setEditingMember((prev) => (prev ? { ...prev, photo: urlOrBase64 } : prev));
+      const { urlOrBase64 } = await uploadCompressedPhotoToCloudinaryOrFallback(croppedFile, 360, 440, 0.82);
+      setEditingMember((prev) =>
+        prev && (!activeId || prev.id === activeId)
+          ? { ...prev, photo: urlOrBase64 || previewDataUrl, hasPhoto: true }
+          : prev
+      );
     } catch (err: any) {
-      setPhotoError('Photo error: ' + (err.message || 'Error'));
+      // Keep the cropped data URL safely if remote upload fails
+      if (!previewDataUrl) {
+        setPhotoError('Photo error: ' + (err.message || 'Error'));
+      }
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -386,6 +463,8 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
       hobby: (editingMember.hobby || '').trim(),
       education: (editingMember.education || '').trim(),
       professional: normalizeOfficialCadre(editingMember.professional),
+      photo: editingMember.photo || '',
+      hasPhoto: Boolean(editingMember.photo),
       approvedAt:
         editingMember.status === 'approved'
           ? editingMember.approvedAt || new Date().toISOString()
@@ -409,7 +488,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
         type: 'success',
         member: updatedRecord,
       });
-      setEditingMember(null);
+      handleCloseEditModal();
     } catch (err: any) {
       setStatusBanner({
         text: 'Save failed: ' + (err.message || 'Error'),
@@ -990,7 +1069,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setEditingMember(null)}
+                onClick={handleCloseEditModal}
                 className="min-w-[44px] min-h-[44px] rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center font-bold cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1121,16 +1200,24 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
 
               {/* Photo Section */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
-                <div className="w-20 h-24 rounded-lg border-2 border-[#d4af37] bg-white overflow-hidden flex items-center justify-center shrink-0">
-                  {editingMember.photo ? (
+                <div className="w-20 h-24 rounded-lg border-2 border-[#d4af37] bg-white overflow-hidden flex items-center justify-center shrink-0 relative">
+                  {isLoadingEditPhoto && !editingMember.photo ? (
+                    <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
+                  ) : editingMember.photo && !photoPreviewBroken ? (
                     <img
                       key={editingMember.photo}
                       src={editingMember.photo}
                       alt={editingMember.fullName}
-                      className="w-full h-full object-cover"
+                      onError={() => setPhotoPreviewBroken(true)}
+                      className="w-full h-full object-cover object-top"
                     />
                   ) : (
                     <ImageIcon className="w-7 h-7 text-slate-300" />
+                  )}
+                  {isUploadingPhoto && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                    </div>
                   )}
                 </div>
                 <div className="flex-1 space-y-2 text-center sm:text-left">
@@ -1149,7 +1236,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                       <>
                         <button
                           type="button"
-                          disabled={isUploadingPhoto}
+                          disabled={isUploadingPhoto || isLoadingEditPhoto}
                           onClick={() => {
                             setPhotoError('');
                             setCropSourceUrl(editingMember.photo || '');
@@ -1165,8 +1252,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                           disabled={isUploadingPhoto}
                           onClick={() => {
                             setPhotoError('');
+                            setPhotoPreviewBroken(false);
+                            setCropSourceUrl('');
+                            photoModifiedInModalRef.current = true;
                             if (photoInputRef.current) photoInputRef.current.value = '';
-                            setEditingMember((prev) => (prev ? { ...prev, photo: '' } : prev));
+                            setEditingMember((prev) =>
+                              prev ? { ...prev, photo: '', hasPhoto: false } : prev
+                            );
                           }}
                           className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer disabled:opacity-60"
                         >
@@ -1183,17 +1275,13 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                     />
                   </div>
                   {photoError && <p className="text-rose-600 font-bold">{photoError}</p>}
+                  {photoPreviewBroken && editingMember.photo && !photoError && (
+                    <p className="text-amber-700 text-[11px] font-semibold">
+                      Existing photo preview unavailable — click &ldquo;Crop / Adjust&rdquo; or &ldquo;Upload Photo&rdquo; to replace.
+                    </p>
+                  )}
                 </div>
               </div>
-
-              {showPhotoCropModal && cropSourceUrl && (
-                <PassportPhotoCropperModal
-                  imageSrc={cropSourceUrl}
-                  language="en"
-                  onCancel={() => setShowPhotoCropModal(false)}
-                  onConfirm={(croppedFile) => handleConfirmAdminCroppedPhoto(croppedFile)}
-                />
-              )}
 
               {/* Personal & Work Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5">
@@ -1500,7 +1588,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
               <div className="sticky bottom-0 bg-white/95 backdrop-blur-xs flex items-center justify-end gap-2.5 pt-3 pb-1 border-t border-slate-200">
                 <button
                   type="button"
-                  onClick={() => setEditingMember(null)}
+                  onClick={handleCloseEditModal}
                   className="min-h-[44px] px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer text-xs"
                 >
                   Cancel
@@ -1519,6 +1607,20 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {showPhotoCropModal && cropSourceUrl && (
+        <PassportPhotoCropperModal
+          imageSrc={cropSourceUrl}
+          language="en"
+          onCancel={() => {
+            setShowPhotoCropModal(false);
+            setCropSourceUrl('');
+          }}
+          onConfirm={(croppedFile, previewDataUrl) =>
+            handleConfirmAdminCroppedPhoto(croppedFile, previewDataUrl)
+          }
+        />
       )}
 
       {/* ============================================================== */}

@@ -7,6 +7,8 @@ export const ID_CARD_PHOTO_HEIGHT = 440;
 const CROP_BOX_WIDTH = 228;
 const CROP_BOX_HEIGHT = Math.round((CROP_BOX_WIDTH * ID_CARD_PHOTO_HEIGHT) / ID_CARD_PHOTO_WIDTH); // 279px
 
+const MAX_ZOOM = 6;
+
 interface PassportPhotoCropperModalProps {
   imageSrc: string;
   language?: 'mr' | 'en';
@@ -26,7 +28,7 @@ function getSafeCanvasImageUrl(rawUrl: string): string {
       if (typeof window !== 'undefined' && parsed.origin === window.location.origin) {
         return trimmed;
       }
-      return `/api/pdf-image-proxy?url=${encodeURIComponent(trimmed)}`;
+      return `/api/proxy-image?url=${encodeURIComponent(trimmed)}`;
     } catch {
       return trimmed;
     }
@@ -50,11 +52,18 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const prevImageSrcRef = useRef<string>(imageSrc);
+  const usedDirectFallbackRef = useRef<boolean>(false);
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
   const dragStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
 
+  // Only reset crop state when imageSrc actually changes after mount
+  // (avoids wiping naturalSize set by synchronous data:/cached onLoad on initial mount)
   useEffect(() => {
+    if (prevImageSrcRef.current === imageSrc) return;
+    prevImageSrcRef.current = imageSrc;
+    usedDirectFallbackRef.current = false;
     setResolvedSrc(getSafeCanvasImageUrl(imageSrc));
     setNaturalSize(null);
     setLoadError('');
@@ -62,6 +71,15 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
     setRotation(0);
     setOffset({ x: 0, y: 0 });
   }, [imageSrc]);
+
+  // Capture dimensions immediately if the image is already cached/complete
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el && el.complete && el.naturalWidth > 0 && el.naturalHeight > 0) {
+      setNaturalSize({ w: el.naturalWidth, h: el.naturalHeight });
+      setLoadError('');
+    }
+  }, [resolvedSrc]);
 
   // Lock body scroll while modal is open
   useEffect(() => {
@@ -112,12 +130,19 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
 
   const applyZoom = useCallback(
     (nextZoomRaw: number) => {
-      const nextZoom = Math.max(1, Math.min(3.5, Number(nextZoomRaw.toFixed(3))));
+      const nextZoom = Math.max(1, Math.min(MAX_ZOOM, Number(nextZoomRaw.toFixed(3))));
       setZoom(nextZoom);
       setOffset((prev) => clampOffset(prev.x, prev.y, nextZoom, rotation));
     },
     [clampOffset, rotation]
   );
+
+  const handleWheelZoom = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!naturalSize) return;
+    e.preventDefault();
+    const step = e.deltaY < 0 ? 0.15 : -0.15;
+    applyZoom(zoom + step);
+  };
 
   const handleRotate = () => {
     const nextRot = (rotation + 90) % 360;
@@ -263,6 +288,7 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUpOrCancel}
             onPointerCancel={handlePointerUpOrCancel}
+            onWheel={handleWheelZoom}
             style={{ width: CROP_BOX_WIDTH, height: CROP_BOX_HEIGHT }}
             className="relative bg-slate-900 rounded-xl border-[3.5px] border-[#d4af37] shadow-lg overflow-hidden select-none touch-none cursor-grab active:cursor-grabbing shrink-0"
           >
@@ -270,7 +296,7 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
               <img
                 ref={imgRef}
                 src={resolvedSrc}
-                crossOrigin="anonymous"
+                crossOrigin={/^https?:\/\//i.test(resolvedSrc) ? 'anonymous' : undefined}
                 alt={isMr ? 'फोटो अ‍ॅडजस्ट' : 'Crop source'}
                 draggable={false}
                 onLoad={(e) => {
@@ -281,6 +307,16 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
                   }
                 }}
                 onError={() => {
+                  const raw = (imageSrc || '').trim();
+                  if (
+                    resolvedSrc.startsWith('/api/proxy-image?') &&
+                    !usedDirectFallbackRef.current &&
+                    /^https?:\/\//i.test(raw)
+                  ) {
+                    usedDirectFallbackRef.current = true;
+                    setResolvedSrc(raw);
+                    return;
+                  }
                   setLoadError(
                     isMr
                       ? 'हा फोटो लोड होऊ शकला नाही. कृपया गॅलरीतून दुसरा फोटो निवडा.'
@@ -295,11 +331,18 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
                   height: naturalSize ? `${naturalSize.h * totalScale}px` : '100%',
                   maxWidth: 'none',
                   maxHeight: 'none',
+                  opacity: naturalSize ? 1 : 0,
                   transform: `translate(-50%, -50%) translate(${offset.x}px, ${offset.y}px) rotate(${rotation}deg)`,
                   transformOrigin: 'center center',
                   pointerEvents: 'none',
                 }}
               />
+            )}
+
+            {!naturalSize && !loadError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/75 text-white text-xs font-bold pointer-events-none">
+                {isMr ? 'फोटो लोड होत आहे...' : 'Loading photo...'}
+              </div>
             )}
 
             {/* Subtle Face & Shoulders Alignment Guide Overlay */}
@@ -359,7 +402,7 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
               <input
                 type="range"
                 min={1}
-                max={3.5}
+                max={MAX_ZOOM}
                 step={0.02}
                 value={zoom}
                 onChange={(e) => applyZoom(parseFloat(e.target.value))}
@@ -368,14 +411,14 @@ export const PassportPhotoCropperModal: React.FC<PassportPhotoCropperModalProps>
               />
               <button
                 type="button"
-                onClick={() => applyZoom(zoom + 0.15)}
-                disabled={zoom >= 3.5}
+                onClick={() => applyZoom(zoom + 0.2)}
+                disabled={zoom >= MAX_ZOOM}
                 className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-[#0b1e36] flex items-center justify-center cursor-pointer shrink-0"
                 aria-label="Zoom in"
               >
                 <ZoomIn className="w-4 h-4" />
               </button>
-              <span className="text-xs font-mono font-bold text-slate-600 w-10 text-right tabular-nums">
+              <span className="text-xs font-mono font-bold text-slate-600 w-11 text-right tabular-nums">
                 {Math.round(zoom * 100)}%
               </span>
             </div>
