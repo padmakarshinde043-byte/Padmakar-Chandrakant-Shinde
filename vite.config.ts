@@ -29,7 +29,7 @@ export default defineConfig({
         lang: 'mr',
         start_url: '/',
         scope: '/',
-        categories: ['education', 'government', 'productivity'],
+        categories: ['education', 'social', 'productivity'],
         icons: [
           {
             src: '/pwa-192x192.png',
@@ -56,7 +56,7 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//, /^\/robots\.txt$/, /^\/sitemap\.xml$/],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [

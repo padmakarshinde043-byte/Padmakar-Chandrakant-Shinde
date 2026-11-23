@@ -3661,7 +3661,8 @@ async function startServer() {
     return next();
   });
 
-  // Digital Asset Links for Android TWA / PWABuilder verification (express.static skips dotfiles by default)
+  // Digital Asset Links for Android TWA / Google Play Deep Links verification
+  // IMPORTANT: Express res.sendFile() rejects dot-directories like `.well-known` with 404 NotFoundError unless dotfiles:'allow' or fs.readFileSync is used!
   app.get('/.well-known/assetlinks.json', (_req, res) => {
     const candidates = [
       path.resolve(process.cwd(), 'dist', '.well-known', 'assetlinks.json'),
@@ -3669,12 +3670,20 @@ async function startServer() {
     ];
     for (const p of candidates) {
       if (fs.existsSync(p)) {
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'public, max-age=300');
-        return res.sendFile(p);
+        try {
+          const jsonText = fs.readFileSync(p, 'utf8');
+          res.status(200);
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'public, max-age=300');
+          return res.send(jsonText);
+        } catch {
+          // try next candidate
+        }
       }
     }
-    return res.status(200).json([]);
+    res.status(200);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return res.send('[]');
   });
 
   if (useViteDev) {
