@@ -160,7 +160,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                   <source srcSet="/president.webp" type="image/webp" />
                   <img
                     src="/president.jpg"
-                    alt={ORG_DETAILS.founderPresident.name}
+                    alt="श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) — राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ"
+                    title="श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) — राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ"
                     width="80"
                     height="80"
                     loading="eager"
@@ -174,7 +175,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                     {ORG_DETAILS.founderPresident.role}
                   </span>
                   <h2 className="font-serifDevanagari text-lg sm:text-xl font-bold text-white leading-tight mt-0.5">
-                    {ORG_DETAILS.founderPresident.name}
+                    <a
+                      href="/rajendra-khairnar"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentTab('founder_profile');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="hover:text-amber-300 transition-colors"
+                    >
+                      {ORG_DETAILS.founderPresident.name}
+                    </a>
                   </h2>
                   <p className="text-sm text-slate-300 mt-0.5 font-mono">
                     {ORG_DETAILS.founderPresident.education}
@@ -194,9 +205,18 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                   <Phone className="w-3.5 h-3.5" />
                   <span>थेट संपर्क: {ORG_DETAILS.founderPresident.phone}</span>
                 </a>
-                <span className="text-slate-300 font-medium">
-                  कार्यालय: मालेगाव (नाशिक)
-                </span>
+                <a
+                  href="/rajendra-khairnar"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentTab('founder_profile');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-amber-300 hover:text-amber-200 font-semibold text-xs sm:text-sm inline-flex items-center gap-1 transition-colors"
+                >
+                  <span>अधिकृत परिचय पहा</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </a>
               </div>
             </div>
           </div>

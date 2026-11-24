@@ -9,12 +9,17 @@ const HOME_TITLE = 'महाराष्ट्र राज्य केंद�
 const DEFAULT_DESCRIPTION =
   'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ (Mahasangh) अधिकृत पोर्टल — ऑनलाईन सदस्यत्व नोंदणी, डिजिटल आयकार्ड, शासन निर्णय, परिपत्रके व पदाधिकारी माहिती.';
 const CANONICAL_ORIGIN = 'https://mahasangh.in';
+const DEFAULT_OG_IMAGE = 'https://mahasangh.in/pwa-512x512.png';
+const DEFAULT_OG_IMAGE_ALT = 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ अधिकृत मानचिन्ह';
 
 export interface RouteMeta {
   tabId: string;
   path: string;
   title: string;
   description?: string;
+  ogType?: string;
+  ogImage?: string;
+  ogImageAlt?: string;
   noIndex?: boolean;
   aliases?: string[];
 }
@@ -26,6 +31,18 @@ export const APP_ROUTES: RouteMeta[] = [
     title: HOME_TITLE,
     description: DEFAULT_DESCRIPTION,
     aliases: ['/home', '/index.html'],
+  },
+  {
+    tabId: 'founder_profile',
+    path: '/rajendra-khairnar',
+    title: `श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) — राज्याध्यक्ष | ${BASE_TITLE}`,
+    description:
+      'श्री. राजेंद्र शिवाजी खैरनार (Rajendra Shivaji Khairnar) — संस्थापक राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ (State President, Maharashtra Rajya Kendrapramukh Va Adhikari Mahasangh). अधिकृत परिचय, छायाचित्र, शैक्षणिक पात्रता व संपर्क माहिती.',
+    ogType: 'profile',
+    ogImage: 'https://mahasangh.in/president.jpg',
+    ogImageAlt:
+      'श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) — राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ',
+    aliases: ['/president', '/founder', '/rajyadhyaksha'],
   },
   {
     tabId: 'about',
@@ -172,7 +189,7 @@ export function resolveTabFromLocation(
   return 'home';
 }
 
-const RELOAD_EXEMPT_TABS = new Set<string>(['admin', 'center_update']);
+const RELOAD_EXEMPT_TABS = new Set<string>(['admin', 'center_update', 'founder_profile']);
 
 export function isPageReloadNavigation(): boolean {
   if (typeof window === 'undefined' || typeof performance === 'undefined') {
@@ -255,13 +272,21 @@ export function syncDocumentMetaForTab(tabId: string): void {
     if (el) el.content = content;
   };
 
+  const ogType = route?.ogType || 'website';
+  const ogImage = route?.ogImage || DEFAULT_OG_IMAGE;
+  const ogImageAlt = route?.ogImageAlt || DEFAULT_OG_IMAGE_ALT;
+
   setMeta('meta[name="title"]', title);
   setMeta('meta[name="description"]', description);
+  setMeta('meta[property="og:type"]', ogType);
   setMeta('meta[property="og:title"]', title);
   setMeta('meta[property="og:description"]', description);
   setMeta('meta[property="og:url"]', canonicalUrl);
+  setMeta('meta[property="og:image"]', ogImage);
+  setMeta('meta[property="og:image:alt"]', ogImageAlt);
   setMeta('meta[name="twitter:title"]', title);
   setMeta('meta[name="twitter:description"]', description);
+  setMeta('meta[name="twitter:image"]', ogImage);
   setMeta(
     'meta[name="robots"]',
     route?.noIndex

@@ -20,6 +20,7 @@ import {
   buildSequentialMemberNumber,
 } from './src/utils/memberNumberAllocator';
 import { computeNextVisitorStats } from './src/utils/visitorCounter';
+import { applyRouteSeoToHtml, FOUNDER_PROFILE_ALIASES } from './src/utils/seoProfileHtml';
 import { ensureMysqlSchema, isMysqlActive, isMysqlConfigured, runMysqlSchemaAuditAndHeal } from './src/db/mysqlPool';
 import {
   mysqlListApplications,
@@ -3796,6 +3797,34 @@ async function startServer() {
     return res.status(404).type('text/plain').send('Sitemap not found');
   });
 
+  // Explicitly disable PWA manifest so browsers never show "Install to Home Screen" or "Open in App"
+  app.get('/manifest.webmanifest', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.status(404).type('text/plain').send('Not Found');
+  });
+
+  // Serve a minimal self-unregistering cleanup Service Worker for returning visitors who had the legacy PWA installed
+  const SELF_UNREGISTER_SW = `self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      .then(() => self.registration.unregister())
+      .catch(() => {})
+  );
+});
+`;
+  app.get('/sw.js', (_req, res) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.status(200).send(SELF_UNREGISTER_SW);
+  });
+  app.get('/registerSW.js', (_req, res) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.status(200).send('');
+  });
+
   // Prevent directory listing probes (return 403 Forbidden for static directory paths)
   const BLOCKED_DIR_PATHS = new Set([
     '/assets',
@@ -3948,6 +3977,25 @@ async function startServer() {
           return next();
         }
       });
+      // Route-specific SEO HTML transform in dev mode for founder profile URLs (e.g. /rajendra-khairnar)
+      app.use(async (req, res, next) => {
+        if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.includes('.')) {
+          return next();
+        }
+        const normalizedReqPath = (req.path || '/').toLowerCase().replace(/\/+$/, '') || '/';
+        if (!FOUNDER_PROFILE_ALIASES.has(normalizedReqPath)) {
+          return next();
+        }
+        try {
+          const rawHtml = fs.readFileSync(path.resolve(process.cwd(), 'index.html'), 'utf8');
+          const transformed = await vite.transformIndexHtml(req.originalUrl, rawHtml);
+          const seoHtml = applyRouteSeoToHtml(transformed, req.path);
+          res.status(200).setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(seoHtml);
+        } catch {
+          return next();
+        }
+      });
       app.use(vite.middlewares);
     } catch (viteErr) {
       if (hasDist) {
@@ -3960,6 +4008,11 @@ async function startServer() {
   }
 
   if (!useViteDev) {
+    const distIndexPath = path.resolve(process.cwd(), 'dist', 'index.html');
+    const cachedDistIndexHtml = fs.existsSync(distIndexPath)
+      ? fs.readFileSync(distIndexPath, 'utf8')
+      : null;
+
     app.use(
       express.static(path.resolve(process.cwd(), 'dist'), {
         redirect: false,
@@ -3984,7 +4037,15 @@ async function startServer() {
     app.use((req, res, next) => {
       if (req.method === 'GET' && !req.path.startsWith('/api')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
+        const baseHtml =
+          cachedDistIndexHtml ??
+          (fs.existsSync(distIndexPath) ? fs.readFileSync(distIndexPath, 'utf8') : null);
+        if (baseHtml) {
+          const seoHtml = applyRouteSeoToHtml(baseHtml, req.path);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(seoHtml);
+        }
+        return res.sendFile(distIndexPath);
       } else {
         next();
       }

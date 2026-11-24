@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://mahasangh.in/</loc>
-    <lastmod>2026-11-21</lastmod>
+    <lastmod>2026-11-24</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://mahasangh.in/president.jpg</image:loc>
+      <image:title>श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) — राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</image:title>
+      <image:caption>श्री. राजेंद्र शिवाजी खैरनार (Rajendra Shivaji Khairnar) — संस्थापक राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ (State President, Maharashtra Rajya Kendrapramukh Va Adhikari Mahasangh)</image:caption>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://mahasangh.in/rajendra-khairnar</loc>
+    <lastmod>2026-11-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+    <image:image>
+      <image:loc>https://mahasangh.in/president.jpg</image:loc>
+      <image:title>श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) — राज्याध्यक्ष</image:title>
+      <image:caption>श्री. राजेंद्र शिवाजी खैरनार (Rajendra Shivaji Khairnar) — संस्थापक राज्याध्यक्ष, महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</image:caption>
+    </image:image>
   </url>
   <url>
     <loc>https://mahasangh.in/about</loc>

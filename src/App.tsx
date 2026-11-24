@@ -15,6 +15,7 @@ const loadAdminTab = () => import('./components/AdminTab');
 const loadAppointmentsTab = () => import('./components/AppointmentsTab');
 const loadPrivacyPolicyTab = () => import('./components/PrivacyPolicyTab');
 const loadCenterUpdatePage = () => import('./components/CenterUpdatePage');
+const loadFounderProfileTab = () => import('./components/FounderProfileTab');
 
 const AboutTab = lazy(() => loadAboutTab().then((m) => ({ default: m.AboutTab })));
 const LeadershipTab = lazy(() => loadLeadershipTab().then((m) => ({ default: m.LeadershipTab })));
@@ -27,6 +28,7 @@ const AdminTab = lazy(() => loadAdminTab().then((m) => ({ default: m.AdminTab })
 const AppointmentsTab = lazy(() => loadAppointmentsTab().then((m) => ({ default: m.AppointmentsTab })));
 const PrivacyPolicyTab = lazy(() => loadPrivacyPolicyTab().then((m) => ({ default: m.PrivacyPolicyTab })));
 const CenterUpdatePage = lazy(() => loadCenterUpdatePage().then((m) => ({ default: m.CenterUpdatePage })));
+const FounderProfileTab = lazy(() => loadFounderProfileTab().then((m) => ({ default: m.FounderProfileTab })));
 
 const prefetchTabChunk = (tabId: string) => {
   switch (tabId) {
@@ -59,6 +61,9 @@ const prefetchTabChunk = (tabId: string) => {
       break;
     case 'privacy':
       loadPrivacyPolicyTab();
+      break;
+    case 'founder_profile':
+      loadFounderProfileTab();
       break;
     case 'admin':
       loadAdminTab();
@@ -847,6 +852,11 @@ export function App() {
           {(visitedTabs.privacy || currentTab === 'privacy') && (
             <div className={currentTab === 'privacy' ? 'block mhs-tab-enter' : 'hidden'}>
               <PrivacyPolicyTab />
+            </div>
+          )}
+          {(visitedTabs.founder_profile || currentTab === 'founder_profile') && (
+            <div className={currentTab === 'founder_profile' ? 'block mhs-tab-enter' : 'hidden'}>
+              <FounderProfileTab setCurrentTab={navigateToTab} />
             </div>
           )}
         </Suspense>
