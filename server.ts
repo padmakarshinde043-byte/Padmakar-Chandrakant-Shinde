@@ -928,10 +928,21 @@ const apiLimiter = rateLimit({
   message: rateLimitMessage,
 });
 
+const mediaUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 80,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => extractClientIpForLimiter(req),
+  validate: { trustProxy: false, xForwardedForHeader: false, keyGeneratorIpFallback: false },
+  message: rateLimitMessage,
+});
+
 app.use('/api/', apiLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/email', contactMailLimiter);
 app.use('/api/mailbox/send', contactMailLimiter);
+app.use('/api/media/upload', mediaUploadLimiter);
 
 function requireRoles(
   allowedRoles: SessionRole[],
@@ -984,7 +995,185 @@ function sanitizeSubAdminForResponse(admin: Record<string, any>) {
 // Raw body parser for Razorpay Webhook signature verification
 app.use('/api/razorpay/webhook', express.raw({ type: 'application/json' }));
 app.use('/api/backup/restore', express.json({ limit: '60mb' }));
+app.use('/api/media/upload', express.json({ limit: '12mb' }));
 app.use(express.json({ limit: '10mb' }));
+
+// =========================================================================
+// Local Server Disk Media Storage (Banners, News, GR PDFs, WhatsApp Media)
+// Eliminates Cloudinary bandwidth/quota usage with 1-year immutable caching
+// =========================================================================
+const UPLOADS_ROOT_DIR = path.resolve(
+  (process.env.UPLOADS_DIR || '').trim() || path.join(process.cwd(), 'uploads')
+);
+
+const ALLOWED_MEDIA_FOLDERS: Record<
+  string,
+  { subAdminPerm?: string; superAdminOnly?: boolean; allowVideo?: boolean; allowPdf?: boolean }
+> = {
+  banners: { subAdminPerm: 'manageLatestBanners', allowVideo: true },
+  news: { subAdminPerm: 'manageNews' },
+  gr: { subAdminPerm: 'manageGovOrders', allowPdf: true },
+  whatsapp: { superAdminOnly: true },
+};
+
+function detectSafeMediaFileFromBuffer(
+  buf: Buffer,
+  folderSpec: { allowVideo?: boolean; allowPdf?: boolean }
+): { ext: string; mime: string; maxBytes: number } | null {
+  if (!buf || buf.length < 12) return null;
+
+  // WebP: RIFF....WEBP
+  if (
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50
+  ) {
+    return { ext: 'webp', mime: 'image/webp', maxBytes: 2.5 * 1024 * 1024 };
+  }
+
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return { ext: 'jpg', mime: 'image/jpeg', maxBytes: 2.5 * 1024 * 1024 };
+  }
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47 &&
+    buf[4] === 0x0d &&
+    buf[5] === 0x0a &&
+    buf[6] === 0x1a &&
+    buf[7] === 0x0a
+  ) {
+    return { ext: 'png', mime: 'image/png', maxBytes: 2.5 * 1024 * 1024 };
+  }
+
+  // MP4: ....ftyp (only allowed for banners)
+  if (
+    folderSpec.allowVideo &&
+    buf[4] === 0x66 &&
+    buf[5] === 0x74 &&
+    buf[6] === 0x79 &&
+    buf[7] === 0x70
+  ) {
+    return { ext: 'mp4', mime: 'video/mp4', maxBytes: 3.2 * 1024 * 1024 };
+  }
+
+  // WebM: 1A 45 DF A3 (only allowed for banners)
+  if (
+    folderSpec.allowVideo &&
+    buf[0] === 0x1a &&
+    buf[1] === 0x45 &&
+    buf[2] === 0xdf &&
+    buf[3] === 0xa3
+  ) {
+    return { ext: 'webm', mime: 'video/webm', maxBytes: 3.2 * 1024 * 1024 };
+  }
+
+  // PDF: %PDF- (only allowed for gr)
+  if (
+    folderSpec.allowPdf &&
+    buf[0] === 0x25 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x44 &&
+    buf[3] === 0x46 &&
+    buf[4] === 0x2d
+  ) {
+    return { ext: 'pdf', mime: 'application/pdf', maxBytes: 6 * 1024 * 1024 };
+  }
+
+  return null;
+}
+
+app.post('/api/media/upload', requireAdminOrSubAdmin(), (req, res) => {
+  try {
+    const authSession = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const rawFolder = String(req.body?.folder || '').trim().toLowerCase();
+    const folderSpec = ALLOWED_MEDIA_FOLDERS[rawFolder];
+    if (!folderSpec) {
+      return res.status(400).json({ status: 'error', message: 'अवैध मीडिया फोल्डर निवडले आहे.' });
+    }
+
+    // Enforce super-admin or granular sub-admin permission per media category
+    if (folderSpec.superAdminOnly && authSession?.role !== 'super_admin') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'या विभागात फाईल अपलोड करण्याचा अधिकार फक्त सुपर अ‍ॅडमिनला आहे.',
+      });
+    }
+    if (
+      authSession?.role === 'sub_admin' &&
+      folderSpec.subAdminPerm &&
+      !Boolean(authSession.permissions?.[folderSpec.subAdminPerm])
+    ) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'आपल्या खात्याला या विभागात फाईल अपलोड करण्याचे अधिकार नाहीत.',
+      });
+    }
+
+    const rawDataUrl = typeof req.body?.dataUrl === 'string' ? req.body.dataUrl.trim() : '';
+    const dataUrlMatch = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(rawDataUrl);
+    if (!dataUrlMatch) {
+      return res.status(400).json({ status: 'error', message: 'अवैध फाईल डेटा फॉरमॅट.' });
+    }
+
+    const fileBuffer = Buffer.from(dataUrlMatch[2].replace(/\s+/g, ''), 'base64');
+    if (!fileBuffer.length) {
+      return res.status(400).json({ status: 'error', message: 'रिकामी फाईल अपलोड करता येणार नाही.' });
+    }
+
+    const detected = detectSafeMediaFileFromBuffer(fileBuffer, folderSpec);
+    if (!detected) {
+      return res.status(415).json({
+        status: 'error',
+        message: 'असमर्थित फाईल प्रकार. फक्त JPG, PNG, WebP (आणि बॅनरसाठी MP4/WebM किंवा GR साठी PDF) चालतील.',
+      });
+    }
+
+    if (fileBuffer.length > detected.maxBytes) {
+      const limitMb = (detected.maxBytes / (1024 * 1024)).toFixed(1);
+      return res.status(413).json({
+        status: 'error',
+        message: `फाईलचा आकार ${limitMb} MB मर्यादेपेक्षा जास्त आहे.`,
+      });
+    }
+
+    const targetDir = path.resolve(UPLOADS_ROOT_DIR, rawFolder);
+    if (!targetDir.startsWith(UPLOADS_ROOT_DIR + path.sep)) {
+      return res.status(400).json({ status: 'error', message: 'अवैध स्टोरेज मार्ग.' });
+    }
+
+    fs.mkdirSync(targetDir, { recursive: true });
+    const safeFilename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${detected.ext}`;
+    const targetFilePath = path.resolve(targetDir, safeFilename);
+    if (!targetFilePath.startsWith(targetDir + path.sep)) {
+      return res.status(400).json({ status: 'error', message: 'अवैध फाईल मार्ग.' });
+    }
+
+    fs.writeFileSync(targetFilePath, fileBuffer);
+    const publicUrl = `/uploads/${rawFolder}/${safeFilename}`;
+    return res.json({
+      status: 'success',
+      url: publicUrl,
+      mime: detected.mime,
+      sizeKb: Math.max(1, Math.round(fileBuffer.length / 1024)),
+    });
+  } catch (err: any) {
+    console.error('Server disk media upload error:', err);
+    return res.status(500).json({
+      status: 'error',
+      message: 'सर्व्हरवर फाईल सेव्ह करताना त्रुटी आली: ' + (err?.message || 'Error'),
+    });
+  }
+});
 
 // Health check endpoint (no secrets exposed)
 app.get('/api/health', (_req, res) => {
@@ -3636,15 +3825,23 @@ async function startServer() {
       return res.status(403).send('403 Forbidden');
     }
 
-    // Also block direct requests to any existing static subdirectory inside dist/ or public/
+    // Also block direct requests to any existing static subdirectory inside dist/, public/, or uploads/
     const relPath = reqPath.replace(/^\/+/, '');
     if (relPath && !relPath.includes('..')) {
-      for (const baseDir of [
-        path.resolve(process.cwd(), 'dist'),
-        path.resolve(process.cwd(), 'public'),
-      ]) {
-        const resolved = path.resolve(baseDir, relPath);
-        if (resolved.startsWith(baseDir + path.sep) && fs.existsSync(resolved)) {
+      const staticDirsToCheck: Array<{ base: string; subPath: string }> = [
+        { base: path.resolve(process.cwd(), 'dist'), subPath: relPath },
+        { base: path.resolve(process.cwd(), 'public'), subPath: relPath },
+      ];
+      if (lowerPath.startsWith('/uploads/')) {
+        staticDirsToCheck.push({
+          base: UPLOADS_ROOT_DIR,
+          subPath: relPath.replace(/^uploads\/+/i, ''),
+        });
+      }
+      for (const item of staticDirsToCheck) {
+        if (!item.subPath) continue;
+        const resolved = path.resolve(item.base, item.subPath);
+        if (resolved.startsWith(item.base + path.sep) && fs.existsSync(resolved)) {
           try {
             if (fs.statSync(resolved).isDirectory()) {
               res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -3663,6 +3860,37 @@ async function startServer() {
     }
     return next();
   });
+
+  // Serve compressed banners, news photos, videos & GR PDFs from server disk with 1-year immutable caching
+  app.use(
+    '/uploads',
+    express.static(UPLOADS_ROOT_DIR, {
+      dotfiles: 'deny',
+      index: false,
+      redirect: false,
+      fallthrough: false,
+      setHeaders: (res, filePath) => {
+        const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        if (normalized.includes('/whatsapp/')) {
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        } else {
+          res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+        }
+        if (normalized.endsWith('.pdf')) {
+          res.setHeader('Content-Disposition', 'inline');
+        } else {
+          res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'; media-src 'self'; sandbox");
+        }
+      },
+    }),
+    (_err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(404).send('Not Found');
+    }
+  );
 
   // Digital Asset Links for Android TWA / Google Play Deep Links verification
   // IMPORTANT: Express res.sendFile() rejects dot-directories like `.well-known` with 404 NotFoundError unless dotfiles:'allow' or fs.readFileSync is used!

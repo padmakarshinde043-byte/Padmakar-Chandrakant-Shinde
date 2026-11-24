@@ -56,13 +56,29 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/\.well-known\//, /^\/robots\.txt$/, /^\/sitemap\.xml$/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/uploads\//, /^\/\.well-known\//, /^\/robots\.txt$/, /^\/sitemap\.xml$/],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
             handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/uploads/') &&
+              /\.(?:webp|png|jpe?g|avif)$/i.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'server-uploads-images-cache',
+              expiration: {
+                maxEntries: 120,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
           },
           {
             urlPattern: /^https:\/\/res\.cloudinary\.com\/.*\.(?:webp|png|jpe?g|avif)(?:\?.*)?$/i,

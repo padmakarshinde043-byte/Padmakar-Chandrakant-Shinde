@@ -83,6 +83,8 @@ import {
   uploadBannerPhotoToCloudinary,
   uploadBannerVideoToCloudinary,
   uploadDataUrlToCloudinary,
+  uploadNewsPhotoToServerDisk,
+  uploadGrFileToServerDisk,
   resolveImageUrlForPdf,
   CloudinaryConfig
 } from '../utils/cloudinary';
@@ -1430,37 +1432,25 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
-      setIsUploadingNewsCloudinary(true);
-      setNewsError('');
-      try {
-        const result = await uploadToCloudinary(file, cloudinaryConfig);
-        setNewsImageUrl(result.url);
-      } catch (err: any) {
-        console.warn('Cloudinary upload error, falling back to local compression:', err);
-        setIsCompressingNewsImg(true);
-        try {
-          const { base64 } = await compressImageFile(file, 800, 600, 0.7);
-          setNewsImageUrl(base64);
-          setNewsError('Cloud upload failed (' + (err.message || '') + '). Used locally compressed image instead.');
-        } catch {
-          setNewsError('Failed to compress image.');
-        } finally {
-          setIsCompressingNewsImg(false);
-        }
-      } finally {
-        setIsUploadingNewsCloudinary(false);
-      }
-    } else {
+    setIsUploadingNewsCloudinary(true);
+    setNewsError('');
+    try {
+      const result = await uploadNewsPhotoToServerDisk(file, cloudinaryConfig);
+      setNewsImageUrl(result.url);
+    } catch (err: any) {
+      console.warn('News photo server upload error, falling back to inline compression:', err);
       setIsCompressingNewsImg(true);
       try {
-        const { base64 } = await compressImageFile(file, 800, 600, 0.7);
+        const { base64 } = await compressImageFile(file, 900, 680, 0.72);
         setNewsImageUrl(base64);
-      } catch (err) {
-        console.warn('News image compression failed:', err);
+      } catch {
+        setNewsError('फोटो प्रोसेस करता आला नाही: ' + (err?.message || ''));
       } finally {
         setIsCompressingNewsImg(false);
       }
+    } finally {
+      setIsUploadingNewsCloudinary(false);
+      e.target.value = '';
     }
   };
 
@@ -1468,19 +1458,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
-      setIsUploadingGoFile(true);
-      setGoError('');
-      try {
-        const result = await uploadToCloudinary(file, cloudinaryConfig);
-        setGoFileUrl(result.url);
-      } catch (err: any) {
-        setGoError('File upload failed: ' + (err.message || ''));
-      } finally {
-        setIsUploadingGoFile(false);
-      }
-    } else {
-      setGoError('Please configure Cloud Storage settings in the Admin Panel first.');
+    setIsUploadingGoFile(true);
+    setGoError('');
+    try {
+      const result = await uploadGrFileToServerDisk(file, cloudinaryConfig);
+      setGoFileUrl(result.url);
+    } catch (err: any) {
+      setGoError('File upload failed: ' + (err?.message || ''));
+    } finally {
+      setIsUploadingGoFile(false);
+      e.target.value = '';
     }
   };
 
@@ -2444,38 +2431,22 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       return;
     }
 
-    if (cloudinaryConfig.enabled && cloudinaryConfig.cloudName && cloudinaryConfig.uploadPreset) {
-      setIsUploadingLeaderCloudinary(true);
-      try {
-        const result = await uploadToCloudinary(file, cloudinaryConfig);
-        setLeaderPhoto(result.url);
-        setLeaderPhotoUrl(result.url);
-        setLeaderPhotoSizeKb(0);
-        setLeaderFormMsg({ text: 'Photo uploaded to cloud storage.', type: 'success' });
-      } catch (err: any) {
-        console.warn('Cloudinary leader upload error, falling back to local compression:', err);
-        try {
-          const { base64, sizeKb } = await compressImageFile(file, 240, 240, 0.72);
-          setLeaderPhoto(base64);
-          setLeaderPhotoSizeKb(sizeKb);
-          setLeaderPhotoUrl('');
-          setLeaderFormMsg({ text: 'Cloud upload failed. Using compressed image (' + sizeKb + ' KB).', type: 'error' });
-        } catch {
-          setLeaderFormMsg({ text: 'Failed to upload photo.', type: 'error' });
-        }
-      } finally {
-        setIsUploadingLeaderCloudinary(false);
-      }
-    } else {
-      try {
-        // Automatically compress down to ~20KB to protect Firebase quota 100%
-        const { base64, sizeKb } = await compressImageFile(file, 240, 240, 0.72);
-        setLeaderPhoto(base64);
-        setLeaderPhotoSizeKb(sizeKb);
-        setLeaderPhotoUrl('');
-      } catch (err: any) {
-        setLeaderFormMsg({ text: 'Failed to compress photo: ' + (err.message || ''), type: 'error' });
-      }
+    setIsUploadingLeaderCloudinary(true);
+    try {
+      // Compress leader passport photo (~18-28KB WebP/JPEG) and store directly in SQL (zero Cloudinary quota)
+      const { base64, sizeKb } = await compressImageFile(file, 320, 380, 0.78);
+      setLeaderPhoto(base64);
+      setLeaderPhotoSizeKb(sizeKb);
+      setLeaderPhotoUrl('');
+      setLeaderFormMsg({
+        text: `Photo compressed (${sizeKb} KB) & ready to save in SQL database.`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setLeaderFormMsg({ text: 'Failed to compress photo: ' + (err?.message || ''), type: 'error' });
+    } finally {
+      setIsUploadingLeaderCloudinary(false);
+      e.target.value = '';
     }
   };
 

@@ -25,7 +25,7 @@ import {
 import { OfficialMember } from '../data/rkMaharashtraData';
 import { fetchOfficials } from '../services/rkFirebaseService';
 import { getAuthHeaders } from '../api/sqlBridge';
-import { CloudinaryConfig, uploadToCloudinary } from '../utils/cloudinary';
+import { CloudinaryConfig, uploadWhatsappMediaToServerDisk } from '../utils/cloudinary';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 
 interface AdminWhatsappBroadcastPanelProps {
@@ -436,21 +436,14 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!cloudinaryConfig.enabled || !cloudinaryConfig.cloudName || !cloudinaryConfig.uploadPreset) {
-      setBroadcastStatus({
-        type: 'error',
-        text: 'Enable Cloud Storage (Cloudinary) first or paste a public https:// photo URL.',
-      });
-      return;
-    }
     setIsUploadingPhoto(true);
     setBroadcastStatus(null);
     try {
-      const result = await uploadToCloudinary(file, cloudinaryConfig);
+      const result = await uploadWhatsappMediaToServerDisk(file, cloudinaryConfig);
       setSenderPhoto(result.url);
       setBroadcastStatus({
         type: 'success',
-        text: 'Photo uploaded and linked.',
+        text: `Photo uploaded to server (${result.sizeKb} KB) and linked.`,
       });
     } catch (err: any) {
       setBroadcastStatus({
@@ -459,6 +452,7 @@ export const AdminWhatsappBroadcastPanel: React.FC<AdminWhatsappBroadcastPanelPr
       });
     } finally {
       setIsUploadingPhoto(false);
+      e.target.value = '';
     }
   };
 

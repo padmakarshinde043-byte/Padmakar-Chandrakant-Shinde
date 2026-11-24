@@ -1,14 +1,16 @@
 import { compressImageFile } from './imageCompressor';
 import { normalizeImageSrcForPdf } from './pdfImageSafety';
+import { getAuthHeaders } from '../api/sqlBridge';
 
 /**
- * Cloudinary Image Upload & Free CDN Storage Utility
- * 
- * Provides 100% quota protection for Firebase:
- * - Photos and news images upload directly to Cloudinary Free Tier (25GB free)
- * - Firebase only stores the short CDN URL string (e.g., https://res.cloudinary.com/...)
- * - Zero base64 payload in Firestore, keeping Firestore database usage strictly near 0 KB.
- * - Uses Cloudinary's official Unsigned Upload Preset feature (no backend or secret API key needed).
+ * Hybrid Media Storage Utility (SQL + Local Server Disk + Optional Cloudinary Fallback)
+ *
+ * Zero-Quota Architecture:
+ * - Member, Official & Leader passport photos (~15-30KB WebP/JPEG) are stored directly in SQL
+ *   (applications/officials/leaders tables already use lazy batch hydration for instant speed).
+ * - Banners, News photos, Short Videos & GR PDFs are compressed client-side and stored on
+ *   the app server disk (`/uploads/<folder>/...`) with 1-year immutable browser & SW caching.
+ * - Existing `https://res.cloudinary.com/...` URLs continue rendering normally.
  */
 
 export interface CloudinaryConfig {
@@ -112,14 +114,73 @@ function dataUrlToFile(dataUrl: string, fileName: string): File {
   return new File([u8arr], `${fileName}.${ext}`, { type: mime });
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('फाईल वाचताना अडचण आली.'));
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      if (result.startsWith('data:')) {
+        resolve(result);
+      } else {
+        reject(new Error('अवैध फाईल फॉरमॅट.'));
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+export type ServerMediaFolder = 'banners' | 'news' | 'gr' | 'whatsapp';
+
 /**
- * Converts a base64 Data URL to a File and uploads it to Cloudinary, returning the HTTPS CDN URL.
+ * Uploads a Data URL (compressed image, short video, or GR PDF) to our own server disk
+ * (`/uploads/<folder>/<random-id>.<ext>`), served with 1-year immutable browser caching.
+ */
+export async function uploadDataUrlToServerDisk(
+  dataUrl: string,
+  folder: ServerMediaFolder
+): Promise<{ url: string; sizeKb: number }> {
+  const res = await fetch('/api/media/upload', {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify({ dataUrl, folder }),
+  });
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(`सर्व्हर अपलोड उपलब्ध नाही (HTTP ${res.status})`);
+  }
+
+  const data = await res.json();
+  if (!res.ok || data.status !== 'success' || !data.url) {
+    throw new Error(data.message || `सर्व्हर अपलोड अयशस्वी झाले (HTTP ${res.status})`);
+  }
+
+  return {
+    url: String(data.url),
+    sizeKb: Number(data.sizeKb || 0),
+  };
+}
+
+/**
+ * Uploads a Data URL to server disk first (zero Cloudinary quota), falling back to Cloudinary only if needed.
  */
 export async function uploadDataUrlToCloudinary(
   dataUrl: string,
   fileName = `banner_${Date.now()}`,
   overrideConfig?: CloudinaryConfig
 ): Promise<string> {
+  try {
+    const uploaded = await uploadDataUrlToServerDisk(dataUrl, 'banners');
+    return uploaded.url;
+  } catch (serverErr) {
+    console.warn('Server disk dataUrl upload unavailable, trying Cloudinary fallback:', serverErr);
+  }
+
   const baseConfig = overrideConfig || getCloudinaryConfig();
   const activeConfig: CloudinaryConfig = {
     cloudName: baseConfig.cloudName?.trim() || 'fdrjsgjy',
@@ -132,37 +193,34 @@ export async function uploadDataUrlToCloudinary(
 }
 
 /**
- * Compresses oversized banner images if needed and uploads directly to Cloudinary,
- * always returning a clean Cloudinary HTTPS URL for saving in Firebase.
+ * Compresses banner images to crisp HD WebP/JPEG (~80-180 KB) and saves to server disk
+ * (`/uploads/banners/...`) with 1-year immutable caching — zero Cloudinary quota used.
  */
 export async function uploadBannerPhotoToCloudinary(
   file: File,
   overrideConfig?: CloudinaryConfig
 ): Promise<{ url: string; sizeKb: number }> {
-  const baseConfig = overrideConfig || getCloudinaryConfig();
-  const activeConfig: CloudinaryConfig = {
-    cloudName: baseConfig.cloudName?.trim() || 'fdrjsgjy',
-    uploadPreset: baseConfig.uploadPreset?.trim() || 'mahasangh',
-    enabled: true,
-  };
+  const compressed = await compressImageFile(file, 1400, 1400, 0.82);
 
-  let uploadFile = file;
-  let sizeKb = Math.round(file.size / 1024);
-
-  // Compress large camera/WhatsApp images to sharp 1600px HD so Cloudinary upload is fast & under limit
-  if (file.size > 1500 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    const compressed = await compressImageFile(file, 1600, 1600, 0.88);
-    uploadFile = dataUrlToFile(compressed.base64, `latest_banner_${Date.now()}`);
-    sizeKb = compressed.sizeKb;
+  try {
+    return await uploadDataUrlToServerDisk(compressed.base64, 'banners');
+  } catch (serverErr) {
+    console.warn('Server disk banner upload unavailable, trying Cloudinary fallback:', serverErr);
   }
 
-  const uploaded = await uploadToCloudinary(uploadFile, activeConfig);
-  return { url: uploaded.url, sizeKb };
+  const baseConfig = overrideConfig || getCloudinaryConfig();
+  if (baseConfig.enabled && baseConfig.cloudName && baseConfig.uploadPreset) {
+    const uploadFile = dataUrlToFile(compressed.base64, `latest_banner_${Date.now()}`);
+    const uploaded = await uploadToCloudinary(uploadFile, baseConfig);
+    return { url: uploaded.url, sizeKb: compressed.sizeKb };
+  }
+
+  throw new Error('बॅनर फोटो सर्व्हरवर अपलोड करता आला नाही. कृपया पुन्हा लॉगिन करून प्रयत्न करा.');
 }
 
 /**
- * Uploads a short video (strictly <= 3MB) to Cloudinary via unsigned upload preset.
- * Enforces the strict 3MB size limit requested by the user.
+ * Uploads a short video (strictly <= 3MB) to server disk (`/uploads/banners/...`) with
+ * HTTP Range streaming & 1-year immutable caching — zero Cloudinary bandwidth used.
  */
 export async function uploadBannerVideoToCloudinary(
   file: File,
@@ -171,7 +229,14 @@ export async function uploadBannerVideoToCloudinary(
   const MAX_VIDEO_BYTES = 3 * 1024 * 1024; // strictly 3 MB
   if (file.size > MAX_VIDEO_BYTES) {
     const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-    throw new Error(`व्हिडिओचा आकार ३ MB पेक्षा जास्त आहे (${sizeMb} MB). कृपया ३ MB किंवा त्यापेक्षा लहान आकाराचा शॉर्ट व्हिडिओ निवडा.`);
+    throw new Error(`व्हिडिओचा आकार 3 MB पेक्षा जास्त आहे (${sizeMb} MB). कृपया 3 MB किंवा त्यापेक्षा लहान आकाराचा शॉर्ट व्हिडिओ निवडा.`);
+  }
+
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    return await uploadDataUrlToServerDisk(dataUrl, 'banners');
+  } catch (serverErr) {
+    console.warn('Server disk video upload unavailable, trying Cloudinary fallback:', serverErr);
   }
 
   const baseConfig = overrideConfig || getCloudinaryConfig();
@@ -182,7 +247,6 @@ export async function uploadBannerVideoToCloudinary(
   formData.append('file', file);
   formData.append('upload_preset', cleanPreset);
 
-  // Try video/upload endpoint, fallback to auto/upload
   const endpoint = `https://api.cloudinary.com/v1_1/${cleanCloudName}/video/upload`;
   let response = await fetch(endpoint, {
     method: 'POST',
@@ -207,7 +271,7 @@ export async function uploadBannerVideoToCloudinary(
   const secureUrl = data.secure_url || data.url;
 
   if (!secureUrl) {
-    throw new Error('Cloudinary कडून व्हिडिओ URL प्राप्त झाली नाही.');
+    throw new Error('व्हिडिओ URL प्राप्त झाली नाही.');
   }
 
   return {
@@ -217,37 +281,119 @@ export async function uploadBannerVideoToCloudinary(
 }
 
 /**
- * Compresses member passport photo to <30KB first, then uploads to Cloudinary.
- * Automatically falls back to the tiny compressed Base64 if Cloudinary is disabled or offline,
- * guaranteeing registration and member edits NEVER fail.
+ * Compresses news photo to crisp WebP/JPEG (~60-150 KB) and saves to server disk (`/uploads/news/...`).
+ */
+export async function uploadNewsPhotoToServerDisk(
+  file: File,
+  overrideConfig?: CloudinaryConfig
+): Promise<{ url: string; sizeKb: number; storageType: 'server' | 'cloudinary' | 'fallback' }> {
+  const compressed = await compressImageFile(file, 1200, 900, 0.8);
+
+  try {
+    const uploaded = await uploadDataUrlToServerDisk(compressed.base64, 'news');
+    return { url: uploaded.url, sizeKb: uploaded.sizeKb || compressed.sizeKb, storageType: 'server' };
+  } catch (serverErr) {
+    console.warn('Server disk news upload unavailable, trying fallback:', serverErr);
+  }
+
+  const config = overrideConfig || getCloudinaryConfig();
+  if (config.enabled && config.cloudName && config.uploadPreset) {
+    try {
+      const tinyFile = dataUrlToFile(compressed.base64, `news_${Date.now()}`);
+      const uploaded = await uploadToCloudinary(tinyFile, config);
+      return { url: uploaded.url, sizeKb: compressed.sizeKb, storageType: 'cloudinary' };
+    } catch (cloudErr) {
+      console.warn('Cloudinary news fallback failed, using compressed inline photo:', cloudErr);
+    }
+  }
+
+  return { url: compressed.base64, sizeKb: compressed.sizeKb, storageType: 'fallback' };
+}
+
+/**
+ * Uploads Government Order / GR PDF (<= 6MB) or compressed image to server disk (`/uploads/gr/...`).
+ */
+export async function uploadGrFileToServerDisk(
+  file: File,
+  overrideConfig?: CloudinaryConfig
+): Promise<{ url: string; sizeKb: number; storageType: 'server' | 'cloudinary' }> {
+  const isImage = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+  if (!isImage && !isPdf) {
+    throw new Error('फक्त PDF किंवा इमेज (JPG/PNG/WebP) फाईल अपलोड करता येईल.');
+  }
+
+  if (isPdf && file.size > 6 * 1024 * 1024) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    throw new Error(`PDF फाईलचा आकार 6 MB पेक्षा जास्त आहे (${sizeMb} MB). कृपया लहान PDF निवडा किंवा Google Drive लिंक वापरा.`);
+  }
+
+  const dataUrl = isImage
+    ? (await compressImageFile(file, 1400, 1800, 0.82)).base64
+    : await fileToDataUrl(file);
+
+  try {
+    const uploaded = await uploadDataUrlToServerDisk(dataUrl, 'gr');
+    return { url: uploaded.url, sizeKb: uploaded.sizeKb, storageType: 'server' };
+  } catch (serverErr) {
+    console.warn('Server disk GR upload unavailable, trying Cloudinary fallback:', serverErr);
+  }
+
+  const config = overrideConfig || getCloudinaryConfig();
+  if (config.enabled && config.cloudName && config.uploadPreset) {
+    const uploaded = await uploadToCloudinary(file, config);
+    return { url: uploaded.url, sizeKb: Math.round(file.size / 1024), storageType: 'cloudinary' };
+  }
+
+  throw new Error('GR फाईल सर्व्हरवर अपलोड करता आली नाही.');
+}
+
+/**
+ * Compresses WhatsApp sender/broadcast image and saves to server disk (`/uploads/whatsapp/...`),
+ * returning a full public HTTPS URL suitable for Meta WhatsApp Cloud API.
+ */
+export async function uploadWhatsappMediaToServerDisk(
+  file: File,
+  overrideConfig?: CloudinaryConfig
+): Promise<{ url: string; sizeKb: number }> {
+  const compressed = await compressImageFile(file, 1000, 1000, 0.82);
+
+  try {
+    const uploaded = await uploadDataUrlToServerDisk(compressed.base64, 'whatsapp');
+    const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '';
+    const fullUrl = uploaded.url.startsWith('http') ? uploaded.url : `${origin}${uploaded.url}`;
+    return { url: fullUrl, sizeKb: uploaded.sizeKb || compressed.sizeKb };
+  } catch (serverErr) {
+    console.warn('Server disk WhatsApp upload unavailable, trying Cloudinary fallback:', serverErr);
+  }
+
+  const config = overrideConfig || getCloudinaryConfig();
+  if (config.enabled && config.cloudName && config.uploadPreset) {
+    const tinyFile = dataUrlToFile(compressed.base64, `whatsapp_${Date.now()}`);
+    const uploaded = await uploadToCloudinary(tinyFile, config);
+    return { url: uploaded.url, sizeKb: compressed.sizeKb };
+  }
+
+  throw new Error('फोटो सर्व्हरवर अपलोड करता आला नाही.');
+}
+
+/**
+ * Compresses member / official passport photo to crisp ~15-30KB WebP/JPEG and stores
+ * directly in SQL (`applications.photo`, `officials.photo`, `contacts.photo`) —
+ * completely avoiding Cloudinary quota usage while keeping lazy-loaded lists lightning fast.
  */
 export async function uploadCompressedPhotoToCloudinaryOrFallback(
   file: File,
   maxWidth = 360,
   maxHeight = 440,
-  quality = 0.72
-): Promise<{ urlOrBase64: string; sizeKb: number; storageType: 'cloudinary' | 'fallback' }> {
+  quality = 0.78
+): Promise<{ urlOrBase64: string; sizeKb: number; storageType: 'sql' | 'cloudinary' | 'fallback' }> {
   const { base64, sizeKb } = await compressImageFile(file, maxWidth, maxHeight, quality);
-  const config = getCloudinaryConfig();
-
-  if (config.enabled && config.cloudName && config.uploadPreset) {
-    try {
-      const tinyFile = dataUrlToFile(base64, `member_${Date.now()}`);
-      const uploaded = await uploadToCloudinary(tinyFile, config);
-      return {
-        urlOrBase64: uploaded.url,
-        sizeKb,
-        storageType: 'cloudinary'
-      };
-    } catch (err) {
-      console.warn('Cloudinary member photo upload fallback to tiny Base64:', err);
-    }
-  }
-
   return {
     urlOrBase64: base64,
     sizeKb,
-    storageType: 'fallback'
+    storageType: 'sql',
   };
 }
 

@@ -6,12 +6,8 @@ import {
   AlertCircle, ChevronRight, ChevronDown, ChevronUp, Phone, MapPin, Building, Calendar, Users, Download, X, Eye, EyeOff, ImageIcon, UserCheck
 } from 'lucide-react';
 import {
-  uploadToCloudinary,
-  getCloudinaryConfig,
   uploadCompressedPhotoToCloudinaryOrFallback,
-  uploadDataUrlToCloudinary
 } from '../utils/cloudinary';
-import { compressImageFile } from '../utils/imageCompressor';
 import {
   DISTRICT_TALUKAS_MAP, MAHARASHTRA_36_DISTRICTS, OfficialMember, AppointedPostItem,
   SUPER_ADMIN_PASSWORD, MASTER_DEV_ADMIN_PASSWORD, DEFAULT_DISTRICT_PASSWORD,
@@ -295,14 +291,10 @@ export const AppointmentsTab: React.FC = () => {
     }
     setIsUploadingMemberPhoto(true);
     try {
-      const { urlOrBase64, storageType } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 400, 500, 0.85);
+      const { urlOrBase64, sizeKb } = await uploadCompressedPhotoToCloudinaryOrFallback(file, 360, 440, 0.78);
       setFormPhoto(urlOrBase64);
       setFormPhotoUrl(urlOrBase64.startsWith('http') ? urlOrBase64 : '');
-      if (storageType === 'cloudinary') {
-        showToast('✓ फोटो थेट क्लाउडवर यशस्वीरीत्या अपलोड झाला!', 'success');
-      } else {
-        showToast('✓ फोटो यशस्वीरीत्या जोडला गेला!', 'success');
-      }
+      showToast(`✓ फोटो (${sizeKb} KB) यशस्वीरीत्या जोडला गेला!`, 'success');
     } catch (err: any) {
       showToast('फोटो अपलोड करताना अडचण आली: ' + (err?.message || ''), 'error');
     } finally {
@@ -1145,14 +1137,7 @@ export const AppointmentsTab: React.FC = () => {
     const finalTaluka = isPostNeedsTaluka ? formTaluka.trim() : '';
 
     const memberId = editingMemberId || String(Date.now());
-    let finalPhoto = formPhoto.trim();
-    if (finalPhoto.startsWith('data:image/')) {
-      try {
-        finalPhoto = await uploadDataUrlToCloudinary(finalPhoto, `official_${memberId}`);
-      } catch (e) {
-        console.warn('Could not upload data url to cloudinary:', e);
-      }
-    }
+    const finalPhoto = formPhoto.trim();
 
     const memberObj: OfficialMember = {
       id: memberId,
