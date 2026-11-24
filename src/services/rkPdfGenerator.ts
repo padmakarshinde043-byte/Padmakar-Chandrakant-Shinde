@@ -42,6 +42,7 @@ import {
 } from '../data/mahasanghData';
 import { toEnglishDigits, formatDateWithEnglishDigits } from '../utils/formatters';
 import { resolveImageUrlForPdf } from '../utils/cloudinary';
+import type { OfficialIdCardData } from '../utils/officialIdCardMatcher';
 import {
   A4_PX_WIDTH,
   A4_PX_HEIGHT,
@@ -369,6 +370,98 @@ async function getIdCardWaveBackgroundDataUrl(width = 3424, height = 2160): Prom
 
     cachedIdCardWaveBgDataUrl = canvas.toDataURL('image/png');
     return cachedIdCardWaveBgDataUrl;
+  } catch {
+    return '';
+  }
+}
+
+let cachedOfficialIdCardWaveBgDataUrl: string | null = null;
+/**
+ * Draws the Official (पदाधिकारी) Straight Gold-and-Saffron-Orange Header/Footer layout
+ * onto Canvas 2D at 3424x2160 (CR80). Preserves exact geometry of the Membership ID Card
+ * with a dignified warm saffron-orange palette and subtle ivory-saffron body tint.
+ */
+async function getOfficialIdCardWaveBackgroundDataUrl(width = 3424, height = 2160): Promise<string> {
+  if (cachedOfficialIdCardWaveBgDataUrl) return cachedOfficialIdCardWaveBgDataUrl;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    const sx = width / 640;
+    const sy = height / 404;
+
+    // Subtle warm ivory-saffron card body tint (distinct from crisp white Membership ID Card)
+    const bodyGrad = ctx.createLinearGradient(0, 102 * sy, 0, 368 * sy);
+    bodyGrad.addColorStop(0, '#fffdf9');
+    bodyGrad.addColorStop(0.55, '#fff9f0');
+    bodyGrad.addColorStop(1, '#fff3e2');
+    ctx.fillStyle = bodyGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Top Warm Saffron-Orange (Kesari) Header strictly above straight gold line
+    const topSaffronGrad = ctx.createLinearGradient(0, 0, width, 95 * sy);
+    topSaffronGrad.addColorStop(0, '#9a3412');
+    topSaffronGrad.addColorStop(0.35, '#c2410c');
+    topSaffronGrad.addColorStop(0.7, '#ea580c');
+    topSaffronGrad.addColorStop(1, '#9a3412');
+    ctx.fillStyle = topSaffronGrad;
+    ctx.fillRect(0, 0, width, 95 * sy);
+
+    const glowCx = 0.62 * width;
+    const glowCy = 0.42 * 95 * sy;
+    const glowR = 0.48 * width;
+    const topWarmGlow = ctx.createRadialGradient(glowCx, glowCy, 0, glowCx, glowCy, glowR);
+    topWarmGlow.addColorStop(0, 'rgba(253, 186, 116, 0.35)');
+    topWarmGlow.addColorStop(1, 'rgba(154, 52, 18, 0)');
+    ctx.fillStyle = topWarmGlow;
+    ctx.fillRect(0, 0, width, 95 * sy);
+
+    // Straight Top Metallic Gold Divider Line with subtle shadow
+    ctx.save();
+    ctx.shadowColor = 'rgba(154, 52, 18, 0.22)';
+    ctx.shadowBlur = 4 * sx;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 1.8 * sy;
+    const topGoldGrad = ctx.createLinearGradient(0, 0, width, 0);
+    topGoldGrad.addColorStop(0, '#a16207');
+    topGoldGrad.addColorStop(0.18, '#f5c842');
+    topGoldGrad.addColorStop(0.48, '#fef08a');
+    topGoldGrad.addColorStop(0.75, '#eab308');
+    topGoldGrad.addColorStop(1, '#92400e');
+    ctx.fillStyle = topGoldGrad;
+    ctx.fillRect(0, 95 * sy, width, 7 * sy);
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(254, 249, 195, 0.72)';
+    ctx.fillRect(0, 95.4 * sy, width, 1 * sy);
+    ctx.fillStyle = 'rgba(133, 77, 14, 0.85)';
+    ctx.fillRect(0, 101.2 * sy, width, 0.8 * sy);
+
+    // Bottom Straight Metallic Gold Line & Warm Saffron-Orange Footer Band
+    const bottomGoldGrad = ctx.createLinearGradient(0, 0, width, 0);
+    bottomGoldGrad.addColorStop(0, '#92400e');
+    bottomGoldGrad.addColorStop(0.28, '#f5c842');
+    bottomGoldGrad.addColorStop(0.55, '#fef08a');
+    bottomGoldGrad.addColorStop(0.82, '#eab308');
+    bottomGoldGrad.addColorStop(1, '#a16207');
+    ctx.fillStyle = bottomGoldGrad;
+    ctx.fillRect(0, 368 * sy, width, 6 * sy);
+
+    ctx.fillStyle = 'rgba(254, 249, 195, 0.65)';
+    ctx.fillRect(0, 368.3 * sy, width, 0.9 * sy);
+
+    const bottomSaffronGrad = ctx.createLinearGradient(0, 0, width, 0);
+    bottomSaffronGrad.addColorStop(0, '#9a3412');
+    bottomSaffronGrad.addColorStop(0.5, '#ea580c');
+    bottomSaffronGrad.addColorStop(1, '#9a3412');
+    ctx.fillStyle = bottomSaffronGrad;
+    ctx.fillRect(0, 374 * sy, width, 30 * sy);
+
+    cachedOfficialIdCardWaveBgDataUrl = canvas.toDataURL('image/png');
+    return cachedOfficialIdCardWaveBgDataUrl;
   } catch {
     return '';
   }
@@ -1055,6 +1148,213 @@ export async function generateMembershipIdCardPdfBase64(
 
 export async function generateMembershipCertificatePdf(app: MembershipApplication): Promise<void> {
   return generateMembershipIdCardPdf(app);
+}
+
+/**
+ * 4B. Official Office-Bearer ID Card (पदाधिकारी डिजिटल आय-कार्ड PDF)
+ * - Identical CR80 dimensions (85.6mm x 54mm) & visual hierarchy as Membership ID Card
+ * - Distinct light warm saffron-orange header/footer & subtle ivory-saffron body tint
+ * - Shows appointed designation + jurisdiction (महाराष्ट्र राज्य / जिल्हा / तालुका) instead of आजीवन सदस्य
+ * - Shows नियुक्ती क्र: instead of सदस्य क्र:
+ * - Preserves Circular Logo, Passport Photo with golden border, QR Code, and Rajendra Khairnar signature
+ */
+async function buildOfficialIdCardPdfDocument(
+  official: OfficialIdCardData
+): Promise<{ pdf: JsPdfType; downloadFileName: string }> {
+  const [sharpLogoUrl, transparentSignUrl, qrUrl, waveBgUrl, safePhotoRawUrl] = await Promise.all([
+    getSharpLogoDataUrl(720),
+    getTransparentSignDataUrl(),
+    getQrCodeDataUrl(),
+    getOfficialIdCardWaveBackgroundDataUrl(3424, 2160),
+    resolveImageUrlForPdf(official.photo),
+  ]);
+
+  const croppedPhotoUrl = safePhotoRawUrl
+    ? await cropPhotoToCoverDataUrl(safePhotoRawUrl, 624, 768)
+    : '';
+
+  const appointmentNo = toEnglishDigits((official.appointmentNumber || '').trim()) || 'MS/2026/01';
+  const displayName = (official.displayName || '').trim() || 'पदाधिकारी';
+  const designationTitle = (official.designationTitle || '').trim() || 'पदाधिकारी';
+  const jurisdictionSubtitle = (official.jurisdictionSubtitle || '').trim() || 'महाराष्ट्र राज्य';
+  const cadre = normalizeOfficialCadre(official.cadre, 'केंद्रप्रमुख / शिक्षण विस्तार अधिकारी');
+  const areaText = (official.areaText || '').trim() || jurisdictionSubtitle;
+  const phoneText = toEnglishDigits((official.phone || '').trim()) || '-';
+
+  // Dynamic typography safeguards for extra-long Marathi designations, names, or order numbers
+  const designationFontPx =
+    designationTitle.length > 24 ? 20.5 : designationTitle.length > 18 ? 23.0 : 26.2;
+  const jurisdictionFontPx =
+    jurisdictionSubtitle.length > 28 ? 14.5 : jurisdictionSubtitle.length > 22 ? 15.8 : 17.2;
+  const nameFontPx = displayName.length > 34 ? 24.5 : displayName.length > 27 ? 27.0 : 29.5;
+  const detailFontPx = areaText.length > 34 ? 17.4 : 19.2;
+  const orderNoFontPx = appointmentNo.length > 19 ? 19.5 : appointmentNo.length > 15 ? 21.8 : 23.8;
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.left = '-9999px';
+  wrapper.style.top = '0';
+  wrapper.style.width = '856px';
+  wrapper.style.height = '540px';
+  wrapper.style.background = '#fffdf9';
+  wrapper.style.zIndex = '999999';
+  wrapper.style.overflow = 'hidden';
+
+  const cardHtml = `
+    <div style="width: 856px; height: 540px; position: relative; background: #fffdf9; border-radius: 21px; border: 3.3px solid #9a3412; box-sizing: border-box; overflow: hidden; font-family: 'Noto Sans Devanagari', sans-serif; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.85);">
+      ${
+        waveBgUrl
+          ? `<img src="${waveBgUrl}" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none;" />`
+          : ''
+      }
+
+      <!-- 1. TOP-LEFT SHARP CIRCULAR LOGO (Inside straight top saffron-orange header) -->
+      ${
+        sharpLogoUrl
+          ? `<div style="position: absolute; left: 2.8%; top: 1.4%; width: 114px; height: 114px; border-radius: 50%; border: 3.6px solid #eab308; background: #ffffff; overflow: hidden; box-sizing: border-box; box-shadow: 0 3px 8px rgba(0,0,0,0.42), 0 0 0 1.8px rgba(255,255,255,0.75);">
+               <img src="${sharpLogoUrl}" alt="महासंघ लोगो" style="width: 100%; height: 100%; display: block;" />
+             </div>`
+          : ''
+      }
+
+      <!-- 2. HEADER 3 TITLE LINES (Identical masthead inside saffron-orange header) -->
+      <div style="position: absolute; left: 16.5%; right: 6%; top: 2.6%; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 800; font-size: 20px; color: #fef08a; letter-spacing: 0.4px; line-height: 1.18; text-shadow: 0 1.3px 3.4px rgba(0,0,0,0.45);">
+          महाराष्ट्र राज्य
+        </div>
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; font-size: 33px; color: #ffffff; line-height: 1.22; letter-spacing: -0.2px; margin-top: 1.8px; text-shadow: 0 2.1px 5.1px rgba(0,0,0,0.58); white-space: nowrap;">
+          केंद्रप्रमुख व अधिकारी महासंघ
+        </div>
+        <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 700; font-size: 15px; color: #ffedd5; line-height: 1.25; margin-top: 7.5px; letter-spacing: 0.2px;">
+          नोंदणी क्र. श्रमिक संघ - महा/एनएसके/एन/2427
+        </div>
+      </div>
+
+      <!-- 3. SUB-HEADER: DESIGNATION & JURISDICTION (Replaces 'आजीवन सदस्य') -->
+      <div style="position: absolute; left: 23.5%; width: 45.5%; top: 26.2%; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; font-size: ${designationFontPx}px; color: #9a3412; line-height: 1.18; white-space: nowrap;">
+          ${escapeCardHtml(designationTitle)}
+        </div>
+        <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 800; font-size: ${jurisdictionFontPx}px; color: #334155; line-height: 1.22; margin-top: 2px; white-space: nowrap;">
+          ${escapeCardHtml(jurisdictionSubtitle)}
+        </div>
+      </div>
+
+      <!-- 4. APPOINTMENT ORDER NUMBER (Replaces 'सदस्य क्र:') -->
+      <div style="position: absolute; right: 1.6%; top: 26.8%; width: 31%; text-align: center; line-height: 1.18;">
+        <div style="font-weight: 800; color: #7c2d12; font-size: 20.5px;">
+          नियुक्ती क्र:
+        </div>
+        <div style="font-family: 'Montserrat', 'Arial Black', 'Segoe UI', sans-serif; font-weight: 900; color: #7c2d12; font-size: ${orderNoFontPx}px; white-space: nowrap; letter-spacing: -0.2px; margin-top: 3px;">
+          ${escapeCardHtml(appointmentNo)}
+        </div>
+      </div>
+
+      <!-- 5. LEFT PASSPORT PHOTO WITH GOLDEN BORDER -->
+      <div style="position: absolute; left: 3.6%; top: 31.2%; width: 154px; height: 189px; border-radius: 12px; border: 3.85px solid #d4af37; background: #fff7ed; overflow: hidden; box-sizing: border-box; box-shadow: 0 3.4px 8.5px rgba(124,45,18,0.22); display: flex; align-items: center; justify-content: center;">
+        ${
+          croppedPhotoUrl
+            ? `<img src="${croppedPhotoUrl}" alt="${escapeCardHtml(displayName)}" style="width: 100%; height: 100%; display: block;" />`
+            : `<div style="text-align: center; color: #9a3412; font-size: 15px; font-weight: 700;">फोटो</div>`
+        }
+      </div>
+
+      <!-- 6. MIDDLE OFFICIAL DETAILS (Cleanly spaced between photo & QR) -->
+      <div style="position: absolute; left: 24.2%; top: 40.4%; width: 51%; display: flex; flex-direction: column; justify-content: center;">
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; font-size: ${nameFontPx}px; color: #9a3412; line-height: 1.2; margin-bottom: 11px; word-break: break-word;">
+          ${escapeCardHtml(displayName)}
+        </div>
+        <div style="font-family: 'Noto Sans Devanagari', sans-serif; font-weight: 700; color: #0f172a; font-size: ${detailFontPx}px; line-height: 1.48; display: flex; flex-direction: column; gap: 6.5px;">
+          <div>संवर्ग: ${escapeCardHtml(cadre)}</div>
+          <div>कार्यक्षेत्र: ${escapeCardHtml(areaText)}</div>
+          <div>
+            मोबाईल: <span style="font-family: 'Courier New', ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; letter-spacing: 0.2px;">${escapeCardHtml(phoneText)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7. RIGHT SCANNABLE QR CODE -->
+      <div style="position: absolute; right: 4.2%; top: 43.2%; width: 140px; height: 140px; background: #ffffff; border: 1.5px solid #fed7aa; border-radius: 6px; display: flex; align-items: center; justify-content: center; padding: 3px; box-sizing: border-box;">
+        ${
+          qrUrl
+            ? `<img src="${qrUrl}" alt="mahasangh.in QR Code" style="width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block;" />`
+            : ''
+        }
+      </div>
+
+      <!-- 8. BOTTOM-LEFT FOOTER TEXT (Above straight bottom gold line) -->
+      <div style="position: absolute; left: 3.8%; bottom: 11.4%; line-height: 1.35;">
+        <div style="font-weight: 800; color: #7c2d12; font-size: 17.3px;">
+          महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+        </div>
+        <div style="font-weight: 900; color: #c2410c; font-size: 18.2px;">
+          अधिकृत पदाधिकारी आय-कार्ड
+        </div>
+      </div>
+
+      <!-- 9. BOTTOM-RIGHT TRANSPARENT BLUE INK SIGNATURE & DESIGNATION -->
+      <div style="position: absolute; right: 3.2%; bottom: 10.1%; min-width: 23%; text-align: center; display: flex; flex-direction: column; align-items: center;">
+        ${
+          transparentSignUrl
+            ? `<img src="${transparentSignUrl}" alt="स्वाक्षरी" style="height: 42.5px; width: auto; max-width: 158px; object-fit: contain; display: block; margin: 0 auto -3px auto;" />`
+            : ''
+        }
+        <div style="font-family: 'Noto Serif Devanagari', 'Noto Sans Devanagari', serif; font-weight: 900; color: #000000; font-size: 20.2px; line-height: 1.18; white-space: nowrap;">
+          श्री. राजेंद्र खैरनार
+        </div>
+        <div style="font-weight: 700; color: #1e293b; font-size: 14.2px; line-height: 1.18; white-space: nowrap;">
+          (संस्थापक राज्याध्यक्ष)
+        </div>
+      </div>
+    </div>
+  `;
+
+  wrapper.innerHTML = cardHtml;
+  document.body.appendChild(wrapper);
+
+  try {
+    await ensureAllImagesInlineDataUrls(wrapper);
+    await waitForFontsAndImages(wrapper);
+
+    const { jsPDF, html2canvas } = await loadPdfEngines();
+    const cardEl = wrapper.firstElementChild as HTMLElement;
+    const canvas = await html2canvas(cardEl, {
+      scale: 2.2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#fffdf9',
+      scrollX: 0,
+      scrollY: 0,
+      x: 0,
+      y: 0,
+      width: 856,
+      height: 540,
+      windowWidth: 856,
+      windowHeight: 540,
+      logging: false,
+    });
+
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: [85.6, 54],
+      compress: true,
+    });
+    const jpegData = canvas.toDataURL('image/jpeg', 0.88);
+    pdf.addImage(jpegData, 'JPEG', 0, 0, 85.6, 54, undefined, 'SLOW');
+    const cleanName = (official.cleanNameForFile || official.displayName || 'पदाधिकारी').replace(/\s+/g, '_');
+    return {
+      pdf,
+      downloadFileName: `पदाधिकारी_आय_कार्ड_${cleanName}.pdf`,
+    };
+  } finally {
+    document.body.removeChild(wrapper);
+  }
+}
+
+export async function generateOfficialIdCardPdf(official: OfficialIdCardData): Promise<void> {
+  const { pdf, downloadFileName } = await buildOfficialIdCardPdfDocument(official);
+  pdf.save(downloadFileName);
 }
 
 /**

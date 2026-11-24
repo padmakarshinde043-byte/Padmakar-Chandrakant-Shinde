@@ -1,22 +1,29 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   UserCheck, ShieldCheck, CheckCircle2, AlertCircle, Phone, Download, Search,
-  Upload, Image as ImageIcon, Check, ExternalLink, Mail, CreditCard, Crop
+  Upload, Image as ImageIcon, Check, ExternalLink, Mail, CreditCard, Crop, Award
 } from 'lucide-react';
 import {
   ORG_DETAILS,
   MAHARASHTRA_DISTRICTS,
   MembershipApplication,
+  Leader,
+  DEFAULT_AUTHORITATIVE_LEADERS,
   OFFICIAL_CADRES,
   TEACHER_PROFESSIONAL_QUALIFICATIONS,
   normalizeOfficialCadre,
 } from '../data/mahasanghData';
 import { toEnglishDigits } from '../utils/formatters';
-import { fetchOfficials } from '../services/rkFirebaseService';
+import { fetchOfficials, fetchDynamicLeaders } from '../services/rkFirebaseService';
 import { OfficialMember, DISTRICT_TALUKAS_MAP } from '../data/rkMaharashtraData';
 import {
   generateMembershipCertificatePdf,
+  generateOfficialIdCardPdf,
 } from '../services/rkPdfGenerator';
+import {
+  resolveOfficialIdCardForQuery,
+  type OfficialIdCardData,
+} from '../utils/officialIdCardMatcher';
 import { RegisteredMembersDirectory } from './RegisteredMembersDirectory';
 import {
   approveApplicationAtomicInFirestore,
@@ -85,8 +92,18 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [officialTaluka, setOfficialTaluka] = useState<string>('');
   const [selectedOfficialId, setSelectedOfficialId] = useState<string>('');
 
-  // Loaded officials from RTDB for auto-fill
+  // Loaded officials & state/district leaders for automatic matching & Official ID card
   const [allOfficials, setAllOfficials] = useState<OfficialMember[]>([]);
+  const [allLeaders, setAllLeaders] = useState<Leader[]>(() => {
+    try {
+      const stored = localStorage.getItem('mahasangh_dynamic_leadership_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_AUTHORITATIVE_LEADERS;
+  });
 
   // Submission & Tracking
   const [submittedApp, setSubmittedApp] = useState<MembershipApplication | null>(null);
@@ -94,8 +111,12 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const [pendingApp, setPendingApp] = useState<MembershipApplication | null>(null);
   const submittedAppRef = useRef<HTMLDivElement | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [lastTrackedQuery, setLastTrackedQuery] = useState('');
   const [searchResult, setSearchResult] = useState<MembershipApplication | null | 'not_found'>(null);
+  const [trackedOfficial, setTrackedOfficial] = useState<OfficialIdCardData | null>(null);
   const [isDownloadingCert, setIsDownloadingCert] = useState<boolean>(false);
+  const [isDownloadingOfficialCard, setIsDownloadingOfficialCard] = useState<boolean>(false);
+  const [cardDownloadError, setCardDownloadError] = useState<string>('');
   const [isTrackingStatus, setIsTrackingStatus] = useState<boolean>(false);
   const [formAlert, setFormAlert] = useState<string>('');
   const [declarationAccepted, setDeclarationAccepted] = useState<boolean>(false);
@@ -169,12 +190,51 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     }
   }, [submittedApp]);
 
-  // Load officials from RTDB for automatic matching
+  // Load officials & state/district leaders for automatic matching and Official ID cards
   useEffect(() => {
     fetchOfficials(false)
       .then((data) => setAllOfficials(data))
       .catch((err) => console.warn('Could not load officials for membership form:', err));
+
+    fetchDynamicLeaders(false)
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setAllLeaders(data);
+        }
+      })
+      .catch((err) => console.warn('Could not load leaders for official ID lookup:', err));
+
+    const onLeadershipUpdated = (ev: Event) => {
+      const detail = (ev as CustomEvent)?.detail;
+      if (Array.isArray(detail) && detail.length > 0) {
+        setAllLeaders(detail);
+      } else {
+        fetchDynamicLeaders(true)
+          .then((data) => {
+            if (Array.isArray(data) && data.length > 0) setAllLeaders(data);
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener('mahasangh_leadership_updated', onLeadershipUpdated);
+    return () => window.removeEventListener('mahasangh_leadership_updated', onLeadershipUpdated);
   }, []);
+
+  // Re-evaluate matched official whenever leaders/officials hydrate after an active Track Status lookup
+  useEffect(() => {
+    if (!lastTrackedQuery && (!searchResult || searchResult === 'not_found')) return;
+    const memberObj = searchResult && searchResult !== 'not_found' ? searchResult : null;
+    const resolved = resolveOfficialIdCardForQuery({
+      queryPhone: lastTrackedQuery,
+      member: memberObj,
+      allLeaders,
+      allOfficials,
+    });
+    setTrackedOfficial(resolved);
+    if (resolved && searchResult === 'not_found') {
+      setSearchResult(null);
+    }
+  }, [allOfficials, allLeaders, lastTrackedQuery, searchResult]);
 
   // Auto-run lookup if landed via ?track=... link (e.g. from approval email)
   useEffect(() => {
@@ -598,6 +658,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
     const queryDigits = query.replace(/\D/g, '');
     setIsTrackingStatus(true);
+    setCardDownloadError('');
+    setLastTrackedQuery(rawTrimmed);
 
     try {
       const isExactIdentifierQuery =
@@ -605,38 +667,65 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
         /^ms[\/-]/i.test(rawTrimmed) ||
         /^app-/i.test(rawTrimmed);
 
-      // 1. Always check Firestore targeted query first so admin-edited / deleted details are authoritative!
+      // Ensure official & leadership directories are hydrated so matching is always authoritative
+      const [officialsList, leadersList] = await Promise.all([
+        allOfficials.length > 0
+          ? Promise.resolve(allOfficials)
+          : fetchOfficials(false).then((list) => {
+              if (list.length > 0) setAllOfficials(list);
+              return list;
+            }).catch(() => allOfficials),
+        allLeaders.length > 0
+          ? Promise.resolve(allLeaders)
+          : fetchDynamicLeaders(false).then((list) => {
+              if (list.length > 0) setAllLeaders(list);
+              return list;
+            }).catch(() => allLeaders),
+      ]);
+
+      let foundMember: MembershipApplication | null = null;
+
+      // 1. Always check Firestore/MySQL targeted query first so admin-edited / deleted details are authoritative!
       if (onTrackRemote) {
         const foundRemote = await onTrackRemote(rawTrimmed);
         if (foundRemote) {
-          setSearchResult(foundRemote);
-          return;
-        }
-        // If remote check returned null for an exact ID / phone / memberNumber, never resurrect from stale local closure
-        if (isExactIdentifierQuery) {
-          setSearchResult('not_found');
-          return;
+          foundMember = foundRemote;
         }
       }
 
       // 2. Fallback to local active records (handles partial Marathi name search or offline mode)
-      const localMatches = applications.filter((a) => {
-        if (!isBlockingApplicationStatus(a.status)) return false;
-        const appNoMatch = a.applicationNumber && a.applicationNumber.toLowerCase() === query;
-        const memberNoMatch = a.memberNumber && a.memberNumber.toLowerCase() === query;
-        const phoneClean = a.phone ? a.phone.replace(/\D/g, '') : '';
-        const phoneMatch = queryDigits.length >= 6 && phoneClean.includes(queryDigits);
-        const nameMatch = a.fullName && a.fullName.toLowerCase().includes(query);
-        return appNoMatch || memberNoMatch || phoneMatch || nameMatch;
-      });
+      if (!foundMember && (!onTrackRemote || !isExactIdentifierQuery)) {
+        const localMatches = applications.filter((a) => {
+          if (!isBlockingApplicationStatus(a.status)) return false;
+          const appNoMatch = a.applicationNumber && a.applicationNumber.toLowerCase() === query;
+          const memberNoMatch = a.memberNumber && a.memberNumber.toLowerCase() === query;
+          const phoneClean = a.phone ? a.phone.replace(/\D/g, '') : '';
+          const phoneMatch = queryDigits.length >= 6 && phoneClean.includes(queryDigits);
+          const nameMatch = a.fullName && a.fullName.toLowerCase().includes(query);
+          return appNoMatch || memberNoMatch || phoneMatch || nameMatch;
+        });
 
-      if (localMatches.length > 0) {
-        const approvedLocal = localMatches.find((m) => m.status === 'approved') || localMatches[0];
-        setSearchResult(approvedLocal);
-        return;
+        if (localMatches.length > 0) {
+          foundMember = localMatches.find((m) => m.status === 'approved') || localMatches[0];
+        }
       }
 
-      setSearchResult('not_found');
+      // 3. Cross-check against all 3 official directories (राज्य पदाधिकारी, जिल्हा पदाधिकारी, जिल्हा कार्यकारिणी)
+      const matchedOfficial = resolveOfficialIdCardForQuery({
+        queryPhone: rawTrimmed,
+        member: foundMember,
+        allLeaders: leadersList,
+        allOfficials: officialsList,
+      });
+
+      setTrackedOfficial(matchedOfficial);
+      if (foundMember) {
+        setSearchResult(foundMember);
+      } else if (matchedOfficial) {
+        setSearchResult(null);
+      } else {
+        setSearchResult('not_found');
+      }
     } finally {
       setIsTrackingStatus(false);
     }
@@ -647,15 +736,29 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     await runTrackLookup(searchQuery);
   };
 
-  // Direct High-Definition PDF Download for Approved Certificate
+  // Direct High-Definition PDF Download for Approved Membership ID Card
   const handleDownloadApprovedCertificate = async (app: MembershipApplication) => {
     setIsDownloadingCert(true);
+    setCardDownloadError('');
     try {
       await generateMembershipCertificatePdf(app);
     } catch (err: any) {
-      alert('प्रमाणपत्र डाऊनलोड करताना त्रुटी आली: ' + (err.message || 'Error'));
+      setCardDownloadError('सदस्यत्व आय-कार्ड डाऊनलोड करताना त्रुटी आली: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'));
     } finally {
       setIsDownloadingCert(false);
+    }
+  };
+
+  // Direct High-Definition PDF Download for Official ID Card (पदाधिकारी आय-कार्ड)
+  const handleDownloadOfficialIdCard = async (official: OfficialIdCardData) => {
+    setIsDownloadingOfficialCard(true);
+    setCardDownloadError('');
+    try {
+      await generateOfficialIdCardPdf(official);
+    } catch (err: any) {
+      setCardDownloadError('पदाधिकारी आय-कार्ड डाऊनलोड करताना त्रुटी आली: ' + (err?.message || 'कृपया पुन्हा प्रयत्न करा.'));
+    } finally {
+      setIsDownloadingOfficialCard(false);
     }
   };
 
@@ -779,7 +882,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               </form>
             </div>
 
-          {/* Search Result Card */}
+          {cardDownloadError && (
+            <div className="mt-3 p-3 bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium rounded-md flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{cardDownloadError}</span>
+            </div>
+          )}
+
+          {/* Search Result Card (Membership Record — with Official ID Card option strictly if matched as an official) */}
           {searchResult && searchResult !== 'not_found' && (
             <div className={`mt-4 p-4 sm:p-5 rounded-md border ${
               searchResult.status === 'approved'
@@ -788,9 +898,9 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             }`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
                 <div className="flex items-center gap-3">
-                  {searchResult.photo ? (
+                  {searchResult.photo || trackedOfficial?.photo ? (
                     <img
-                      src={searchResult.photo}
+                      src={searchResult.photo || trackedOfficial?.photo}
                       alt={searchResult.fullName}
                       className="w-12 h-14 object-cover rounded border border-slate-300 shrink-0"
                     />
@@ -823,7 +933,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 </span>
               </div>
 
-              {/* Approved View with Direct PDF Download */}
+              {/* Approved View with Direct PDF Download(s) */}
               {searchResult.status === 'approved' ? (
                 <div className="mt-4 space-y-3">
                   <div className="flex items-center gap-2 text-emerald-800 text-sm sm:text-base font-semibold">
@@ -831,38 +941,74 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     <span>अभिनंदन, आपले आजीवन सदस्यत्व मंजूर करण्यात आले आहे.</span>
                   </div>
 
-                  <div className="bg-white p-3.5 rounded-md border border-slate-300 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <span className="text-slate-500 block text-xs sm:text-sm">अधिकृत आजीवन सदस्य क्रमांक:</span>
-                      <strong className="text-base sm:text-lg text-[#193568] font-mono tabular-nums">
-                        {searchResult.memberNumber || 'MS/2026/MAHA/0001'}
-                      </strong>
-                    </div>
-
-                    {searchResult.isOfficial && searchResult.officialPost && (
+                  <div className="bg-white p-3.5 sm:p-4 rounded-md border border-slate-300 text-sm text-slate-700 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <span className="text-slate-500 block text-xs sm:text-sm">संघटनेतील पद:</span>
-                        <strong className="text-sm sm:text-base text-slate-900 font-bold">
-                          {searchResult.officialPost} {searchResult.officialTaluka ? `(${searchResult.officialTaluka})` : ''}
+                        <span className="text-slate-500 block text-xs sm:text-sm">अधिकृत आजीवन सदस्य क्रमांक:</span>
+                        <strong className="text-base sm:text-lg text-[#193568] font-mono tabular-nums">
+                          {searchResult.memberNumber || 'MS/2026/MAHA/0001'}
                         </strong>
                       </div>
-                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadApprovedCertificate(searchResult)}
-                      disabled={isDownloadingCert}
-                      className="bg-[#df6b16] hover:bg-[#c2590d] text-white font-semibold text-sm px-4 py-2.5 rounded-md flex items-center gap-2 transition-colors disabled:opacity-50 cursor-pointer"
-                    >
-                      <Download className={`w-4 h-4 ${isDownloadingCert ? 'animate-spin' : ''}`} />
-                      {isDownloadingCert ? 'आय-कार्ड तयार होत आहे...' : 'अधिकृत आय-कार्ड डाऊनलोड (PDF)'}
-                    </button>
+                      {trackedOfficial && (
+                        <div className="bg-orange-50/80 border border-orange-200 rounded-md px-3 py-1.5">
+                          <span className="text-orange-800 block text-xs font-semibold">
+                            संघटनेतील अधिकृत पद ({trackedOfficial.jurisdictionSubtitle}):
+                          </span>
+                          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 mt-0.5">
+                            <strong className="text-sm sm:text-base text-[#9a3412] font-bold">
+                              {trackedOfficial.designationTitle}
+                            </strong>
+                            <span className="text-xs sm:text-sm text-slate-700">
+                              नियुक्ती क्र.:{' '}
+                              <strong className="font-mono tabular-nums text-[#7c2d12]">
+                                {trackedOfficial.appointmentNumber}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 pt-1 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadApprovedCertificate(searchResult)}
+                        disabled={isDownloadingCert}
+                        className="bg-[#193568] hover:bg-[#11254a] text-white font-semibold text-sm px-4 py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                      >
+                        <Download className={`w-4 h-4 shrink-0 ${isDownloadingCert ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isDownloadingCert
+                            ? 'सदस्यत्व आय-कार्ड तयार होत आहे...'
+                            : trackedOfficial
+                            ? 'सदस्यत्व आय-कार्ड डाऊनलोड (PDF)'
+                            : 'अधिकृत आय-कार्ड डाऊनलोड (PDF)'}
+                        </span>
+                      </button>
+
+                      {trackedOfficial && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadOfficialIdCard(trackedOfficial)}
+                          disabled={isDownloadingOfficialCard}
+                          className="bg-[#c2410c] hover:bg-[#9a3412] text-white font-semibold text-sm px-4 py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs border border-amber-300/60"
+                        >
+                          <Award className={`w-4 h-4 text-amber-200 shrink-0 ${isDownloadingOfficialCard ? 'animate-spin' : ''}`} />
+                          <span>
+                            {isDownloadingOfficialCard
+                              ? 'पदाधिकारी आय-कार्ड तयार होत आहे...'
+                              : 'पदाधिकारी आय-कार्ड डाऊनलोड (PDF)'}
+                          </span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="mt-3 space-y-3">
                   <div className="text-sm sm:text-base text-amber-950 font-medium bg-amber-50 p-3 rounded-md border border-amber-200 leading-relaxed">
-                    आपला अर्ज जतन आहे, परंतु <strong>₹225.20</strong> सदस्यत्व शुल्क अद्याप प्रलंबित आहे. पेमेंट पूर्ण करताच आपले अधिकृत आय-कार्ड उपलब्ध होईल.
+                    आपला अर्ज जतन आहे, परंतु <strong>₹225.20</strong> सदस्यत्व शुल्क अद्याप प्रलंबित आहे. पेमेंट पूर्ण करताच आपले सदस्यत्व आय-कार्ड उपलब्ध होईल.
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
@@ -890,12 +1036,102 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       <span>पेमेंट पर्याय व स्थिती तपासा</span>
                     </button>
                   </div>
+
+                  {/* If pending member is also an official, allow downloading their Official ID Card immediately */}
+                  {trackedOfficial && (
+                    <div className="bg-orange-50/80 border border-orange-300 rounded-md p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="text-sm text-slate-800">
+                        <span className="text-xs font-bold text-[#9a3412] block">
+                          अधिकृत पदाधिकारी नोंद आढळली ({trackedOfficial.jurisdictionSubtitle})
+                        </span>
+                        <strong className="text-base text-[#7c2d12]">{trackedOfficial.designationTitle}</strong>
+                        <span className="mx-2 text-slate-400">·</span>
+                        <span>
+                          नियुक्ती क्र.: <strong className="font-mono tabular-nums">{trackedOfficial.appointmentNumber}</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadOfficialIdCard(trackedOfficial)}
+                        disabled={isDownloadingOfficialCard}
+                        className="bg-[#c2410c] hover:bg-[#9a3412] text-white font-semibold text-sm px-4 py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                      >
+                        <Award className={`w-4 h-4 text-amber-200 shrink-0 ${isDownloadingOfficialCard ? 'animate-spin' : ''}`} />
+                        <span>
+                          {isDownloadingOfficialCard
+                            ? 'पदाधिकारी आय-कार्ड तयार होत आहे...'
+                            : 'पदाधिकारी आय-कार्ड डाऊनलोड (PDF)'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {searchResult === 'not_found' && (
+          {/* Direct Official Result Card (When matched as राज्य/जिल्हा पदाधिकारी or जिल्हा कार्यकारिणी without a membership application yet) */}
+          {!searchResult && trackedOfficial && (
+            <div className="mt-4 p-4 sm:p-5 rounded-md border-2 border-orange-300 bg-orange-50/40">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-orange-200">
+                <div className="flex items-center gap-3">
+                  {trackedOfficial.photo ? (
+                    <img
+                      src={trackedOfficial.photo}
+                      alt={trackedOfficial.displayName}
+                      className="w-12 h-14 object-cover rounded border border-orange-300 shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-14 bg-orange-100/70 rounded border border-orange-200 flex items-center justify-center text-orange-700 shrink-0">
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-serifDevanagari font-bold text-[#7c2d12] text-lg sm:text-xl block">
+                      {trackedOfficial.displayName}
+                    </span>
+                    <span className="text-sm text-slate-700">
+                      पद: <strong className="text-[#9a3412]">{trackedOfficial.designationTitle}</strong>
+                      {' · '}
+                      <strong>{trackedOfficial.jurisdictionSubtitle}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                <span className="px-2.5 py-1 rounded text-xs sm:text-sm font-semibold self-start sm:self-auto bg-[#c2410c] text-white border border-[#9a3412]">
+                  अधिकृत पदाधिकारी
+                </span>
+              </div>
+
+              <div className="mt-4 bg-white p-3.5 sm:p-4 rounded-md border border-orange-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <span className="text-slate-500 block text-xs sm:text-sm">नियुक्ती क्रमांक:</span>
+                  <strong className="text-base sm:text-lg text-[#7c2d12] font-mono tabular-nums">
+                    {trackedOfficial.appointmentNumber}
+                  </strong>
+                  <p className="text-xs text-slate-600 pt-1">
+                    टीप: आपली आजीवन सदस्यत्व नोंद अद्याप पूर्ण नसेल, तर खालील फॉर्ममधून नोंदणी करता येईल.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadOfficialIdCard(trackedOfficial)}
+                  disabled={isDownloadingOfficialCard}
+                  className="bg-[#c2410c] hover:bg-[#9a3412] text-white font-semibold text-sm px-4 py-2.5 rounded-md flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer shrink-0 shadow-2xs border border-amber-300/60"
+                >
+                  <Award className={`w-4 h-4 text-amber-200 shrink-0 ${isDownloadingOfficialCard ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isDownloadingOfficialCard
+                      ? 'पदाधिकारी आय-कार्ड तयार होत आहे...'
+                      : 'पदाधिकारी आय-कार्ड डाऊनलोड (PDF)'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {searchResult === 'not_found' && !trackedOfficial && (
             <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-800 text-sm font-medium rounded-md flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>कोणताही अर्ज आढळला नाही. कृपया अचूक १० अंकी मोबाईल नंबर, सदस्य क्रमांक किंवा अर्ज क्रमांक तपासून पुन्हा प्रयत्न करा.</span>
