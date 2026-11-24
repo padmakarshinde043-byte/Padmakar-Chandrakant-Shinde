@@ -1192,7 +1192,7 @@ export const MemberEditManager: React.FC<MemberEditManagerProps> = ({
                         }
                         className="w-4 h-4 text-emerald-600 rounded"
                       />
-                      <span className="font-bold text-slate-800">Paid (₹220)</span>
+                      <span className="font-bold text-slate-800">Paid (₹225.20)</span>
                     </label>
                   </div>
                 </div>

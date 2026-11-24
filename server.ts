@@ -2939,10 +2939,12 @@ app.post('/api/razorpay/admin-config', requireAdminOrSubAdmin('manageRazorpay'),
   });
 });
 
-// 4. Create Razorpay Order
+// 4. Create Razorpay Order (Lifetime ₹100 + Annual ₹120 + Payment Gateway Charge ₹5.20 = ₹225.20)
+const MEMBERSHIP_FEE_PAISE = 22520;
+
 app.post('/api/razorpay/create-order', appSubmitLimiter, async (req, res) => {
   try {
-    const { amount = 220, applicationId, fullName, phone, email, district } = req.body;
+    const { applicationId, fullName, phone, email, district } = req.body;
     const { instance, config } = getRazorpayInstance();
 
     if (!instance) {
@@ -2952,7 +2954,7 @@ app.post('/api/razorpay/create-order', appSubmitLimiter, async (req, res) => {
       });
     }
 
-    const amountInPaise = Math.round(Number(amount) * 100);
+    const amountInPaise = MEMBERSHIP_FEE_PAISE;
     const receipt = `rcpt_${applicationId || Date.now()}`.substring(0, 40);
 
     const options = {
@@ -3107,9 +3109,10 @@ app.post('/api/razorpay/webhook', async (req, res) => {
         const applicationId = payment.notes?.applicationId;
 
         console.log(
-          `✓ Webhook Payment Captured! Payment ID: ${paymentId}, Amount: ₹${amountPaise / 100}, Phone: ${phone}`
+          `✓ Webhook Payment Captured! Payment ID: ${paymentId}, Amount: ₹${(amountPaise / 100).toFixed(2)}, Phone: ${phone}`
         );
 
+        // Accepts current ₹225.20 (22520 paise) as well as any legacy ₹220 (22000 paise) payments in transit
         if (amountPaise >= 22000) {
           const updated = await approveApplicationOnServer({
             applicationId,

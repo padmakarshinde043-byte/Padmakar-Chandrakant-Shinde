@@ -122,7 +122,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
     setPaymentStatusNotice('');
 
     initiateRazorpayPayment({
-      amount: 220,
+      amount: 225.2,
       applicationId: app.id,
       fullName: app.fullName,
       phone: app.phone,
@@ -398,7 +398,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
           // Pending application already exists: block duplicate creation and let user pay for existing app
           setExistingPendingMatch({ app: matchedApp, matchedBy });
           setFormAlert(
-            `${matchLabel} वापरून आपला फॉर्म यापूर्वीच भरलेला आहे (अर्ज संदर्भ क्र.: ${matchedApp.applicationNumber}, नाव: ${matchedApp.fullName}), परंतु ₹220 पेमेंट अद्याप पूर्ण झालेले नाही. कृपया नवीन फॉर्म न भरता या अर्जाचे पेमेंट पूर्ण करा.`
+            `${matchLabel} वापरून आपला फॉर्म यापूर्वीच भरलेला आहे (अर्ज संदर्भ क्र.: ${matchedApp.applicationNumber}, नाव: ${matchedApp.fullName}), परंतु ₹225.20 पेमेंट अद्याप पूर्ण झालेले नाही. कृपया नवीन फॉर्म न भरता या अर्जाचे पेमेंट पूर्ण करा.`
           );
           setPendingApp(matchedApp);
           setShowPaymentModal(true);
@@ -862,7 +862,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               ) : (
                 <div className="mt-3 space-y-3">
                   <div className="text-sm sm:text-base text-amber-950 font-medium bg-amber-50 p-3 rounded-md border border-amber-200 leading-relaxed">
-                    आपला अर्ज जतन आहे, परंतु <strong>₹220</strong> सदस्यत्व शुल्क अद्याप प्रलंबित आहे. पेमेंट पूर्ण करताच आपले अधिकृत आय-कार्ड उपलब्ध होईल.
+                    आपला अर्ज जतन आहे, परंतु <strong>₹225.20</strong> सदस्यत्व शुल्क अद्याप प्रलंबित आहे. पेमेंट पूर्ण करताच आपले अधिकृत आय-कार्ड उपलब्ध होईल.
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5">
                     <button
@@ -876,7 +876,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       className="bg-[#193568] hover:bg-[#11254a] disabled:opacity-60 text-white text-sm font-semibold px-4 py-2.5 rounded-md flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <CreditCard className="w-4 h-4" />
-                      <span>{isRazorpayLoading ? 'पेमेंट खिडकी उघडत आहे...' : 'Razorpay ने ₹220 भरा'}</span>
+                      <span>{isRazorpayLoading ? 'पेमेंट खिडकी उघडत आहे...' : 'Razorpay ने ₹225.20 भरा'}</span>
                     </button>
                     <button
                       type="button"
@@ -1406,12 +1406,16 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     <td className="py-2.5 px-4 text-right font-mono tabular-nums font-semibold">₹ 100.00</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4">वार्षिक वर्गणी (प्रति वर्ष)</td>
+                    <td className="py-2.5 px-4">वार्षिक वर्गणी (दरवर्षी भरायची वर्गणी)</td>
                     <td className="py-2.5 px-4 text-right font-mono tabular-nums font-semibold">₹ 120.00</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4">पेमेंट गेटवे चार्ज</td>
+                    <td className="py-2.5 px-4 text-right font-mono tabular-nums font-semibold">₹ 5.20</td>
                   </tr>
                   <tr className="bg-slate-50 font-bold text-[#193568]">
                     <td className="py-2.5 px-4">एकूण ऑनलाईन देय रक्कम</td>
-                    <td className="py-2.5 px-4 text-right font-mono tabular-nums text-base">₹ 220.00</td>
+                    <td className="py-2.5 px-4 text-right font-mono tabular-nums text-base">₹ 225.20</td>
                   </tr>
                 </tbody>
               </table>
@@ -1420,7 +1424,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             <div className="bg-slate-50 border border-slate-200 rounded-md px-4 py-3 text-sm sm:text-base text-slate-700 leading-relaxed flex items-start gap-2.5">
               <ShieldCheck className="w-4 h-4 text-[#193568] shrink-0 mt-1" />
               <span>
-                अर्ज सबमिट केल्यानंतर सुरक्षित <strong>Razorpay Payment Window</strong> उघडेल. त्याद्वारे UPI (PhonePe / GPay / Paytm) किंवा डेबिट/क्रेडिट कार्डने ₹220 शुल्क भरता येईल.
+                अर्ज सबमिट केल्यानंतर सुरक्षित <strong>Razorpay Payment Window</strong> उघडेल. त्याद्वारे UPI (PhonePe / GPay / Paytm) किंवा डेबिट/क्रेडिट कार्डने ₹225.20 शुल्क भरता येईल.
               </span>
             </div>
 
@@ -1464,7 +1468,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 <strong>मंजुरी व रद्द करण्याचे सर्वस्वी अधिकार:</strong> अर्जाची पडताळणी करून सदस्यत्व मंजूर करण्याचा किंवा नाकारण्याचा सर्वस्वी अधिकार महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाकडे राखीव आहे. दिलेली माहिती किंवा कागदपत्रे चुकीची अथवा बनावट आढळल्यास कोणतीही पूर्वसूचना न देता सदस्यत्व व आय-कार्ड तात्काळ रद्द केले जाईल.
               </li>
               <li>
-                <strong>शुल्क व परतावा धोरण:</strong> आजीवन सदस्यत्व (₹100) आणि वार्षिक वर्गणी (₹120) असे एकूण ₹220/- शुल्क Razorpay द्वारे भरणे आवश्यक आहे. एकदा भरलेले शुल्क कोणत्याही कारणास्तव परत (Non-Refundable) मिळणार नाही.
+                <strong>शुल्क व परतावा धोरण:</strong> आजीवन सदस्यत्व (₹100), वार्षिक वर्गणी (₹120) आणि पेमेंट गेटवे चार्ज (₹5.20) असे एकूण ₹225.20/- शुल्क Razorpay द्वारे भरणे आवश्यक आहे. एकदा भरलेले शुल्क कोणत्याही कारणास्तव परत (Non-Refundable) मिळणार नाही.
               </li>
               <li>
                 <strong>शिस्त व नियमांतील बदल:</strong> प्रत्येक सदस्याने महासंघाची घटना व निर्णय पाळणे बंधनकारक राहील. या नियम व अटींमध्ये बदल करण्याचा अंतिम अधिकार राज्य कार्यकारिणीकडे राखीव असेल.
@@ -1507,7 +1511,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 </div>
                 <p className="leading-relaxed">
                   अर्जदार: <strong>{existingPendingMatch.app.salutation} {existingPendingMatch.app.fullName}</strong> · संदर्भ क्र.:{' '}
-                  <strong className="font-mono">{existingPendingMatch.app.applicationNumber}</strong> · मोबाईल: <strong>{existingPendingMatch.app.phone}</strong>. कृपया या अर्जाचे ₹220 पेमेंट पूर्ण करा.
+                  <strong className="font-mono">{existingPendingMatch.app.applicationNumber}</strong> · मोबाईल: <strong>{existingPendingMatch.app.phone}</strong>. कृपया या अर्जाचे ₹225.20 पेमेंट पूर्ण करा.
                 </p>
               </div>
               <button
@@ -1519,7 +1523,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                 className="w-full sm:w-auto bg-[#193568] hover:bg-[#11254a] text-white font-semibold px-5 py-2.5 rounded-md text-sm sm:text-base flex items-center justify-center gap-2 shrink-0 cursor-pointer"
               >
                 <CreditCard className="w-4 h-4" />
-                <span>या अर्जाचे पेमेंट पूर्ण करा (₹220)</span>
+                <span>या अर्जाचे पेमेंट पूर्ण करा (₹225.20)</span>
               </button>
             </div>
           )}
@@ -1543,7 +1547,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               className="w-full sm:w-auto bg-[#df6b16] hover:bg-[#c2590d] disabled:opacity-65 text-white font-semibold px-7 py-3 rounded-md text-base transition-colors flex items-center justify-center gap-2 shrink-0 cursor-pointer"
             >
               <UserCheck className="w-4 h-4" />
-              <span>{isSubmittingForm ? 'अर्ज जतन होत आहे...' : 'अर्ज जतन करा व ₹220 पेमेंट करा'}</span>
+              <span>{isSubmittingForm ? 'अर्ज जतन होत आहे...' : 'अर्ज जतन करा व ₹225.20 पेमेंट करा'}</span>
             </button>
           </div>
         </form>
@@ -1640,7 +1644,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
               <div className="sticky top-0 z-30 bg-[#193568] text-white px-5 py-4 flex items-center justify-between shrink-0 border-b-2 border-[#efb24b]">
                 <div>
                   <h3 className="font-serifDevanagari font-bold text-lg sm:text-xl leading-tight text-white">
-                    अधिकृत सदस्यत्व शुल्क पेमेंट — ₹220
+                    अधिकृत सदस्यत्व शुल्क पेमेंट — ₹225.20
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-200 mt-0.5">
                     {ORG_DETAILS.name}
@@ -1683,7 +1687,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
 
                 {existingPendingMatch && existingPendingMatch.app.id === pendingApp.id && (
                   <div className="p-3 bg-amber-50 border border-amber-300 text-amber-950 text-sm rounded-md font-medium leading-relaxed">
-                    <strong>टीप:</strong> आपला अर्ज यापूर्वीच जतन केलेला आहे (संदर्भ क्र.: <span className="font-mono font-bold">{pendingApp.applicationNumber}</span>). नवीन फॉर्म न भरता या अर्जाचे ₹220 शुल्क पूर्ण करा.
+                    <strong>टीप:</strong> आपला अर्ज यापूर्वीच जतन केलेला आहे (संदर्भ क्र.: <span className="font-mono font-bold">{pendingApp.applicationNumber}</span>). नवीन फॉर्म न भरता या अर्जाचे ₹225.20 शुल्क पूर्ण करा.
                   </div>
                 )}
 
@@ -1702,8 +1706,8 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                       <span className="font-mono font-semibold text-slate-900">{pendingApp.applicationNumber}</span>
                     </div>
                     <div className="px-4 py-2 flex justify-between gap-2">
-                      <span className="text-slate-600">शुल्क विवरण (आजीवन ₹100 + वार्षिक ₹120)</span>
-                      <span className="font-mono tabular-nums font-bold text-[#193568] text-base">₹ 220.00</span>
+                      <span className="text-slate-600">शुल्क विवरण (आजीवन ₹100 + वार्षिक ₹120 + गेटवे चार्ज ₹5.20)</span>
+                      <span className="font-mono tabular-nums font-bold text-[#193568] text-base shrink-0">₹ 225.20</span>
                     </div>
                   </div>
                 </div>
@@ -1721,7 +1725,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                     className="w-full px-6 py-3 bg-[#193568] hover:bg-[#11254a] text-white font-semibold text-base rounded-md flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
                   >
                     <ShieldCheck className="w-4 h-4 text-[#efb24b]" />
-                    <span>{isRazorpayLoading ? 'Razorpay पेमेंट खिडकी उघडत आहे...' : 'Razorpay द्वारे सुरक्षित ₹220 भरा'}</span>
+                    <span>{isRazorpayLoading ? 'Razorpay पेमेंट खिडकी उघडत आहे...' : 'Razorpay द्वारे सुरक्षित ₹225.20 भरा'}</span>
                   </button>
 
                   <p className="text-xs sm:text-sm text-slate-500">
@@ -1737,7 +1741,7 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <a
-                      href={`https://rzp.io/rzp/Us7q4y7?name=${encodeURIComponent(pendingApp.fullName)}&email=${encodeURIComponent(pendingApp.email)}&phone=${encodeURIComponent(pendingApp.phone)}`}
+                      href={`https://pages.razorpay.com/pl_TyW790BRUB7ZLD/view?full_name=${encodeURIComponent(pendingApp.fullName)}&name=${encodeURIComponent(pendingApp.fullName)}&email=${encodeURIComponent(pendingApp.email)}&phone=${encodeURIComponent(pendingApp.phone)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3.5 py-2 bg-white hover:bg-slate-50 text-[#193568] border border-slate-300 font-semibold text-sm rounded-md flex items-center gap-1.5 transition-colors"

@@ -126,7 +126,7 @@ export function matchRazorpayPaymentsWithPendingApps(params: {
       app,
       paymentId,
       orderId: String(payment.order_id || app.razorpayOrderId || ''),
-      amountRupees: Math.round(grossPaise / 100),
+      amountRupees: Number((grossPaise / 100).toFixed(2)),
       paidAtIso: createdSec > 0 ? new Date(createdSec * 1000).toISOString() : '',
       method: String(payment.method || '').toUpperCase(),
       contact: String(payment.contact || notes.phone || ''),
