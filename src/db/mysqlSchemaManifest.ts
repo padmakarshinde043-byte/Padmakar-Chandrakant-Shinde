@@ -281,6 +281,25 @@ export const MYSQL_SCHEMA_MANIFEST: MysqlTableSpec[] = [
       { name: 'updated_at', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
     ],
   },
+  {
+    table: 'website_feedback',
+    marathiLabel: 'वेबसाइट रेटिंग व अभिप्राय (website_feedback)',
+    primaryKey: 'id',
+    columns: [
+      { name: 'id', definition: 'VARCHAR(128) NOT NULL' },
+      { name: 'design_rating', definition: 'TINYINT NOT NULL DEFAULT 0' },
+      { name: 'navigation_rating', definition: 'TINYINT NOT NULL DEFAULT 0' },
+      { name: 'speed_rating', definition: 'TINYINT NOT NULL DEFAULT 0' },
+      { name: 'mobile_rating', definition: 'TINYINT NOT NULL DEFAULT 0' },
+      { name: 'overall_rating', definition: 'TINYINT NOT NULL DEFAULT 0' },
+      { name: 'average_rating', definition: 'DECIMAL(3,2) NOT NULL DEFAULT 0.00' },
+      { name: 'suggestion', definition: 'TEXT NULL' },
+      { name: 'page_path', definition: "VARCHAR(255) NOT NULL DEFAULT '/'" },
+      { name: 'device_type', definition: "VARCHAR(32) NOT NULL DEFAULT 'unknown'" },
+      { name: 'created_at', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
+    ],
+    indexes: [{ name: 'idx_feedback_created', definition: 'INDEX `idx_feedback_created` (`created_at`)' }],
+  },
 ];
 
 export function buildCreateTableSql(spec: MysqlTableSpec): string {

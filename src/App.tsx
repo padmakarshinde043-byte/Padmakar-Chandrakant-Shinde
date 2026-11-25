@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeTab } from './components/HomeTab';
 import { OfflineIndicator } from './components/PWAInstallButton';
+import { WebsiteFeedbackModal } from './components/WebsiteFeedbackModal';
 
 const loadAboutTab = () => import('./components/AboutTab');
 const loadLeadershipTab = () => import('./components/LeadershipTab');
@@ -864,6 +865,10 @@ export function App() {
 
       <Footer setCurrentTab={navigateToTab} />
       <OfflineIndicator />
+      <WebsiteFeedbackModal
+        delayMs={7000}
+        disabled={currentTab === 'admin' || currentTab === 'center_update'}
+      />
     </div>
   );
 }

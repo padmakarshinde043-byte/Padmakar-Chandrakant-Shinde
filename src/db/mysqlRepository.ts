@@ -37,6 +37,7 @@ import {
 } from '../utils/centerUpdateHelper';
 import { toEnglishDigits } from '../utils/formatters';
 import { computeNextVisitorStats } from '../utils/visitorCounter';
+import { WebsiteFeedbackRecord, computeRecordAverageRating } from '../utils/feedbackAnalytics';
 
 function getTodayISTString(): string {
   try {
@@ -1420,6 +1421,82 @@ export async function mysqlDeleteContact(id: string): Promise<void> {
   await ensureMysqlSchema();
   const pool = getMysqlPool();
   await pool.execute('DELETE FROM `contacts` WHERE `id` = ?', [id]);
+}
+
+export async function mysqlListWebsiteFeedback(): Promise<WebsiteFeedbackRecord[]> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT * FROM `website_feedback` ORDER BY `created_at` DESC LIMIT 500'
+    );
+    return rows.map((r) => {
+      const designRating = Number(r.design_rating || 0);
+      const navigationRating = Number(r.navigation_rating || 0);
+      const speedRating = Number(r.speed_rating || 0);
+      const mobileRating = Number(r.mobile_rating || 0);
+      const overallRating = Number(r.overall_rating || 0);
+      const dbAvg = Number(r.average_rating);
+      const averageRating =
+        Number.isFinite(dbAvg) && dbAvg > 0
+          ? Number(dbAvg.toFixed(2))
+          : computeRecordAverageRating({
+              designRating,
+              navigationRating,
+              speedRating,
+              mobileRating,
+              overallRating,
+            });
+      const rawDevice = String(r.device_type || 'unknown');
+      const deviceType: WebsiteFeedbackRecord['deviceType'] =
+        rawDevice === 'mobile' || rawDevice === 'desktop' ? rawDevice : 'unknown';
+
+      return {
+        id: String(r.id),
+        designRating,
+        navigationRating,
+        speedRating,
+        mobileRating,
+        overallRating,
+        averageRating,
+        suggestion: String(r.suggestion || ''),
+        pagePath: String(r.page_path || '/'),
+        deviceType,
+        createdAt: String(r.created_at || ''),
+      };
+    });
+  });
+}
+
+export async function mysqlSaveWebsiteFeedback(entry: WebsiteFeedbackRecord): Promise<void> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute(
+      `INSERT INTO \`website_feedback\` (
+        id, design_rating, navigation_rating, speed_rating, mobile_rating, overall_rating,
+        average_rating, suggestion, page_path, device_type, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        String(entry.id),
+        Number(entry.designRating || 0),
+        Number(entry.navigationRating || 0),
+        Number(entry.speedRating || 0),
+        Number(entry.mobileRating || 0),
+        Number(entry.overallRating || 0),
+        Number(entry.averageRating || 0),
+        String(entry.suggestion || ''),
+        String(entry.pagePath || '/'),
+        String(entry.deviceType || 'unknown'),
+        String(entry.createdAt || new Date().toISOString()),
+      ]
+    );
+  });
+}
+
+export async function mysqlDeleteWebsiteFeedback(id: string): Promise<void> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute('DELETE FROM `website_feedback` WHERE `id` = ?', [String(id)]);
+  });
 }
 
 // =========================================================================

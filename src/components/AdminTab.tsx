@@ -6,9 +6,19 @@ import {
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
-  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy, Star
 } from 'lucide-react';
 import JSZip from 'jszip';
+import { AdminRatingPanel } from './AdminRatingPanel';
+import {
+  fetchWebsiteFeedbackForAdmin,
+  deleteWebsiteFeedbackForAdmin,
+} from '../services/feedbackService';
+import {
+  WebsiteFeedbackRecord,
+  FeedbackAggregateSummary,
+  computeFeedbackSummary,
+} from '../utils/feedbackAnalytics';
 import {
   MembershipApplication,
   NewsItem,
@@ -205,6 +215,7 @@ type AdminSubTabKey =
   | 'gov_order'
   | 'manage_admins'
   | 'contact_messages'
+  | 'rating'
   | 'maintenance'
   | 'password'
   | 'cloudinary';
@@ -1027,6 +1038,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     attachmentNames: string[];
   }
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [websiteFeedbackItems, setWebsiteFeedbackItems] = useState<WebsiteFeedbackRecord[]>([]);
+  const [websiteFeedbackSummary, setWebsiteFeedbackSummary] = useState<FeedbackAggregateSummary>(() =>
+    computeFeedbackSummary([])
+  );
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
   const [mailboxEmails, setMailboxEmails] = useState<MailboxEmailItem[]>([]);
   const [mailboxAccount, setMailboxAccount] = useState('contact@mahasangh.in');
   const [mailboxError, setMailboxError] = useState('');
@@ -2231,6 +2247,32 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  const loadWebsiteFeedback = async () => {
+    setIsLoadingFeedback(true);
+    try {
+      const result = await fetchWebsiteFeedbackForAdmin();
+      setWebsiteFeedbackItems(result.items);
+      setWebsiteFeedbackSummary(result.summary);
+    } catch (e) {
+      console.warn('Failed to load website feedback:', e);
+    } finally {
+      setIsLoadingFeedback(false);
+    }
+  };
+
+  const handleDeleteWebsiteFeedback = async (id: string) => {
+    try {
+      await deleteWebsiteFeedbackForAdmin(id);
+      setWebsiteFeedbackItems((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        setWebsiteFeedbackSummary(computeFeedbackSummary(next));
+        return next;
+      });
+    } catch (e) {
+      console.warn('Delete website feedback failed:', e);
+    }
+  };
+
   const handleToggleMailboxEmailRead = async (emailItem: MailboxEmailItem) => {
     const nextRead = !emailItem.isRead;
     setMailboxEmails((prev) =>
@@ -2340,9 +2382,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   };
 
   const hasAutoLoadedMailboxRef = useRef(false);
+  const hasAutoLoadedFeedbackRef = useRef(false);
   useEffect(() => {
     if (!isLoggedIn) {
       hasAutoLoadedMailboxRef.current = false;
+      hasAutoLoadedFeedbackRef.current = false;
       return;
     }
     if (
@@ -2351,6 +2395,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     ) {
       hasAutoLoadedMailboxRef.current = true;
       loadContactMessages();
+    }
+    if (
+      (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) &&
+      (activeAdminSubTab === 'rating' || !hasAutoLoadedFeedbackRef.current)
+    ) {
+      hasAutoLoadedFeedbackRef.current = true;
+      loadWebsiteFeedback();
     }
   }, [isLoggedIn, activeAdminSubTab, currentUser?.isSuperAdmin, currentUser?.permissions.manageContactMessages]);
 
@@ -2937,6 +2988,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       shortLabel: 'Inbox',
       icon: <MessageSquare className="w-4 h-4 shrink-0" />,
       badge: contactMessages.length + mailboxEmails.length > 0 ? contactMessages.length + mailboxEmails.length : undefined,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages),
+    },
+    {
+      key: 'rating',
+      label:
+        websiteFeedbackItems.length > 0
+          ? `Rating (${toEnglishDigits(websiteFeedbackItems.length)})`
+          : 'Rating',
+      shortLabel: 'Rating',
+      icon: <Star className="w-4 h-4 shrink-0 text-amber-500" />,
+      badge: websiteFeedbackItems.length > 0 ? websiteFeedbackItems.length : undefined,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages),
     },
     {
@@ -7189,6 +7251,17 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </button>
                 </form>
               </div>
+            )}
+
+            {/* Sub-tab: Website Rating & Feedback Summary */}
+            {activeAdminSubTab === 'rating' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages) && (
+              <AdminRatingPanel
+                items={websiteFeedbackItems}
+                summary={websiteFeedbackSummary}
+                isLoading={isLoadingFeedback}
+                onRefresh={loadWebsiteFeedback}
+                onDelete={handleDeleteWebsiteFeedback}
+              />
             )}
 
             {/* Sub-tab 5: Unified Mailbox (contact@mahasangh.in Emails + Website Contact Form Inquiries) */}

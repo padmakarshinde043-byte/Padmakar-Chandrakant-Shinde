@@ -78,7 +78,7 @@ export function normalizeMobile10(raw?: string | null): string {
 export function normalizeDistrictLabel(raw?: string | null): string {
   const clean = String(raw || '')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .replace(/^जिल्हा\s*[-:–—]?\s*/u, '')
+    .replace(/^जिल्हा\s*(?:-|:|–|—)?\s*/u, '')
     .replace(/\s+/g, ' ')
     .trim();
   if (!clean) return '';

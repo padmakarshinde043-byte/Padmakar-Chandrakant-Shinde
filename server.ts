@@ -59,6 +59,9 @@ import {
   mysqlListContacts,
   mysqlSaveContact,
   mysqlDeleteContact,
+  mysqlListWebsiteFeedback,
+  mysqlSaveWebsiteFeedback,
+  mysqlDeleteWebsiteFeedback,
   mysqlListSubAdmins,
   mysqlSaveSubAdmin,
   mysqlUpdateSubAdminPassword,
@@ -82,6 +85,11 @@ import {
   mysqlIsPresidentPasswordDefault,
   mysqlSetPresidentPassword,
 } from './src/db/mysqlRepository';
+import {
+  WebsiteFeedbackRecord,
+  validateAndNormalizeFeedbackInput,
+  computeFeedbackSummary,
+} from './src/utils/feedbackAnalytics';
 import {
   AppointedPostItem,
   SUPER_ADMIN_PASSWORD,
@@ -2732,6 +2740,67 @@ app.delete('/api/db/contacts/:id', requireAdminOrSubAdmin('manageContactMessages
     res.json({ status: 'success' });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+// Website Rating & Feedback Popup API (Public POST with rate limit + validation; Admin-only GET/DELETE)
+const memoryWebsiteFeedbackStore: WebsiteFeedbackRecord[] = [];
+
+app.get('/api/db/feedback', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
+  try {
+    const items = isMysqlActive()
+      ? await mysqlListWebsiteFeedback()
+      : [...memoryWebsiteFeedbackStore];
+    sendFreshJson(req, res, {
+      items,
+      summary: computeFeedbackSummary(items),
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Failed to load website feedback' });
+  }
+});
+
+app.post('/api/db/feedback', contactMailLimiter, async (req, res) => {
+  try {
+    const validation = validateAndNormalizeFeedbackInput(req.body || {});
+    if (!validation.valid || !validation.record) {
+      return res.status(400).json({
+        status: 'error',
+        message: validation.error || 'कृपया किमान एका निकषाला तरी स्टार रेटिंग द्या.',
+      });
+    }
+
+    const record = validation.record;
+    if (isMysqlActive()) {
+      await mysqlSaveWebsiteFeedback(record);
+    } else {
+      memoryWebsiteFeedbackStore.unshift(record);
+      if (memoryWebsiteFeedbackStore.length > 500) {
+        memoryWebsiteFeedbackStore.length = 500;
+      }
+    }
+
+    return res.status(201).json({ status: 'success', item: record });
+  } catch (err: any) {
+    return res.status(500).json({ status: 'error', message: err?.message || 'Failed to save feedback' });
+  }
+});
+
+app.delete('/api/db/feedback/:id', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
+  try {
+    const targetId = String(req.params.id || '').trim();
+    if (!targetId) {
+      return res.status(400).json({ status: 'error', message: 'Invalid feedback ID' });
+    }
+    if (isMysqlActive()) {
+      await mysqlDeleteWebsiteFeedback(targetId);
+    } else {
+      const idx = memoryWebsiteFeedbackStore.findIndex((item) => item.id === targetId);
+      if (idx !== -1) memoryWebsiteFeedbackStore.splice(idx, 1);
+    }
+    return res.json({ status: 'success' });
+  } catch (err: any) {
+    return res.status(500).json({ status: 'error', message: err?.message || 'Failed to delete feedback' });
   }
 });
 

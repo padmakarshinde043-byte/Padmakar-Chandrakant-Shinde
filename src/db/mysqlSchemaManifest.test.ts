@@ -12,7 +12,7 @@ import {
   isRecoverableMysqlSchemaError,
 } from './mysqlSchemaManifest';
 
-test('MYSQL_SCHEMA_MANIFEST defines all 13 core tables and every column used in mysqlRepository.ts', () => {
+test('MYSQL_SCHEMA_MANIFEST defines all 14 core tables and every column used in mysqlRepository.ts', () => {
   const tableNames = MYSQL_SCHEMA_MANIFEST.map((t) => t.table);
   assert.deepEqual(tableNames, [
     'applications',
@@ -28,8 +28,9 @@ test('MYSQL_SCHEMA_MANIFEST defines all 13 core tables and every column used in 
     'appointed_posts',
     'district_passwords',
     'leadership_meta',
+    'website_feedback',
   ]);
-  assert.ok(getTotalManifestColumnsCount() >= 120);
+  assert.ok(getTotalManifestColumnsCount() >= 130);
 
   // Verify every table & column referenced by INSERT/UPDATE in mysqlRepository.ts is present in the manifest
   const repoSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/db/mysqlRepository.ts'), 'utf-8');
@@ -68,8 +69,8 @@ test('computeSchemaDiff identifies missing tables, missing columns on existing t
     existingIndexesByTable,
   });
 
-  // 10 missing tables should be queued for CREATE TABLE IF NOT EXISTS
-  assert.equal(diff.tablesToCreate.length, 10);
+  // 11 missing tables should be queued for CREATE TABLE IF NOT EXISTS
+  assert.equal(diff.tablesToCreate.length, 11);
   const createSql = buildCreateTableSql(diff.tablesToCreate[0]);
   assert.match(createSql, /^CREATE TABLE IF NOT EXISTS `/);
   assert.match(createSql, /CHARSET=utf8mb4/);
