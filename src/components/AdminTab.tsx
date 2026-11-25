@@ -57,6 +57,8 @@ import {
   AdminPermissions,
   ContactMessage,
   fetchContactsForAdmin,
+  updateContactReadStatusInFirestore,
+  markAllContactsReadInFirestore,
   deleteContactMessageFromFirestore,
   approveApplicationAtomicInFirestore,
   addApprovedMemberToCache,
@@ -2238,6 +2240,56 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     }
   };
 
+  const handleToggleContactMessageRead = async (msg: ContactMessage) => {
+    const currentlyRead = Boolean(msg.isRead || msg.read);
+    const nextRead = !currentlyRead;
+    setContactMessages((prev) =>
+      prev.map((m) => (m.id === msg.id ? { ...m, isRead: nextRead, read: nextRead } : m))
+    );
+    try {
+      await updateContactReadStatusInFirestore(msg.id, nextRead);
+      showAdminFeedback(nextRead ? 'Marked as read.' : 'Marked as unread.', 'success');
+    } catch {
+      setContactMessages((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, isRead: currentlyRead, read: currentlyRead } : m))
+      );
+      showAdminFeedback('Failed to save read status.', 'error');
+    }
+  };
+
+  const handleMarkAllMessagesRead = async () => {
+    const unreadContacts = contactMessages.filter((m) => !(m.isRead || m.read));
+    const unreadEmails = mailboxEmails.filter((e) => !e.isRead);
+    if (unreadContacts.length === 0 && unreadEmails.length === 0) return;
+
+    setContactMessages((prev) => prev.map((m) => ({ ...m, isRead: true, read: true })));
+    setMailboxEmails((prev) => prev.map((e) => ({ ...e, isRead: true })));
+
+    try {
+      const tasks: Promise<unknown>[] = [];
+      if (unreadContacts.length > 0) {
+        tasks.push(markAllContactsReadInFirestore());
+      }
+      for (const em of unreadEmails) {
+        tasks.push(
+          fetch('/api/mailbox/mark-read', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+            body: JSON.stringify({ uid: em.uid, isRead: true, folder: em.folder || 'INBOX' }),
+          }).then((r) => {
+            if (!r.ok) throw new Error('Mark read failed');
+          })
+        );
+      }
+      await Promise.all(tasks);
+      showAdminFeedback('All messages marked as read.', 'success');
+    } catch {
+      showAdminFeedback('Some messages could not be updated. Refreshing...', 'error');
+      loadContactMessages();
+    }
+  };
+
   const handleDeleteContactMessage = async (id: string) => {
     try {
       await deleteContactMessageFromFirestore(id);
@@ -2880,6 +2932,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const missingCenterCount = applications.filter(
     (a) => a.status !== 'rejected' && isMissingCenterName(a.centerName)
   ).length;
+  const unreadContactMessagesCount = contactMessages.filter((m) => !(m.isRead || m.read)).length;
+  const unreadMailboxEmailsCount = mailboxEmails.filter((e) => !e.isRead).length;
+  const totalUnreadMessagesCount = unreadContactMessagesCount + unreadMailboxEmailsCount;
 
   // Ordered Navigation Items tailored for Mobile Bottom Bar + Bottom Sheet Drawer + Desktop Sidebar
   const adminNavItems: Array<{
@@ -2984,10 +3039,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     },
     {
       key: 'contact_messages',
-      label: `Messages (${toEnglishDigits(contactMessages.length + mailboxEmails.length)})`,
+      label: 'Messages',
       shortLabel: 'Inbox',
       icon: <MessageSquare className="w-4 h-4 shrink-0" />,
-      badge: contactMessages.length + mailboxEmails.length > 0 ? contactMessages.length + mailboxEmails.length : undefined,
+      badge: totalUnreadMessagesCount > 0 ? totalUnreadMessagesCount : undefined,
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.manageContactMessages),
     },
     {
@@ -3282,9 +3337,9 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         ) : (
           /* Authenticated Admin Dashboard Workspace */
           <div className="flex flex-col lg:flex-row gap-6 items-start">
-            {/* Desktop Left Navy Sidebar */}
-            <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 bg-[#0b1e36] text-white rounded-2xl border border-[#efb24b]/40 p-3 shadow-lg sticky top-20 space-y-1">
-              <div className="px-3 py-2.5 mb-2 border-b border-white/10">
+            {/* Desktop Left Navy Sidebar (Independently Scrollable on Laptop/Desktop) */}
+            <aside className="hidden lg:flex lg:flex-col w-64 shrink-0 bg-[#0b1e36] text-white rounded-2xl border border-[#efb24b]/40 p-3 shadow-lg sticky top-20 max-h-[calc(100vh-5.75rem)] overflow-hidden">
+              <div className="px-3 py-2.5 mb-2 border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-2 text-xs font-bold text-[#efb24b]">
                   <Shield className="w-4 h-4 shrink-0" />
                   <span className="truncate">
@@ -3296,7 +3351,10 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 </p>
               </div>
 
-              <nav className="space-y-1" aria-label="Admin Navigation">
+              <nav
+                className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-1 pr-1 admin-sidebar-scroll"
+                aria-label="Admin Navigation"
+              >
                 {permittedNavItems.map((item) => {
                   const isActive = activeAdminSubTab === item.key;
                   return (
@@ -7320,7 +7378,19 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                       <span>Refresh</span>
                     </button>
 
-                    <span className="bg-amber-100 text-[#9a460b] font-bold text-xs px-3 py-1.5 rounded-lg border border-amber-300 font-mono">
+                    {totalUnreadMessagesCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllMessagesRead}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Mark all unread messages as read"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>Mark All Read ({toEnglishDigits(totalUnreadMessagesCount)})</span>
+                      </button>
+                    )}
+
+                    <span className="bg-slate-100 text-slate-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-slate-300 font-mono">
                       Total: {toEnglishDigits(contactMessages.length + mailboxEmails.length)}
                     </span>
                   </div>
@@ -7621,11 +7691,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                         }
 
                         const msg = entry.contactItem;
+                        const isMsgRead = Boolean(msg.isRead || msg.read);
                         const cleanPhone = (msg.phone || '').replace(/\D/g, '');
                         return (
                           <div
                             key={`contact-${msg.id}`}
-                            className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs hover:border-amber-400 transition-all space-y-3"
+                            className={`bg-white rounded-xl border p-5 shadow-xs transition-all space-y-3 ${
+                              isMsgRead
+                                ? 'border-slate-200 hover:border-slate-300'
+                                : 'border-amber-300 bg-amber-50/15 hover:border-amber-400'
+                            }`}
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
                               <div className="flex items-center gap-2.5">
@@ -7640,13 +7715,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                                     <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">
                                       Contact Form
                                     </span>
-                                    {msg.isRead ? (
-                                      <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded text-[10px] border border-slate-200">
+                                    {isMsgRead ? (
+                                      <span className="bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] border border-emerald-200">
                                         Read
                                       </span>
                                     ) : (
                                       <span className="bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded text-[10px] border border-amber-300">
-                                        New
+                                        Unread
                                       </span>
                                     )}
                                   </div>
@@ -7666,22 +7741,16 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                               <div className="flex items-center gap-2 self-end sm:self-auto">
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    const nextRead = !msg.isRead;
-                                    setContactMessages((prev) =>
-                                      prev.map((m) => (m.id === msg.id ? { ...m, isRead: nextRead } : m))
-                                    );
-                                    showAdminFeedback(nextRead ? 'Marked as read.' : 'Marked as unread.', 'success');
-                                  }}
+                                  onClick={() => handleToggleContactMessageRead(msg)}
                                   className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-colors border cursor-pointer ${
-                                    msg.isRead
+                                    isMsgRead
                                       ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
                                       : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
                                   }`}
                                   title="Toggle Read Status"
                                 >
                                   <Check className="w-3.5 h-3.5" />
-                                  <span>{msg.isRead ? 'Mark Unread' : 'Mark Read'}</span>
+                                  <span>{isMsgRead ? 'Mark Unread' : 'Mark Read'}</span>
                                 </button>
                                 <button
                                   type="button"

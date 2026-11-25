@@ -58,6 +58,8 @@ import {
   mysqlDeleteGovOrder,
   mysqlListContacts,
   mysqlSaveContact,
+  mysqlUpdateContactReadStatus,
+  mysqlMarkAllContactsRead,
   mysqlDeleteContact,
   mysqlListWebsiteFeedback,
   mysqlSaveWebsiteFeedback,
@@ -2734,6 +2736,33 @@ app.post('/api/db/contacts', contactMailLimiter, async (req, res) => {
   }
 });
 
+app.patch('/api/db/contacts/:id/read', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
+  try {
+    const targetId = String(req.params.id || '').trim();
+    if (!targetId) {
+      return res.status(400).json({ status: 'error', message: 'Invalid contact ID' });
+    }
+    const isRead = Boolean(req.body?.isRead);
+    if (isMysqlActive()) {
+      await mysqlUpdateContactReadStatus(targetId, isRead);
+    }
+    res.json({ status: 'success', id: targetId, isRead });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
+app.post('/api/db/contacts/mark-all-read', requireAdminOrSubAdmin('manageContactMessages'), async (_req, res) => {
+  try {
+    if (isMysqlActive()) {
+      await mysqlMarkAllContactsRead();
+    }
+    res.json({ status: 'success' });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Error' });
+  }
+});
+
 app.delete('/api/db/contacts/:id', requireAdminOrSubAdmin('manageContactMessages'), async (req, res) => {
   try {
     await mysqlDeleteContact(req.params.id);
@@ -3593,7 +3622,10 @@ app.get('/api/mailbox/messages', requireAdminOrSubAdmin('manageContactMessages')
           textBody,
           snippet: textBody.slice(0, 220),
           date: dateIso,
-          isRead: Boolean(msg.flags && msg.flags.has('\\Seen')),
+          isRead: Boolean(
+            msg.flags &&
+              Array.from(msg.flags).some((f) => String(f).toLowerCase() === '\\seen')
+          ),
           hasAttachments: attachmentNames.length > 0,
           attachmentNames,
         });
@@ -3777,10 +3809,12 @@ app.post('/api/mailbox/mark-read', requireAdminOrSubAdmin('manageContactMessages
     client = connected.client;
     const lock = await client.getMailboxLock(folder);
     try {
-      if (isRead) {
-        await client.messageFlagsAdd({ uid }, ['\\Seen'], { uid: true });
-      } else {
-        await client.messageFlagsRemove({ uid }, ['\\Seen'], { uid: true });
+      const uidRange = String(uid);
+      const updated = isRead
+        ? await client.messageFlagsAdd(uidRange, ['\\Seen'], { uid: true })
+        : await client.messageFlagsRemove(uidRange, ['\\Seen'], { uid: true });
+      if (!updated) {
+        return res.status(500).json({ status: 'error', message: 'Could not update email read flag on IMAP server' });
       }
       res.json({ status: 'success', uid, isRead });
     } finally {
@@ -3810,7 +3844,7 @@ app.delete('/api/mailbox/message/:uid', requireAdminOrSubAdmin('manageContactMes
     client = connected.client;
     const lock = await client.getMailboxLock(folder);
     try {
-      await client.messageDelete({ uid }, { uid: true });
+      await client.messageDelete(String(uid), { uid: true });
       res.json({ status: 'success', uid });
     } finally {
       lock.release();

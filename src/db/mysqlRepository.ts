@@ -1390,6 +1390,7 @@ export async function mysqlListContacts(): Promise<Record<string, any>[]> {
       subject: r.subject ? String(r.subject) : undefined,
       message: String(r.message || ''),
       photo: r.photo ? String(r.photo) : undefined,
+      isRead: Boolean(Number(r.is_read || 0)),
       createdAt: String(r.created_at || ''),
     }));
   });
@@ -1399,9 +1400,9 @@ export async function mysqlSaveContact(contact: Record<string, any>): Promise<vo
   return withMysqlSchemaRetry(async () => {
     const pool = getMysqlPool();
     await pool.execute(
-      `INSERT INTO \`contacts\` (id, name, phone, email, district, subject, message, photo, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE message = VALUES(message), photo = VALUES(photo)`,
+      `INSERT INTO \`contacts\` (id, name, phone, email, district, subject, message, photo, is_read, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE message = VALUES(message), photo = VALUES(photo), is_read = VALUES(is_read)`,
       [
         String(contact.id),
         String(contact.name || ''),
@@ -1411,9 +1412,27 @@ export async function mysqlSaveContact(contact: Record<string, any>): Promise<vo
         String(contact.subject || ''),
         String(contact.message || ''),
         String(contact.photo || ''),
+        contact.isRead ? 1 : 0,
         String(contact.createdAt || new Date().toISOString()),
       ]
     );
+  });
+}
+
+export async function mysqlUpdateContactReadStatus(id: string, isRead: boolean): Promise<void> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute('UPDATE `contacts` SET `is_read` = ? WHERE `id` = ?', [
+      isRead ? 1 : 0,
+      String(id),
+    ]);
+  });
+}
+
+export async function mysqlMarkAllContactsRead(): Promise<void> {
+  return withMysqlSchemaRetry(async () => {
+    const pool = getMysqlPool();
+    await pool.execute('UPDATE `contacts` SET `is_read` = 1 WHERE `is_read` = 0');
   });
 }
 

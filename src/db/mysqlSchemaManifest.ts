@@ -157,6 +157,7 @@ export const MYSQL_SCHEMA_MANIFEST: MysqlTableSpec[] = [
       { name: 'subject', definition: "VARCHAR(500) NOT NULL DEFAULT ''" },
       { name: 'message', definition: 'LONGTEXT NULL' },
       { name: 'photo', definition: 'LONGTEXT NULL' },
+      { name: 'is_read', definition: 'TINYINT(1) NOT NULL DEFAULT 0' },
       { name: 'created_at', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
     ],
   },

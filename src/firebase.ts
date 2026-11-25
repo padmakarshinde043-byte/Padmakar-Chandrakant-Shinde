@@ -1438,6 +1438,49 @@ export async function fetchContactsForAdmin(): Promise<ContactMessage[]> {
   return raw ? JSON.parse(raw) : [];
 }
 
+export async function updateContactReadStatusInFirestore(
+  id: string,
+  isRead: boolean
+): Promise<void> {
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest(`/api/db/contacts/${encodeURIComponent(id)}/read`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isRead }),
+    });
+  }
+
+  const raw = safeStorageGet(CONTACTS_STORAGE_KEY);
+  if (raw) {
+    try {
+      const list: ContactMessage[] = JSON.parse(raw);
+      safeStorageSet(
+        CONTACTS_STORAGE_KEY,
+        JSON.stringify(list.map((c) => (c.id === id ? { ...c, isRead, read: isRead } : c)))
+      );
+    } catch {}
+  }
+}
+
+export async function markAllContactsReadInFirestore(): Promise<void> {
+  if (await isSqlBackendActive()) {
+    await sqlApiRequest('/api/db/contacts/mark-all-read', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+  }
+
+  const raw = safeStorageGet(CONTACTS_STORAGE_KEY);
+  if (raw) {
+    try {
+      const list: ContactMessage[] = JSON.parse(raw);
+      safeStorageSet(
+        CONTACTS_STORAGE_KEY,
+        JSON.stringify(list.map((c) => ({ ...c, isRead: true, read: true })))
+      );
+    } catch {}
+  }
+}
+
 export async function deleteContactMessageFromFirestore(id: string): Promise<void> {
   if (await isSqlBackendActive()) {
     try {
