@@ -393,35 +393,35 @@ async function getOfficialIdCardWaveBackgroundDataUrl(width = 3424, height = 216
     const sx = width / 640;
     const sy = height / 404;
 
-    // Subtle warm ivory-saffron card body tint (distinct from crisp white Membership ID Card)
+    // Subtle soft ice-blue card body tint (distinct from crisp white Membership ID Card and warm saffron)
     const bodyGrad = ctx.createLinearGradient(0, 102 * sy, 0, 368 * sy);
-    bodyGrad.addColorStop(0, '#fffdf9');
-    bodyGrad.addColorStop(0.55, '#fff9f0');
-    bodyGrad.addColorStop(1, '#fff3e2');
+    bodyGrad.addColorStop(0, '#f8fbff');
+    bodyGrad.addColorStop(0.55, '#f0f6fc');
+    bodyGrad.addColorStop(1, '#e2edf8');
     ctx.fillStyle = bodyGrad;
     ctx.fillRect(0, 0, width, height);
 
-    // Top Warm Saffron-Orange (Kesari) Header strictly above straight gold line
-    const topSaffronGrad = ctx.createLinearGradient(0, 0, width, 95 * sy);
-    topSaffronGrad.addColorStop(0, '#9a3412');
-    topSaffronGrad.addColorStop(0.35, '#c2410c');
-    topSaffronGrad.addColorStop(0.7, '#ea580c');
-    topSaffronGrad.addColorStop(1, '#9a3412');
-    ctx.fillStyle = topSaffronGrad;
+    // Top Soft Professional Sky Blue (आकाशी) Header strictly above straight gold line
+    const topSkyGrad = ctx.createLinearGradient(0, 0, width, 95 * sy);
+    topSkyGrad.addColorStop(0, '#0369a1');
+    topSkyGrad.addColorStop(0.35, '#0284c7');
+    topSkyGrad.addColorStop(0.7, '#0ea5e9');
+    topSkyGrad.addColorStop(1, '#0369a1');
+    ctx.fillStyle = topSkyGrad;
     ctx.fillRect(0, 0, width, 95 * sy);
 
     const glowCx = 0.62 * width;
     const glowCy = 0.42 * 95 * sy;
     const glowR = 0.48 * width;
-    const topWarmGlow = ctx.createRadialGradient(glowCx, glowCy, 0, glowCx, glowCy, glowR);
-    topWarmGlow.addColorStop(0, 'rgba(253, 186, 116, 0.35)');
-    topWarmGlow.addColorStop(1, 'rgba(154, 52, 18, 0)');
-    ctx.fillStyle = topWarmGlow;
+    const topSkyGlow = ctx.createRadialGradient(glowCx, glowCy, 0, glowCx, glowCy, glowR);
+    topSkyGlow.addColorStop(0, 'rgba(125, 211, 252, 0.45)');
+    topSkyGlow.addColorStop(1, 'rgba(3, 105, 161, 0)');
+    ctx.fillStyle = topSkyGlow;
     ctx.fillRect(0, 0, width, 95 * sy);
 
     // Straight Top Metallic Gold Divider Line with subtle shadow
     ctx.save();
-    ctx.shadowColor = 'rgba(154, 52, 18, 0.22)';
+    ctx.shadowColor = 'rgba(2, 132, 199, 0.25)';
     ctx.shadowBlur = 4 * sx;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 1.8 * sy;
@@ -440,7 +440,7 @@ async function getOfficialIdCardWaveBackgroundDataUrl(width = 3424, height = 216
     ctx.fillStyle = 'rgba(133, 77, 14, 0.85)';
     ctx.fillRect(0, 101.2 * sy, width, 0.8 * sy);
 
-    // Bottom Straight Metallic Gold Line & Warm Saffron-Orange Footer Band
+    // Bottom Straight Metallic Gold Line & Soft Sky Blue Footer Band
     const bottomGoldGrad = ctx.createLinearGradient(0, 0, width, 0);
     bottomGoldGrad.addColorStop(0, '#92400e');
     bottomGoldGrad.addColorStop(0.28, '#f5c842');
@@ -453,11 +453,11 @@ async function getOfficialIdCardWaveBackgroundDataUrl(width = 3424, height = 216
     ctx.fillStyle = 'rgba(254, 249, 195, 0.65)';
     ctx.fillRect(0, 368.3 * sy, width, 0.9 * sy);
 
-    const bottomSaffronGrad = ctx.createLinearGradient(0, 0, width, 0);
-    bottomSaffronGrad.addColorStop(0, '#9a3412');
-    bottomSaffronGrad.addColorStop(0.5, '#ea580c');
-    bottomSaffronGrad.addColorStop(1, '#9a3412');
-    ctx.fillStyle = bottomSaffronGrad;
+    const bottomSkyGrad = ctx.createLinearGradient(0, 0, width, 0);
+    bottomSkyGrad.addColorStop(0, '#0369a1');
+    bottomSkyGrad.addColorStop(0.5, '#0284c7');
+    bottomSkyGrad.addColorStop(1, '#0369a1');
+    ctx.fillStyle = bottomSkyGrad;
     ctx.fillRect(0, 374 * sy, width, 30 * sy);
 
     cachedOfficialIdCardWaveBgDataUrl = canvas.toDataURL('image/png');
