@@ -66,61 +66,26 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
               महाराष्ट्रभरातील केंद्रप्रमुख, विस्तार अधिकारी व शिक्षण प्रशासकीय संवर्गाच्या सन्मानासाठी, हक्कांसाठी आणि गुणवत्तापूर्ण प्राथमिक शिक्षणासाठी कार्यरत असलेले सर्वोच्च व्यासपीठ.
             </p>
 
-            {/* Quick Action CTAs */}
-            <div className="flex flex-wrap gap-2.5 pt-1">
-              <button
-                onClick={() => {
-                  setCurrentTab('membership');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-bold px-5 py-2.5 rounded-lg text-sm sm:text-base flex items-center gap-2 shadow-md transition-all active:scale-98"
-              >
-                <span>सदस्यत्व अर्ज करा</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setCurrentTab('appointments');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2.5 rounded-lg text-sm sm:text-base border border-white/20 transition-all flex items-center gap-2"
-              >
-                <Award className="w-4 h-4 text-amber-400" />
-                <span>पदाधिकारी</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setCurrentTab('news');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="text-slate-300 hover:text-white font-semibold px-3 py-2.5 text-sm sm:text-base transition-colors cursor-pointer"
-              >
-                बातम्या पहा →
-              </button>
-            </div>
-
-            {/* Key Organization Stats Strip */}
-            <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pt-4 border-t border-slate-700/60">
-              <div className="flex items-center gap-5 sm:gap-7">
+            {/* Key Organization Stats Strip (Even bolder and more prominent per user request) */}
+            <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 pt-5 border-t border-slate-700/80 bg-white/5 p-4 rounded-xl backdrop-blur-xs">
+              <div className="flex items-center gap-6 sm:gap-8">
                 <div>
-                  <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                  <strong className="block text-2xl sm:text-3xl font-black font-mono text-amber-300 drop-shadow-sm">
                     <AnimatedCounter target={34} />
                   </strong>
-                  <span className="text-xs sm:text-sm text-slate-300 font-medium">जिल्हा शाखा</span>
+                  <span className="text-xs sm:text-sm text-white font-extrabold tracking-wide">जिल्हा शाखा</span>
                 </div>
                 <div>
-                  <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                  <strong className="block text-2xl sm:text-3xl font-black font-mono text-amber-300 drop-shadow-sm">
                     <AnimatedCounter target={350} suffix="+" />
                   </strong>
-                  <span className="text-xs sm:text-sm text-slate-300 font-medium">तालुका कार्यकारिणी</span>
+                  <span className="text-xs sm:text-sm text-white font-extrabold tracking-wide">तालुका कार्यकारिणी</span>
                 </div>
                 <div>
-                  <strong className="block text-xl sm:text-2xl font-black font-mono text-amber-400">
+                  <strong className="block text-2xl sm:text-3xl font-black font-mono text-amber-300 drop-shadow-sm">
                     <AnimatedCounter target={5000} />
                   </strong>
-                  <span className="text-xs sm:text-sm text-slate-300 font-medium">सदस्य उद्दिष्ट</span>
+                  <span className="text-xs sm:text-sm text-white font-extrabold tracking-wide">सदस्य उद्दिष्ट</span>
                 </div>
               </div>
 
@@ -131,13 +96,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 title="नोंदणीकृत अधिकृत सदस्य यादी पहा"
-                className="group w-full sm:w-auto bg-[#153160] hover:bg-[#1a3c74] px-3.5 py-2 rounded-lg border border-[#efb24b]/75 border-b-2 border-b-[#efb24b] shadow-md transition-all cursor-pointer flex flex-col items-center justify-center shrink-0"
+                className="group w-full sm:w-auto bg-[#153160] hover:bg-[#1a3c74] px-4 py-2.5 rounded-xl border border-[#efb24b] border-b-3 border-b-[#efb24b] shadow-lg transition-all cursor-pointer flex flex-col items-center justify-center shrink-0"
               >
-                <span className="flex items-center justify-center gap-1.5 text-white text-xs sm:text-[13px] font-bold leading-tight whitespace-nowrap">
-                  <Users className="w-3.5 h-3.5 text-[#efb24b] shrink-0" />
+                <span className="flex items-center justify-center gap-1.5 text-white text-xs sm:text-[13px] font-black leading-tight whitespace-nowrap">
+                  <Users className="w-4 h-4 text-[#efb24b] shrink-0" />
                   <span>नोंदणीकृत अधिकृत सदस्य यादी</span>
                 </span>
-                <strong className="block text-xl sm:text-2xl font-black font-mono tabular-nums text-[#efb24b] leading-none mt-1 group-hover:scale-105 transition-transform">
+                <strong className="block text-2xl sm:text-3xl font-black font-mono tabular-nums text-[#efb24b] leading-none mt-1 group-hover:scale-105 transition-transform">
                   {typeof registeredMembersCount === 'number' ? (
                     <AnimatedCounter target={registeredMembersCount} />
                   ) : (
@@ -219,6 +184,50 @@ export const HomeTab: React.FC<HomeTabProps> = ({ setCurrentTab, onSelectNews, n
                 </a>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quick Action CTAs Bar (Placed below State President card and above Digital Service Center per user request) */}
+      <section className="bg-gradient-to-r from-[#0b1e36] via-[#13325b] to-[#0b1e36] py-5 px-4 sm:px-6 border-y border-amber-500/50 shadow-md">
+        <div className="max-w-[1240px] mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="text-white">
+            <span className="text-xs font-bold text-amber-400 block tracking-wide">महासंघाच्या महत्त्वाच्या सेवा</span>
+            <span className="text-sm sm:text-base font-serifDevanagari font-extrabold">त्वरित सेवांसाठी खालील पर्यायांवर क्लिक करा:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => {
+                setCurrentTab('membership');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-amber-500 hover:bg-amber-600 text-[#0b1e36] font-extrabold px-5 py-2.5 rounded-xl text-sm sm:text-base flex items-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer"
+            >
+              <span>सदस्यत्व अर्ज करा</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => {
+                setCurrentTab('appointments');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-white/10 hover:bg-white/25 text-white font-extrabold px-5 py-2.5 rounded-xl text-sm sm:text-base border border-amber-400/40 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <Award className="w-4 h-4 text-amber-400" />
+              <span>पदाधिकारी</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setCurrentTab('news');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="bg-white/10 hover:bg-white/25 text-white font-extrabold px-5 py-2.5 rounded-xl text-sm sm:text-base border border-amber-400/40 transition-all flex items-center gap-2 cursor-pointer"
+            >
+              <span>बातम्या पहा</span>
+              <ArrowRight className="w-4 h-4 text-amber-300" />
+            </button>
           </div>
         </div>
       </section>

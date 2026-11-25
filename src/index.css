@@ -18,11 +18,7 @@ body {
   color: var(--ink);
   font-family: 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.7;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   user-select: none;
-  -webkit-touch-callout: none;
 }
 
 input,
@@ -30,9 +26,6 @@ textarea,
 select,
 [contenteditable="true"],
 .allow-copy {
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
   user-select: text !important;
 }
 
@@ -192,8 +185,5 @@ h1, h2, h3, .serif-marathi {
 }
 
 .admin-panel {
-  -webkit-user-select: text !important;
-  -moz-user-select: text !important;
-  -ms-user-select: text !important;
   user-select: text !important;
 }
