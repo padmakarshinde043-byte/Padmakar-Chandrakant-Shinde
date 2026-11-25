@@ -53,7 +53,7 @@ export interface MembershipApplication {
   officialPost?: string; // संघटनेतील पद
   officialDistrict?: string;
   officialTaluka?: string;
-  paymentConfirmed?: boolean; // ₹225.20 payment verified by Razorpay or admin
+  paymentConfirmed?: boolean; // ₹226.00 payment verified by Razorpay or admin
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   approvedBy?: string;
@@ -194,7 +194,7 @@ export const ORG_DETAILS = {
     { name: "श्री ज्ञानेश्वर तुळशीराम नंदनवार", phone: "9423484305", designation: "राज्य पदाधिकारी" },
     { name: "श्री गणेश रघुनाथ राऊत", phone: "9604898527", designation: "राज्य पदाधिकारी" },
   ],
-  membershipFee: "₹225.20 (आजीवन सदस्यत्व ₹100 + वार्षिक वर्गणी ₹120 + पेमेंट गेटवे चार्ज ₹5.20)",
+  membershipFee: "₹226.00 (आजीवन सदस्यत्व ₹100 + वार्षिक वर्गणी ₹120 + पेमेंट गेटवे चार्ज ₹6.00)",
   founderPresident: {
     name: "श्री. राजेंद्र शिवाजी खैरनार",
     role: "संस्थापक राज्याध्यक्ष",

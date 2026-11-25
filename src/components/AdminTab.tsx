@@ -8750,7 +8750,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           Payment receipt verified <span className="text-rose-600">*</span>
                         </strong>
                         <span className="text-[11px] text-[#607184]">
-                          Confirmed that total membership fee (₹225.20: lifetime ₹100 + annual ₹120 + gateway ₹5.20) was received.
+                          Confirmed that total membership fee (₹226.00: lifetime ₹100 + annual ₹120 + gateway ₹6.00) was received.
                         </span>
                       </div>
                     </label>
@@ -9046,7 +9046,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                           </td>
                           <td className="py-2 px-3 font-mono">{toEnglishDigits(item.app.phone)}</td>
                           <td className="py-2 px-3">
-                            <div className="font-bold text-emerald-700">₹{Number(item.amountRupees || 225.2).toFixed(2)}</div>
+                            <div className="font-bold text-emerald-700">₹{Number(item.amountRupees || 226).toFixed(2)}</div>
                             <div className="text-[11px] text-slate-500">
                               {matchByLabel(item.matchBy)}
                               {item.paidAtIso ? ` · ${formatDateWithEnglishDigits(item.paidAtIso)}` : ''}
