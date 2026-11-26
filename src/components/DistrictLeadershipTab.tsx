@@ -363,7 +363,6 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
       });
 
     // Merge officialLeaders (from AppointmentsTab) and allLeaders (from Leadership management)
-    // officialLeaders take precedence over default/fallback slots
     const combinedLeaders = [...officialLeaders, ...allLeaders];
 
     const presidents = combinedLeaders.filter((l) => {
@@ -389,72 +388,61 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
       );
     });
 
-    const findMatchingSecretary = (region: string, usedSecIds: Set<string>): Leader | undefined => {
-      const normKey = normalizeDistrictPairKey(region);
-      const match = secretaries.find((s, idx) => {
+    const rows: DistrictCapsuleRow[] = [];
+    const usedPresIds = new Set<string>();
+    const usedSecIds = new Set<string>();
+
+    // Build rows strictly in MAHARASHTRA_DISTRICTS order (matching dropdown order)
+    for (const dist of MAHARASHTRA_DISTRICTS) {
+      // Find president matching this district
+      const pres = presidents.find((p, idx) => {
+        const pid = p.id || `${p.name}-${idx}`;
+        if (usedPresIds.has(pid)) return false;
+        return matchesDistrictName(p.region, dist);
+      });
+      if (pres) {
+        usedPresIds.add(pres.id || `${pres.name}-${pres.region}`);
+      }
+
+      // Find secretary matching this district
+      const sec = secretaries.find((s, idx) => {
         const sid = s.id || `${s.name}-${idx}`;
         if (usedSecIds.has(sid)) return false;
-        return (
-          matchesDistrictName(s.region, region) ||
-          matchesDistrictName(s.region, normKey) ||
-          normalizeDistrictPairKey(s.region) === normKey
-        );
+        return matchesDistrictName(s.region, dist);
       });
-      if (match) {
-        const matchIdx = secretaries.indexOf(match);
-        usedSecIds.add(match.id || `${match.name}-${matchIdx}`);
+      if (sec) {
+        usedSecIds.add(sec.id || `${sec.name}-${sec.region}`);
       }
-      return match;
-    };
 
-    const rows: DistrictCapsuleRow[] = [];
-    const seenDistrictKeys = new Set<string>();
-    const usedSecretaryIds = new Set<string>();
-
-    // 1. Preserve EXACT existing order of District Presidents
-    for (const pres of presidents) {
-      const rawRegion = (pres.region || '').trim();
-      const key = normalizeDistrictPairKey(rawRegion) || pres.id || pres.name;
-      if (!key || seenDistrictKeys.has(key)) continue;
-      seenDistrictKeys.add(key);
-
-      const secretary = findMatchingSecretary(rawRegion, usedSecretaryIds);
       rows.push({
-        districtKey: key,
-        districtTitle: formatDistrictDisplayTitle(rawRegion),
+        districtKey: normalizeDistrictPairKey(dist),
+        districtTitle: formatDistrictDisplayTitle(dist),
         president: pres,
-        secretary,
-      });
-    }
-
-    // 2. Append any remaining districts from official 34 districts
-    for (const dist of MAHARASHTRA_DISTRICTS) {
-      const key = normalizeDistrictPairKey(dist);
-      if (seenDistrictKeys.has(key)) continue;
-      seenDistrictKeys.add(key);
-      const secretary = findMatchingSecretary(dist, usedSecretaryIds);
-      rows.push({
-        districtKey: key,
-        districtTitle: dist,
-        president: undefined,
-        secretary,
-      });
-    }
-
-    // 3. Any extra custom district secretaries not already included in the 34 districts
-    secretaries.forEach((sec, idx) => {
-      const sid = sec.id || `${sec.name}-${idx}`;
-      if (usedSecretaryIds.has(sid)) return;
-      const key = normalizeDistrictPairKey(sec.region) || sid;
-      if (seenDistrictKeys.has(key)) return;
-      seenDistrictKeys.add(key);
-      rows.push({
-        districtKey: key,
-        districtTitle: formatDistrictDisplayTitle(sec.region),
-        president: undefined,
         secretary: sec,
       });
-    });
+    }
+
+    // Append any extra custom districts not in MAHARASHTRA_DISTRICTS
+    for (const pres of presidents) {
+      const pid = pres.id || pres.name;
+      if (usedPresIds.has(pid)) continue;
+      const rawRegion = (pres.region || '').trim();
+      if (!rawRegion) continue;
+      const sec = secretaries.find((s, idx) => {
+        const sid = s.id || `${s.name}-${idx}`;
+        if (usedSecIds.has(sid)) return false;
+        return matchesDistrictName(s.region, rawRegion);
+      });
+      if (sec) {
+        usedSecIds.add(sec.id || `${sec.name}-${sec.region}`);
+      }
+      rows.push({
+        districtKey: normalizeDistrictPairKey(rawRegion),
+        districtTitle: formatDistrictDisplayTitle(rawRegion),
+        president: pres,
+        secretary: sec,
+      });
+    }
 
     return rows;
   }, [allLeaders, officialsVersion]);
