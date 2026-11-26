@@ -5,7 +5,8 @@ import {
   DEFAULT_AUTHORITATIVE_LEADERS,
   MAHARASHTRA_DISTRICTS,
 } from '../data/mahasanghData';
-import { fetchDynamicLeaders } from '../services/rkFirebaseService';
+import { MAHARASHTRA_34_DISTRICTS, OfficialMember } from '../data/rkMaharashtraData';
+import { fetchDynamicLeaders, fetchOfficials } from '../services/rkFirebaseService';
 import { matchesDistrictName, getOfficialsFromStorageSync } from '../utils/officialsCache';
 
 interface DistrictLeadershipTabProps {
@@ -206,6 +207,7 @@ const DistrictCard: React.FC<DistrictCardProps> = React.memo(({ row, theme }) =>
                 className="w-full h-full object-cover object-top"
                 loading="lazy"
                 decoding="async"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/80 px-1">
@@ -241,6 +243,7 @@ const DistrictCard: React.FC<DistrictCardProps> = React.memo(({ row, theme }) =>
                 className="w-full h-full object-cover object-top"
                 loading="lazy"
                 decoding="async"
+                referrerPolicy="no-referrer"
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/80 px-1">
@@ -283,7 +286,7 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
     return DEFAULT_AUTHORITATIVE_LEADERS;
   });
 
-  const [officialsVersion, setOfficialsVersion] = useState(0);
+  const [officials, setOfficials] = useState<OfficialMember[]>(() => getOfficialsFromStorageSync());
 
   const loadLeaders = async (force = false) => {
     try {
@@ -297,8 +300,21 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
     }
   };
 
+  const loadOfficials = async (force = false) => {
+    try {
+      const remoteOfficials = await fetchOfficials(force);
+      if (Array.isArray(remoteOfficials)) {
+        setOfficials(remoteOfficials);
+      }
+    } catch (e) {
+      console.warn('Error loading district officials:', e);
+    }
+  };
+
   useEffect(() => {
     loadLeaders(false);
+    loadOfficials(false);
+
     const onUpdated = (ev: Event) => {
       const detail = (ev as CustomEvent)?.detail;
       if (Array.isArray(detail) && detail.length > 0) {
@@ -311,8 +327,14 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
       }
     };
 
-    const onOfficialsUpdated = () => {
-      setOfficialsVersion((v) => v + 1);
+    const onOfficialsUpdated = (ev: Event) => {
+      const detail = (ev as CustomEvent)?.detail;
+      if (Array.isArray(detail)) {
+        setOfficials(detail);
+      } else {
+        setOfficials(getOfficialsFromStorageSync());
+        loadOfficials(true);
+      }
     };
 
     window.addEventListener('mahasangh_leadership_updated', onUpdated);
@@ -327,28 +349,33 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
   }, []);
 
   const districtRows = useMemo<DistrictCapsuleRow[]>(() => {
-    // 1. Fetch officials from AppointmentsTab storage (जिल्हा पदाधिकारी) with robust matching
-    const officials = getOfficialsFromStorageSync();
+    const cleanPostText = (raw?: string) =>
+      (raw || '').replace(/\s+/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+    const isDistrictPresidentPost = (raw?: string) => {
+      const p = cleanPostText(raw);
+      if (!p || p.includes('तालुका') || p.includes('महिला') || p.includes('उपाध्यक्ष') || p.includes('कार्याध्यक्ष')) {
+        return false;
+      }
+      return p === 'जिल्हाध्यक्ष' || p === 'जिल्हाअध्यक्ष' || p.includes('जिल्हाध्यक्ष') || p.includes('जिल्हाअध्यक्ष');
+    };
+
+    const isDistrictSecretaryPost = (raw?: string) => {
+      const p = cleanPostText(raw);
+      if (!p || p.includes('तालुका') || p.includes('महिला')) {
+        return false;
+      }
+      return p.includes('जिल्हासरचिटणीस') || p.includes('जिल्हासर्चिटणीस');
+    };
+
+    // 1. Officials from AppointmentsTab (जिल्हा पदाधिकारी) — full list including photos
     const officialLeaders: Leader[] = officials
-      .filter((o) => {
-        const cleanPost = (o.appointedPost || '')
-          .replace(/\s+/g, '')
-          .replace(/[\u200B-\u200D\uFEFF]/g, '');
-        return (
-          cleanPost.includes('जिल्हाध्यक्ष') ||
-          cleanPost.includes('जिल्हाअध्यक्ष') ||
-          cleanPost.includes('जिल्हासरचिटणीस') ||
-          cleanPost.includes('जिल्हासर्चिटणीस')
-        );
-      })
+      .filter((o) => isDistrictPresidentPost(o.appointedPost) || isDistrictSecretaryPost(o.appointedPost))
       .map((o, i) => {
-        const fullName = `${o.salutation || ''} ${o.firstName} ${o.middleName || ''} ${o.lastName}`
+        const fullName = `${o.salutation || ''} ${o.firstName || ''} ${o.middleName || ''} ${o.lastName || ''}`
           .replace(/\s+/g, ' ')
           .trim();
-        const cleanPost = (o.appointedPost || '')
-          .replace(/\s+/g, '')
-          .replace(/[\u200B-\u200D\uFEFF]/g, '');
-        const isSec = cleanPost.includes('सरचिटणीस') || cleanPost.includes('सर्चिटणीस');
+        const isSec = isDistrictSecretaryPost(o.appointedPost);
         const cat = isSec ? 'जिल्हा सरचिटणीस' : 'जिल्हा अध्यक्ष';
         return {
           id: o.id || `off-${i}`,
@@ -362,90 +389,68 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
         };
       });
 
-    // Merge officialLeaders (from AppointmentsTab) and allLeaders (from Leadership management)
-    const combinedLeaders = [...officialLeaders, ...allLeaders];
+    const officialPresidents = officialLeaders.filter((l) => l.category === 'जिल्हा अध्यक्ष');
+    const officialSecretaries = officialLeaders.filter((l) => l.category === 'जिल्हा सरचिटणीस');
 
-    const presidents = combinedLeaders.filter((l) => {
+    const leaderPresidents = allLeaders.filter((l) => {
       if (!l) return false;
       const cat = (l.category || '').trim();
-      const role = (l.role || '').replace(/\s+/g, '');
-      return (
-        cat === 'जिल्हा अध्यक्ष' ||
-        cat === 'district' ||
-        role.includes('जिल्हाध्यक्ष') ||
-        role.includes('जिल्हाअध्यक्ष')
-      );
+      return cat === 'जिल्हा अध्यक्ष' || cat === 'district' || isDistrictPresidentPost(l.role);
     });
 
-    const secretaries = combinedLeaders.filter((l) => {
+    const leaderSecretaries = allLeaders.filter((l) => {
       if (!l) return false;
       const cat = (l.category || '').trim();
-      const role = (l.role || '').replace(/\s+/g, '');
-      return (
-        cat === 'जिल्हा सरचिटणीस' ||
-        role.includes('जिल्हासरचिटणीस') ||
-        role.includes('जिल्हासर्चिटणीस')
-      );
+      return cat === 'जिल्हा सरचिटणीस' || isDistrictSecretaryPost(l.role);
     });
 
-    const rows: DistrictCapsuleRow[] = [];
-    const usedPresIds = new Set<string>();
-    const usedSecIds = new Set<string>();
+    const matchesDist = (region: string | undefined, dist: string, distKey: string) =>
+      matchesDistrictName(region, dist) ||
+      matchesDistrictName(region, distKey) ||
+      normalizeDistrictPairKey(region) === distKey;
 
-    // Build rows strictly in MAHARASHTRA_DISTRICTS order (matching dropdown order)
-    for (const dist of MAHARASHTRA_DISTRICTS) {
-      // Find president matching this district
-      const pres = presidents.find((p, idx) => {
-        const pid = p.id || `${p.name}-${idx}`;
-        if (usedPresIds.has(pid)) return false;
-        return matchesDistrictName(p.region, dist);
-      });
-      if (pres) {
-        usedPresIds.add(pres.id || `${pres.name}-${pres.region}`);
+    const pickBestForDistrict = (
+      officialPool: Leader[],
+      leaderPool: Leader[],
+      dist: string,
+      distKey: string
+    ): Leader | undefined => {
+      const officialMatches = officialPool.filter((l) => matchesDist(l.region, dist, distKey));
+      const leaderMatches = leaderPool.filter((l) => matchesDist(l.region, dist, distKey));
+
+      const bestOfficial =
+        officialMatches.find((l) => !isPlaceholderLeaderName(l.name) && Boolean(l.photo)) ||
+        officialMatches.find((l) => !isPlaceholderLeaderName(l.name));
+
+      const bestLeader =
+        leaderMatches.find((l) => !isPlaceholderLeaderName(l.name) && Boolean(l.photo)) ||
+        leaderMatches.find((l) => !isPlaceholderLeaderName(l.name)) ||
+        leaderMatches[0];
+
+      if (bestOfficial) {
+        if (!bestOfficial.photo && bestLeader?.photo) {
+          return { ...bestOfficial, photo: bestLeader.photo };
+        }
+        return bestOfficial;
       }
 
-      // Find secretary matching this district
-      const sec = secretaries.find((s, idx) => {
-        const sid = s.id || `${s.name}-${idx}`;
-        if (usedSecIds.has(sid)) return false;
-        return matchesDistrictName(s.region, dist);
-      });
-      if (sec) {
-        usedSecIds.add(sec.id || `${sec.name}-${sec.region}`);
-      }
+      return bestLeader;
+    };
 
-      rows.push({
-        districtKey: normalizeDistrictPairKey(dist),
+    // Build strictly the exact 34 districts in the exact dropdown order of AppointmentsTab
+    return MAHARASHTRA_34_DISTRICTS.map((dist) => {
+      const distKey = normalizeDistrictPairKey(dist);
+      const president = pickBestForDistrict(officialPresidents, leaderPresidents, dist, distKey);
+      const secretary = pickBestForDistrict(officialSecretaries, leaderSecretaries, dist, distKey);
+
+      return {
+        districtKey: distKey,
         districtTitle: formatDistrictDisplayTitle(dist),
-        president: pres,
-        secretary: sec,
-      });
-    }
-
-    // Append any extra custom districts not in MAHARASHTRA_DISTRICTS
-    for (const pres of presidents) {
-      const pid = pres.id || pres.name;
-      if (usedPresIds.has(pid)) continue;
-      const rawRegion = (pres.region || '').trim();
-      if (!rawRegion) continue;
-      const sec = secretaries.find((s, idx) => {
-        const sid = s.id || `${s.name}-${idx}`;
-        if (usedSecIds.has(sid)) return false;
-        return matchesDistrictName(s.region, rawRegion);
-      });
-      if (sec) {
-        usedSecIds.add(sec.id || `${sec.name}-${sec.region}`);
-      }
-      rows.push({
-        districtKey: normalizeDistrictPairKey(rawRegion),
-        districtTitle: formatDistrictDisplayTitle(rawRegion),
-        president: pres,
-        secretary: sec,
-      });
-    }
-
-    return rows;
-  }, [allLeaders, officialsVersion]);
+        president,
+        secretary,
+      };
+    });
+  }, [allLeaders, officials]);
 
   const filteredRows = useMemo(() => {
     const term = districtSearch.trim().toLowerCase();

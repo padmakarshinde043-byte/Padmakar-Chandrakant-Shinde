@@ -203,6 +203,9 @@ export async function saveOfficialToRtdb(member: OfficialMember): Promise<void> 
   }
   const updatedList = [member, ...baseList.filter((x) => x.id !== member.id)];
   safeCacheOfficials(updatedList);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('rk2026_officials_updated', { detail: updatedList }));
+  }
 }
 
 /**
@@ -234,8 +237,12 @@ export async function deleteOfficialFromRtdb(id: string): Promise<void> {
       if (Array.isArray(parsed)) baseList = parsed;
     } catch {}
   }
+  const filteredList = baseList.filter((x) => x.id !== id);
   if (baseList.length > 0) {
-    safeCacheOfficials(baseList.filter((x) => x.id !== id));
+    safeCacheOfficials(filteredList);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('rk2026_officials_updated', { detail: filteredList }));
   }
 }
 
