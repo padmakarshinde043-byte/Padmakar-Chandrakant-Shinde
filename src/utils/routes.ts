@@ -57,8 +57,24 @@ export const APP_ROUTES: RouteMeta[] = [
     path: '/leadership',
     title: `राज्य नेतृत्व — ${BASE_TITLE}`,
     description:
-      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी व विभागीय पदाधिकाऱ्यांची अधिकृत यादी.',
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या राज्य कार्यकारिणीतील पदाधिकाऱ्यांची अधिकृत यादी.',
     aliases: ['/state-leadership'],
+  },
+  {
+    tabId: 'women_leadership',
+    path: '/women-leadership',
+    title: `महिला आघाडी — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या महिला आघाडी राज्य कार्यकारिणीतील पदाधिकाऱ्यांची अधिकृत यादी.',
+    aliases: ['/mahila-aghadi', '/women-wing'],
+  },
+  {
+    tabId: 'division_leadership',
+    path: '/division-leadership',
+    title: `विभाग नेतृत्व — ${BASE_TITLE}`,
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाच्या विभागीय कार्यकारिणी व विभागीय समन्वयकांची अधिकृत यादी.',
+    aliases: ['/divisional-leadership', '/vibhag-netrutva'],
   },
   {
     tabId: 'district_leadership',

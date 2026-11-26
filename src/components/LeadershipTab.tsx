@@ -6,13 +6,57 @@ import {
 } from '../data/mahasanghData';
 import { fetchDynamicLeaders } from '../services/rkFirebaseService';
 
+export type LeadershipSectionMode = 'state' | 'women' | 'division';
+
 interface LeadershipTabProps {
+  mode?: LeadershipSectionMode;
   setCurrentTab: (tab: string) => void;
 }
 
 const DYNAMIC_LEADERSHIP_STORAGE_KEY = 'mahasangh_dynamic_leadership_v1';
 
-export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) => {
+const SECTION_META: Record<
+  LeadershipSectionMode,
+  {
+    eyebrow: string;
+    pageTitle: string;
+    subtitle: string;
+    sectionTitle: string;
+    borderClass: string;
+    badgeClass: string;
+    emptyText: string;
+  }
+> = {
+  state: {
+    eyebrow: 'राज्य नेतृत्व व कार्यकारिणी',
+    pageTitle: 'राज्य नेतृत्व',
+    subtitle: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची राज्य कार्यकारिणी',
+    sectionTitle: 'राज्य कार्यकारिणी',
+    borderClass: 'border-amber-600',
+    badgeClass: 'bg-slate-100',
+    emptyText: 'राज्य कार्यकारिणीचे पदाधिकारी लवकरच जोडले जातील. (आपण ॲडमिन पॅनलमधून नवीन पदाधिकारी जोडू शकता)',
+  },
+  women: {
+    eyebrow: 'महिला आघाडी राज्य नेतृत्व',
+    pageTitle: 'महिला आघाडी',
+    subtitle: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची महिला आघाडी राज्य कार्यकारिणी',
+    sectionTitle: 'महिला आघाडी राज्य कार्यकारिणी',
+    borderClass: 'border-rose-500',
+    badgeClass: 'bg-rose-50',
+    emptyText: 'महिला आघाडी राज्य कार्यकारिणीचे पदाधिकारी लवकरच जोडले जातील. (आपण ॲडमिन पॅनलमधून नवीन पदाधिकारी जोडू शकता)',
+  },
+  division: {
+    eyebrow: 'विभागीय नेतृत्व व समन्वय',
+    pageTitle: 'विभाग नेतृत्व',
+    subtitle: 'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची विभागीय कार्यकारिणी व समन्वयक',
+    sectionTitle: 'विभागीय कार्यकारिणी',
+    borderClass: 'border-blue-600',
+    badgeClass: 'bg-blue-50',
+    emptyText: 'विभागीय कार्यकारिणीचे पदाधिकारी लवकरच जोडले जातील. (आपण ॲडमिन पॅनलमधून नवीन पदाधिकारी जोडू शकता)',
+  },
+};
+
+export const LeadershipTab: React.FC<LeadershipTabProps> = ({ mode = 'state', setCurrentTab }) => {
   const [allLeaders, setAllLeaders] = useState<Leader[]>(() => {
     try {
       const stored = localStorage.getItem(DYNAMIC_LEADERSHIP_STORAGE_KEY);
@@ -56,13 +100,25 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
     return () => window.removeEventListener('mahasangh_leadership_updated', onUpdated);
   }, []);
 
-  const stateExecutive = allLeaders.filter((l) => l.category === 'राज्य कार्यकारिणी' || l.category === 'state' || !l.category);
-  const womenExecutive = allLeaders.filter((l) => l.category === 'महिला आघाडी राज्य कार्यकारिणी');
-  const divisional = allLeaders.filter((l) => l.category === 'विभागीय समन्वयक' || l.category === 'विभागीय कार्यकारिणी' || l.category === 'division');
+  const sectionLeaders =
+    mode === 'women'
+      ? allLeaders.filter((l) => l.category === 'महिला आघाडी राज्य कार्यकारिणी')
+      : mode === 'division'
+        ? allLeaders.filter(
+            (l) =>
+              l.category === 'विभागीय समन्वयक' ||
+              l.category === 'विभागीय कार्यकारिणी' ||
+              l.category === 'division'
+          )
+        : allLeaders.filter(
+            (l) => l.category === 'राज्य कार्यकारिणी' || l.category === 'state' || !l.category
+          );
+
+  const meta = SECTION_META[mode];
 
   const renderLeaderCard = (leader: Leader) => (
     <div
-      key={(leader.id || leader.name) + leader.region}
+      key={(leader.id || leader.name) + (leader.region || '')}
       className="bg-white rounded-xl border border-slate-200/90 shadow-sm hover:shadow-md hover:border-amber-400 transition-all flex flex-col items-center p-3.5 text-center group overflow-hidden"
     >
       <div className="w-full aspect-[4/4.2] bg-slate-100 flex items-center justify-center mb-3 rounded-lg overflow-hidden border border-slate-200/80 group-hover:border-amber-200 transition-all relative shrink-0">
@@ -70,6 +126,8 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
           <img
             src={leader.photo}
             alt={leader.name}
+            loading="lazy"
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover object-top"
           />
         ) : (
@@ -101,13 +159,13 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         <div className="border-b-2 border-[#102a43] pb-3.5 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-              राज्य नेतृत्व व कार्यकारिणी
+              {meta.eyebrow}
             </span>
             <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
-              राज्य पदाधिकारी
+              {meta.pageTitle}
             </h1>
             <p className="text-sm sm:text-base text-slate-600 mt-1.5">
-              महासंघाची राज्य कार्यकारिणी, महिला आघाडी राज्य कार्यकारिणी व विभागीय कार्यकारिणी
+              {meta.subtitle}
             </p>
           </div>
           <button
@@ -123,55 +181,24 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ setCurrentTab }) =
         </div>
       </div>
 
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 space-y-10">
-        {/* Section 1: राज्य कार्यकारिणी */}
-        <section className="bg-white p-5 sm:p-6 rounded-2xl border-l-8 border-amber-600 shadow-sm">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6">
+        <section className={`bg-white p-5 sm:p-6 rounded-2xl border-l-8 ${meta.borderClass} shadow-sm`}>
           <div className="mb-6 flex items-center justify-between">
             <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-              राज्य कार्यकारिणी
+              {meta.sectionTitle}
             </h3>
-            <span className="text-xs sm:text-sm text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
-              एकूण: <strong className="font-mono text-[#0b1e36]">{stateExecutive.length}</strong>
+            <span className={`text-xs sm:text-sm text-slate-500 font-medium ${meta.badgeClass} px-3 py-1 rounded-full`}>
+              एकूण: <strong className="font-mono text-[#0b1e36]">{sectionLeaders.length}</strong>
             </span>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {stateExecutive.map((leader) => renderLeaderCard(leader))}
-          </div>
-        </section>
-
-        {/* Section 2: महिला आघाडी राज्य कार्यकारिणी */}
-        <section className="bg-white p-5 sm:p-6 rounded-2xl border-l-8 border-rose-500 shadow-sm">
-          <div className="mb-6 flex items-center justify-between">
-            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-              महिला आघाडी राज्य कार्यकारिणी
-            </h3>
-            <span className="text-xs sm:text-sm text-slate-500 font-medium bg-rose-50 px-3 py-1 rounded-full">
-              एकूण: <strong className="font-mono text-[#0b1e36]">{womenExecutive.length}</strong>
-            </span>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {womenExecutive.length > 0 ? (
-              womenExecutive.map((leader) => renderLeaderCard(leader))
+            {sectionLeaders.length > 0 ? (
+              sectionLeaders.map((leader) => renderLeaderCard(leader))
             ) : (
               <div className="col-span-full py-8 text-center text-sm sm:text-base text-slate-400">
-                महिला आघाडी राज्य कार्यकारिणीचे पदाधिकारी लवकरच जोडले जातील. (आपण ॲडमिन पॅनलमधून नवीन पदाधिकारी जोडू शकता)
+                {meta.emptyText}
               </div>
             )}
-          </div>
-        </section>
-
-        {/* Section 3: विभागीय कार्यकारिणी */}
-        <section className="bg-white p-5 sm:p-6 rounded-2xl border-l-8 border-blue-600 shadow-sm">
-          <div className="mb-6 flex items-center justify-between">
-            <h3 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#0b1e36]">
-              विभागीय कार्यकारिणी
-            </h3>
-            <span className="text-xs sm:text-sm text-slate-500 font-medium bg-blue-50 px-3 py-1 rounded-full">
-              एकूण: <strong className="font-mono text-[#0b1e36]">{divisional.length}</strong>
-            </span>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-            {divisional.map((leader) => renderLeaderCard(leader))}
           </div>
         </section>
       </div>

@@ -38,6 +38,8 @@ const prefetchTabChunk = (tabId: string) => {
       loadAboutTab();
       break;
     case 'leadership':
+    case 'women_leadership':
+    case 'division_leadership':
       loadLeadershipTab();
       break;
     case 'district_leadership':
@@ -790,7 +792,17 @@ export function App() {
           )}
           {(visitedTabs.leadership || currentTab === 'leadership') && (
             <div className={currentTab === 'leadership' ? 'block mhs-tab-enter' : 'hidden'}>
-              <LeadershipTab setCurrentTab={navigateToTab} />
+              <LeadershipTab mode="state" setCurrentTab={navigateToTab} />
+            </div>
+          )}
+          {(visitedTabs.women_leadership || currentTab === 'women_leadership') && (
+            <div className={currentTab === 'women_leadership' ? 'block mhs-tab-enter' : 'hidden'}>
+              <LeadershipTab mode="women" setCurrentTab={navigateToTab} />
+            </div>
+          )}
+          {(visitedTabs.division_leadership || currentTab === 'division_leadership') && (
+            <div className={currentTab === 'division_leadership' ? 'block mhs-tab-enter' : 'hidden'}>
+              <LeadershipTab mode="division" setCurrentTab={navigateToTab} />
             </div>
           )}
           {(visitedTabs.district_leadership || currentTab === 'district_leadership') && (

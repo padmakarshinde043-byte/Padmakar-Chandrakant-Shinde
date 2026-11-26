@@ -14,6 +14,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
     { id: 'home', label: 'मुख्यपृष्ठ' },
     { id: 'about', label: 'आमच्याबद्दल' },
     { id: 'leadership', label: 'राज्य नेतृत्व' },
+    { id: 'women_leadership', label: 'महिला आघाडी' },
+    { id: 'division_leadership', label: 'विभाग नेतृत्व' },
     { id: 'district_leadership', label: 'जिल्हा नेतृत्व' },
     { id: 'appointments', label: 'जिल्हा पदाधिकारी' },
     { id: 'advisory', label: 'राज्य सल्लागार मंडळ' },
@@ -96,9 +98,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
 
       {/* 2. Submenu Bar (सब मेनू पट्टी - आकर्षक, ठळक अक्षरे व सुंदर रंगसंगती) */}
       <div className="bg-[#0b1e36] border-y border-amber-500/60 shadow-inner">
-        <div className="max-w-[1240px] mx-auto px-2 sm:px-6">
+        <div className="max-w-[1320px] mx-auto px-2 sm:px-4">
           {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex flex-nowrap items-center overflow-x-auto no-scrollbar justify-start lg:justify-center gap-1 xl:gap-1.5 py-1.5" aria-label="मुख्य नेव्हिगेशन">
+          <nav className="hidden lg:flex flex-nowrap items-center overflow-x-auto no-scrollbar justify-start xl:justify-center gap-0.5 xl:gap-1 py-1.5" aria-label="मुख्य नेव्हिगेशन">
             {navItems.map((item) => {
               const isActive = currentTab === item.id;
               return (
@@ -107,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
                   onMouseEnter={() => onPrefetchTab?.(item.id)}
                   onFocus={() => onPrefetchTab?.(item.id)}
                   onClick={() => handleNavClick(item.id)}
-                  className={`mhs-btn-press whitespace-nowrap shrink-0 text-[12px] xl:text-[13px] px-2 xl:px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`mhs-btn-press whitespace-nowrap shrink-0 text-[11.5px] xl:text-[12.5px] px-1.5 xl:px-2 py-1.5 rounded-lg transition-all cursor-pointer ${
                     isActive
                       ? 'bg-amber-500 text-[#0b1e36] font-extrabold shadow-sm'
                       : 'text-slate-100 hover:text-white hover:bg-white/10 font-bold'

@@ -49,6 +49,18 @@ const ROUTE_SEO_OVERRIDES: Record<string, RouteSeoOverride> = {
     description:
       'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाचे संस्थापक राज्याध्यक्ष श्री. राजेंद्र शिवाजी खैरनार (Rajendra Khairnar) व राज्य कार्यकारिणीची अधिकृत यादी.',
   },
+  '/women-leadership': {
+    canonicalPath: '/women-leadership',
+    title: 'महिला आघाडी — महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ',
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची महिला आघाडी राज्य कार्यकारिणी व पदाधिकाऱ्यांची अधिकृत यादी.',
+  },
+  '/division-leadership': {
+    canonicalPath: '/division-leadership',
+    title: 'विभाग नेतृत्व — महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ',
+    description:
+      'महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघाची विभागीय कार्यकारिणी व विभागीय समन्वयकांची अधिकृत यादी.',
+  },
   '/district-leadership': {
     canonicalPath: '/district-leadership',
     title: 'जिल्हा नेतृत्व — महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ',
