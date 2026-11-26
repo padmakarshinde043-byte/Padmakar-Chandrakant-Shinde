@@ -6,7 +6,7 @@ import {
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
-  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy, Star
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy, Star, Printer
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { AdminRatingPanel } from './AdminRatingPanel';
@@ -1499,6 +1499,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   const [contactPhotoModal, setContactPhotoModal] = useState<{ src: string; title: string } | null>(null);
   const [advisorySubTab, setAdvisorySubTab] = useState<'कायदेविषयक सल्लागार' | 'मार्गदर्शक'>('कायदेविषयक सल्लागार');
   const [dynamicLeaders, setDynamicLeaders] = useState<Leader[]>([]);
+  const [showExecutiveAuditModal, setShowExecutiveAuditModal] = useState(false);
   const [editingLeaderId, setEditingLeaderId] = useState<string | null>(null);
   const [leaderName, setLeaderName] = useState('');
   const [leaderRole, setLeaderRole] = useState('');
@@ -8190,7 +8191,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Card 1: Resequence Member Numbers */}
                   <div className="p-4 sm:p-5 rounded-xl bg-[#fbf8f2] border border-[#e7ded1] flex flex-col justify-between gap-4">
                     <div className="space-y-1.5">
@@ -8263,6 +8264,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                     >
                       <Trash2 className={`w-3.5 h-3.5 ${isPurgingGhosts ? 'animate-spin' : ''}`} />
                       <span>{isPurgingGhosts ? 'Cleaning...' : 'Clean Trash / Data'}</span>
+                    </button>
+                  </div>
+
+                  {/* Card 4: Executive Audit Report (4-Page Report) */}
+                  <div className="p-4 sm:p-5 rounded-xl bg-[#fbf8f2] border border-[#e7ded1] flex flex-col justify-between gap-4">
+                    <div className="space-y-1.5">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-100 text-indigo-800">
+                        <FileText className="w-4 h-4" />
+                      </span>
+                      <h4 className="text-base font-bold text-[#0b1e36]">
+                        Executive Audit Report
+                      </h4>
+                      <p className="text-xs text-[#607184] leading-relaxed">
+                        4-पानांचा प्रिंट करण्याजोगा कार्यकारिणी भरलेली व रिक्त पदांचा ऑडिट रिपोर्ट (राज्य, महिला, विभाग, सल्लागार).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowExecutiveAuditModal(true)}
+                      className="w-full min-h-[42px] rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-2 text-xs font-bold shadow-xs transition-colors cursor-pointer px-3.5"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Generate 4-Page Report</span>
                     </button>
                   </div>
                 </div>
@@ -9153,6 +9177,279 @@ export const AdminTab: React.FC<AdminTabProps> = ({
         </div>
         );
       })()}
+
+      {/* ============================================================== */}
+      {/* 4-Page Executive Vacancy & Filled Posts Audit Report Modal       */}
+      {/* ============================================================== */}
+      {showExecutiveAuditModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-[#e7ded1] overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="bg-[#0b1e36] text-white px-6 py-4 flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3">
+                <FileText className="w-6 h-6 text-[#efb24b]" />
+                <div>
+                  <h3 className="text-lg font-bold">कार्यकारणी व रिक्त पदे ऑडिट रिपोर्ट (4-Page Report)</h3>
+                  <p className="text-xs text-slate-300">सर्व ४ कार्यकारी मंडळांचे भरलेली पदे व रिक्त पदांचा आढावा</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="bg-[#efb24b] hover:bg-[#df6b16] text-[#0b1e36] font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>प्रिंट / PDF</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExecutiveAuditModal(false)}
+                  className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body / Report Pages */}
+            <div className="p-6 overflow-y-auto space-y-12 bg-[#fbf8f2] text-[#0b1e36]">
+              {/* Page 1: राज्य कार्यकारिणी */}
+              <div className="bg-white p-6 rounded-2xl border border-[#e7ded1] shadow-xs print-page space-y-4">
+                <div className="text-center border-b border-[#e7ded1] pb-4">
+                  <h4 className="text-xl font-bold text-[#0b1e36]">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</h4>
+                  <p className="text-sm font-semibold text-[#df6b16] mt-1">१. राज्य कार्यकारिणी व रिक्त पदे ऑडिट रिपोर्ट</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#0b1e36] text-white">
+                        <th className="p-3 border border-slate-300 w-16 text-center">अ.क्र.</th>
+                        <th className="p-3 border border-slate-300">पदाचे नाव</th>
+                        <th className="p-3 border border-slate-300">नियुक्त व्यक्तीचे नाव / स्थिती</th>
+                        <th className="p-3 border border-slate-300 w-48">विभाग / जिल्हा</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const statePosts = [
+                          { role: "राज्याध्यक्ष" },
+                          { role: "कार्याध्यक्ष" },
+                          { role: "महासचिव" },
+                          { role: "सहसचिव" },
+                          { role: "कोषाध्यक्ष" },
+                          { role: "उपाध्यक्ष" },
+                          { role: "उपाध्यक्ष" },
+                          { role: "सदस्य" }
+                        ];
+                        return statePosts.map((p, idx) => {
+                          const matched = dynamicLeaders.find(l => 
+                            (l.category === 'राज्य कार्यकारिणी' || l.category === 'state') && 
+                            (l.role || '').includes(p.role) &&
+                            isValidLeaderRecord(l)
+                          );
+                          const isFilled = Boolean(matched);
+                          return (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                              <td className="p-3 border border-slate-200 text-center font-mono">{idx + 1}</td>
+                              <td className="p-3 border border-slate-200 font-bold">{p.role}</td>
+                              <td className="p-3 border border-slate-200">
+                                {isFilled ? (
+                                  <span className="font-bold text-[#193568]">{matched?.name}</span>
+                                ) : (
+                                  <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">रिक्त पद</span>
+                                )}
+                              </td>
+                              <td className="p-3 border border-slate-200 text-slate-600">{isFilled ? (matched?.region || '-') : '—'}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Page 2: महिला आघाडी */}
+              <div className="bg-white p-6 rounded-2xl border border-[#e7ded1] shadow-xs print-page space-y-4">
+                <div className="text-center border-b border-[#e7ded1] pb-4">
+                  <h4 className="text-xl font-bold text-[#0b1e36]">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</h4>
+                  <p className="text-sm font-semibold text-[#df6b16] mt-1">२. महिला आघाडी राज्य कार्यकारिणी व रिक्त पदे ऑडिट रिपोर्ट</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#0b1e36] text-white">
+                        <th className="p-3 border border-slate-300 w-16 text-center">अ.क्र.</th>
+                        <th className="p-3 border border-slate-300">पदाचे नाव</th>
+                        <th className="p-3 border border-slate-300">नियुक्त व्यक्तीचे नाव / स्थिती</th>
+                        <th className="p-3 border border-slate-300 w-48">विभाग / जिल्हा</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const mahilaPosts = [
+                          { role: "महिला आघाडी अध्यक्ष" },
+                          { role: "महिला आघाडी कार्याध्यक्ष" },
+                          { role: "महिला आघाडी महासचिव" },
+                          { role: "महिला आघाडी उपाध्यक्ष" },
+                          { role: "महिला आघाडी सहसचिव" },
+                          { role: "महिला आघाडी कोषाध्यक्ष" }
+                        ];
+                        return mahilaPosts.map((p, idx) => {
+                          const matched = dynamicLeaders.find(l => 
+                            ((l.category || '').includes('महिला') || (l.role || '').includes('महिला')) && 
+                            (l.role || '').includes(p.role.replace('महिला आघाडी ', '')) &&
+                            isValidLeaderRecord(l)
+                          );
+                          const isFilled = Boolean(matched);
+                          return (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                              <td className="p-3 border border-slate-200 text-center font-mono">{idx + 1}</td>
+                              <td className="p-3 border border-slate-200 font-bold">{p.role}</td>
+                              <td className="p-3 border border-slate-200">
+                                {isFilled ? (
+                                  <span className="font-bold text-[#193568]">{matched?.name}</span>
+                                ) : (
+                                  <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">रिक्त पद</span>
+                                )}
+                              </td>
+                              <td className="p-3 border border-slate-200 text-slate-600">{isFilled ? (matched?.region || '-') : '—'}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Page 3: विभाग कार्यकारिणी */}
+              <div className="bg-white p-6 rounded-2xl border border-[#e7ded1] shadow-xs print-page space-y-4">
+                <div className="text-center border-b border-[#e7ded1] pb-4">
+                  <h4 className="text-xl font-bold text-[#0b1e36]">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</h4>
+                  <p className="text-sm font-semibold text-[#df6b16] mt-1">३. विभाग कार्यकारिणी / समन्वयक व रिक्त पदे ऑडिट रिपोर्ट</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#0b1e36] text-white">
+                        <th className="p-3 border border-slate-300 w-16 text-center">अ.क्र.</th>
+                        <th className="p-3 border border-slate-300">विभागीय पद</th>
+                        <th className="p-3 border border-slate-300">नियुक्त व्यक्तीचे नाव / स्थिती</th>
+                        <th className="p-3 border border-slate-300 w-48">विभाग</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const divisions = [
+                          "पुणे विभाग",
+                          "औरंगाबाद विभाग",
+                          "नागपूर विभाग",
+                          "नाशिक विभाग",
+                          "कोकण विभाग",
+                          "अमरावती विभाग"
+                        ];
+                        return divisions.map((divName, idx) => {
+                          const matched = dynamicLeaders.find(l => 
+                            (l.category === 'विभागीय समन्वयक' || l.category === 'division') && 
+                            (l.region || '').includes(divName.split(' ')[0]) &&
+                            isValidLeaderRecord(l)
+                          );
+                          const isFilled = Boolean(matched);
+                          return (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                              <td className="p-3 border border-slate-200 text-center font-mono">{idx + 1}</td>
+                              <td className="p-3 border border-slate-200 font-bold">{divName} समन्वयक</td>
+                              <td className="p-3 border border-slate-200">
+                                {isFilled ? (
+                                  <span className="font-bold text-[#193568]">{matched?.name}</span>
+                                ) : (
+                                  <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">रिक्त पद</span>
+                                )}
+                              </td>
+                              <td className="p-3 border border-slate-200 text-slate-600">{divName}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Page 4: राज्य सल्लागार मंडळ */}
+              <div className="bg-white p-6 rounded-2xl border border-[#e7ded1] shadow-xs print-page space-y-4">
+                <div className="text-center border-b border-[#e7ded1] pb-4">
+                  <h4 className="text-xl font-bold text-[#0b1e36]">महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ</h4>
+                  <p className="text-sm font-semibold text-[#df6b16] mt-1">४. राज्य सल्लागार मंडळ व कायदेविषयक सल्लागार ऑडिट रिपोर्ट</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead>
+                      <tr className="bg-[#0b1e36] text-white">
+                        <th className="p-3 border border-slate-300 w-16 text-center">अ.क्र.</th>
+                        <th className="p-3 border border-slate-300">सल्लागार पद</th>
+                        <th className="p-3 border border-slate-300">नियुक्त व्यक्तीचे नाव / स्थिती</th>
+                        <th className="p-3 border border-slate-300 w-48">कार्यक्षेत्र / न्यायालय</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const advisoryPosts = [
+                          { role: "कायदेविषयक सल्लागार", region: "सर्वोच्च न्यायालय, दिल्ली" },
+                          { role: "कायदेविषयक सल्लागार", region: "सर्वोच्च न्यायालय, दिल्ली" },
+                          { role: "मुख्य मार्गदर्शक", region: "पुणे विभाग" },
+                          { role: "वरिष्ठ मार्गदर्शक", region: "नागपूर विभाग" },
+                          { role: "शैक्षणिक मार्गदर्शक", region: "नाशिक विभाग" },
+                          { role: "प्रशासकीय मार्गदर्शक", region: "छत्रपती संभाजीनगर विभाग" },
+                          { role: "संघटनात्मक मार्गदर्शक", region: "कोल्हापूर विभाग" }
+                        ];
+                        return advisoryPosts.map((p, idx) => {
+                          const matched = dynamicLeaders.find(l => 
+                            (isAdvisoryBoardLeader(l)) && 
+                            ((l.role || '').includes(p.role) || (idx < 2 && isLegalAdvisorLeader(l))) &&
+                            isValidLeaderRecord(l)
+                          );
+                          const isFilled = Boolean(matched);
+                          return (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                              <td className="p-3 border border-slate-200 text-center font-mono">{idx + 1}</td>
+                              <td className="p-3 border border-slate-200 font-bold">{p.role}</td>
+                              <td className="p-3 border border-slate-200">
+                                {isFilled ? (
+                                  <span className="font-bold text-[#193568]">{matched?.name}</span>
+                                ) : (
+                                  <span className="text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">रिक्त पद</span>
+                                )}
+                              </td>
+                              <td className="p-3 border border-slate-200 text-slate-600">{isFilled ? (matched?.region || p.region) : p.region}</td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-slate-100 px-6 py-4 border-t border-[#e7ded1] flex items-center justify-between gap-4 shrink-0">
+              <p className="text-xs text-[#607184]">
+                टीप: प्रिंट बटन दाबल्यावर प्रत्येक कार्यकारिणीचे पान स्वतंत्रपणे प्रिंट होईल (4-Page Report).
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowExecutiveAuditModal(false)}
+                className="min-h-[40px] bg-[#0b1e36] text-white text-xs font-bold px-5 py-2 rounded-xl hover:bg-[#193568] cursor-pointer"
+              >
+                बंद करा
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

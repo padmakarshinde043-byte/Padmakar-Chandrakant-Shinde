@@ -205,4 +205,3 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ mode = 'state', se
     </div>
   );
 };
-

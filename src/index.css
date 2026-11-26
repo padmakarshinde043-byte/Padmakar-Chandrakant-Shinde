@@ -67,6 +67,11 @@ h1, h2, h3, .serif-marathi {
     margin: 0 !important;
     padding: 25px !important;
   }
+  .vacancy-report-page {
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+  }
 }
 
 /* Professional lightweight GPU-composited animations (transform & opacity only) */
