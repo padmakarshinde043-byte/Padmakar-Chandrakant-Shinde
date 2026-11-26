@@ -269,11 +269,11 @@ export const AboutTab: React.FC<AboutTabProps> = ({ setCurrentTab }) => {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {CORE_DEMANDS.map((demand, idx) => (
               <div
                 key={idx}
-                className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs hover:border-amber-500 transition-all flex flex-col justify-between"
+                className="bg-gradient-to-b from-white to-amber-50/30 p-5 sm:p-6 rounded-2xl border border-amber-300/60 shadow-md hover:shadow-xl hover:border-amber-500 transition-all flex flex-col justify-between group"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
