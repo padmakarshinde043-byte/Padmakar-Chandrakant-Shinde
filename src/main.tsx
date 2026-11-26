@@ -9,36 +9,18 @@ if (typeof window !== 'undefined') {
     event.preventDefault();
   });
 
-  // Unregister any previously installed legacy PWA Service Workers & purge old workbox caches
+  // Register clean offline Service Worker for 30-day caching and instant PWA performance
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker
-      .getRegistrations()
-      .then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister().catch(() => {});
-        }
-      })
-      .catch(() => {});
-  }
-
-  if ('caches' in window) {
-    caches
-      .keys()
-      .then((keys) => {
-        for (const key of keys) {
-          if (
-            key.startsWith('workbox-') ||
-            key.includes('vite-pwa') ||
-            key === 'server-uploads-images-cache' ||
-            key === 'cloudinary-images-cache' ||
-            key === 'google-fonts-cache' ||
-            key === 'gstatic-fonts-cache'
-          ) {
-            caches.delete(key).catch(() => {});
-          }
-        }
-      })
-      .catch(() => {});
+    window.addEventListener('load', () => {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => {
+          console.log('Mahasangh PWA Service Worker registered successfully:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('Mahasangh PWA Service Worker registration failed:', err);
+        });
+    });
   }
 }
 
