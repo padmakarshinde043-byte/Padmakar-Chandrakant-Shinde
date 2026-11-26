@@ -153,7 +153,7 @@ export const LeadershipTab: React.FC<LeadershipTabProps> = ({ mode = 'state', se
   );
 
   return (
-    <div className="bg-slate-50 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800">
+    <div className="bg-slate-50 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800 mhs-tab-enter">
       {/* Page Header */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-5">
         <div className="border-b-2 border-[#102a43] pb-3.5 flex flex-col sm:flex-row sm:items-end justify-between gap-4">

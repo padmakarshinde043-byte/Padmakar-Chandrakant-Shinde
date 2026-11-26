@@ -6,7 +6,7 @@ import {
   MAHARASHTRA_DISTRICTS,
 } from '../data/mahasanghData';
 import { fetchDynamicLeaders } from '../services/rkFirebaseService';
-import { matchesDistrictName } from '../utils/officialsCache';
+import { matchesDistrictName, getOfficialsFromStorageSync } from '../utils/officialsCache';
 
 interface DistrictLeadershipTabProps {
   setCurrentTab?: (tab: string) => void;
@@ -16,7 +16,7 @@ const DYNAMIC_LEADERSHIP_STORAGE_KEY = 'mahasangh_dynamic_leadership_v1';
 
 const ROW_GLOSSY_THEMES = [
   {
-    card: 'bg-gradient-to-br from-sky-100/90 via-white/95 to-sky-50/90 border-sky-200/90 shadow-[0_10px_28px_-10px_rgba(14,165,233,0.28)]',
+    card: 'bg-gradient-to-br from-sky-100/90 via-white/95 to-sky-50/90 border-sky-200/90 shadow-[0_6px_20px_-8px_rgba(14,165,233,0.22)]',
     glossTop: 'from-white/90 via-sky-50/70 to-transparent',
     headerBg: 'bg-gradient-to-r from-sky-200/55 via-sky-100/70 to-cyan-100/55 border-sky-200/80 text-sky-950',
     pinColor: 'text-sky-700',
@@ -27,7 +27,7 @@ const ROW_GLOSSY_THEMES = [
     glowOrb: 'bg-sky-200/45',
   },
   {
-    card: 'bg-gradient-to-br from-emerald-100/85 via-white/95 to-teal-50/90 border-emerald-200/90 shadow-[0_10px_28px_-10px_rgba(16,185,129,0.25)]',
+    card: 'bg-gradient-to-br from-emerald-100/85 via-white/95 to-teal-50/90 border-emerald-200/90 shadow-[0_6px_20px_-8px_rgba(16,185,129,0.2)]',
     glossTop: 'from-white/90 via-emerald-50/70 to-transparent',
     headerBg: 'bg-gradient-to-r from-emerald-200/50 via-emerald-100/70 to-teal-100/55 border-emerald-200/80 text-emerald-950',
     pinColor: 'text-emerald-700',
@@ -38,7 +38,7 @@ const ROW_GLOSSY_THEMES = [
     glowOrb: 'bg-emerald-200/40',
   },
   {
-    card: 'bg-gradient-to-br from-amber-100/85 via-white/95 to-orange-50/85 border-amber-200/90 shadow-[0_10px_28px_-10px_rgba(245,158,11,0.26)]',
+    card: 'bg-gradient-to-br from-amber-100/85 via-white/95 to-orange-50/85 border-amber-200/90 shadow-[0_6px_20px_-8px_rgba(245,158,11,0.22)]',
     glossTop: 'from-white/90 via-amber-50/70 to-transparent',
     headerBg: 'bg-gradient-to-r from-amber-200/55 via-amber-100/70 to-orange-100/55 border-amber-200/80 text-amber-950',
     pinColor: 'text-amber-700',
@@ -49,7 +49,7 @@ const ROW_GLOSSY_THEMES = [
     glowOrb: 'bg-amber-200/45',
   },
   {
-    card: 'bg-gradient-to-br from-indigo-100/80 via-white/95 to-violet-50/85 border-indigo-200/90 shadow-[0_10px_28px_-10px_rgba(99,102,241,0.24)]',
+    card: 'bg-gradient-to-br from-indigo-100/80 via-white/95 to-violet-50/85 border-indigo-200/90 shadow-[0_6px_20px_-8px_rgba(99,102,241,0.2)]',
     glossTop: 'from-white/90 via-indigo-50/70 to-transparent',
     headerBg: 'bg-gradient-to-r from-indigo-200/50 via-indigo-100/65 to-violet-100/55 border-indigo-200/80 text-indigo-950',
     pinColor: 'text-indigo-700',
@@ -60,7 +60,7 @@ const ROW_GLOSSY_THEMES = [
     glowOrb: 'bg-indigo-200/40',
   },
   {
-    card: 'bg-gradient-to-br from-rose-100/80 via-white/95 to-pink-50/85 border-rose-200/90 shadow-[0_10px_28px_-10px_rgba(244,63,94,0.22)]',
+    card: 'bg-gradient-to-br from-rose-100/80 via-white/95 to-pink-50/85 border-rose-200/90 shadow-[0_6px_20px_-8px_rgba(244,63,94,0.18)]',
     glossTop: 'from-white/90 via-rose-50/70 to-transparent',
     headerBg: 'bg-gradient-to-r from-rose-200/50 via-rose-100/65 to-pink-100/55 border-rose-200/80 text-rose-950',
     pinColor: 'text-rose-700',
@@ -71,7 +71,7 @@ const ROW_GLOSSY_THEMES = [
     glowOrb: 'bg-rose-200/40',
   },
   {
-    card: 'bg-gradient-to-br from-cyan-100/85 via-white/95 to-blue-50/85 border-cyan-200/90 shadow-[0_10px_28px_-10px_rgba(6,182,212,0.24)]',
+    card: 'bg-gradient-to-br from-cyan-100/85 via-white/95 to-blue-50/85 border-cyan-200/90 shadow-[0_6px_20px_-8px_rgba(6,182,212,0.2)]',
     glossTop: 'from-white/90 via-cyan-50/70 to-transparent',
     headerBg: 'bg-gradient-to-r from-cyan-200/55 via-cyan-100/70 to-blue-100/55 border-cyan-200/80 text-cyan-950',
     pinColor: 'text-cyan-700',
@@ -156,6 +156,118 @@ interface DistrictCapsuleRow {
   secretary?: Leader;
 }
 
+interface DistrictCardProps {
+  row: DistrictCapsuleRow;
+  theme: typeof ROW_GLOSSY_THEMES[number];
+}
+
+const DistrictCard: React.FC<DistrictCardProps> = React.memo(({ row, theme }) => {
+  const pres = row.president;
+  const sec = row.secretary;
+  const hasPresName = pres && !isPlaceholderLeaderName(pres.name);
+  const hasSecName = sec && !isPlaceholderLeaderName(sec.name);
+
+  return (
+    <article
+      className={`relative rounded-3xl border backdrop-blur-xs p-4 sm:p-4.5 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl ${theme.card}`}
+    >
+      {/* Glossy specular top highlight */}
+      <div
+        className={`pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b ${theme.glossTop} opacity-80`}
+      />
+      {/* Soft ambient gloss orb */}
+      <div
+        className={`pointer-events-none -right-8 -bottom-8 w-28 h-28 rounded-full blur-2xl absolute ${theme.glowOrb}`}
+      />
+
+      {/* Top District Header Banner */}
+      <div
+        className={`relative z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-2xl border backdrop-blur-sm mb-3.5 shadow-inner ${theme.headerBg}`}
+      >
+        <MapPin className={`w-4 h-4 shrink-0 ${theme.pinColor}`} />
+        <h2 className="font-serifDevanagari text-base sm:text-lg font-extrabold tracking-tight text-center leading-snug">
+          {row.districtTitle}
+        </h2>
+      </div>
+
+      {/* Dual Portrait Row: Left = जिल्हाध्यक्ष, Right = जिल्हा सरचिटणीस (Photo and Name only as requested) */}
+      <div className="relative z-10 grid grid-cols-2 gap-3 items-stretch">
+        {/* Left Slot: जिल्हाध्यक्ष */}
+        <div
+          className={`rounded-2xl border p-2.5 flex flex-col items-center text-center shadow-sm backdrop-blur-sm ${theme.slotBg}`}
+        >
+          <div
+            className={`w-full aspect-[4/4.5] rounded-xl overflow-hidden bg-slate-100 mb-2.5 flex items-center justify-center shrink-0 ${theme.photoRing}`}
+          >
+            {pres?.photo ? (
+              <img
+                src={pres.photo}
+                alt={hasPresName ? pres!.name : `${row.districtTitle} जिल्हाध्यक्ष`}
+                className="w-full h-full object-cover object-top"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/80 px-1">
+                <ImageIcon className="w-7 h-7 opacity-40" />
+                <span className="text-[10px] font-bold mt-1 text-slate-400">फोटो नाही</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 w-full flex flex-col justify-between items-center gap-1.5">
+            <h3 className="font-serifDevanagari text-sm sm:text-[15px] font-bold text-[#0b1e36] leading-snug line-clamp-2">
+              {hasPresName ? pres!.name : '-'}
+            </h3>
+            <span
+              className={`inline-block text-[11px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${theme.roleBadgeLeft}`}
+            >
+              जिल्हाध्यक्ष
+            </span>
+          </div>
+        </div>
+
+        {/* Right Slot: जिल्हा सरचिटणीस */}
+        <div
+          className={`rounded-2xl border p-2.5 flex flex-col items-center text-center shadow-sm backdrop-blur-sm ${theme.slotBg}`}
+        >
+          <div
+            className={`w-full aspect-[4/4.5] rounded-xl overflow-hidden bg-slate-100 mb-2.5 flex items-center justify-center shrink-0 ${theme.photoRing}`}
+          >
+            {sec?.photo ? (
+              <img
+                src={sec.photo}
+                alt={hasSecName ? sec!.name : `${row.districtTitle} जिल्हा सरचिटणीस`}
+                className="w-full h-full object-cover object-top"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/80 px-1">
+                <ImageIcon className="w-7 h-7 opacity-40" />
+                <span className="text-[10px] font-bold mt-1 text-slate-400">फोटो नाही</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 w-full flex flex-col justify-between items-center gap-1.5">
+            <h3 className="font-serifDevanagari text-sm sm:text-[15px] font-bold text-[#0b1e36] leading-snug line-clamp-2">
+              {hasSecName ? sec!.name : '-'}
+            </h3>
+            <span
+              className={`inline-block text-[11px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${theme.roleBadgeRight}`}
+            >
+              जिल्हा सरचिटणीस
+            </span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+});
+
+DistrictCard.displayName = 'DistrictCard';
+
 export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ setCurrentTab }) => {
   const [districtSearch, setDistrictSearch] = useState('');
   const [allLeaders, setAllLeaders] = useState<Leader[]>(() => {
@@ -201,11 +313,43 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
   }, []);
 
   const districtRows = useMemo<DistrictCapsuleRow[]>(() => {
-    const presidents = allLeaders.filter(
-      (l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district')
+    // 1. Fetch officials from AppointmentsTab storage (जिल्हा पदाधिकारी) for automatic sync
+    const officials = getOfficialsFromStorageSync();
+    const officialLeaders: Leader[] = officials
+      .filter((o) => {
+        const title = (o.appointedPost || '').trim();
+        return (
+          title === 'जिल्हा अध्यक्ष' ||
+          title === 'जिल्हा सरचिटणीस' ||
+          title.includes('जिल्हा अध्यक्ष') ||
+          title.includes('जिल्हा सरचिटणीस')
+        );
+      })
+      .map((o, i) => {
+        const fullName = `${o.salutation || ''} ${o.firstName} ${o.middleName || ''} ${o.lastName}`
+          .replace(/\s+/g, ' ')
+          .trim();
+        const cat = (o.appointedPost || '').includes('सरचिटणीस') ? 'जिल्हा सरचिटणीस' : 'जिल्हा अध्यक्ष';
+        return {
+          id: o.id || `off-${i}`,
+          name: fullName,
+          role: o.appointedPost || cat,
+          region: o.district || '',
+          education: '',
+          phone: o.mobile || '-',
+          photo: o.photo || '',
+          category: cat,
+        };
+      });
+
+    // Merge officialLeaders (from AppointmentsTab) and allLeaders (from Leadership management)
+    const combinedLeaders = [...officialLeaders, ...allLeaders];
+
+    const presidents = combinedLeaders.filter(
+      (l) => l && (l.category === 'जिल्हा अध्यक्ष' || l.category === 'district' || (l.role || '').includes('जिल्हा अध्यक्ष'))
     );
-    const secretaries = allLeaders.filter(
-      (l) => l && l.category === 'जिल्हा सरचिटणीस'
+    const secretaries = combinedLeaders.filter(
+      (l) => l && (l.category === 'जिल्हा सरचिटणीस' || (l.role || '').includes('जिल्हा सरचिटणीस'))
     );
 
     const findMatchingSecretary = (region: string, usedSecIds: Set<string>): Leader | undefined => {
@@ -292,7 +436,7 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
   }, [districtRows, districtSearch]);
 
   return (
-    <div className="bg-gradient-to-b from-slate-50 via-[#f8fafc] to-slate-100 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800">
+    <div className="bg-gradient-to-b from-slate-50 via-[#f8fafc] to-slate-100 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800 mhs-tab-enter">
       {/* Page Header */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-5">
         <div className="border-b-2 border-[#102a43] pb-3.5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
@@ -355,111 +499,9 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
             {filteredRows.map((row, idx) => {
-              // Each desktop 3-card row gets its own distinct soft pastel glossy color
               const rowIndex = Math.floor(idx / 3);
               const theme = ROW_GLOSSY_THEMES[rowIndex % ROW_GLOSSY_THEMES.length];
-
-              const pres = row.president;
-              const sec = row.secretary;
-              const hasPresName = pres && !isPlaceholderLeaderName(pres.name);
-              const hasSecName = sec && !isPlaceholderLeaderName(sec.name);
-
-              return (
-                <article
-                  key={row.districtKey + idx}
-                  className={`relative rounded-3xl border backdrop-blur-md p-4 sm:p-4.5 overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl ${theme.card}`}
-                >
-                  {/* Glossy specular top highlight */}
-                  <div
-                    className={`pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b ${theme.glossTop} opacity-80`}
-                  />
-                  {/* Soft ambient gloss orb */}
-                  <div
-                    className={`pointer-events-none -right-8 -bottom-8 w-28 h-28 rounded-full blur-2xl absolute ${theme.glowOrb}`}
-                  />
-
-                  {/* Top District Header Banner */}
-                  <div
-                    className={`relative z-10 flex items-center justify-center gap-2 px-3 py-2 rounded-2xl border backdrop-blur-sm mb-3.5 shadow-inner ${theme.headerBg}`}
-                  >
-                    <MapPin className={`w-4 h-4 shrink-0 ${theme.pinColor}`} />
-                    <h2 className="font-serifDevanagari text-base sm:text-lg font-extrabold tracking-tight text-center leading-snug">
-                      {row.districtTitle}
-                    </h2>
-                  </div>
-
-                  {/* Dual Portrait Row: Left = जिल्हाध्यक्ष, Right = जिल्हा सरचिटणीस */}
-                  <div className="relative z-10 grid grid-cols-2 gap-3 items-stretch">
-                    {/* Left Slot: जिल्हाध्यक्ष */}
-                    <div
-                      className={`rounded-2xl border p-2.5 flex flex-col items-center text-center shadow-sm backdrop-blur-sm ${theme.slotBg}`}
-                    >
-                      <div
-                        className={`w-full aspect-[4/4.5] rounded-xl overflow-hidden bg-slate-100 mb-2.5 flex items-center justify-center shrink-0 ${theme.photoRing}`}
-                      >
-                        {pres?.photo ? (
-                          <img
-                            src={pres.photo}
-                            alt={hasPresName ? pres!.name : `${row.districtTitle} जिल्हाध्यक्ष`}
-                            className="w-full h-full object-cover object-top"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/80 px-1">
-                            <ImageIcon className="w-7 h-7 opacity-40" />
-                            <span className="text-[10px] font-bold mt-1 text-slate-400">फोटो नाही</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 w-full flex flex-col justify-between items-center gap-1.5">
-                        <h3 className="font-serifDevanagari text-sm sm:text-[15px] font-bold text-[#0b1e36] leading-snug line-clamp-2">
-                          {hasPresName ? pres!.name : '-'}
-                        </h3>
-                        <span
-                          className={`inline-block text-[11px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${theme.roleBadgeLeft}`}
-                        >
-                          जिल्हाध्यक्ष
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Right Slot: जिल्हा सरचिटणीस */}
-                    <div
-                      className={`rounded-2xl border p-2.5 flex flex-col items-center text-center shadow-sm backdrop-blur-sm ${theme.slotBg}`}
-                    >
-                      <div
-                        className={`w-full aspect-[4/4.5] rounded-xl overflow-hidden bg-slate-100 mb-2.5 flex items-center justify-center shrink-0 ${theme.photoRing}`}
-                      >
-                        {sec?.photo ? (
-                          <img
-                            src={sec.photo}
-                            alt={hasSecName ? sec!.name : `${row.districtTitle} जिल्हा सरचिटणीस`}
-                            className="w-full h-full object-cover object-top"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100/80 px-1">
-                            <ImageIcon className="w-7 h-7 opacity-40" />
-                            <span className="text-[10px] font-bold mt-1 text-slate-400">फोटो नाही</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 w-full flex flex-col justify-between items-center gap-1.5">
-                        <h3 className="font-serifDevanagari text-sm sm:text-[15px] font-bold text-[#0b1e36] leading-snug line-clamp-2">
-                          {hasSecName ? sec!.name : '-'}
-                        </h3>
-                        <span
-                          className={`inline-block text-[11px] sm:text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${theme.roleBadgeRight}`}
-                        >
-                          जिल्हा सरचिटणीस
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
+              return <DistrictCard key={row.districtKey + idx} row={row} theme={theme} />;
             })}
           </div>
         )}
