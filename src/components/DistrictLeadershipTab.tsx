@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Image as ImageIcon, MapPin, Users, LayoutGrid, Table as TableIcon } from 'lucide-react';
+import { Search, Image as ImageIcon, MapPin, Users } from 'lucide-react';
 import {
   Leader,
   DEFAULT_AUTHORITATIVE_LEADERS,
@@ -217,8 +217,8 @@ const DistrictCard: React.FC<DistrictCardProps> = React.memo(({ row, theme }) =>
             )}
           </div>
 
-          <div className="flex-1 w-full flex flex-col justify-between items-center gap-1.5">
-            <h3 className="font-serifDevanagari text-sm sm:text-[15px] font-bold text-[#0b1e36] leading-snug line-clamp-2">
+          <div className="flex-1 w-full flex flex-col justify-between items-center gap-2 pt-0.5">
+            <h3 className="w-full font-serifDevanagari text-[15px] sm:text-[17px] font-black text-[#020c1b] leading-snug tracking-normal break-words bg-white/95 rounded-lg px-2 py-1.5 border border-slate-200/80 shadow-2xs">
               {hasPresName ? pres!.name : '-'}
             </h3>
             <span
@@ -253,8 +253,8 @@ const DistrictCard: React.FC<DistrictCardProps> = React.memo(({ row, theme }) =>
             )}
           </div>
 
-          <div className="flex-1 w-full flex flex-col justify-between items-center gap-1.5">
-            <h3 className="font-serifDevanagari text-sm sm:text-[15px] font-bold text-[#0b1e36] leading-snug line-clamp-2">
+          <div className="flex-1 w-full flex flex-col justify-between items-center gap-2 pt-0.5">
+            <h3 className="w-full font-serifDevanagari text-[15px] sm:text-[17px] font-black text-[#020c1b] leading-snug tracking-normal break-words bg-white/95 rounded-lg px-2 py-1.5 border border-slate-200/80 shadow-2xs">
               {hasSecName ? sec!.name : '-'}
             </h3>
             <span
@@ -272,7 +272,6 @@ const DistrictCard: React.FC<DistrictCardProps> = React.memo(({ row, theme }) =>
 DistrictCard.displayName = 'DistrictCard';
 
 export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ setCurrentTab }) => {
-  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [districtSearch, setDistrictSearch] = useState('');
   const [allLeaders, setAllLeaders] = useState<Leader[]>(() => {
     try {
@@ -478,35 +477,7 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* View Mode Toggle */}
-            <div className="flex items-center bg-slate-200/80 p-1 rounded-xl border border-slate-300">
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'cards'
-                    ? 'bg-[#0b1e36] text-amber-300 shadow-xs'
-                    : 'text-slate-700 hover:text-slate-900'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>कार्ड व्ह्यू</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  viewMode === 'table'
-                    ? 'bg-[#0b1e36] text-amber-300 shadow-xs'
-                    : 'text-slate-700 hover:text-slate-900'
-                }`}
-              >
-                <TableIcon className="w-3.5 h-3.5" />
-                <span>तक्ता आढावा (रिक्त पदे)</span>
-              </button>
-            </div>
-
-            <div className="relative w-full sm:w-60">
+            <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -549,67 +520,13 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
           <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center text-slate-500 shadow-sm">
             कोणताही जिल्हा किंवा पदाधिकारी आढळला नाही.
           </div>
-        ) : viewMode === 'cards' ? (
+        ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
             {filteredRows.map((row, idx) => {
               const rowIndex = Math.floor(idx / 3);
               const theme = ROW_GLOSSY_THEMES[rowIndex % ROW_GLOSSY_THEMES.length];
               return <DistrictCard key={row.districtKey + idx} row={row} theme={theme} />;
             })}
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs bg-white">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#0b1e36] text-amber-300 text-xs sm:text-sm font-bold uppercase tracking-wider">
-                  <th className="p-3.5 text-center w-16">अ.क्र.</th>
-                  <th className="p-3.5">जिल्हा (District)</th>
-                  <th className="p-3.5">जिल्हाध्यक्ष (President)</th>
-                  <th className="p-3.5">जिल्हा सरचिटणीस (Secretary)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-sm">
-                {filteredRows.map((row, idx) => {
-                  const presName = row.president?.name;
-                  const secName = row.secretary?.name;
-                  const hasPres = presName && !isPlaceholderLeaderName(presName);
-                  const hasSec = secName && !isPlaceholderLeaderName(secName);
-
-                  return (
-                    <tr key={row.districtKey + idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-3.5 text-center font-mono font-bold text-slate-500">
-                        {idx + 1}
-                      </td>
-                      <td className="p-3.5 font-bold font-serifDevanagari text-[#0b1e36]">
-                        {row.districtTitle}
-                      </td>
-                      <td className="p-3.5">
-                        {hasPres ? (
-                          <span className="font-bold text-emerald-900 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 inline-block font-serifDevanagari">
-                            {presName}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                            ⚠️ रिक्त पद
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5">
-                        {hasSec ? (
-                          <span className="font-bold text-cyan-900 bg-cyan-50 px-3 py-1 rounded-lg border border-cyan-200 inline-block font-serifDevanagari">
-                            {secName}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
-                            ⚠️ रिक्त पद
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         )}
       </div>

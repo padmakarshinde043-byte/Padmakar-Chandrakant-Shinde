@@ -5,20 +5,22 @@ import './index.css';
 
 // Prevent browser "Install to Home Screen" / "Install App" prompts across mobile & desktop
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeinstallprompt', (event) => {
-    event.preventDefault();
-  });
+  window.addEventListener(
+    'beforeinstallprompt',
+    (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    { capture: true }
+  );
 
-  // Register clean offline Service Worker for 30-day caching and instant PWA performance
+  // Register Service Worker for Web Push Notifications and offline caching
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker
-        .register('/sw.js')
-        .then((reg) => {
-          console.log('Mahasangh PWA Service Worker registered successfully:', reg.scope);
-        })
+        .register('/sw.js', { scope: '/' })
         .catch((err) => {
-          console.warn('Mahasangh PWA Service Worker registration failed:', err);
+          console.warn('Mahasangh Service Worker registration failed:', err);
         });
     });
   }

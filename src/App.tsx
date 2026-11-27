@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { HomeTab } from './components/HomeTab';
 import { OfflineIndicator } from './components/PWAInstallButton';
+import { PushNotificationPrompt } from './components/PushNotificationPrompt';
 import { WebsiteFeedbackModal } from './components/WebsiteFeedbackModal';
 
 const loadAboutTab = () => import('./components/AboutTab');
@@ -877,6 +878,9 @@ export function App() {
 
       <Footer setCurrentTab={navigateToTab} />
       <OfflineIndicator />
+      <PushNotificationPrompt
+        disabled={currentTab === 'admin' || currentTab === 'center_update'}
+      />
       <WebsiteFeedbackModal
         delayMs={7000}
         disabled={currentTab === 'admin' || currentTab === 'center_update'}

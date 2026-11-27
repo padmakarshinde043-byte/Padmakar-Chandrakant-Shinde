@@ -135,6 +135,13 @@ import {
   matchRazorpayPaymentsWithPendingApps,
   RazorpayApiPaymentLike,
 } from './src/utils/razorpaySyncMatcher';
+import {
+  getVapidPublicKey,
+  upsertPushSubscription,
+  removePushSubscription,
+  getPushStats,
+  sendPushBroadcast,
+} from './src/utils/webPushService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -853,7 +860,7 @@ app.use(
           'https://*.google.com',
         ],
         workerSrc: ["'self'", 'blob:'],
-        manifestSrc: ["'self'"],
+        manifestSrc: ["'none'"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],
         upgradeInsecureRequests: null,
@@ -2139,6 +2146,77 @@ app.post('/api/whatsapp/broadcast', requireSuperAdmin, async (req, res) => {
     res.json({ status: 'success', ...summary });
   } catch (err: any) {
     res.status(500).json({ status: 'error', message: err?.message || 'WhatsApp प्रसारण करताना त्रुटी आली.' });
+  }
+});
+
+// =========================================================================
+// Web Push Notification Routes (/api/push/*) — Works on Web & Play Store TWA
+// =========================================================================
+
+app.get('/api/push/public-key', async (_req, res) => {
+  try {
+    const publicKey = await getVapidPublicKey();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ status: 'ok', publicKey });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Unable to load VAPID key' });
+  }
+});
+
+app.post('/api/push/subscribe', appSubmitLimiter, async (req, res) => {
+  try {
+    const sub = req.body?.subscription || req.body;
+    const ua = typeof req.body?.userAgent === 'string' ? req.body.userAgent : req.get('user-agent') || '';
+    const result = await upsertPushSubscription(sub, ua);
+    res.json({ status: 'success', ...result });
+  } catch (err: any) {
+    res.status(400).json({ status: 'error', message: err?.message || 'Invalid push subscription' });
+  }
+});
+
+app.post('/api/push/unsubscribe', appSubmitLimiter, async (req, res) => {
+  try {
+    const endpoint = String(req.body?.endpoint || '').trim();
+    const result = await removePushSubscription(endpoint);
+    res.json({ status: 'success', ...result });
+  } catch (err: any) {
+    res.status(400).json({ status: 'error', message: err?.message || 'Unsubscribe failed' });
+  }
+});
+
+app.get('/api/push/stats', requireSuperAdmin, async (_req, res) => {
+  try {
+    const stats = await getPushStats();
+    res.json({ status: 'ok', ...stats });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Failed to load push stats' });
+  }
+});
+
+app.post('/api/push/send', requireSuperAdmin, async (req, res) => {
+  try {
+    const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+    const title = String(req.body?.title || '').trim();
+    const body = String(req.body?.body || '').trim();
+    const url = typeof req.body?.url === 'string' ? req.body.url : '/';
+
+    if (!title || !body) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'कृपया नोटिफिकेशनचे शीर्षक आणि संदेश दोन्ही भरा.',
+      });
+    }
+
+    const log = await sendPushBroadcast({
+      title,
+      body,
+      url,
+      sentBy: session?.email || 'super_admin',
+    });
+
+    res.json({ status: 'success', log });
+  } catch (err: any) {
+    res.status(400).json({ status: 'error', message: err?.message || 'पुश नोटिफिकेशन पाठवताना त्रुटी आली.' });
   }
 });
 
@@ -3900,27 +3978,29 @@ async function startServer() {
     return res.status(404).type('text/plain').send('Sitemap not found');
   });
 
-  // Explicitly disable PWA manifest so browsers never show "Install to Home Screen" or "Open in App"
-  app.get('/manifest.webmanifest', (_req, res) => {
+  // Explicitly disable PWA manifest endpoints so browsers never show "Install App" or "Add to Home Screen" buttons
+  app.get(['/manifest.webmanifest', '/manifest.json', '/site.webmanifest'], (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.status(404).type('text/plain').send('Not Found');
   });
 
-  // Serve a minimal self-unregistering cleanup Service Worker for returning visitors who had the legacy PWA installed
-  const SELF_UNREGISTER_SW = `self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
-      .then(() => self.registration.unregister())
-      .catch(() => {})
-  );
-});
-`;
+  // Serve the real Service Worker (public/sw.js or dist/sw.js) for Web Push Notifications & offline caching
   app.get('/sw.js', (_req, res) => {
+    const candidates = [
+      path.resolve(process.cwd(), 'dist', 'sw.js'),
+      path.resolve(process.cwd(), 'public', 'sw.js'),
+    ];
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Service-Worker-Allowed', '/');
+        return res.sendFile(p);
+      }
+    }
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.status(200).send(SELF_UNREGISTER_SW);
+    return res.status(404).send('// Service worker not found');
   });
   app.get('/registerSW.js', (_req, res) => {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');

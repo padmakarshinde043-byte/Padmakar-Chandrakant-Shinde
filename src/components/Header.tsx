@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { ORG_DETAILS } from '../data/mahasanghData';
+import { HeaderPushBellButton } from './PushNotificationPrompt';
 
 interface HeaderProps {
   currentTab: string;
@@ -92,8 +93,8 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
           </span>
         </button>
 
-        {/* Right Spacer: Preserves optical alignment for centered title */}
-        <div className="min-w-12 min-[380px]:min-w-14 sm:min-w-16 md:min-w-20 shrink-0" aria-hidden="true" />
+        {/* Right: Subtle Push Notification Bell Toggle (also balances centered title) */}
+        <HeaderPushBellButton />
       </div>
 
       {/* 2. Submenu Bar (सब मेनू पट्टी - आकर्षक, ठळक अक्षरे व सुंदर रंगसंगती) */}

@@ -6,7 +6,7 @@ import {
   UserPlus, Shield, MessageSquare, Mail, PhoneCall, RefreshCw,
   Cloud, AlertCircle, RotateCcw, Calendar,
   ArrowUp, ArrowDown, ChevronUp, ChevronDown, Menu, Play, Video,
-  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy, Star, Printer
+  Send, Inbox, Reply, Smartphone, Globe, Paperclip, Database, Wrench, Link2, Copy, Star, Printer, BellRing
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { AdminRatingPanel } from './AdminRatingPanel';
@@ -108,6 +108,7 @@ import { MemberEditManager } from './MemberEditManager';
 import { MembershipIdCardPreview } from './MembershipIdCardPreview';
 import { AdminBackupRestorePanel } from './AdminBackupRestorePanel';
 import { AdminWhatsappBroadcastPanel } from './AdminWhatsappBroadcastPanel';
+import { AdminPushNotificationPanel } from './AdminPushNotificationPanel';
 import {
   authApiRequest,
   sqlApiRequest,
@@ -208,6 +209,7 @@ type AdminSubTabKey =
   | 'district_leadership'
   | 'master_studio'
   | 'whatsapp_broadcast'
+  | 'push_notifications'
   | 'backup_restore'
   | 'add_news'
   | 'latest_banners'
@@ -2996,6 +2998,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       label: 'WhatsApp',
       shortLabel: 'WhatsApp',
       icon: <Smartphone className="w-4 h-4 shrink-0 text-emerald-600" />,
+      allowed: Boolean(currentUser?.isSuperAdmin),
+    },
+    {
+      key: 'push_notifications',
+      label: 'Push Alerts',
+      shortLabel: 'Push',
+      icon: <BellRing className="w-4 h-4 shrink-0 text-amber-600" />,
       allowed: Boolean(currentUser?.isSuperAdmin),
     },
     {
@@ -8154,6 +8163,11 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 dynamicLeaders={dynamicLeaders}
                 cloudinaryConfig={cloudinaryConfig}
               />
+            )}
+
+            {/* Super Admin Only: Web & App Push Notification Broadcast Panel */}
+            {activeAdminSubTab === 'push_notifications' && currentUser?.isSuperAdmin && (
+              <AdminPushNotificationPanel />
             )}
 
             {/* Super Admin Only: 1-Click Full Website & Database Backup / Restore */}
