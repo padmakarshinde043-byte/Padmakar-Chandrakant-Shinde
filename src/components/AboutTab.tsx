@@ -52,19 +52,13 @@ export const AboutTab: React.FC<AboutTabProps> = ({ setCurrentTab }) => {
   };
 
   return (
-    <div className="bg-slate-50 pt-3 pb-8 sm:pt-4 sm:pb-10 text-slate-800">
+    <div className="bg-slate-50 pt-1.5 pb-6 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-4">
-        <div className="border-b border-slate-200 pb-3">
-          <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-            अधिकृत ओळख, ध्येय व वैधानिक स्वरूप
-          </span>
-          <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
-            आमच्याबद्दल — महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघ
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-2.5">
+        <div className="border-b border-slate-200/80 pb-2">
+          <h1 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#0b1e36]">
+            आमच्याबद्दल
           </h1>
-          <p className="text-base text-slate-700 mt-2 max-w-3xl leading-relaxed">
-            {ORG_DETAILS.tagline} — राज्यातील 34 जिल्हे व 350+ तालुक्यांतील प्राथमिक शिक्षण विभागांतर्गत कार्यरत केंद्रप्रमुख आणि शिक्षण विस्तार अधिकाऱ्यांना संघटित, तंत्रसक्षम आणि सन्मानित करणारे शासन नोंदणीकृत अधिकृत राज्यस्तरीय व्यासपीठ.
-          </p>
         </div>
       </div>
 

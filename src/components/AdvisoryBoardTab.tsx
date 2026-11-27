@@ -100,19 +100,13 @@ export const AdvisoryBoardTab: React.FC = () => {
   );
 
   return (
-    <div className="bg-slate-50 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800">
+    <div className="bg-slate-50 pt-1.5 pb-6 text-slate-800">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-6">
-        <div className="border-b-2 border-[#102a43] pb-4">
-          <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-            अधिकृत सल्लागार व मार्गदर्शन कक्ष
-          </span>
-          <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-2.5">
+        <div className="border-b border-[#102a43]/30 pb-2">
+          <h1 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#0b1e36]">
             राज्य सल्लागार मंडळ
           </h1>
-          <p className="text-base text-slate-600 mt-2 max-w-2xl leading-relaxed">
-            महाराष्ट्र राज्य केंद्रप्रमुख व अधिकारी महासंघास कायदेविषयक, प्रशासकीय व शैक्षणिक दिशादर्शन करणारे सन्माननीय सल्लागार व मार्गदर्शक.
-          </p>
         </div>
       </div>
 

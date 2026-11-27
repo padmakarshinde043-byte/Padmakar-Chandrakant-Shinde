@@ -763,20 +763,14 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   };
 
   return (
-    <div className="bg-[#f5f7fa] pt-3 pb-6 sm:pt-4 sm:pb-8">
+    <div className="bg-[#f5f7fa] pt-1.5 pb-6">
       <div className="max-w-[1000px] mx-auto px-4">
         {/* Institutional Page Masthead & Standard Portal Navigation Tabs */}
-        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-4 overflow-hidden">
-          <div className="px-4 py-3.5 sm:px-6 sm:py-4">
-            <div className="text-xs sm:text-sm font-semibold text-slate-600 mb-1">
-              {ORG_DETAILS.name} · आजीवन सभासद कक्ष
-            </div>
-            <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-bold text-[#193568] leading-snug">
+        <div className="bg-white border border-slate-300 border-t-4 border-t-[#193568] rounded-md mb-2.5 overflow-hidden">
+          <div className="px-4 py-2.5 sm:px-6 sm:py-3">
+            <h1 className="font-serifDevanagari text-xl sm:text-2xl font-bold text-[#193568] leading-snug">
               सदस्यत्व नोंदणी व अधिकृत सभासद यादी
             </h1>
-            <p className="text-base text-slate-600 mt-2 leading-relaxed max-w-3xl">
-              नोंदणीकृत सभासद यादी, अर्जाची स्थिती व आय-कार्ड डाऊनलोड आणि नवीन आजीवन सदस्यत्व अर्जाची अधिकृत सुविधा.
-            </p>
           </div>
 
           {/* Standard Horizontal Portal Section Tabs */}

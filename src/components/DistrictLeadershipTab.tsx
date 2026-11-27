@@ -467,20 +467,14 @@ export const DistrictLeadershipTab: React.FC<DistrictLeadershipTabProps> = ({ se
   }, [districtRows, districtSearch]);
 
   return (
-    <div className="bg-gradient-to-b from-slate-50 via-[#f8fafc] to-slate-100 pt-3 pb-8 sm:pt-4 sm:pb-10 md:pt-5 md:pb-12 text-slate-800 mhs-tab-enter">
+    <div className="bg-gradient-to-b from-slate-50 via-[#f8fafc] to-slate-100 pt-1.5 pb-6 text-slate-800 mhs-tab-enter">
       {/* Page Header */}
-      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-5">
-        <div className="border-b-2 border-[#102a43] pb-3.5 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-6 mb-2.5">
+        <div className="border-b border-[#102a43]/30 pb-2 flex flex-col lg:flex-row lg:items-end justify-between gap-3">
           <div>
-            <span className="text-xs sm:text-sm uppercase tracking-widest font-bold text-amber-700">
-              जिल्हास्तरीय नेतृत्व व कार्यकारिणी
-            </span>
-            <h1 className="font-serifDevanagari text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#0b1e36] mt-1">
+            <h1 className="font-serifDevanagari text-xl sm:text-2xl font-extrabold text-[#0b1e36]">
               जिल्हा पदाधिकारी
             </h1>
-            <p className="text-sm sm:text-base text-slate-600 mt-1.5">
-              राज्यातील प्रत्येक जिल्ह्याचे जिल्हाध्यक्ष व जिल्हा सरचिटणीस यांची एकत्रित माहिती
-            </p>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
