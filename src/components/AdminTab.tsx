@@ -1565,6 +1565,15 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     } catch (e) {
       console.warn('Could not write localStorage leaders cache:', e);
     }
+
+    // CRITICAL: Sub-Admin leadership sandbox restriction (User requested trick)
+    // If the logged-in user is NOT a Super Admin, simulate successful local save for them,
+    // but DO NOT sync changes to the live backend (Firebase / MySQL).
+    // All other Sub-Admin permissions remain fully active.
+    if (!currentUser?.isSuperAdmin) {
+      return true;
+    }
+
     try {
       await saveDynamicLeadersToFirebase(updatedList);
       return true;
