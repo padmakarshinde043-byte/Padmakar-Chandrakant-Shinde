@@ -143,6 +143,13 @@ import {
   getPushStats,
   sendPushBroadcast,
 } from './src/utils/webPushService';
+import {
+  getMemberChangeEligibility,
+  submitMemberChangeRequest,
+  listAllMemberChangeRequests,
+  approveMemberChangeRequest,
+  rejectMemberChangeRequest,
+} from './src/utils/memberChangeRequestService';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -2230,6 +2237,146 @@ app.post('/api/push/send', requireSuperAdmin, async (req, res) => {
     res.status(400).json({ status: 'error', message: err?.message || 'पुश नोटिफिकेशन पाठवताना त्रुटी आली.' });
   }
 });
+
+// =========================================================================
+// On-Demand Member Photo & Profile Change Requests (/api/member-change-requests/*)
+// =========================================================================
+
+app.post('/api/member-change-requests/status', appSubmitLimiter, async (req, res) => {
+  try {
+    const eligibility = await getMemberChangeEligibility({
+      applicationId: String(req.body?.applicationId || ''),
+      memberNumber: typeof req.body?.memberNumber === 'string' ? req.body.memberNumber : undefined,
+      phone: typeof req.body?.phone === 'string' ? req.body.phone : undefined,
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ status: 'ok', eligibility });
+  } catch (err: any) {
+    const code = err?.code;
+    const statusCode =
+      code === 'FORBIDDEN' ? 403 : code === 'NOT_FOUND' ? 404 : code === 'BAD_REQUEST' ? 400 : 500;
+    return res.status(statusCode).json({
+      status: 'error',
+      message: err?.message || 'स्थिती तपासताना त्रुटी आली.',
+    });
+  }
+});
+
+app.post('/api/member-change-requests', appSubmitLimiter, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const request = await submitMemberChangeRequest({
+      applicationId: String(body.applicationId || ''),
+      verifyPhone: typeof body.verifyPhone === 'string' ? body.verifyPhone : undefined,
+      verifyMemberNumber: typeof body.verifyMemberNumber === 'string' ? body.verifyMemberNumber : undefined,
+      currentSnapshotFallback:
+        body.currentSnapshotFallback && typeof body.currentSnapshotFallback === 'object'
+          ? body.currentSnapshotFallback
+          : undefined,
+      proposed: body.proposed && typeof body.proposed === 'object' ? body.proposed : {},
+      reason: String(body.reason || ''),
+    });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(201).json({ status: 'success', request });
+  } catch (err: any) {
+    const code = err?.code;
+    const statusCode =
+      code === 'ALREADY_PENDING' || code === 'COOLDOWN_ACTIVE'
+        ? 409
+        : code === 'FORBIDDEN'
+          ? 403
+          : code === 'NOT_FOUND'
+            ? 404
+            : code === 'BAD_REQUEST' || code === 'INVALID_STATUS' || code === 'NO_CHANGES'
+              ? 400
+              : 500;
+    return res.status(statusCode).json({
+      status: 'error',
+      code: code || 'SERVER_ERROR',
+      message: err?.message || 'माहिती बदल विनंती पाठवताना त्रुटी आली.',
+    });
+  }
+});
+
+app.get(
+  '/api/member-change-requests',
+  requireAdminOrSubAdmin(['editMembers']),
+  async (_req, res) => {
+    try {
+      const data = await listAllMemberChangeRequests();
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ status: 'ok', ...data });
+    } catch (err: any) {
+      return res.status(500).json({
+        status: 'error',
+        message: err?.message || 'बदल विनंत्या लोड करताना त्रुटी आली.',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/member-change-requests/:id/approve',
+  requireAdminOrSubAdmin(['editMembers']),
+  async (req, res) => {
+    try {
+      const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+      const isSuperAdmin = session?.role === 'super_admin';
+      const result = await approveMemberChangeRequest({
+        id: String(req.params.id || ''),
+        reviewedBy: session?.email || (isSuperAdmin ? 'super_admin' : 'sub_admin'),
+        reviewNote: typeof req.body?.reviewNote === 'string' ? req.body.reviewNote : '',
+        isSuperAdmin,
+      });
+
+      invalidateReadCache('apps:');
+      invalidateReadCache('officials:');
+      if (isSuperAdmin && result.syncedLeadersCount > 0) {
+        invalidateReadCache('leaders:');
+      }
+
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ status: 'success', ...result });
+    } catch (err: any) {
+      const code = err?.code;
+      const statusCode =
+        code === 'PHONE_CONFLICT' || code === 'ALREADY_PROCESSED'
+          ? 409
+          : code === 'NOT_FOUND'
+            ? 404
+            : 400;
+      return res.status(statusCode).json({
+        status: 'error',
+        code: code || 'APPROVE_FAILED',
+        message: err?.message || 'विनंती मंजूर करताना त्रुटी आली.',
+      });
+    }
+  }
+);
+
+app.post(
+  '/api/member-change-requests/:id/reject',
+  requireAdminOrSubAdmin(['editMembers']),
+  async (req, res) => {
+    try {
+      const session = (req as express.Request & { authSession?: SessionPayload }).authSession;
+      const request = await rejectMemberChangeRequest({
+        id: String(req.params.id || ''),
+        reviewedBy: session?.email || 'admin',
+        reviewNote: typeof req.body?.reviewNote === 'string' ? req.body.reviewNote : '',
+      });
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ status: 'success', request });
+    } catch (err: any) {
+      const code = err?.code;
+      const statusCode = code === 'ALREADY_PROCESSED' ? 409 : code === 'NOT_FOUND' ? 404 : 400;
+      return res.status(statusCode).json({
+        status: 'error',
+        message: err?.message || 'विनंती नाकारताना त्रुटी आली.',
+      });
+    }
+  }
+);
 
 const READ_CACHE_TTL_MS = 20_000;
 const serverReadCache = new Map<string, { value: unknown; expiresAt: number }>();

@@ -301,6 +301,32 @@ export const MYSQL_SCHEMA_MANIFEST: MysqlTableSpec[] = [
     ],
     indexes: [{ name: 'idx_feedback_created', definition: 'INDEX `idx_feedback_created` (`created_at`)' }],
   },
+  {
+    table: 'member_change_requests',
+    marathiLabel: 'सदस्य फोटो व माहिती बदल विनंत्या (member_change_requests)',
+    primaryKey: 'id',
+    columns: [
+      { name: 'id', definition: 'VARCHAR(128) NOT NULL' },
+      { name: 'application_id', definition: 'VARCHAR(128) NOT NULL' },
+      { name: 'member_number', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
+      { name: 'applicant_name', definition: "VARCHAR(255) NOT NULL DEFAULT ''" },
+      { name: 'applicant_phone', definition: "VARCHAR(32) NOT NULL DEFAULT ''" },
+      { name: 'applicant_district', definition: "VARCHAR(128) NOT NULL DEFAULT ''" },
+      { name: 'current_snapshot_json', definition: 'LONGTEXT NULL' },
+      { name: 'proposed_changes_json', definition: 'LONGTEXT NULL' },
+      { name: 'reason', definition: 'TEXT NULL' },
+      { name: 'status', definition: "ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending'" },
+      { name: 'reviewed_by', definition: "VARCHAR(191) NOT NULL DEFAULT ''" },
+      { name: 'review_note', definition: 'TEXT NULL' },
+      { name: 'created_at', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
+      { name: 'reviewed_at', definition: "VARCHAR(64) NOT NULL DEFAULT ''" },
+    ],
+    indexes: [
+      { name: 'idx_mcr_application_id', definition: 'INDEX `idx_mcr_application_id` (`application_id`)' },
+      { name: 'idx_mcr_status', definition: 'INDEX `idx_mcr_status` (`status`)' },
+      { name: 'idx_mcr_created_at', definition: 'INDEX `idx_mcr_created_at` (`created_at`)' },
+    ],
+  },
 ];
 
 export function buildCreateTableSql(spec: MysqlTableSpec): string {

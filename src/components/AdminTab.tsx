@@ -109,6 +109,7 @@ import { MembershipIdCardPreview } from './MembershipIdCardPreview';
 import { AdminBackupRestorePanel } from './AdminBackupRestorePanel';
 import { AdminWhatsappBroadcastPanel } from './AdminWhatsappBroadcastPanel';
 import { AdminPushNotificationPanel } from './AdminPushNotificationPanel';
+import { AdminMemberChangeRequestsPanel } from './AdminMemberChangeRequestsPanel';
 import {
   authApiRequest,
   sqlApiRequest,
@@ -205,6 +206,7 @@ const DYNAMIC_LEADERSHIP_STORAGE_KEY = 'mahasangh_dynamic_leadership_v1';
 type AdminSubTabKey =
   | 'applications'
   | 'edit_members'
+  | 'member_change_requests'
   | 'leadership'
   | 'district_leadership'
   | 'master_studio'
@@ -413,6 +415,7 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   // Logged-in admin user information & RBAC permissions
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => initialPersistedAdmin);
   const [adminUsersList, setAdminUsersList] = useState<AdminUser[]>([]);
+  const [pendingMemberChangeRequestsCount, setPendingMemberChangeRequestsCount] = useState<number>(0);
 
   // First Login Password Creation State (when a sub-admin logs in for the first time)
   const [isFirstLoginMode, setIsFirstLoginMode] = useState(false);
@@ -1912,6 +1915,29 @@ export const AdminTab: React.FC<AdminTabProps> = ({
     };
   }, []);
 
+  // Load pending Member Change Requests count for Super Admin & editMembers Sub-Admins
+  useEffect(() => {
+    if (!isLoggedIn || !(currentUser?.isSuperAdmin || currentUser?.permissions?.editMembers)) {
+      setPendingMemberChangeRequestsCount(0);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/member-change-requests', {
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.counts) {
+          setPendingMemberChangeRequestsCount(Number(data.counts.pending || 0));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, currentUser]);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2973,6 +2999,14 @@ export const AdminTab: React.FC<AdminTabProps> = ({
       allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.editMembers),
     },
     {
+      key: 'member_change_requests',
+      label: 'Update Requests',
+      shortLabel: 'Updates',
+      icon: <Edit3 className="w-4 h-4 shrink-0 text-amber-600" />,
+      badge: pendingMemberChangeRequestsCount > 0 ? pendingMemberChangeRequestsCount : undefined,
+      allowed: Boolean(currentUser?.isSuperAdmin || currentUser?.permissions.editMembers),
+    },
+    {
       key: 'leadership',
       label: 'State Leaders',
       shortLabel: 'State',
@@ -3990,6 +4024,37 @@ export const AdminTab: React.FC<AdminTabProps> = ({
                 isLoadingApps={isLoadingApps}
               />
             )}
+
+            {/* Sub-tab 1C: On-Demand Member Photo & Profile Change Requests */}
+            {activeAdminSubTab === 'member_change_requests' &&
+              (currentUser?.isSuperAdmin || currentUser?.permissions.editMembers) && (
+                <AdminMemberChangeRequestsPanel
+                  isSuperAdmin={Boolean(currentUser?.isSuperAdmin)}
+                  onPendingCountChange={setPendingMemberChangeRequestsCount}
+                  onMemberApproved={async () => {
+                    if (onFetchApplications) {
+                      await onFetchApplications(true);
+                    }
+                    if (currentUser?.isSuperAdmin) {
+                      try {
+                        const freshLeaders = await fetchDynamicLeaders(true);
+                        if (freshLeaders && freshLeaders.length > 0) {
+                          const normalized = normalizeDynamicLeadersList(freshLeaders);
+                          setDynamicLeaders(normalized);
+                          safeStorageSetItem(
+                            typeof localStorage !== 'undefined' ? localStorage : null,
+                            DYNAMIC_LEADERSHIP_STORAGE_KEY,
+                            JSON.stringify(normalized)
+                          );
+                          window.dispatchEvent(
+                            new CustomEvent('mahasangh_leadership_updated', { detail: normalized })
+                          );
+                        }
+                      } catch {}
+                    }
+                  }}
+                />
+              )}
 
             {/* Sub-tab 2: State Leadership Management (राज्य पदाधिकारी) */}
             {activeAdminSubTab === 'leadership' && (currentUser?.isSuperAdmin || currentUser?.permissions.manageLeadership) && (

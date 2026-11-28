@@ -39,6 +39,7 @@ import { initiateRazorpayPayment } from '../utils/razorpay';
 import { uploadCompressedPhotoToCloudinaryOrFallback } from '../utils/cloudinary';
 import { deriveGenderFromSalutation } from '../utils/memberGender';
 import { PassportPhotoCropperModal } from './PassportPhotoCropperModal';
+import { MemberChangeRequestModal } from './MemberChangeRequestModal';
 
 interface MembershipTabProps {
   onAddApplication: (
@@ -136,6 +137,13 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
   const formSectionRef = useRef<HTMLDivElement | null>(null);
   const [activeJumpTab, setActiveJumpTab] = useState<'directory' | 'track' | 'register'>('directory');
   const initialTrackRanRef = useRef<boolean>(false);
+  const [showChangeRequestModal, setShowChangeRequestModal] = useState<boolean>(false);
+  const [changeEligibility, setChangeEligibility] = useState<{
+    eligible: boolean;
+    hasPending: boolean;
+    cooldownDaysRemaining: number;
+    lastRejectedNote?: string;
+  } | null>(null);
 
   const handleStartRazorpayCheckout = (app: MembershipApplication) => {
     setIsRazorpayLoading(true);
@@ -235,6 +243,41 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
       setSearchResult(null);
     }
   }, [allOfficials, allLeaders, lastTrackedQuery, searchResult]);
+
+  // Quietly check on-demand profile/photo change request eligibility when an approved member views Track Status
+  useEffect(() => {
+    if (!searchResult || searchResult === 'not_found' || searchResult.status !== 'approved') {
+      setChangeEligibility(null);
+      return;
+    }
+    let cancelled = false;
+    fetch('/api/member-change-requests/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applicationId: searchResult.id,
+        memberNumber: searchResult.memberNumber,
+        phone: searchResult.phone,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.eligibility) {
+          setChangeEligibility({
+            eligible: Boolean(data.eligibility.eligible),
+            hasPending: Boolean(data.eligibility.hasPending),
+            cooldownDaysRemaining: Number(data.eligibility.cooldownDaysRemaining || 0),
+            lastRejectedNote: String(data.eligibility.lastRejectedNote || ''),
+          });
+        }
+      })
+      .catch(() => {
+        // Leave subtle default link available if status probe fails transiently
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchResult]);
 
   // Auto-run lookup if landed via ?track=... link (e.g. from approval email)
   useEffect(() => {
@@ -995,6 +1038,36 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
                               : 'पदाधिकारी आय-कार्ड डाऊनलोड (PDF)'}
                           </span>
                         </button>
+                      )}
+                    </div>
+
+                    {/* Discreet on-demand member photo/details correction link (kept understated for genuine needs only) */}
+                    <div className="pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+                      {changeEligibility?.hasPending ? (
+                        <span>
+                          आपली फोटो/माहिती दुरुस्ती विनंती सध्या अ‍ॅडमिन मंजुरीसाठी प्रलंबित आहे.
+                        </span>
+                      ) : changeEligibility && changeEligibility.cooldownDaysRemaining > 0 ? (
+                        <span className="tabular-nums">
+                          माहिती दुरुस्ती नुकतीच मंजूर झाली आहे — पुढील विनंती{' '}
+                          {toEnglishDigits(changeEligibility.cooldownDaysRemaining)} दिवसांनंतर करता येईल.
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                          <span>फोटो किंवा माहितीमध्ये चूक आहे का?</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowChangeRequestModal(true)}
+                            className="text-[#193568] hover:text-amber-700 underline underline-offset-2 font-semibold cursor-pointer"
+                          >
+                            दुरुस्ती विनंती पाठवा
+                          </button>
+                          {changeEligibility?.lastRejectedNote && (
+                            <span className="text-rose-700">
+                              · मागील शेरा: {changeEligibility.lastRejectedNote}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2031,6 +2104,23 @@ export const MembershipTab: React.FC<MembershipTabProps> = ({
             </div>
           </div>
         )}
+
+        {showChangeRequestModal &&
+          searchResult &&
+          searchResult !== 'not_found' &&
+          searchResult.status === 'approved' && (
+            <MemberChangeRequestModal
+              member={searchResult}
+              onClose={() => setShowChangeRequestModal(false)}
+              onSubmitted={() => {
+                setChangeEligibility({
+                  eligible: false,
+                  hasPending: true,
+                  cooldownDaysRemaining: 0,
+                });
+              }}
+            />
+          )}
       </div>
     </div>
   );
