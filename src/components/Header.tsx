@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { ORG_DETAILS } from '../data/mahasanghData';
 import { HeaderPushBellButton } from './PushNotificationPrompt';
+import { resolveTabFromLocation } from '../utils/routes';
 
 interface HeaderProps {
   currentTab: string;
@@ -93,8 +94,13 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
           </span>
         </button>
 
-        {/* Right: Subtle Push Notification Bell Toggle (also balances centered title) */}
-        <HeaderPushBellButton />
+        {/* Right: Notification Center Inbox with Unread Count Badge */}
+        <HeaderPushBellButton
+          onNavigatePath={(path) => {
+            const targetTab = resolveTabFromLocation(path, '');
+            handleNavClick(targetTab);
+          }}
+        />
       </div>
 
       {/* 2. Submenu Bar (सब मेनू पट्टी - आकर्षक, ठळक अक्षरे व सुंदर रंगसंगती) */}

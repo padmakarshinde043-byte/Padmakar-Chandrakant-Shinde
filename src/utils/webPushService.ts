@@ -274,6 +274,25 @@ async function appendPushBroadcastLog(item: PushBroadcastLogItem): Promise<void>
   }
 }
 
+export interface PublicPushNotificationItem {
+  id: string;
+  title: string;
+  body: string;
+  url: string;
+  createdAt: string;
+}
+
+export async function getPublicPushNotifications(): Promise<PublicPushNotificationItem[]> {
+  const logs = await loadPushBroadcastLogs();
+  return logs.map((item) => ({
+    id: String(item.id || ''),
+    title: String(item.title || ''),
+    body: String(item.body || ''),
+    url: sanitizePushTargetUrl(item.url),
+    createdAt: String(item.createdAt || ''),
+  }));
+}
+
 export async function getPushStats(): Promise<{
   subscriberCount: number;
   vapidConfigured: boolean;

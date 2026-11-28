@@ -144,6 +144,7 @@ export const AdminPushNotificationPanel: React.FC = () => {
       });
       setTitle('');
       setBody('');
+      window.dispatchEvent(new CustomEvent('mahasangh_push_inbox_refresh'));
       await loadStats();
     } catch (err: any) {
       setStatusMsg({ text: err?.message || 'सर्व्हर त्रुटी.', type: 'error' });

@@ -139,6 +139,7 @@ import {
   getVapidPublicKey,
   upsertPushSubscription,
   removePushSubscription,
+  getPublicPushNotifications,
   getPushStats,
   sendPushBroadcast,
 } from './src/utils/webPushService';
@@ -2181,6 +2182,16 @@ app.post('/api/push/unsubscribe', appSubmitLimiter, async (req, res) => {
     res.json({ status: 'success', ...result });
   } catch (err: any) {
     res.status(400).json({ status: 'error', message: err?.message || 'Unsubscribe failed' });
+  }
+});
+
+app.get('/api/push/inbox', async (_req, res) => {
+  try {
+    const notifications = await getPublicPushNotifications();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ status: 'ok', notifications });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', message: err?.message || 'Unable to load notifications' });
   }
 });
 
