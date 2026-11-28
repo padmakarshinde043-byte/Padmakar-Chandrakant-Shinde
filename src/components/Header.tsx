@@ -11,6 +11,8 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPrefetchTab }) => {
   const scrollNavRef = useRef<HTMLDivElement | null>(null);
+  const logoTapCountRef = useRef<number>(0);
+  const logoTapTimerRef = useRef<number | null>(null);
 
   const navItems = [
     { id: 'home', label: 'मुख्यपृष्ठ' },
@@ -32,6 +34,45 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  useEffect(() => {
+    return () => {
+      if (logoTapTimerRef.current !== null) {
+        window.clearTimeout(logoTapTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Secret 5-tap gesture on the Mahasangh emblem logo opens Admin Login in the same browser/TWA app
+  const handleLogoClick = () => {
+    if (logoTapTimerRef.current !== null) {
+      window.clearTimeout(logoTapTimerRef.current);
+    }
+
+    const nextCount = logoTapCountRef.current + 1;
+    logoTapCountRef.current = nextCount;
+
+    if (nextCount === 3) {
+      onPrefetchTab?.('admin');
+    }
+
+    if (nextCount >= 5) {
+      logoTapCountRef.current = 0;
+      logoTapTimerRef.current = null;
+      setCurrentTab('admin');
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      return;
+    }
+
+    logoTapTimerRef.current = window.setTimeout(() => {
+      logoTapCountRef.current = 0;
+      logoTapTimerRef.current = null;
+    }, 2500);
+
+    if (nextCount === 1 && currentTab !== 'home') {
+      handleNavClick('home');
+    }
+  };
+
   // Keep active mobile item in view when tab changes
   useEffect(() => {
     if (scrollNavRef.current) {
@@ -48,8 +89,9 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, setCurrentTab, onPre
       <div className="max-w-[1240px] mx-auto px-2 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-1.5 sm:gap-4">
         {/* Left: Official Organization Emblem Logo */}
         <button
-          onClick={() => handleNavClick('home')}
-          className="flex items-center group focus:outline-none shrink-0"
+          type="button"
+          onClick={handleLogoClick}
+          className="flex items-center group focus:outline-none shrink-0 touch-manipulation select-none cursor-pointer"
           aria-label="महासंघ मुख्यपृष्ठ"
         >
           <div className="relative">
